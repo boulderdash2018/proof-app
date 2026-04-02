@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User, SignupData } from '../types';
 import { firebaseAuthService } from '../services/firebaseAuth';
+import { trackEvent, identifyUser, resetUser } from '../services/posthogConfig';
 
 interface AuthStore {
   user: User | null;
@@ -24,8 +25,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const user = await firebaseAuthService.login(email, password);
       set({ user, isAuthenticated: true, isLoading: false });
+
+      // Track login event
+      trackEvent('user_login', { email });
+      identifyUser(user.id, { email: user.id });
     } catch (error: any) {
       set({ isLoading: false });
+      trackEvent('login_failed', { email });
       throw error;
     }
   },
@@ -35,14 +41,21 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const user = await firebaseAuthService.signup(data);
       set({ user, isAuthenticated: true, isLoading: false });
+
+      // Track signup event
+      trackEvent('user_signup', { email: data.email });
+      identifyUser(user.id, { email: user.id });
     } catch (error: any) {
       set({ isLoading: false });
+      trackEvent('signup_failed', { email: data.email });
       throw error;
     }
   },
 
   logout: async () => {
     set({ user: null, isAuthenticated: false });
+    trackEvent('user_logout');
+    resetUser();
   },
 
   updateProfile: async (data: Partial<User>) => {
