@@ -17,6 +17,7 @@ import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { CategoryTag, TransportMode, Place } from '../types';
 import mockApi from '../services/mockApi';
+import { trackEvent } from '../services/posthogConfig';
 
 const TRANSPORT_OPTIONS: TransportMode[] = ['Métro', 'Vélo', 'À pied', 'Voiture', 'Trottinette'];
 
@@ -114,6 +115,15 @@ export const CreateScreen: React.FC = () => {
         duration,
         transport: transport!,
       });
+
+      // Track plan creation
+      trackEvent('plan_created', {
+        title,
+        tags_count: selectedTags.length,
+        places_count: places.length,
+        transport,
+      });
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSuccess(true);
     } catch {

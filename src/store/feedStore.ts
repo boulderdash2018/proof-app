@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Plan } from '../types';
 import mockApi from '../services/mockApi';
+import analytics from '../services/analyticsUtils';
 
 interface FeedStore {
   plans: Plan[];
@@ -45,13 +46,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const { likedPlanIds, plans } = get();
     const newLiked = new Set(likedPlanIds);
     const isLiked = newLiked.has(planId);
+    const plan = plans.find((p) => p.id === planId);
 
     if (isLiked) {
       newLiked.delete(planId);
       mockApi.unlikePlan(planId);
+      analytics.planUnliked(planId);
     } else {
       newLiked.add(planId);
       mockApi.likePlan(planId);
+      if (plan) {
+        analytics.planLiked(planId, plan.title, plan.authorId);
+      }
     }
 
     const updatedPlans = plans.map((p) =>
@@ -64,15 +70,20 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   toggleSave: (planId: string) => {
-    const { savedPlanIds } = get();
+    const { savedPlanIds, plans } = get();
     const newSaved = new Set(savedPlanIds);
+    const plan = plans.find((p) => p.id === planId);
 
     if (newSaved.has(planId)) {
       newSaved.delete(planId);
       mockApi.unsavePlan(planId);
+      analytics.planUnsaved(planId);
     } else {
       newSaved.add(planId);
       mockApi.savePlan(planId);
+      if (plan) {
+        analytics.planSaved(planId, plan.title);
+      }
     }
 
     set({ savedPlanIds: newSaved });
