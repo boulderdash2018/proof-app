@@ -1,0 +1,37 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Colors } from '../constants';
+
+interface PtsPillProps {
+  points: number;
+  label?: string;
+}
+
+export const PtsPill: React.FC<PtsPillProps> = ({ points, label }) => (
+  <View style={styles.pill}>
+    <Text style={styles.star}>⭐</Text>
+    <Text style={styles.text}>{label || `${points} XP pts`}</Text>
+  </View>
+);
+
+const styles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.goldBg,
+    borderWidth: 1,
+    borderColor: Colors.goldBorder,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  star: {
+    fontSize: 11,
+  },
+  text: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.gold,
+  },
+});

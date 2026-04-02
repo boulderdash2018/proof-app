@@ -1,0 +1,31 @@
+export const Colors = {
+  primary: '#FF6B35',
+  black: '#111111',
+  white: '#FFFFFF',
+  success: '#0F9B68',
+  successBg: '#EDFAF5',
+  successBorder: '#B8EDD8',
+  error: '#FF3B30',
+  errorBg: '#FFF0F0',
+  purple: '#534AB7',
+  purpleBg: '#F0EEFF',
+  gold: '#B07800',
+  goldBg: '#FFF8E6',
+  goldBorder: '#FFE099',
+  pink: '#D4537E',
+  pinkBg: '#FFF0F5',
+
+  gray100: '#F8F8F8',
+  gray200: '#F5F5F5',
+  gray300: '#F0F0F0',
+  gray400: '#EEEEEE',
+  gray500: '#CCCCCC',
+  gray600: '#AAAAAA',
+  gray700: '#888888',
+  gray800: '#555555',
+
+  border: '#EEEEEE',
+  borderLight: '#F5F5F5',
+
+  unreadBg: '#FFF8F5',
+} as const;
