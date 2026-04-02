@@ -161,6 +161,7 @@ export const ExploreScreen: React.FC = () => {
         <>
           <Text style={styles.sectionLabel}>CATÉGORIES</Text>
           <FlatList
+            key="categories-grid"
             data={CATEGORIES}
             renderItem={renderCategoryCard}
             keyExtractor={(item) => item.name}
@@ -177,6 +178,7 @@ export const ExploreScreen: React.FC = () => {
             </Text>
           </View>
           <FlatList
+            key="user-results"
             data={userResults}
             renderItem={renderUserResult}
             keyExtractor={(item) => item.id}
@@ -215,6 +217,7 @@ export const ExploreScreen: React.FC = () => {
           </View>
 
           <FlatList
+            key="plan-results"
             data={filteredPlans}
             renderItem={renderCompactPlan}
             keyExtractor={(item) => item.id}

@@ -12,7 +12,7 @@ export interface User {
   username: string;
   displayName: string;
   initials: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
   avatarBg: string;
   avatarColor: string;
   badgeType: BadgeType;

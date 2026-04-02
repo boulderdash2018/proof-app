@@ -29,7 +29,7 @@ const newUserDefaults = (fbUser: FirebaseUser): User => {
     username: email.split('@')[0],
     displayName,
     initials,
-    avatarUrl: fbUser.photoURL || undefined,
+    avatarUrl: fbUser.photoURL || null,
     avatarBg: '#E8E8E8',
     avatarColor: '#666666',
     badgeType: 'novice',
@@ -48,10 +48,11 @@ const newUserDefaults = (fbUser: FirebaseUser): User => {
   };
 };
 
-// Save user profile to Firestore
+// Save user profile to Firestore (strip undefined values)
 const saveUserProfile = async (user: User): Promise<void> => {
   const { id, ...data } = user;
-  await setDoc(doc(db, 'users', id), data);
+  const clean = JSON.parse(JSON.stringify(data));
+  await setDoc(doc(db, 'users', id), clean);
 };
 
 // Load user profile from Firestore, or create it if it doesn't exist
