@@ -17,6 +17,7 @@ import { useAuthStore } from '../store';
 export const SignupScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const signup = useAuthStore((s) => s.signup);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
 
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,6 +25,7 @@ export const SignupScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = (): boolean => {
@@ -146,7 +148,17 @@ export const SignupScreen: React.FC = () => {
           <SecondaryButton
             label="Continuer avec Google"
             icon="🔵"
-            onPress={() => {}}
+            onPress={async () => {
+              setGoogleLoading(true);
+              try {
+                await loginWithGoogle();
+              } catch (err: any) {
+                setErrors({ email: err.message || 'Erreur Google' });
+              } finally {
+                setGoogleLoading(false);
+              }
+            }}
+            loading={googleLoading}
           />
 
           <View style={styles.bottomRow}>

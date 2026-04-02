@@ -17,10 +17,12 @@ import { useAuthStore } from '../store';
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const login = useAuthStore((s) => s.login);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const validate = (): boolean => {
@@ -106,7 +108,17 @@ export const LoginScreen: React.FC = () => {
           <SecondaryButton
             label="Continuer avec Google"
             icon="🔵"
-            onPress={() => {}}
+            onPress={async () => {
+              setGoogleLoading(true);
+              try {
+                await loginWithGoogle();
+              } catch (err: any) {
+                setErrors({ password: err.message || 'Erreur Google' });
+              } finally {
+                setGoogleLoading(false);
+              }
+            }}
+            loading={googleLoading}
           />
 
           <View style={styles.bottomRow}>

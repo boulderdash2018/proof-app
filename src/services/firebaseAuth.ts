@@ -1,6 +1,8 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   setPersistence,
   browserLocalPersistence,
@@ -101,6 +103,22 @@ export const firebaseAuthService = {
         }
       });
     });
+  },
+
+  signInWithGoogle: async (): Promise<User> => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const { user: fbUser } = await signInWithPopup(auth, provider);
+      return convertFirebaseUser(fbUser);
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Connexion annulée');
+      }
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error('Le popup a été bloqué par le navigateur');
+      }
+      throw new Error(error.message || 'Erreur lors de la connexion Google');
+    }
   },
 
   onAuthStateChange: (callback: (user: User | null) => void) => {

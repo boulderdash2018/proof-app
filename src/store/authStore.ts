@@ -8,6 +8,7 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   signup: (data: SignupData) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
@@ -32,6 +33,20 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (error: any) {
       set({ isLoading: false });
       trackEvent('login_failed', { email });
+      throw error;
+    }
+  },
+
+  loginWithGoogle: async () => {
+    set({ isLoading: true });
+    try {
+      const user = await firebaseAuthService.signInWithGoogle();
+      set({ user, isAuthenticated: true, isLoading: false });
+      trackEvent('user_login_google', { email: user.username });
+      identifyUser(user.id, { email: user.id });
+    } catch (error: any) {
+      set({ isLoading: false });
+      trackEvent('login_google_failed');
       throw error;
     }
   },
