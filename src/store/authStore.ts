@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User, SignupData } from '../types';
-import mockApi from '../services/mockApi';
+import { firebaseAuthService } from '../services/firebaseAuth';
 
 interface AuthStore {
   user: User | null;
@@ -22,22 +22,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   login: async (email: string, password: string) => {
     set({ isLoading: true });
     try {
-      const user = await mockApi.login(email, password);
+      const user = await firebaseAuthService.login(email, password);
       set({ user, isAuthenticated: true, isLoading: false });
-    } catch {
+    } catch (error: any) {
       set({ isLoading: false });
-      throw new Error('Identifiants incorrects');
+      throw error;
     }
   },
 
   signup: async (data: SignupData) => {
     set({ isLoading: true });
     try {
-      const user = await mockApi.signup(data);
+      const user = await firebaseAuthService.signup(data);
       set({ user, isAuthenticated: true, isLoading: false });
-    } catch {
+    } catch (error: any) {
       set({ isLoading: false });
-      throw new Error("Erreur lors de l'inscription");
+      throw error;
     }
   },
 
@@ -53,9 +53,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   loadSession: async () => {
     set({ isLoading: true });
     try {
-      // Simulate checking stored session
-      const user = await mockApi.getCurrentUser();
-      set({ user, isAuthenticated: true, isLoading: false });
+      const user = await firebaseAuthService.getCurrentUser();
+      if (user) {
+        set({ user, isAuthenticated: true, isLoading: false });
+      } else {
+        set({ user: null, isAuthenticated: false, isLoading: false });
+      }
     } catch {
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
