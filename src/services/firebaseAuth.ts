@@ -9,11 +9,12 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from './firebaseConfig';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from './firebaseConfig';
 import { User, SignupData } from '../types';
 
-// Convert Firebase user to our User type
-const convertFirebaseUser = (fbUser: FirebaseUser): User => {
+// Default values for a new user
+const newUserDefaults = (fbUser: FirebaseUser): User => {
   const email = fbUser.email || '';
   const displayName = fbUser.displayName || email.split('@')[0];
   const initials = displayName
@@ -47,6 +48,34 @@ const convertFirebaseUser = (fbUser: FirebaseUser): User => {
   };
 };
 
+// Save user profile to Firestore
+const saveUserProfile = async (user: User): Promise<void> => {
+  const { id, ...data } = user;
+  await setDoc(doc(db, 'users', id), data);
+};
+
+// Load user profile from Firestore, or create it if it doesn't exist
+const loadUserProfile = async (fbUser: FirebaseUser): Promise<User> => {
+  const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+
+  if (userDoc.exists()) {
+    // User exists in Firestore — load their saved data
+    const data = userDoc.data();
+    return { id: fbUser.uid, ...data } as User;
+  } else {
+    // First time (e.g. Google sign-in) — create profile with defaults
+    const user = newUserDefaults(fbUser);
+    await saveUserProfile(user);
+    return user;
+  }
+};
+
+// Update specific fields in Firestore
+export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<void> => {
+  const { id, ...fields } = data as any;
+  await updateDoc(doc(db, 'users', userId), fields);
+};
+
 // Set persistence to local (keep user logged in)
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
@@ -59,12 +88,13 @@ export const firebaseAuthService = {
         data.password
       );
 
-      // Update display name
-      // await updateProfile(fbUser, {
-      //   displayName: `${data.firstName} ${data.lastName}`,
-      // });
+      // Create user with defaults and save to Firestore
+      const user = newUserDefaults(fbUser);
+      user.displayName = data.firstName;
+      user.initials = data.firstName.charAt(0).toUpperCase();
+      await saveUserProfile(user);
 
-      return convertFirebaseUser(fbUser);
+      return user;
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         throw new Error('Cet email est déjà utilisé');
@@ -79,7 +109,7 @@ export const firebaseAuthService = {
   login: async (email: string, password: string): Promise<User> => {
     try {
       const { user: fbUser } = await signInWithEmailAndPassword(auth, email, password);
-      return convertFirebaseUser(fbUser);
+      return await loadUserProfile(fbUser);
     } catch (error: any) {
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         throw new Error('Email ou mot de passe incorrect');
@@ -94,10 +124,10 @@ export const firebaseAuthService = {
 
   getCurrentUser: async (): Promise<User | null> => {
     return new Promise((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
         unsubscribe();
         if (fbUser) {
-          resolve(convertFirebaseUser(fbUser));
+          resolve(await loadUserProfile(fbUser));
         } else {
           resolve(null);
         }
@@ -109,7 +139,8 @@ export const firebaseAuthService = {
     try {
       const provider = new GoogleAuthProvider();
       const { user: fbUser } = await signInWithPopup(auth, provider);
-      return convertFirebaseUser(fbUser);
+      // loadUserProfile will create the profile if it's a new Google user
+      return await loadUserProfile(fbUser);
     } catch (error: any) {
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('Connexion annulée');
@@ -122,9 +153,9 @@ export const firebaseAuthService = {
   },
 
   onAuthStateChange: (callback: (user: User | null) => void) => {
-    return onAuthStateChanged(auth, (fbUser) => {
+    return onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
-        callback(convertFirebaseUser(fbUser));
+        callback(await loadUserProfile(fbUser));
       } else {
         callback(null);
       }

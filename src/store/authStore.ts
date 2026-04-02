@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User, SignupData } from '../types';
-import { firebaseAuthService } from '../services/firebaseAuth';
+import { firebaseAuthService, updateUserProfile } from '../services/firebaseAuth';
 import { trackEvent, identifyUser, resetUser } from '../services/posthogConfig';
 
 interface AuthStore {
@@ -74,8 +74,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   updateProfile: async (data: Partial<User>) => {
-    const updated = await mockApi.updateProfile(data);
-    set({ user: updated });
+    const currentUser = get().user;
+    if (!currentUser) return;
+    await updateUserProfile(currentUser.id, data);
+    set({ user: { ...currentUser, ...data } });
   },
 
   loadSession: async () => {
