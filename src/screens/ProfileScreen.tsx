@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout } from '../constants';
 import { Avatar } from '../components';
-import { useAuthStore } from '../store';
+import { useAuthStore, useFriendsStore } from '../store';
 import { Badge, BadgeId } from '../types';
 import mockApi from '../services/mockApi';
 
@@ -28,6 +28,7 @@ export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
+  const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
   const [badges, setBadges] = useState<Badge[]>([]);
   const [userPlans, setUserPlans] = useState<any[]>([]);
 
@@ -35,6 +36,7 @@ export const ProfileScreen: React.FC = () => {
     if (user) {
       mockApi.getBadges(user.unlockedBadges).then(setBadges);
       mockApi.getUserPlans(user.id).then(setUserPlans);
+      fetchIncomingRequests(user.id);
     }
   }, [user]);
 
@@ -53,9 +55,19 @@ export const ProfileScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mon profil</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => navigation.navigate('FriendRequests')} style={styles.friendReqBtn}>
+            <Text style={styles.friendReqIcon}>👥</Text>
+            {incomingRequests.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{incomingRequests.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -183,6 +195,22 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.borderLight,
   },
   headerTitle: { fontSize: 21, fontWeight: '800', color: Colors.black, letterSpacing: -0.5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center' },
+  friendReqBtn: { marginRight: 16, position: 'relative' },
+  friendReqIcon: { fontSize: 22 },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { color: Colors.white, fontSize: 9, fontWeight: '800' },
   settingsIcon: { fontSize: 22 },
   scroll: { paddingBottom: 30 },
   hero: {

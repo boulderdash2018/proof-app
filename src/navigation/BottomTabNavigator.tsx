@@ -24,6 +24,7 @@ import { NotificationsSettingsScreen } from '../screens/NotificationsSettingsScr
 import { PrivacySettingsScreen } from '../screens/PrivacySettingsScreen';
 import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
+import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
 
 // Feed Stack
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
@@ -39,6 +40,7 @@ const ExploreStack = createNativeStackNavigator<ExploreStackParamList>();
 const ExploreStackNavigator: React.FC = () => (
   <ExploreStack.Navigator screenOptions={{ headerShown: false }}>
     <ExploreStack.Screen name="Explore" component={ExploreScreen} />
+    <ExploreStack.Screen name="OtherProfile" component={OtherProfileScreen} />
   </ExploreStack.Navigator>
 );
 
@@ -66,6 +68,7 @@ const ProfileStackNavigator: React.FC = () => (
     <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
     <ProfileStack.Screen name="Followers" component={FollowersScreen} />
     <ProfileStack.Screen name="Following" component={FollowingScreen} />
+    <ProfileStack.Screen name="FriendRequests" component={FriendRequestsScreen} />
     <ProfileStack.Screen name="Settings" component={SettingsScreen} />
     <ProfileStack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
     <ProfileStack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />

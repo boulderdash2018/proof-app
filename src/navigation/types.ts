@@ -16,6 +16,7 @@ export type FeedStackParamList = {
 
 export type ExploreStackParamList = {
   Explore: undefined;
+  OtherProfile: { userId: string };
 };
 
 export type CreateStackParamList = {
@@ -31,6 +32,7 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   Followers: { userId: string };
   Following: { userId: string };
+  FriendRequests: undefined;
   Settings: undefined;
   NotificationsSettings: undefined;
   PrivacySettings: undefined;

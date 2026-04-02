@@ -106,3 +106,13 @@ export interface SignupData {
   email: string;
   password: string;
 }
+
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  fromUser?: User;
+  toUser?: User;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+}
