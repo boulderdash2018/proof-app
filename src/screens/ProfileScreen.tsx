@@ -18,6 +18,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { Badge, BadgeId } from '../types';
 import mockApi from '../services/mockApi';
 import { getFriendIds } from '../services/friendsService';
+import { fetchUserPlans } from '../services/plansService';
 
 const { width } = Dimensions.get('window');
 const MINI_CARD_W = (width - Layout.screenPadding * 2 - 8) / 2;
@@ -42,10 +43,10 @@ export const ProfileScreen: React.FC = () => {
   useEffect(() => {
     if (user) {
       mockApi.getBadges(user.unlockedBadges).then(setBadges);
-      mockApi.getUserPlans(user.id).then(setUserPlans);
+      fetchUserPlans(user.id).then(setUserPlans);
       fetchIncomingRequests(user.id);
       getFriendIds(user.id).then(ids => setFriendCount(ids.length));
-      fetchSaves();
+      fetchSaves(user.id);
     }
   }, [user]);
 
@@ -55,8 +56,8 @@ export const ProfileScreen: React.FC = () => {
       if (user) {
         getFriendIds(user.id).then(ids => setFriendCount(ids.length));
         fetchIncomingRequests(user.id);
-        mockApi.getUserPlans(user.id).then(setUserPlans);
-        fetchSaves();
+        fetchUserPlans(user.id).then(setUserPlans);
+        fetchSaves(user.id);
       }
     }, [user])
   );

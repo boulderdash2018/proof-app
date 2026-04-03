@@ -10,6 +10,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
 import { useAuthStore, useFriendsStore } from '../store';
 import { getUserById, getFriendshipStatus, getPendingRequestId, getFriendIds } from '../services/friendsService';
+import { fetchUserPlans } from '../services/plansService';
 import mockApi from '../services/mockApi';
 
 type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
@@ -56,7 +57,7 @@ export const OtherProfileScreen: React.FC = () => {
         setPendingRequestId(reqId);
       }
     });
-    mockApi.getUserPlans(userId).then(setUserPlans);
+    fetchUserPlans(userId).then(setUserPlans);
     refreshCounts();
   }, [userId, currentUser]);
 

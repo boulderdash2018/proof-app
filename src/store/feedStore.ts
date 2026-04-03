@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { Plan, SavedPlan } from '../types';
-import mockApi from '../services/mockApi';
 import analytics from '../services/analyticsUtils';
+import {
+  fetchFeedPlans,
+  fetchLikedPlanIds,
+  fetchSavedPlanIds,
+  toggleLikePlan,
+  savePlan as savePlanFS,
+  unsavePlan as unsavePlanFS,
+} from '../services/plansService';
 import { useSavesStore } from './savesStore';
 
 interface FeedStore {
@@ -10,7 +17,8 @@ interface FeedStore {
   isRefreshing: boolean;
   likedPlanIds: Set<string>;
   savedPlanIds: Set<string>;
-  fetchFeed: () => Promise<void>;
+  currentUserId: string | null;
+  fetchFeed: (userId?: string) => Promise<void>;
   refreshFeed: () => Promise<void>;
   addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
@@ -22,23 +30,49 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   isLoading: false,
   isRefreshing: false,
   likedPlanIds: new Set<string>(),
-  savedPlanIds: new Set<string>(['plan-2', 'plan-3']),
+  savedPlanIds: new Set<string>(),
+  currentUserId: null,
 
-  fetchFeed: async () => {
+  fetchFeed: async (userId?: string) => {
     set({ isLoading: true });
     try {
-      const plans = await mockApi.getFeed();
-      set({ plans, isLoading: false });
-    } catch {
+      const plans = await fetchFeedPlans();
+      const updates: Partial<FeedStore> = { plans, isLoading: false };
+
+      if (userId) {
+        updates.currentUserId = userId;
+        const [likedIds, savedIds] = await Promise.all([
+          fetchLikedPlanIds(userId),
+          fetchSavedPlanIds(userId),
+        ]);
+        updates.likedPlanIds = likedIds;
+        updates.savedPlanIds = savedIds;
+      }
+
+      set(updates as any);
+    } catch (err) {
+      console.error('fetchFeed error:', err);
       set({ isLoading: false });
     }
   },
 
   refreshFeed: async () => {
+    const { currentUserId } = get();
     set({ isRefreshing: true });
     try {
-      const plans = await mockApi.getFeed();
-      set({ plans, isRefreshing: false });
+      const plans = await fetchFeedPlans();
+      const updates: Partial<FeedStore> = { plans, isRefreshing: false };
+
+      if (currentUserId) {
+        const [likedIds, savedIds] = await Promise.all([
+          fetchLikedPlanIds(currentUserId),
+          fetchSavedPlanIds(currentUserId),
+        ]);
+        updates.likedPlanIds = likedIds;
+        updates.savedPlanIds = savedIds;
+      }
+
+      set(updates as any);
     } catch {
       set({ isRefreshing: false });
     }
@@ -50,21 +84,19 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   toggleLike: (planId: string) => {
-    const { likedPlanIds, plans } = get();
+    const { likedPlanIds, plans, currentUserId } = get();
+    if (!currentUserId) return;
+
     const newLiked = new Set(likedPlanIds);
     const isLiked = newLiked.has(planId);
     const plan = plans.find((p) => p.id === planId);
 
     if (isLiked) {
       newLiked.delete(planId);
-      mockApi.unlikePlan(planId);
       analytics.planUnliked(planId);
     } else {
       newLiked.add(planId);
-      mockApi.likePlan(planId);
-      if (plan) {
-        analytics.planLiked(planId, plan.title, plan.authorId);
-      }
+      if (plan) analytics.planLiked(planId, plan.title, plan.authorId);
     }
 
     const updatedPlans = plans.map((p) =>
@@ -74,28 +106,33 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     );
 
     set({ likedPlanIds: newLiked, plans: updatedPlans });
+    // Persist to Firestore in background
+    toggleLikePlan(currentUserId, planId, isLiked).catch(console.error);
   },
 
   toggleSave: (planId: string) => {
-    const { savedPlanIds, plans } = get();
+    const { savedPlanIds, plans, currentUserId } = get();
+    if (!currentUserId) return;
+
     const newSaved = new Set(savedPlanIds);
     const plan = plans.find((p) => p.id === planId);
     const savesStore = useSavesStore.getState();
 
     if (newSaved.has(planId)) {
       newSaved.delete(planId);
-      mockApi.unsavePlan(planId);
       analytics.planUnsaved(planId);
-      // Remove from saves store
       savesStore.unsave(planId);
+      // Persist to Firestore
+      unsavePlanFS(currentUserId, planId).catch(console.error);
     } else {
       newSaved.add(planId);
-      mockApi.savePlan(planId);
       if (plan) {
         analytics.planSaved(planId, plan.title);
         // Add to saves store as "to do"
         const entry: SavedPlan = { planId: plan.id, plan, isDone: false, savedAt: new Date().toISOString() };
         useSavesStore.setState((state) => ({ savedPlans: [entry, ...state.savedPlans] }));
+        // Persist to Firestore
+        savePlanFS(currentUserId, planId).catch(console.error);
       }
     }
 

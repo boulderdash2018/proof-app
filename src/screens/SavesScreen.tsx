@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { Chip, EmptyState } from '../components';
-import { useSavesStore } from '../store';
+import { useAuthStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { SavedPlan } from '../types';
@@ -18,14 +18,15 @@ import { SavedPlan } from '../types';
 export const SavesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const user = useAuthStore((s) => s.user);
   const { savedPlans, isLoading, fetchSaves, markAsDone, unsave } = useSavesStore();
   const [activeTab, setActiveTab] = useState<'todo' | 'done'>('todo');
   const C = useColors();
   const { t } = useTranslation();
 
   useEffect(() => {
-    fetchSaves();
-  }, []);
+    if (user) fetchSaves(user.id);
+  }, [user?.id]);
 
   const filteredPlans = savedPlans.filter((sp) =>
     activeTab === 'todo' ? !sp.isDone : sp.isDone

@@ -21,7 +21,7 @@ import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode } from '../types';
-import mockApi from '../services/mockApi';
+import { createPlan } from '../services/plansService';
 import { trackEvent } from '../services/posthogConfig';
 
 const TRANSPORT_OPTIONS: TransportMode[] = ['Métro', 'Vélo', 'À pied', 'Voiture', 'Trottinette'];
@@ -152,7 +152,7 @@ export const CreateScreen: React.FC = () => {
     if (!validate() || !user) return;
     setIsPublishing(true);
     try {
-      const newPlan = await mockApi.publishPlan(
+      const newPlan = await createPlan(
         {
           title,
           tags: selectedTags,

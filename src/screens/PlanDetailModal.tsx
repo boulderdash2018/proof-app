@@ -6,11 +6,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Colors, Layout } from '../constants';
 import { Avatar, Chip, UserBadge, XpBadge } from '../components';
-import { useFeedStore, useSavesStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
-import mockApi from '../services/mockApi';
+import { fetchPlanById } from '../services/plansService';
 
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
@@ -30,6 +30,7 @@ export const PlanDetailModal: React.FC = () => {
   const C = useColors();
   const { t } = useTranslation();
 
+  const user = useAuthStore((s) => s.user);
   const feedPlans = useFeedStore((s) => s.plans);
   const { likedPlanIds, savedPlanIds, toggleLike, toggleSave } = useFeedStore();
   const { savedPlans, markAsDone, fetchSaves } = useSavesStore();
@@ -43,12 +44,12 @@ export const PlanDetailModal: React.FC = () => {
 
   useEffect(() => {
     if (!plan) {
-      mockApi.getPlanById(planId).then((result) => {
+      fetchPlanById(planId).then((result) => {
         if (result) setPlan(result);
       });
     }
     // Ensure saved plans are loaded so we can check isDone
-    if (savedPlans.length === 0) fetchSaves();
+    if (savedPlans.length === 0 && user) fetchSaves(user.id);
   }, [planId]);
 
   const isLiked = likedPlanIds.has(planId);

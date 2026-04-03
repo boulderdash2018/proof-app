@@ -27,9 +27,9 @@ export const FeedScreen: React.FC = () => {
   const { unreadCount, fetchNotifications } = useNotifStore();
 
   useEffect(() => {
-    fetchFeed();
+    fetchFeed(user?.id);
     fetchNotifications();
-  }, []);
+  }, [user?.id]);
 
   const handleLike = (planId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
