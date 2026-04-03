@@ -176,7 +176,9 @@ export const en: Record<TranslationKeys, string> = {
   profile_followers: 'followers',
   profile_likes_received: 'likes received',
   profile_badges: 'BADGES',
-  profile_recent_plans: 'MY RECENT PLANS',
+  profile_recent_plans: 'MY CREATED PLANS',
+  profile_saved_plans: 'PLANS TO DO',
+  profile_done_plans: 'PLANS DONE',
   profile_friends: 'friends',
 
   // Edit profile

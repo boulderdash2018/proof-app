@@ -12,7 +12,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Layout } from '../constants';
 import { Avatar } from '../components';
-import { useAuthStore, useFriendsStore } from '../store';
+import { useAuthStore, useFriendsStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Badge, BadgeId } from '../types';
@@ -32,6 +32,7 @@ export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
+  const { savedPlans, fetchSaves } = useSavesStore();
   const C = useColors();
   const { t } = useTranslation();
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -44,18 +45,24 @@ export const ProfileScreen: React.FC = () => {
       mockApi.getUserPlans(user.id).then(setUserPlans);
       fetchIncomingRequests(user.id);
       getFriendIds(user.id).then(ids => setFriendCount(ids.length));
+      fetchSaves();
     }
   }, [user]);
 
-  // Refresh friend count every time the profile tab is focused
+  // Refresh data every time the profile tab is focused
   useFocusEffect(
     useCallback(() => {
       if (user) {
         getFriendIds(user.id).then(ids => setFriendCount(ids.length));
         fetchIncomingRequests(user.id);
+        mockApi.getUserPlans(user.id).then(setUserPlans);
+        fetchSaves();
       }
     }, [user])
   );
+
+  const donePlans = savedPlans.filter((sp) => sp.isDone);
+  const todoPlans = savedPlans.filter((sp) => !sp.isDone);
 
   if (!user) return null;
 
@@ -162,6 +169,43 @@ export const ProfileScreen: React.FC = () => {
             </View>
           </View>
         )}
+
+        {donePlans.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_done_plans}</Text>
+            <View style={styles.plansGrid}>
+              {donePlans.map((sp) => {
+                const colors = parseGradient(sp.plan.gradient);
+                return (
+                  <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
+                    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.miniCard}>
+                      <View style={styles.doneCheck}><Text style={styles.doneCheckText}>✓</Text></View>
+                      <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {todoPlans.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_saved_plans}</Text>
+            <View style={styles.plansGrid}>
+              {todoPlans.map((sp) => {
+                const colors = parseGradient(sp.plan.gradient);
+                return (
+                  <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
+                    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.miniCard}>
+                      <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -207,4 +251,6 @@ const styles = StyleSheet.create({
   plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end' },
   miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: '#4CAF50', alignItems: 'center', justifyContent: 'center' },
+  doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
 });

@@ -174,7 +174,9 @@ export const fr = {
   profile_followers: 'followers',
   profile_likes_received: 'likes reçus',
   profile_badges: 'BADGES',
-  profile_recent_plans: 'MES PLANS RÉCENTS',
+  profile_recent_plans: 'MES PLANS CRÉÉS',
+  profile_saved_plans: 'PLANS À FAIRE',
+  profile_done_plans: 'PLANS FAITS',
   profile_friends: 'amis',
 
   // Edit profile

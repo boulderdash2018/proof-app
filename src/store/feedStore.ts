@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { Plan } from '../types';
+import { Plan, SavedPlan } from '../types';
 import mockApi from '../services/mockApi';
 import analytics from '../services/analyticsUtils';
+import { useSavesStore } from './savesStore';
 
 interface FeedStore {
   plans: Plan[];
@@ -79,16 +80,22 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const { savedPlanIds, plans } = get();
     const newSaved = new Set(savedPlanIds);
     const plan = plans.find((p) => p.id === planId);
+    const savesStore = useSavesStore.getState();
 
     if (newSaved.has(planId)) {
       newSaved.delete(planId);
       mockApi.unsavePlan(planId);
       analytics.planUnsaved(planId);
+      // Remove from saves store
+      savesStore.unsave(planId);
     } else {
       newSaved.add(planId);
       mockApi.savePlan(planId);
       if (plan) {
         analytics.planSaved(planId, plan.title);
+        // Add to saves store as "to do"
+        const entry: SavedPlan = { planId: plan.id, plan, isDone: false, savedAt: new Date().toISOString() };
+        useSavesStore.setState((state) => ({ savedPlans: [entry, ...state.savedPlans] }));
       }
     }
 
