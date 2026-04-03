@@ -10,15 +10,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../constants';
 import { PlanCard, PtsPill, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore } from '../store';
+import { useColors } from '../hooks/useColors';
 import { Plan } from '../types';
 
 export const FeedScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
+  const C = useColors();
   const { plans, isLoading, isRefreshing, likedPlanIds, savedPlanIds, fetchFeed, refreshFeed, toggleLike, toggleSave } =
     useFeedStore();
   const { unreadCount, fetchNotifications } = useNotifStore();
@@ -52,16 +53,15 @@ export const FeedScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.logo}>
-          proof<Text style={styles.logoDot}>.</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
+        <Text style={[styles.logo, { color: C.black }]}>
+          proof<Text style={{ color: C.primary }}>.</Text>
         </Text>
         <View style={styles.headerRight}>
           <PtsPill points={user?.xpPoints ? user.xpPoints % 1000 : 240} />
           <TouchableOpacity
-            style={styles.bellBtn}
+            style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
             onPress={() => navigation.navigate('Notifications')}
           >
             <Text style={styles.bellIcon}>🔔</Text>
@@ -70,7 +70,6 @@ export const FeedScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Content */}
       {isLoading && plans.length === 0 ? (
         <LoadingSkeleton count={3} />
       ) : (
@@ -84,7 +83,7 @@ export const FeedScreen: React.FC = () => {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={refreshFeed}
-              tintColor={Colors.primary}
+              tintColor={C.primary}
             />
           }
           ListEmptyComponent={
@@ -103,10 +102,7 @@ export const FeedScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.white,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -114,44 +110,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
   },
-  logo: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: Colors.black,
-    letterSpacing: -1.5,
-  },
-  logoDot: {
-    color: Colors.primary,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  bellBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.gray200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bellIcon: {
-    fontSize: 16,
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF3B30',
-  },
-  list: {
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
+  logo: { fontSize: 26, fontWeight: '800', letterSpacing: -1.5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bellBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  bellIcon: { fontSize: 16 },
+  bellBadge: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
+  list: { paddingTop: 10, paddingBottom: 20 },
 });

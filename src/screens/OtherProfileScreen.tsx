@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Layout } from '../constants';
 import { Avatar, UserBadge, PrimaryButton, SecondaryButton } from '../components';
+import { useColors } from '../hooks/useColors';
 import { User } from '../types';
 import { useAuthStore, useFriendsStore } from '../store';
 import { getUserById, getFriendshipStatus, getPendingRequestId } from '../services/friendsService';
@@ -20,6 +21,7 @@ export const OtherProfileScreen: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+  const C = useColors();
   const [actionLoading, setActionLoading] = useState(false);
 
   const userId = route.params?.userId;
@@ -73,7 +75,7 @@ export const OtherProfileScreen: React.FC = () => {
   };
 
   if (!user) return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <Text style={styles.loading}>Chargement...</Text>
     </View>
   );
@@ -118,10 +120,10 @@ export const OtherProfileScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.back} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={styles.headerTitle}>{user.displayName}</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+      <View style={[styles.header, { borderBottomColor: C.border }]}>
+        <Text style={[styles.back, { color: C.black }]} onPress={() => navigation.goBack()}>‹</Text>
+        <Text style={[styles.headerTitle, { color: C.black }]}>{user.displayName}</Text>
         <View style={{ width: 30 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>

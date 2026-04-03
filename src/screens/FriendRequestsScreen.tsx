@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Layout } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
+import { useColors } from '../hooks/useColors';
 import { FriendRequest } from '../types';
 
 type Tab = 'received' | 'sent';
@@ -30,6 +31,7 @@ export const FriendRequestsScreen: React.FC = () => {
     declineRequest,
   } = useFriendsStore();
 
+  const C = useColors();
   const [tab, setTab] = useState<Tab>('received');
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export const FriendRequestsScreen: React.FC = () => {
   const data = tab === 'received' ? incomingRequests : sentRequests;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.back} onPress={() => navigation.goBack()}>‹</Text>

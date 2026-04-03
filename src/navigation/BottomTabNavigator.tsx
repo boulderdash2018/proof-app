@@ -25,6 +25,8 @@ import { PrivacySettingsScreen } from '../screens/PrivacySettingsScreen';
 import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
+import { useThemeStore } from '../store';
+import { DarkColors, Colors } from '../constants';
 
 // Feed Stack
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
@@ -114,11 +116,14 @@ const CreateTabButton: React.FC<{ onPress?: () => void }> = ({ onPress }) => (
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 export const BottomTabNavigator: React.FC = () => {
+  const isDark = useThemeStore((s) => s.isDark);
+  const C = isDark ? DarkColors : Colors;
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { backgroundColor: C.white, borderTopColor: C.border }],
         tabBarShowLabel: false,
       }}
     >

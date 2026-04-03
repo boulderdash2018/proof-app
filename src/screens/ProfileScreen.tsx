@@ -10,9 +10,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Layout } from '../constants';
+import { Layout } from '../constants';
 import { Avatar } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
+import { useColors } from '../hooks/useColors';
 import { Badge, BadgeId } from '../types';
 import mockApi from '../services/mockApi';
 
@@ -29,6 +30,7 @@ export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
+  const C = useColors();
   const [badges, setBadges] = useState<Badge[]>([]);
   const [userPlans, setUserPlans] = useState<any[]>([]);
 
@@ -51,15 +53,14 @@ export const ProfileScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mon profil</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
+        <Text style={[styles.headerTitle, { color: C.black }]}>Mon profil</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => navigation.navigate('FriendRequests')} style={styles.friendReqBtn}>
             <Text style={styles.friendReqIcon}>👥</Text>
             {incomingRequests.length > 0 && (
-              <View style={styles.badge}>
+              <View style={[styles.badge, { backgroundColor: C.primary }]}>
                 <Text style={styles.badgeText}>{incomingRequests.length}</Text>
               </View>
             )}
@@ -71,106 +72,74 @@ export const ProfileScreen: React.FC = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Hero */}
-        <View style={styles.hero}>
-          <Avatar
-            initials={user.initials}
-            bg={user.avatarBg}
-            color={user.avatarColor}
-            size="L"
-            avatarUrl={user.avatarUrl}
-            borderColor={Colors.primary}
-          />
-          <Text style={styles.displayName}>{user.displayName}</Text>
+        <View style={[styles.hero, { borderBottomColor: C.border }]}>
+          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
+          <Text style={[styles.displayName, { color: C.black }]}>{user.displayName}</Text>
           <View style={styles.rankBadge}>
-            <Text style={styles.rankText}>{user.rank} · Lv. {user.level}</Text>
+            <Text style={[styles.rankText, { color: C.primary }]}>{user.rank} · Lv. {user.level}</Text>
           </View>
         </View>
 
-        {/* XP Bar */}
         <View style={styles.xpSection}>
           <View style={styles.xpLabels}>
-            <Text style={styles.xpLabel}>XP {user.xpPoints} / {user.xpForNextLevel}</Text>
-            <Text style={styles.xpLabel}>→ Lv. {user.level + 1}</Text>
+            <Text style={[styles.xpLabel, { color: C.gray700 }]}>XP {user.xpPoints} / {user.xpForNextLevel}</Text>
+            <Text style={[styles.xpLabel, { color: C.gray700 }]}>→ Lv. {user.level + 1}</Text>
           </View>
-          <View style={styles.xpBarBg}>
-            <View style={[styles.xpBarFill, { width: `${Math.min(xpProgress * 100, 100)}%` }]} />
+          <View style={[styles.xpBarBg, { backgroundColor: C.gray300 }]}>
+            <View style={[styles.xpBarFill, { width: `${Math.min(xpProgress * 100, 100)}%`, backgroundColor: C.primary }]} />
           </View>
         </View>
 
-        {/* Currencies */}
         <View style={styles.currencyRow}>
-          <View style={styles.xpPill}>
-            <Text style={styles.xpPillText}>⭐ {displayXp} XP pts</Text>
+          <View style={[styles.xpPill, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
+            <Text style={[styles.xpPillText, { color: C.gold }]}>⭐ {displayXp} XP pts</Text>
           </View>
-          <View style={styles.coinsPill}>
-            <Text style={styles.coinsPillText}>+ {user.coins} coins</Text>
+          <View style={[styles.coinsPill, { backgroundColor: C.successBg, borderColor: C.successBorder }]}>
+            <Text style={[styles.coinsPillText, { color: C.success }]}>+ {user.coins} coins</Text>
           </View>
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{user.planCount}</Text>
-            <Text style={styles.statLabel}>plans</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{user.planCount}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>plans</Text>
           </View>
-          <View style={styles.statDivider} />
-          <TouchableOpacity
-            style={styles.stat}
-            onPress={() => navigation.navigate('Followers', { userId: user.id })}
-          >
-            <Text style={styles.statValue}>{formatCount(user.followersCount)}</Text>
-            <Text style={styles.statLabel}>followers</Text>
+          <View style={[styles.statDivider, { backgroundColor: C.border }]} />
+          <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers', { userId: user.id })}>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.followersCount)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>followers</Text>
           </TouchableOpacity>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{formatCount(user.likesReceived)}</Text>
-            <Text style={styles.statLabel}>likes reçus</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.likesReceived)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>likes reçus</Text>
           </View>
         </View>
 
-        {/* Badges */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>BADGES</Text>
+          <Text style={[styles.sectionLabel, { color: C.gray700 }]}>BADGES</Text>
           <View style={styles.badgesGrid}>
-            {badges.map((badge) => (
-              <View
-                key={badge.id}
-                style={[styles.badgeItem, !badge.isUnlocked && { opacity: 0.3 }]}
-              >
-                <View style={styles.badgeIcon}>
-                  <Text style={styles.badgeEmoji}>
-                    {badge.isUnlocked ? badge.emoji : '🔒'}
-                  </Text>
+            {badges.map((b) => (
+              <View key={b.id} style={[styles.badgeItem, !b.isUnlocked && { opacity: 0.3 }]}>
+                <View style={[styles.badgeIcon, { backgroundColor: C.gray200 }]}>
+                  <Text style={styles.badgeEmoji}>{b.isUnlocked ? b.emoji : '🔒'}</Text>
                 </View>
-                <Text style={styles.badgeName} numberOfLines={1}>{badge.label}</Text>
+                <Text style={[styles.badgeName, { color: C.gray800 }]} numberOfLines={1}>{b.label}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Recent Plans */}
         {userPlans.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>MES PLANS RÉCENTS</Text>
+            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>MES PLANS RÉCENTS</Text>
             <View style={styles.plansGrid}>
               {userPlans.map((plan) => {
                 const colors = parseGradient(plan.gradient);
                 return (
-                  <TouchableOpacity
-                    key={plan.id}
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
-                  >
-                    <LinearGradient
-                      colors={colors}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.miniCard}
-                    >
-                      <Text style={styles.miniCardTitle} numberOfLines={2}>
-                        {plan.title}
-                      </Text>
+                  <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.miniCard}>
+                      <Text style={styles.miniCardTitle} numberOfLines={2}>{plan.title}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 );
@@ -184,156 +153,43 @@ export const ProfileScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Layout.screenPadding,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  headerTitle: { fontSize: 21, fontWeight: '800', color: Colors.black, letterSpacing: -0.5 },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   friendReqBtn: { marginRight: 16, position: 'relative' },
   friendReqIcon: { fontSize: 22 },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -6,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: { color: Colors.white, fontSize: 9, fontWeight: '800' },
+  badge: { position: 'absolute', top: -4, right: -6, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  badgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
   settingsIcon: { fontSize: 22 },
   scroll: { paddingBottom: 30 },
-  hero: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  displayName: { fontSize: 19, fontWeight: '800', color: Colors.black, marginTop: 10 },
-  rankBadge: {
-    backgroundColor: '#FFF0EB',
-    borderWidth: 1,
-    borderColor: '#FFE0D0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginTop: 6,
-  },
-  rankText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+  hero: { alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1 },
+  displayName: { fontSize: 19, fontWeight: '800', marginTop: 10 },
+  rankBadge: { backgroundColor: '#FFF0EB', borderWidth: 1, borderColor: '#FFE0D0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, marginTop: 6 },
+  rankText: { fontSize: 11, fontWeight: '700' },
   xpSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 14 },
-  xpLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  xpLabel: { fontSize: 10, color: Colors.gray700 },
-  xpBarBg: {
-    height: 5,
-    backgroundColor: Colors.gray300,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  xpBarFill: {
-    height: 5,
-    backgroundColor: Colors.primary,
-    borderRadius: 3,
-  },
-  currencyRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 14,
-  },
-  xpPill: {
-    backgroundColor: Colors.goldBg,
-    borderWidth: 1,
-    borderColor: Colors.goldBorder,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  xpPillText: { fontSize: 12, fontWeight: '700', color: Colors.gold },
-  coinsPill: {
-    backgroundColor: Colors.successBg,
-    borderWidth: 1,
-    borderColor: Colors.successBorder,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  coinsPillText: { fontSize: 12, fontWeight: '700', color: Colors.success },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    marginHorizontal: Layout.screenPadding,
-  },
+  xpLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  xpLabel: { fontSize: 10 },
+  xpBarBg: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  xpBarFill: { height: 5, borderRadius: 3 },
+  currencyRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, paddingVertical: 14 },
+  xpPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
+  xpPillText: { fontSize: 12, fontWeight: '700' },
+  coinsPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
+  coinsPillText: { fontSize: 12, fontWeight: '700' },
+  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderBottomWidth: 1, marginHorizontal: Layout.screenPadding },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 17, fontWeight: '800', color: Colors.black },
-  statLabel: { fontSize: 11, color: Colors.gray700, marginTop: 2 },
-  statDivider: { width: 1, height: 28, backgroundColor: Colors.border },
-  section: {
-    paddingHorizontal: Layout.screenPadding,
-    paddingTop: 18,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    color: Colors.gray700,
-    marginBottom: 12,
-  },
-  badgesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  badgeItem: {
-    width: '25%',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  badgeIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: Colors.gray200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  statValue: { fontSize: 17, fontWeight: '800' },
+  statLabel: { fontSize: 11, marginTop: 2 },
+  statDivider: { width: 1, height: 28 },
+  section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
+  badgesGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  badgeItem: { width: '25%', alignItems: 'center', marginBottom: 14 },
+  badgeIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   badgeEmoji: { fontSize: 20 },
-  badgeName: { fontSize: 9, color: Colors.gray800, marginTop: 4, textAlign: 'center' },
-  plansGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  miniCard: {
-    width: MINI_CARD_W,
-    height: 76,
-    borderRadius: 14,
-    padding: 10,
-    justifyContent: 'flex-end',
-  },
-  miniCardTitle: {
-    color: Colors.white,
-    fontSize: 12,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
+  badgeName: { fontSize: 9, marginTop: 4, textAlign: 'center' },
+  plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end' },
+  miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 });

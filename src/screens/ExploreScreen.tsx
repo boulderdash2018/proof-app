@@ -11,10 +11,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Layout, CATEGORIES } from '../constants';
+import { Layout, CATEGORIES } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { Plan, CategoryTag, User } from '../types';
 import { useAuthStore } from '../store';
+import { useColors } from '../hooks/useColors';
 import mockApi from '../services/mockApi';
 import { searchUsers } from '../services/friendsService';
 
@@ -31,6 +32,7 @@ export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const currentUser = useAuthStore(s => s.user);
+  const C = useColors();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryTag | null>(null);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
@@ -137,16 +139,16 @@ export const ExploreScreen: React.FC = () => {
   const showCategories = !selectedCategory && searchQuery.length < 2;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Text style={styles.pageTitle}>Explorer</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+      <Text style={[styles.pageTitle, { color: C.black }]}>Explorer</Text>
 
       {/* Search bar */}
-      <View style={styles.searchBar}>
+      <View style={[styles.searchBar, { backgroundColor: C.gray200 }]}>
         <Text style={styles.searchIcon}>🔍</Text>
         <RNTextInput
           style={styles.searchInput}
           placeholder="Recherche ou @pseudo pour trouver des amis"
-          placeholderTextColor={Colors.gray600}
+          placeholderTextColor={C.gray600}
           value={searchQuery}
           onChangeText={handleSearch}
         />

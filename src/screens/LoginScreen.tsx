@@ -10,14 +10,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Typography, Layout } from '../constants';
+import { Typography, Layout } from '../constants';
 import { PrimaryButton, SecondaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
+import { useColors } from '../hooks/useColors';
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const login = useAuthStore((s) => s.login);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
+  const C = useColors();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,7 +53,7 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: C.white }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
@@ -61,11 +63,11 @@ export const LoginScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.logo}>
-            proof<Text style={styles.dot}>.</Text>
+          <Text style={[styles.logo, { color: C.black }]}>
+            proof<Text style={{ color: C.primary }}>.</Text>
           </Text>
 
-          <Text style={styles.title}>Bon retour 👋</Text>
+          <Text style={[styles.title, { color: C.black }]}>Bon retour 👋</Text>
 
           <TextInput
             label="Email"
