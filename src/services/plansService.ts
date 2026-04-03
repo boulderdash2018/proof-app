@@ -4,13 +4,14 @@ import {
   where,
   getDocs,
   setDoc,
+  addDoc,
   updateDoc,
   deleteDoc,
   doc,
   getDoc,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { Plan, Place, User, SavedPlan, CategoryTag, TransportMode } from '../types';
+import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode } from '../types';
 
 const PLANS = 'plans';
 const SAVED_PLANS = 'savedPlans';
@@ -219,4 +220,53 @@ export const unsavePlan = async (userId: string, planId: string): Promise<void> 
 /** Mark a saved plan as done */
 export const markPlanAsDone = async (userId: string, planId: string): Promise<void> => {
   await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), { isDone: true });
+};
+
+// ==================== COMMENTS ====================
+
+const COMMENTS = 'comments';
+
+/** Fetch comments for a plan */
+export const fetchComments = async (planId: string): Promise<Comment[]> => {
+  try {
+    const q = query(collection(db, COMMENTS), where('planId', '==', planId));
+    const snap = await getDocs(q);
+    const comments = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Comment));
+    comments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return comments;
+  } catch (err) {
+    console.error('[plansService] fetchComments error:', err);
+    return [];
+  }
+};
+
+/** Add a comment to a plan */
+export const addComment = async (planId: string, author: User, text: string): Promise<Comment> => {
+  const now = new Date().toISOString();
+  const commentData = {
+    planId,
+    authorId: author.id,
+    authorName: author.displayName,
+    authorInitials: author.initials,
+    authorAvatarBg: author.avatarBg,
+    authorAvatarColor: author.avatarColor,
+    authorAvatarUrl: author.avatarUrl || null,
+    text,
+    createdAt: now,
+  };
+  const ref = await addDoc(collection(db, COMMENTS), commentData);
+
+  // Increment commentsCount on the plan
+  try {
+    const planRef = doc(db, PLANS, planId);
+    const planSnap = await getDoc(planRef);
+    if (planSnap.exists()) {
+      const current = (planSnap.data() as Plan).commentsCount || 0;
+      await updateDoc(planRef, { commentsCount: current + 1 });
+    }
+  } catch (err) {
+    console.error('[plansService] update commentsCount error:', err);
+  }
+
+  return { ...commentData, id: ref.id };
 };

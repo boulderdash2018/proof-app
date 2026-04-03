@@ -163,6 +163,12 @@ export const en: Record<TranslationKeys, string> = {
   plan_save: 'Save',
   plan_mark_done: 'Done?',
   plan_already_done: 'Done ✓',
+  plan_comments_title: 'COMMENTS',
+  plan_comment_placeholder: 'Add a comment...',
+  plan_comment_send: 'Send',
+  plan_no_comments: 'No comments yet',
+  plan_no_comments_sub: 'Be the first to comment!',
+  plan_comment_just_now: 'just now',
 
   // Place detail
   place_reviews_proof: 'Proof reviews',

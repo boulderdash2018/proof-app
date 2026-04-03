@@ -161,6 +161,12 @@ export const fr = {
   plan_save: 'Sauver',
   plan_mark_done: 'Fait ?',
   plan_already_done: 'Fait ✓',
+  plan_comments_title: 'COMMENTAIRES',
+  plan_comment_placeholder: 'Ajouter un commentaire...',
+  plan_comment_send: 'Envoyer',
+  plan_no_comments: 'Aucun commentaire',
+  plan_no_comments_sub: 'Sois le premier à commenter !',
+  plan_comment_just_now: "à l'instant",
 
   // Place detail
   place_reviews_proof: 'avis Proof',

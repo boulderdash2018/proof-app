@@ -101,6 +101,19 @@ export interface SavedPlan {
   savedAt: string;
 }
 
+export interface Comment {
+  id: string;
+  planId: string;
+  authorId: string;
+  authorName: string;
+  authorInitials: string;
+  authorAvatarBg: string;
+  authorAvatarColor: string;
+  authorAvatarUrl?: string | null;
+  text: string;
+  createdAt: string;
+}
+
 export interface SignupData {
   firstName: string;
   email: string;
