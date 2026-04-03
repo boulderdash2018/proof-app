@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
@@ -18,17 +18,31 @@ export const SettingsScreen: React.FC = () => {
   const logout = useAuthStore((s) => s.logout);
 
   const handleLogout = () => {
-    Alert.alert('Se déconnecter', 'Tu es sûr ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Se déconnecter', style: 'destructive', onPress: () => logout() },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tu es sûr de vouloir te déconnecter ?')) {
+        logout();
+      }
+    } else {
+      const { Alert } = require('react-native');
+      Alert.alert('Se déconnecter', 'Tu es sûr ?', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Se déconnecter', style: 'destructive', onPress: () => logout() },
+      ]);
+    }
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert('Supprimer mon compte', 'Cette action est irréversible. Tape SUPPRIMER pour confirmer.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => logout() },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Cette action est irréversible. Tu es sûr ?')) {
+        logout();
+      }
+    } else {
+      const { Alert } = require('react-native');
+      Alert.alert('Supprimer mon compte', 'Cette action est irréversible.', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => logout() },
+      ]);
+    }
   };
 
   return (
