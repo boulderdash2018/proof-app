@@ -68,6 +68,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: async () => {
+    await firebaseAuthService.logout();
     set({ user: null, isAuthenticated: false });
     trackEvent('user_logout');
     resetUser();
