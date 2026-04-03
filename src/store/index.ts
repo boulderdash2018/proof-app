@@ -6,3 +6,4 @@ export { useFriendsStore } from './friendsStore';
 export { useThemeStore } from './themeStore';
 export { useLanguageStore } from './languageStore';
 export type { Language } from './languageStore';
+export { useSettingsStore } from './settingsStore';
