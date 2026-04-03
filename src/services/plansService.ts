@@ -8,8 +8,6 @@ import {
   deleteDoc,
   doc,
   getDoc,
-  orderBy,
-  limit,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Plan, Place, User, SavedPlan, CategoryTag, TransportMode } from '../types';
@@ -85,30 +83,51 @@ export const createPlan = async (
 
 /** Fetch all plans for the feed (ordered by date) */
 export const fetchFeedPlans = async (): Promise<Plan[]> => {
-  const q = query(collection(db, PLANS), orderBy('createdAt', 'desc'), limit(50));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => {
-    const data = d.data() as Plan;
-    return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
-  });
+  try {
+    const snap = await getDocs(collection(db, PLANS));
+    console.log(`[plansService] fetchFeedPlans: ${snap.docs.length} plans found`);
+    const plans = snap.docs.map((d) => {
+      const data = d.data() as Plan;
+      return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+    });
+    // Sort client-side (avoids Firestore index requirement)
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchFeedPlans error:', err);
+    return [];
+  }
 };
 
 /** Fetch plans created by a specific user */
 export const fetchUserPlans = async (userId: string): Promise<Plan[]> => {
-  const q = query(collection(db, PLANS), where('authorId', '==', userId), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => {
-    const data = d.data() as Plan;
-    return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
-  });
+  try {
+    const q = query(collection(db, PLANS), where('authorId', '==', userId));
+    const snap = await getDocs(q);
+    console.log(`[plansService] fetchUserPlans(${userId}): ${snap.docs.length} plans found`);
+    const plans = snap.docs.map((d) => {
+      const data = d.data() as Plan;
+      return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+    });
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchUserPlans error:', err);
+    return [];
+  }
 };
 
 /** Fetch a single plan by ID */
 export const fetchPlanById = async (planId: string): Promise<Plan | null> => {
-  const snap = await getDoc(doc(db, PLANS, planId));
-  if (!snap.exists()) return null;
-  const data = snap.data() as Plan;
-  return { ...data, id: snap.id, timeAgo: getTimeAgo(data.createdAt) };
+  try {
+    const snap = await getDoc(doc(db, PLANS, planId));
+    if (!snap.exists()) return null;
+    const data = snap.data() as Plan;
+    return { ...data, id: snap.id, timeAgo: getTimeAgo(data.createdAt) };
+  } catch (err) {
+    console.error('[plansService] fetchPlanById error:', err);
+    return null;
+  }
 };
 
 // ==================== LIKES ====================
@@ -148,18 +167,25 @@ export const toggleLikePlan = async (userId: string, planId: string, isLiked: bo
 
 /** Fetch saved plans for a user */
 export const fetchSavedPlans = async (userId: string): Promise<SavedPlan[]> => {
-  const q = query(collection(db, `users/${userId}/${SAVED_PLANS}`), orderBy('savedAt', 'desc'));
-  const snap = await getDocs(q);
+  try {
+    const snap = await getDocs(collection(db, `users/${userId}/${SAVED_PLANS}`));
+    console.log(`[plansService] fetchSavedPlans(${userId}): ${snap.docs.length} saves found`);
 
-  const results: SavedPlan[] = [];
-  for (const d of snap.docs) {
-    const data = d.data() as { isDone: boolean; savedAt: string };
-    const plan = await fetchPlanById(d.id);
-    if (plan) {
-      results.push({ planId: d.id, plan, isDone: data.isDone, savedAt: data.savedAt });
+    const results: SavedPlan[] = [];
+    for (const d of snap.docs) {
+      const data = d.data() as { isDone: boolean; savedAt: string };
+      const plan = await fetchPlanById(d.id);
+      if (plan) {
+        results.push({ planId: d.id, plan, isDone: data.isDone, savedAt: data.savedAt });
+      }
     }
+    // Sort client-side
+    results.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+    return results;
+  } catch (err) {
+    console.error('[plansService] fetchSavedPlans error:', err);
+    return [];
   }
-  return results;
 };
 
 /** Get saved plan IDs for a user (quick lookup) */
