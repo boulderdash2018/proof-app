@@ -17,6 +17,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Badge, BadgeId } from '../types';
 import mockApi from '../services/mockApi';
+import { getFriendIds } from '../services/friendsService';
 
 const { width } = Dimensions.get('window');
 const MINI_CARD_W = (width - Layout.screenPadding * 2 - 8) / 2;
@@ -35,12 +36,14 @@ export const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
   const [badges, setBadges] = useState<Badge[]>([]);
   const [userPlans, setUserPlans] = useState<any[]>([]);
+  const [friendCount, setFriendCount] = useState<number>(0);
 
   useEffect(() => {
     if (user) {
       mockApi.getBadges(user.unlockedBadges).then(setBadges);
       mockApi.getUserPlans(user.id).then(setUserPlans);
       fetchIncomingRequests(user.id);
+      getFriendIds(user.id).then(ids => setFriendCount(ids.length));
     }
   }, [user]);
 
@@ -108,8 +111,8 @@ export const ProfileScreen: React.FC = () => {
           </View>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers', { userId: user.id })}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.followersCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(friendCount)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_friends}</Text>
           </TouchableOpacity>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <View style={styles.stat}>

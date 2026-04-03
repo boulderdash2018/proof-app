@@ -9,7 +9,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
 import { useAuthStore, useFriendsStore } from '../store';
-import { getUserById, getFriendshipStatus, getPendingRequestId } from '../services/friendsService';
+import { getUserById, getFriendshipStatus, getPendingRequestId, getFriendIds } from '../services/friendsService';
 import mockApi from '../services/mockApi';
 
 type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
@@ -34,6 +34,7 @@ export const OtherProfileScreen: React.FC = () => {
   const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [userPlans, setUserPlans] = useState<Plan[]>([]);
+  const [realFriendCount, setRealFriendCount] = useState<number | null>(null);
   const C = useColors();
   const { t } = useTranslation();
   const [actionLoading, setActionLoading] = useState(false);
@@ -51,6 +52,7 @@ export const OtherProfileScreen: React.FC = () => {
       }
     });
     mockApi.getUserPlans(userId).then(setUserPlans);
+    getFriendIds(userId).then(ids => setRealFriendCount(ids.length));
   }, [userId, currentUser]);
 
   const handleAddFriend = async () => {
@@ -159,7 +161,7 @@ export const OtherProfileScreen: React.FC = () => {
                 <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
               </View>
               <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.followersCount)}</Text>
+                <Text style={[styles.statValue, { color: C.black }]}>{realFriendCount !== null ? formatCount(realFriendCount) : formatCount(user.followersCount)}</Text>
                 <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_friends}</Text>
               </View>
               <View style={styles.stat}>
