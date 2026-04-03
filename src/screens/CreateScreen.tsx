@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Layout, CATEGORIES } from '../constants';
 import { PrimaryButton, Chip, TextInput } from '../components';
-import { useAuthStore, useFeedStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode } from '../types';
@@ -78,6 +78,7 @@ export const CreateScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const addPlan = useFeedStore((s) => s.addPlan);
+  const addCreatedPlan = useSavesStore((s) => s.addCreatedPlan);
   const C = useColors();
   const { t } = useTranslation();
 
@@ -171,8 +172,9 @@ export const CreateScreen: React.FC = () => {
         },
         user
       );
-      // Add to feed store immediately
+      // Add to feed store + saves (as done) immediately
       addPlan(newPlan);
+      addCreatedPlan(newPlan);
       trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSuccess(true);

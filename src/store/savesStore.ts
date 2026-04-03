@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SavedPlan } from '../types';
+import { Plan, SavedPlan } from '../types';
 import mockApi from '../services/mockApi';
 
 interface SavesStore {
@@ -7,6 +7,7 @@ interface SavesStore {
   isLoading: boolean;
   fetchSaves: () => Promise<void>;
   markAsDone: (planId: string) => void;
+  addCreatedPlan: (plan: Plan) => void;
   unsave: (planId: string) => void;
 }
 
@@ -31,6 +32,12 @@ export const useSavesStore = create<SavesStore>((set, get) => ({
     );
     set({ savedPlans: updated });
     mockApi.markPlanDone(planId);
+  },
+
+  addCreatedPlan: (plan: Plan) => {
+    const { savedPlans } = get();
+    const entry: SavedPlan = { planId: plan.id, plan, isDone: true, savedAt: new Date().toISOString() };
+    set({ savedPlans: [entry, ...savedPlans] });
   },
 
   unsave: (planId: string) => {
