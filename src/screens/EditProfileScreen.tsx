@@ -58,25 +58,32 @@ export const EditProfileScreen: React.FC = () => {
 
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
+      const base64DataUrl = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : null;
+
       setIsUploading(true);
       try {
-        if (asset.base64) {
-          // Upload base64 to Firebase Storage
+        if (base64DataUrl) {
+          // Try Firebase Storage upload
           const fileName = `avatars/${user?.id}_${Date.now()}.jpg`;
           const storageRef = ref(storage, fileName);
-          const base64Data = `data:image/jpeg;base64,${asset.base64}`;
-          await uploadString(storageRef, base64Data, 'data_url');
+          await uploadString(storageRef, base64DataUrl, 'data_url');
           const downloadUrl = await getDownloadURL(storageRef);
           setAvatarUrl(downloadUrl);
         } else {
-          // Fallback: use local URI (works for preview)
+          // No base64 available, use URI
           setAvatarUrl(asset.uri);
         }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (err) {
-        console.error('Upload error:', err);
-        // Final fallback: use local URI
-        setAvatarUrl(asset.uri);
+        console.error('Firebase Storage upload failed, using base64 fallback:', err);
+        // Fallback: store base64 data URL directly (works everywhere, persists in Firestore)
+        if (base64DataUrl) {
+          setAvatarUrl(base64DataUrl);
+        } else {
+          setAvatarUrl(asset.uri);
+        }
       } finally {
         setIsUploading(false);
       }
