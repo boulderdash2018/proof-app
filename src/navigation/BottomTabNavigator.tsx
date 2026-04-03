@@ -69,6 +69,7 @@ const ProfileStackNavigator: React.FC = () => (
   <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStack.Screen name="Profile" component={ProfileScreen} />
     <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
+    <ProfileStack.Screen name="OtherProfile" component={OtherProfileScreen} />
     <ProfileStack.Screen name="Followers" component={FollowersScreen} />
     <ProfileStack.Screen name="Following" component={FollowingScreen} />
     <ProfileStack.Screen name="FriendRequests" component={FriendRequestsScreen} />
