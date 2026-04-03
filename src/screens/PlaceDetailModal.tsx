@@ -4,32 +4,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { Avatar } from '../components';
+import { useColors } from '../hooks/useColors';
 import { Place, Plan } from '../types';
 import mockApi from '../services/mockApi';
-
-const renderStars = (rating: number, size: number = 14): React.ReactNode => {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    stars.push(
-      <Text
-        key={i}
-        style={{
-          fontSize: size,
-          color: i <= Math.round(rating) ? Colors.primary : Colors.gray400,
-        }}
-      >
-        ★
-      </Text>
-    );
-  }
-  return <View style={{ flexDirection: 'row' }}>{stars}</View>;
-};
 
 export const PlaceDetailModal: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { placeId, planId } = route.params as { placeId: string; planId: string };
+  const C = useColors();
 
   const [place, setPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,18 +33,36 @@ export const PlaceDetailModal: React.FC = () => {
     loadPlace();
   }, [planId, placeId]);
 
+  const renderStars = (rating: number, size: number = 14): React.ReactNode => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Text
+          key={i}
+          style={{
+            fontSize: size,
+            color: i <= Math.round(rating) ? C.primary : C.gray400,
+          }}
+        >
+          ★
+        </Text>
+      );
+    }
+    return <View style={{ flexDirection: 'row' }}>{stars}</View>;
+  };
+
   if (loading || !place) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backChevron}>&#8249;</Text>
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+        <View style={[styles.header, { borderBottomColor: C.borderLight, backgroundColor: C.white }]}>
+          <TouchableOpacity style={[styles.backBtn, { backgroundColor: C.gray200 }]} onPress={() => navigation.goBack()}>
+            <Text style={[styles.backChevron, { color: C.black }]}>&#8249;</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chargement...</Text>
+          <Text style={[styles.headerTitle, { color: C.black }]}>Chargement...</Text>
           <View style={{ width: 34 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Chargement...</Text>
+          <Text style={[styles.loadingText, { color: C.gray700 }]}>Chargement...</Text>
         </View>
       </View>
     );
@@ -70,13 +72,13 @@ export const PlaceDetailModal: React.FC = () => {
   const maxPercent = Math.max(...place.ratingDistribution, 1);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backChevron}>&#8249;</Text>
+      <View style={[styles.header, { borderBottomColor: C.borderLight, backgroundColor: C.white }]}>
+        <TouchableOpacity style={[styles.backBtn, { backgroundColor: C.gray200 }]} onPress={() => navigation.goBack()}>
+          <Text style={[styles.backChevron, { color: C.black }]}>&#8249;</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: C.black }]} numberOfLines={1}>
           {place.name}
         </Text>
         <View style={{ width: 34 }} />
@@ -88,15 +90,15 @@ export const PlaceDetailModal: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Rating Block */}
-        <View style={styles.ratingBlock}>
+        <View style={[styles.ratingBlock, { borderBottomColor: C.border }]}>
           {/* Left Column */}
           <View style={styles.ratingLeft}>
-            <Text style={styles.ratingBig}>{place.rating}</Text>
+            <Text style={[styles.ratingBig, { color: C.black }]}>{place.rating}</Text>
             {renderStars(place.rating, 16)}
-            <Text style={styles.reviewCountText}>{place.reviewCount} avis Proof</Text>
+            <Text style={[styles.reviewCountText, { color: C.gray700 }]}>{place.reviewCount} avis Proof</Text>
             <View style={styles.addressRow}>
               <Text style={styles.addressPin}>📍</Text>
-              <Text style={styles.addressText} numberOfLines={2}>
+              <Text style={[styles.addressText, { color: C.gray700 }]} numberOfLines={2}>
                 {place.address}
               </Text>
             </View>
@@ -109,12 +111,12 @@ export const PlaceDetailModal: React.FC = () => {
               const barWidth = (percent / maxPercent) * maxBarWidth;
               return (
                 <View key={star} style={styles.histogramRow}>
-                  <Text style={styles.histogramLabel}>{star}</Text>
-                  <View style={styles.histogramTrack}>
+                  <Text style={[styles.histogramLabel, { color: C.gray700 }]}>{star}</Text>
+                  <View style={[styles.histogramTrack, { backgroundColor: C.gray300 }]}>
                     <View
                       style={[
                         styles.histogramBar,
-                        { width: Math.max(barWidth, 2) },
+                        { width: Math.max(barWidth, 2), backgroundColor: C.primary },
                       ]}
                     />
                   </View>
@@ -125,7 +127,7 @@ export const PlaceDetailModal: React.FC = () => {
         </View>
 
         {/* Reviews Section */}
-        <Text style={styles.sectionLabel}>AVIS DE LA COMMUNAUTÉ PROOF</Text>
+        <Text style={[styles.sectionLabel, { color: C.black }]}>AVIS DE LA COMMUNAUTÉ PROOF</Text>
 
         {place.reviews.map((review) => (
           <View key={review.id} style={styles.reviewCard}>
@@ -137,10 +139,10 @@ export const PlaceDetailModal: React.FC = () => {
                 size="S"
               />
               <View style={styles.reviewContent}>
-                <Text style={styles.reviewText}>{review.text}</Text>
+                <Text style={[styles.reviewText, { color: C.black }]}>{review.text}</Text>
                 <View style={styles.reviewFooter}>
                   {renderStars(review.rating, 12)}
-                  <Text style={styles.reviewAuthor}>{review.authorName}</Text>
+                  <Text style={[styles.reviewAuthor, { color: C.gray700 }]}>{review.authorName}</Text>
                 </View>
               </View>
             </View>
@@ -149,11 +151,11 @@ export const PlaceDetailModal: React.FC = () => {
       </ScrollView>
 
       {/* CTA Button */}
-      <View style={[styles.ctaContainer, { paddingBottom: insets.bottom + 14 }]}>
+      <View style={[styles.ctaContainer, { paddingBottom: insets.bottom + 14, backgroundColor: C.white, borderTopColor: C.border }]}>
         <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8}>
           <Text style={styles.ctaText}>📍 Noter ce lieu</Text>
         </TouchableOpacity>
-        <Text style={styles.ctaSubtitle}>Valide uniquement si tu as fait le plan</Text>
+        <Text style={[styles.ctaSubtitle, { color: C.gray700 }]}>Valide uniquement si tu as fait le plan</Text>
       </View>
     </View>
   );
@@ -162,7 +164,6 @@ export const PlaceDetailModal: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
   },
   header: {
     flexDirection: 'row',
@@ -171,27 +172,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
   },
   backBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: Colors.gray200,
     alignItems: 'center',
     justifyContent: 'center',
   },
   backChevron: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.black,
     marginTop: -2,
   },
   headerTitle: {
     flex: 1,
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.black,
     textAlign: 'center',
     marginHorizontal: 10,
   },
@@ -202,7 +199,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: Colors.gray700,
   },
   scrollView: {
     flex: 1,
@@ -214,7 +210,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 18,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   ratingLeft: {
     flex: 1,
@@ -223,13 +218,11 @@ const styles = StyleSheet.create({
   ratingBig: {
     fontSize: 54,
     fontWeight: '700',
-    color: Colors.black,
     lineHeight: 58,
     marginBottom: 4,
   },
   reviewCountText: {
     fontSize: 12,
-    color: Colors.gray700,
     marginTop: 4,
   },
   addressRow: {
@@ -244,7 +237,6 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 12,
-    color: Colors.gray700,
     flex: 1,
     lineHeight: 16,
   },
@@ -259,7 +251,6 @@ const styles = StyleSheet.create({
   histogramLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.gray700,
     width: 14,
     textAlign: 'right',
     marginRight: 6,
@@ -267,19 +258,16 @@ const styles = StyleSheet.create({
   histogramTrack: {
     width: 120,
     height: 8,
-    backgroundColor: Colors.gray300,
     borderRadius: 4,
     overflow: 'hidden',
   },
   histogramBar: {
     height: 8,
-    backgroundColor: Colors.primary,
     borderRadius: 4,
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.black,
     letterSpacing: 0.5,
     paddingHorizontal: 18,
     marginTop: 20,
@@ -300,7 +288,6 @@ const styles = StyleSheet.create({
   reviewText: {
     fontSize: 12,
     lineHeight: 18,
-    color: Colors.black,
     marginBottom: 6,
   },
   reviewFooter: {
@@ -310,7 +297,6 @@ const styles = StyleSheet.create({
   },
   reviewAuthor: {
     fontSize: 11,
-    color: Colors.gray700,
   },
   ctaContainer: {
     position: 'absolute',
@@ -319,9 +305,7 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 18,
     paddingTop: 12,
-    backgroundColor: Colors.white,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
     alignItems: 'center',
   },
   ctaButton: {
@@ -338,7 +322,6 @@ const styles = StyleSheet.create({
   },
   ctaSubtitle: {
     fontSize: 11,
-    color: Colors.gray700,
     marginTop: 6,
   },
 });
