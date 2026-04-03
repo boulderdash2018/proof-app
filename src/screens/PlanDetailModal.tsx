@@ -19,8 +19,12 @@ import { Avatar, Chip, UserBadge, XpBadge } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { Plan, Comment } from '../types';
+import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
+
+const TRANSPORT_EMOJIS: Record<TransportMode, string> = {
+  'Métro': '🚇', 'Vélo': '🚲', 'À pied': '🚶', 'Voiture': '🚗', 'Trottinette': '🛴',
+};
 
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
@@ -202,28 +206,81 @@ export const PlanDetailModal: React.FC = () => {
 
           <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.plan_full}</Text>
 
-          {plan.places.map((place, index) => (
-            <TouchableOpacity
-              key={place.id}
-              style={[styles.placeRow, { borderBottomColor: C.borderLight }]}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('PlaceDetail', { placeId: place.id, planId: plan.id })}
-            >
-              <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
-                <Text style={styles.placeNumberText}>{index + 1}</Text>
+          {plan.places.map((place, index) => {
+            // Find travel segment to next place
+            const travelToNext: TravelSegment | undefined = plan.travelSegments?.find(
+              (ts) => ts.fromPlaceId === place.id
+            ) || (plan.travelSegments && plan.travelSegments[index]);
+            const isLast = index === plan.places.length - 1;
+
+            return (
+              <View key={place.id}>
+                <TouchableOpacity
+                  style={[styles.placeRow, !isLast && !travelToNext ? { borderBottomColor: C.borderLight, borderBottomWidth: 1 } : {}]}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('PlaceDetail', { placeId: place.id, planId: plan.id })}
+                >
+                  {/* Left column: number + dashed line */}
+                  <View style={styles.placeLeftCol}>
+                    <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
+                      <Text style={styles.placeNumberText}>{index + 1}</Text>
+                    </View>
+                  </View>
+
+                  {/* Right column: info */}
+                  <View style={styles.placeInfo}>
+                    <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
+                    <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type} &middot; {place.address.split(',')[0]}</Text>
+                    <View style={styles.ratingRow}>
+                      <Text style={[styles.ratingStar, { color: C.primary }]}>★</Text>
+                      <Text style={[styles.ratingNumber, { color: C.black }]}>{place.rating}</Text>
+                      <Text style={[styles.ratingCount, { color: C.gray700 }]}>({place.reviewCount} {t.plan_reviews})</Text>
+                    </View>
+                    {/* Per-place price & duration */}
+                    {(place.placePrice != null || place.placeDuration != null) && (
+                      <View style={styles.placeMeta}>
+                        {place.placePrice != null && place.placePrice > 0 && (
+                          <View style={[styles.placeMetaTag, { backgroundColor: C.gray200 }]}>
+                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>💰 {place.placePrice}€</Text>
+                          </View>
+                        )}
+                        {place.placeDuration != null && place.placeDuration > 0 && (
+                          <View style={[styles.placeMetaTag, { backgroundColor: C.gray200 }]}>
+                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>⏱️ {place.placeDuration}min</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.placeChevron, { color: C.gray600 }]}>›</Text>
+                </TouchableOpacity>
+
+                {/* Dashed line + travel segment between places */}
+                {!isLast && (
+                  <View style={styles.travelSegment}>
+                    <View style={styles.travelDashedCol}>
+                      <View style={[styles.dashedLine, { borderLeftColor: C.primary + '50' }]} />
+                    </View>
+                    <View style={[styles.travelInfo, { backgroundColor: C.gray200 + '80' }]}>
+                      {travelToNext ? (
+                        <>
+                          <Text style={[styles.travelText, { color: C.gray700 }]}>
+                            {TRANSPORT_EMOJIS[travelToNext.transport]} {travelToNext.transport}
+                          </Text>
+                          <View style={[styles.travelDot, { backgroundColor: C.gray500 }]} />
+                          <Text style={[styles.travelText, { color: C.gray700 }]}>
+                            {travelToNext.duration}min
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.travelText, { color: C.gray500 }]}>⋯</Text>
+                      )}
+                    </View>
+                  </View>
+                )}
               </View>
-              <View style={styles.placeInfo}>
-                <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
-                <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type} &middot; {place.address.split(',')[0]}</Text>
-                <View style={styles.ratingRow}>
-                  <Text style={[styles.ratingStar, { color: C.primary }]}>★</Text>
-                  <Text style={[styles.ratingNumber, { color: C.black }]}>{place.rating}</Text>
-                  <Text style={[styles.ratingCount, { color: C.gray700 }]}>({place.reviewCount} {t.plan_reviews})</Text>
-                </View>
-              </View>
-              <Text style={[styles.placeChevron, { color: C.gray600 }]}>›</Text>
-            </TouchableOpacity>
-          ))}
+            );
+          })}
 
           {/* ========== COMMENTS SECTION ========== */}
           <Text style={[styles.sectionLabel, { color: C.gray700, marginTop: 24 }]}>
@@ -328,8 +385,9 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 13, fontWeight: '600' },
   metaDot: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 10 },
   sectionLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1, paddingHorizontal: 18, marginTop: 18, marginBottom: 10 },
-  placeRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1 },
-  placeNumber: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  placeRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
+  placeLeftCol: { alignItems: 'center', marginRight: 12 },
+  placeNumber: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   placeNumberText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   placeInfo: { flex: 1 },
   placeName: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
@@ -338,7 +396,18 @@ const styles = StyleSheet.create({
   ratingStar: { fontSize: 12, marginRight: 3 },
   ratingNumber: { fontSize: 12, fontWeight: '600', marginRight: 4 },
   ratingCount: { fontSize: 11 },
-  placeChevron: { fontSize: 18, marginLeft: 8 },
+  placeMeta: { flexDirection: 'row', marginTop: 6, gap: 6 },
+  placeMetaTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  placeMetaText: { fontSize: 11, fontWeight: '600' },
+  placeChevron: { fontSize: 18, marginLeft: 8, marginTop: 6 },
+
+  // Travel segment between places
+  travelSegment: { flexDirection: 'row', paddingHorizontal: 18, paddingVertical: 2 },
+  travelDashedCol: { width: 30, alignItems: 'center' },
+  dashedLine: { height: 32, borderLeftWidth: 2, borderStyle: 'dashed' },
+  travelInfo: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, marginLeft: 12 },
+  travelText: { fontSize: 11, fontWeight: '600' },
+  travelDot: { width: 3, height: 3, borderRadius: 1.5, marginHorizontal: 6 },
 
   // Comments
   emptyComments: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 18 },
