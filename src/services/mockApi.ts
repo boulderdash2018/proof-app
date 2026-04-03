@@ -236,7 +236,16 @@ const places: Record<string, Place[]> = {
 
 // ==================== SEED PLANS ====================
 
-const seedPlans: Plan[] = [
+const GRADIENTS = [
+  'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
+  'linear-gradient(135deg, #5ED4B4, #1D9E75, #0B5C48)',
+  'linear-gradient(135deg, #F4A0C0, #D4537E, #993556)',
+  'linear-gradient(135deg, #7C8CF8, #5B5EE8, #3A3DB0)',
+  'linear-gradient(135deg, #FFD76E, #F5A623, #D48B07)',
+  'linear-gradient(135deg, #82E0F5, #3EADD1, #1A7BA0)',
+];
+
+let seedPlans: Plan[] = [
   {
     id: 'plan-1',
     authorId: 'user-1',
@@ -487,14 +496,15 @@ export const mockApi = {
   },
 
   // Create
-  publishPlan: async (planData: Partial<Plan>): Promise<Plan> => {
+  publishPlan: async (planData: Partial<Plan>, author?: User): Promise<Plan> => {
     await sleep(1500);
+    const randomGradient = GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
     const newPlan: Plan = {
       id: 'plan-new-' + Date.now(),
-      authorId: currentUser.id,
-      author: currentUser,
+      authorId: author?.id || currentUser.id,
+      author: author || currentUser,
       title: planData.title || '',
-      gradient: 'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
+      gradient: randomGradient,
       tags: planData.tags || [],
       places: planData.places || [],
       price: planData.price || '~0€',
@@ -506,6 +516,8 @@ export const mockApi = {
       createdAt: new Date().toISOString(),
       timeAgo: 'maintenant',
     };
+    // Add to seedPlans so it appears in feed + profile
+    seedPlans = [newPlan, ...seedPlans];
     return newPlan;
   },
 

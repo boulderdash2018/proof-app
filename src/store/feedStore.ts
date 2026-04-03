@@ -11,6 +11,7 @@ interface FeedStore {
   savedPlanIds: Set<string>;
   fetchFeed: () => Promise<void>;
   refreshFeed: () => Promise<void>;
+  addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
   toggleSave: (planId: string) => void;
 }
@@ -40,6 +41,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     } catch {
       set({ isRefreshing: false });
     }
+  },
+
+  addPlan: (plan: Plan) => {
+    const { plans } = get();
+    set({ plans: [plan, ...plans] });
   },
 
   toggleLike: (planId: string) => {
