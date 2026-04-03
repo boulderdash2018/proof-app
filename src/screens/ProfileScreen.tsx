@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Layout } from '../constants';
 import { Avatar } from '../components';
@@ -46,6 +46,16 @@ export const ProfileScreen: React.FC = () => {
       getFriendIds(user.id).then(ids => setFriendCount(ids.length));
     }
   }, [user]);
+
+  // Refresh friend count every time the profile tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        getFriendIds(user.id).then(ids => setFriendCount(ids.length));
+        fetchIncomingRequests(user.id);
+      }
+    }, [user])
+  );
 
   if (!user) return null;
 

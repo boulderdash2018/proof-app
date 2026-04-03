@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout } from '../constants';
 import { Avatar, UserBadge, PrimaryButton, SecondaryButton } from '../components';
@@ -41,6 +41,11 @@ export const OtherProfileScreen: React.FC = () => {
 
   const userId = route.params?.userId;
 
+  const refreshCounts = useCallback(() => {
+    if (!userId) return;
+    getFriendIds(userId).then(ids => setRealFriendCount(ids.length));
+  }, [userId]);
+
   useEffect(() => {
     if (!userId || !currentUser) return;
     getUserById(userId).then(setUser);
@@ -52,8 +57,15 @@ export const OtherProfileScreen: React.FC = () => {
       }
     });
     mockApi.getUserPlans(userId).then(setUserPlans);
-    getFriendIds(userId).then(ids => setRealFriendCount(ids.length));
+    refreshCounts();
   }, [userId, currentUser]);
+
+  // Refresh counts when screen comes back into focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshCounts();
+    }, [refreshCounts])
+  );
 
   const handleAddFriend = async () => {
     if (!currentUser || !userId) return;
@@ -70,6 +82,7 @@ export const OtherProfileScreen: React.FC = () => {
     setActionLoading(true);
     await acceptRequest(pendingRequestId, currentUser.id);
     setFriendStatus('friends');
+    refreshCounts();
     setActionLoading(false);
   };
 
@@ -78,6 +91,7 @@ export const OtherProfileScreen: React.FC = () => {
     setActionLoading(true);
     await declineRequest(pendingRequestId, currentUser.id);
     setFriendStatus('none');
+    refreshCounts();
     setActionLoading(false);
   };
 
@@ -86,6 +100,7 @@ export const OtherProfileScreen: React.FC = () => {
     setActionLoading(true);
     await removeFriend(currentUser.id, userId);
     setFriendStatus('none');
+    refreshCounts();
     setActionLoading(false);
   };
 
