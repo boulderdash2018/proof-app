@@ -6,11 +6,15 @@ import {
   unsavePlan as unsavePlanFS,
   saveCreatedPlan,
 } from '../services/plansService';
+import { useAuthStore } from './authStore';
+
+const getCurrentUserId = (): string | null => {
+  return useAuthStore.getState().user?.id || null;
+};
 
 interface SavesStore {
   savedPlans: SavedPlan[];
   isLoading: boolean;
-  currentUserId: string | null;
   fetchSaves: (userId?: string) => Promise<void>;
   markAsDone: (planId: string) => void;
   addCreatedPlan: (plan: Plan) => void;
@@ -20,12 +24,11 @@ interface SavesStore {
 export const useSavesStore = create<SavesStore>((set, get) => ({
   savedPlans: [],
   isLoading: false,
-  currentUserId: null,
 
   fetchSaves: async (userId?: string) => {
-    const uid = userId || get().currentUserId;
+    const uid = userId || getCurrentUserId();
     if (!uid) return;
-    set({ isLoading: true, currentUserId: uid });
+    set({ isLoading: true });
     try {
       const savedPlans = await fetchSavedPlans(uid);
       set({ savedPlans, isLoading: false });
@@ -36,33 +39,27 @@ export const useSavesStore = create<SavesStore>((set, get) => ({
   },
 
   markAsDone: (planId: string) => {
-    const { savedPlans, currentUserId } = get();
+    const uid = getCurrentUserId();
+    const { savedPlans } = get();
     const updated = savedPlans.map((sp) =>
       sp.planId === planId ? { ...sp, isDone: true } : sp
     );
     set({ savedPlans: updated });
-    // Persist to Firestore
-    if (currentUserId) {
-      markPlanAsDone(currentUserId, planId).catch(console.error);
-    }
+    if (uid) markPlanAsDone(uid, planId).catch(console.error);
   },
 
   addCreatedPlan: (plan: Plan) => {
-    const { savedPlans, currentUserId } = get();
+    const uid = getCurrentUserId();
+    const { savedPlans } = get();
     const entry: SavedPlan = { planId: plan.id, plan, isDone: true, savedAt: new Date().toISOString() };
     set({ savedPlans: [entry, ...savedPlans] });
-    // Persist to Firestore
-    if (currentUserId) {
-      saveCreatedPlan(currentUserId, plan.id).catch(console.error);
-    }
+    if (uid) saveCreatedPlan(uid, plan.id).catch(console.error);
   },
 
   unsave: (planId: string) => {
-    const { savedPlans, currentUserId } = get();
+    const uid = getCurrentUserId();
+    const { savedPlans } = get();
     set({ savedPlans: savedPlans.filter((sp) => sp.planId !== planId) });
-    // Persist to Firestore
-    if (currentUserId) {
-      unsavePlanFS(currentUserId, planId).catch(console.error);
-    }
+    if (uid) unsavePlanFS(uid, planId).catch(console.error);
   },
 }));

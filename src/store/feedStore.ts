@@ -10,6 +10,12 @@ import {
   unsavePlan as unsavePlanFS,
 } from '../services/plansService';
 import { useSavesStore } from './savesStore';
+import { useAuthStore } from './authStore';
+
+// Helper to get current user id reliably
+const getCurrentUserId = (): string | null => {
+  return useAuthStore.getState().user?.id || null;
+};
 
 interface FeedStore {
   plans: Plan[];
@@ -17,7 +23,6 @@ interface FeedStore {
   isRefreshing: boolean;
   likedPlanIds: Set<string>;
   savedPlanIds: Set<string>;
-  currentUserId: string | null;
   fetchFeed: (userId?: string) => Promise<void>;
   refreshFeed: () => Promise<void>;
   addPlan: (plan: Plan) => void;
@@ -31,19 +36,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   isRefreshing: false,
   likedPlanIds: new Set<string>(),
   savedPlanIds: new Set<string>(),
-  currentUserId: null,
 
   fetchFeed: async (userId?: string) => {
+    const uid = userId || getCurrentUserId();
     set({ isLoading: true });
     try {
       const plans = await fetchFeedPlans();
       const updates: Partial<FeedStore> = { plans, isLoading: false };
 
-      if (userId) {
-        updates.currentUserId = userId;
+      if (uid) {
         const [likedIds, savedIds] = await Promise.all([
-          fetchLikedPlanIds(userId),
-          fetchSavedPlanIds(userId),
+          fetchLikedPlanIds(uid),
+          fetchSavedPlanIds(uid),
         ]);
         updates.likedPlanIds = likedIds;
         updates.savedPlanIds = savedIds;
@@ -57,16 +61,16 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   refreshFeed: async () => {
-    const { currentUserId } = get();
+    const uid = getCurrentUserId();
     set({ isRefreshing: true });
     try {
       const plans = await fetchFeedPlans();
       const updates: Partial<FeedStore> = { plans, isRefreshing: false };
 
-      if (currentUserId) {
+      if (uid) {
         const [likedIds, savedIds] = await Promise.all([
-          fetchLikedPlanIds(currentUserId),
-          fetchSavedPlanIds(currentUserId),
+          fetchLikedPlanIds(uid),
+          fetchSavedPlanIds(uid),
         ]);
         updates.likedPlanIds = likedIds;
         updates.savedPlanIds = savedIds;
@@ -84,9 +88,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   },
 
   toggleLike: (planId: string) => {
-    const { likedPlanIds, plans, currentUserId } = get();
-    if (!currentUserId) return;
+    const uid = getCurrentUserId();
+    if (!uid) { console.warn('[feedStore] toggleLike: no user id'); return; }
 
+    const { likedPlanIds, plans } = get();
     const newLiked = new Set(likedPlanIds);
     const isLiked = newLiked.has(planId);
     const plan = plans.find((p) => p.id === planId);
@@ -107,13 +112,14 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
 
     set({ likedPlanIds: newLiked, plans: updatedPlans });
     // Persist to Firestore in background
-    toggleLikePlan(currentUserId, planId, isLiked).catch(console.error);
+    toggleLikePlan(uid, planId, isLiked).catch(console.error);
   },
 
   toggleSave: (planId: string) => {
-    const { savedPlanIds, plans, currentUserId } = get();
-    if (!currentUserId) return;
+    const uid = getCurrentUserId();
+    if (!uid) { console.warn('[feedStore] toggleSave: no user id'); return; }
 
+    const { savedPlanIds, plans } = get();
     const newSaved = new Set(savedPlanIds);
     const plan = plans.find((p) => p.id === planId);
     const savesStore = useSavesStore.getState();
@@ -123,7 +129,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       analytics.planUnsaved(planId);
       savesStore.unsave(planId);
       // Persist to Firestore
-      unsavePlanFS(currentUserId, planId).catch(console.error);
+      unsavePlanFS(uid, planId).catch(console.error);
     } else {
       newSaved.add(planId);
       if (plan) {
@@ -132,7 +138,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         const entry: SavedPlan = { planId: plan.id, plan, isDone: false, savedAt: new Date().toISOString() };
         useSavesStore.setState((state) => ({ savedPlans: [entry, ...state.savedPlans] }));
         // Persist to Firestore
-        savePlanFS(currentUserId, planId).catch(console.error);
+        savePlanFS(uid, planId).catch(console.error);
       }
     }
 
