@@ -6,11 +6,13 @@ import { Colors, Layout } from '../constants';
 import { Avatar, UserBadge } from '../components';
 import { User } from '../types';
 import mockApi from '../services/mockApi';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const FollowersScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export const FollowersScreen: React.FC = () => {
         <Text style={styles.name}>{item.displayName}</Text>
         <UserBadge type={item.badgeType} small />
       </View>
-      <TouchableOpacity style={styles.followBtn}><Text style={styles.followText}>Suivre</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.followBtn}><Text style={styles.followText}>{t.followers_follow}</Text></TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -32,7 +34,7 @@ export const FollowersScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.back} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={styles.headerTitle}>Followers</Text>
+        <Text style={styles.headerTitle}>{t.followers_title}</Text>
         <View style={{ width: 30 }} />
       </View>
       <FlatList data={users} renderItem={renderItem} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} />

@@ -12,27 +12,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { PrimaryButton } from '../components';
-
-const SLIDES = [
-  {
-    emoji: '🗺️',
-    title: 'Découvre ta ville autrement',
-    subtitle: 'Des journées entières, pas juste des adresses.',
-  },
-  {
-    emoji: '👥',
-    title: 'Partagé par de vraies personnes',
-    subtitle: 'Tes amis, des créateurs locaux, des curieux comme toi.',
-  },
-  {
-    emoji: '🏆',
-    title: 'Gagne des points en explorant',
-    subtitle: 'XP, coins, badges — chaque sortie compte.',
-  },
-];
+import { useTranslation } from '../hooks/useTranslation';
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
+
+  const SLIDES = [
+    { emoji: '🗺️', title: t.onboarding_title_1, subtitle: t.onboarding_sub_1 },
+    { emoji: '👥', title: t.onboarding_title_2, subtitle: t.onboarding_sub_2 },
+    { emoji: '🏆', title: t.onboarding_title_3, subtitle: t.onboarding_sub_3 },
+  ];
   const scrollRef = useRef<ScrollView>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const { width } = useWindowDimensions();
@@ -78,7 +68,7 @@ export const OnboardingScreen: React.FC = () => {
 
         <View style={styles.buttons}>
           <PrimaryButton
-            label={currentPage === 2 ? 'Commencer' : 'Suivant'}
+            label={currentPage === 2 ? t.onboarding_start : t.next}
             onPress={() => {
               if (currentPage === 2) {
                 navigation.navigate('Signup');
@@ -91,7 +81,7 @@ export const OnboardingScreen: React.FC = () => {
             style={styles.loginLink}
             onPress={() => navigation.navigate('Login')}
           >
-            J'ai déjà un compte
+            {t.onboarding_login}
           </Text>
         </View>
       </View>

@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { Avatar, PrimaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -16,6 +17,7 @@ export const EditProfileScreen: React.FC = () => {
   const [bio, setBio] = useState(user?.bio || '');
   const [isPrivate, setIsPrivate] = useState(user?.isPrivate || false);
   const [isSaving, setIsSaving] = useState(false);
+  const { t } = useTranslation();
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -28,24 +30,24 @@ export const EditProfileScreen: React.FC = () => {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.back} onPress={() => navigation.goBack()}>‹ Retour</Text>
-          <Text style={styles.headerTitle}>Modifier le profil</Text>
+          <Text style={styles.back} onPress={() => navigation.goBack()}>{t.back}</Text>
+          <Text style={styles.headerTitle}>{t.edit_profile_title}</Text>
           <View style={{ width: 60 }} />
         </View>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.avatarSection}>
             <Avatar initials={user?.initials || 'LT'} bg={user?.avatarBg || '#F0EEFF'} color={user?.avatarColor || '#534AB7'} size="L" borderColor={Colors.primary} />
-            <Text style={styles.changePhotoLink}>Changer la photo</Text>
+            <Text style={styles.changePhotoLink}>{t.edit_profile_change_photo}</Text>
           </View>
-          <TextInput label="Nom affiché" value={displayName} onChangeText={setDisplayName} />
-          <TextInput label="Pseudo (@)" value={username} onChangeText={setUsername} autoCapitalize="none" />
-          <TextInput label="Bio" value={bio} onChangeText={setBio} multiline numberOfLines={3} maxLength={150} placeholder="Dis quelque chose sur toi..." />
+          <TextInput label={t.edit_profile_display_name} value={displayName} onChangeText={setDisplayName} />
+          <TextInput label={t.edit_profile_username} value={username} onChangeText={setUsername} autoCapitalize="none" />
+          <TextInput label={t.edit_profile_bio} value={bio} onChangeText={setBio} multiline numberOfLines={3} maxLength={150} placeholder={t.edit_profile_bio_placeholder} />
           <Text style={styles.charCount}>{bio.length}/150</Text>
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Compte privé</Text>
+            <Text style={styles.switchLabel}>{t.edit_profile_private}</Text>
             <Switch value={isPrivate} onValueChange={setIsPrivate} trackColor={{ true: Colors.primary }} />
           </View>
-          <PrimaryButton label="Enregistrer" onPress={handleSave} loading={isSaving} />
+          <PrimaryButton label={t.save} onPress={handleSave} loading={isSaving} />
         </ScrollView>
       </View>
     </KeyboardAvoidingView>

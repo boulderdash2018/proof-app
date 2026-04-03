@@ -14,12 +14,14 @@ import { Colors, Typography, Layout } from '../constants';
 import { PrimaryButton, SecondaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const SignupScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const signup = useAuthStore((s) => s.signup);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const C = useColors();
+  const { t } = useTranslation();
 
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,19 +35,19 @@ export const SignupScreen: React.FC = () => {
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!firstName.trim()) {
-      newErrors.firstName = 'Prénom requis';
+      newErrors.firstName = t.signup_error_firstname;
     }
     if (!email.includes('@')) {
-      newErrors.email = 'Email invalide';
+      newErrors.email = t.signup_error_email;
     }
     if (password.length < 8) {
-      newErrors.password = '8 caractères minimum';
+      newErrors.password = t.signup_error_password;
     }
     if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
+      newErrors.confirmPassword = t.signup_error_confirm;
     }
     if (!accepted) {
-      newErrors.accepted = 'Tu dois accepter les conditions';
+      newErrors.accepted = t.signup_error_terms;
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -58,7 +60,7 @@ export const SignupScreen: React.FC = () => {
       await signup({ firstName, email, password });
       navigation.navigate('SetupProfile');
     } catch (err: any) {
-      setErrors({ email: err.message || "Erreur lors de l'inscription" });
+      setErrors({ email: err.message || t.signup_error_generic });
     } finally {
       setLoading(false);
     }
@@ -79,43 +81,43 @@ export const SignupScreen: React.FC = () => {
             proof<Text style={{ color: C.primary }}>.</Text>
           </Text>
 
-          <Text style={[styles.title, { color: C.black }]}>Crée ton compte</Text>
+          <Text style={[styles.title, { color: C.black }]}>{t.signup_title}</Text>
 
           <TextInput
-            label="Prénom"
+            label={t.signup_firstname_label}
             value={firstName}
             onChangeText={setFirstName}
             error={errors.firstName}
-            placeholder="Ton prénom"
+            placeholder={t.signup_firstname_placeholder}
           />
 
           <TextInput
-            label="Email"
+            label={t.login_email_label}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             error={errors.email}
-            placeholder="ton@email.com"
+            placeholder={t.login_email_placeholder}
           />
 
           <TextInput
-            label="Mot de passe"
+            label={t.login_password_label}
             value={password}
             onChangeText={setPassword}
             isPassword
             error={errors.password}
-            placeholder="Ton mot de passe"
+            placeholder={t.login_password_placeholder}
           />
-          <Text style={styles.passwordHint}>8 caractères minimum</Text>
+          <Text style={styles.passwordHint}>{t.signup_password_hint}</Text>
 
           <TextInput
-            label="Confirmer mot de passe"
+            label={t.signup_confirm_label}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             isPassword
             error={errors.confirmPassword}
-            placeholder="Confirme ton mot de passe"
+            placeholder={t.signup_confirm_placeholder}
           />
 
           <TouchableOpacity
@@ -125,8 +127,7 @@ export const SignupScreen: React.FC = () => {
           >
             <Text style={styles.checkbox}>{accepted ? '☑' : '☐'}</Text>
             <Text style={styles.checkboxLabel}>
-              J'accepte les conditions d'utilisation et la politique de
-              confidentialité
+              {t.signup_accept_terms}
             </Text>
           </TouchableOpacity>
           {errors.accepted && (
@@ -136,26 +137,26 @@ export const SignupScreen: React.FC = () => {
           <View style={styles.spacer} />
 
           <PrimaryButton
-            label="Créer mon compte"
+            label={t.signup_submit}
             onPress={handleSignup}
             loading={loading}
           />
 
           <View style={styles.separator}>
             <View style={styles.line} />
-            <Text style={styles.separatorText}>ou</Text>
+            <Text style={styles.separatorText}>{t.or}</Text>
             <View style={styles.line} />
           </View>
 
           <SecondaryButton
-            label="Continuer avec Google"
+            label={t.login_google}
             icon="🔵"
             onPress={async () => {
               setGoogleLoading(true);
               try {
                 await loginWithGoogle();
               } catch (err: any) {
-                setErrors({ email: err.message || 'Erreur Google' });
+                setErrors({ email: err.message || t.login_error_google });
               } finally {
                 setGoogleLoading(false);
               }
@@ -164,9 +165,9 @@ export const SignupScreen: React.FC = () => {
           />
 
           <View style={styles.bottomRow}>
-            <Text style={styles.bottomText}>Déjà un compte ?</Text>
+            <Text style={styles.bottomText}>{t.signup_has_account}</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.bottomLink}>Se connecter</Text>
+              <Text style={styles.bottomLink}>{t.login_submit}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

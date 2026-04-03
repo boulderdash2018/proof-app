@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { PlanCard, PtsPill, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
 
 export const FeedScreen: React.FC = () => {
@@ -20,6 +21,7 @@ export const FeedScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const C = useColors();
+  const { t } = useTranslation();
   const { plans, isLoading, isRefreshing, likedPlanIds, savedPlanIds, fetchFeed, refreshFeed, toggleLike, toggleSave } =
     useFeedStore();
   const { unreadCount, fetchNotifications } = useNotifStore();
@@ -89,9 +91,9 @@ export const FeedScreen: React.FC = () => {
           ListEmptyComponent={
             <EmptyState
               icon="🏙️"
-              title="Aucun plan pour l'instant"
-              subtitle="Découvre des plans partagés par la communauté"
-              ctaLabel="Explorer"
+              title={t.feed_empty_title}
+              subtitle={t.feed_empty_subtitle}
+              ctaLabel={t.feed_empty_cta}
               onCtaPress={() => navigation.navigate('ExploreTab')}
             />
           }

@@ -14,12 +14,14 @@ import { Colors, Typography, Layout } from '../constants';
 import { PrimaryButton, SecondaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const login = useAuthStore((s) => s.login);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const C = useColors();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,10 +32,10 @@ export const LoginScreen: React.FC = () => {
   const validate = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
     if (!email.includes('@')) {
-      newErrors.email = 'Email invalide';
+      newErrors.email = t.login_error_email;
     }
     if (!password) {
-      newErrors.password = 'Mot de passe requis';
+      newErrors.password = t.login_error_password;
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -46,7 +48,7 @@ export const LoginScreen: React.FC = () => {
       await login(email, password);
       // RootNavigator auto-redirects on isAuthenticated change
     } catch (err: any) {
-      setErrors({ password: err.message || 'Identifiants incorrects' });
+      setErrors({ password: err.message || t.login_error_credentials });
     } finally {
       setLoading(false);
     }
@@ -67,55 +69,55 @@ export const LoginScreen: React.FC = () => {
             proof<Text style={{ color: C.primary }}>.</Text>
           </Text>
 
-          <Text style={[styles.title, { color: C.black }]}>Bon retour 👋</Text>
+          <Text style={[styles.title, { color: C.black }]}>{t.login_welcome}</Text>
 
           <TextInput
-            label="Email"
+            label={t.login_email_label}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             error={errors.email}
-            placeholder="ton@email.com"
+            placeholder={t.login_email_placeholder}
           />
 
           <TextInput
-            label="Mot de passe"
+            label={t.login_password_label}
             value={password}
             onChangeText={setPassword}
             isPassword
             error={errors.password}
-            placeholder="Ton mot de passe"
+            placeholder={t.login_password_placeholder}
           />
 
           <TouchableOpacity
             style={styles.forgotRow}
             onPress={() => navigation.navigate('ForgotPassword')}
           >
-            <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+            <Text style={styles.forgotText}>{t.login_forgot}</Text>
           </TouchableOpacity>
 
           <PrimaryButton
-            label="Se connecter"
+            label={t.login_submit}
             onPress={handleLogin}
             loading={loading}
           />
 
           <View style={styles.separator}>
             <View style={styles.line} />
-            <Text style={styles.separatorText}>ou</Text>
+            <Text style={styles.separatorText}>{t.or}</Text>
             <View style={styles.line} />
           </View>
 
           <SecondaryButton
-            label="Continuer avec Google"
+            label={t.login_google}
             icon="🔵"
             onPress={async () => {
               setGoogleLoading(true);
               try {
                 await loginWithGoogle();
               } catch (err: any) {
-                setErrors({ password: err.message || 'Erreur Google' });
+                setErrors({ password: err.message || t.login_error_google });
               } finally {
                 setGoogleLoading(false);
               }
@@ -124,9 +126,9 @@ export const LoginScreen: React.FC = () => {
           />
 
           <View style={styles.bottomRow}>
-            <Text style={styles.bottomText}>Pas encore de compte ? </Text>
+            <Text style={styles.bottomText}>{t.login_no_account}</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-              <Text style={styles.bottomLink}>S'inscrire</Text>
+              <Text style={styles.bottomLink}>{t.login_signup_link}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

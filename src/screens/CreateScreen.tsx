@@ -16,6 +16,7 @@ import { Colors, Layout, CATEGORIES } from '../constants';
 import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, Place } from '../types';
 import mockApi from '../services/mockApi';
 import { trackEvent } from '../services/posthogConfig';
@@ -27,6 +28,16 @@ export const CreateScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const C = useColors();
+  const { t } = useTranslation();
+
+  const getTransportLabel = (mode: TransportMode): string => {
+    const map: Record<TransportMode, string> = {
+      'Métro': t.transport_metro, 'Vélo': t.transport_velo,
+      'À pied': t.transport_pied, 'Voiture': t.transport_voiture,
+      'Trottinette': t.transport_trottinette,
+    };
+    return map[mode];
+  };
 
   const [title, setTitle] = useState('');
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
@@ -48,13 +59,13 @@ export const CreateScreen: React.FC = () => {
 
   const addPlace = () => {
     Alert.prompt
-      ? Alert.prompt('Ajouter un lieu', 'Nom du lieu', (name) => {
+      ? Alert.prompt(t.create_add_place_title, t.create_add_place_prompt, (name) => {
           if (name) {
             setPlaces((prev) => [...prev, { id: `sp-${Date.now()}`, name, type: 'Lieu' }]);
           }
         })
-      : Alert.alert('Ajouter un lieu', 'Simulation: un lieu a été ajouté', [
-          { text: 'Annuler', style: 'cancel' },
+      : Alert.alert(t.create_add_place_title, t.create_add_place_sim, [
+          { text: t.cancel, style: 'cancel' },
           { text: 'Café Oberkampf', onPress: () => setPlaces((prev) => [...prev, { id: `sp-${Date.now()}`, name: 'Café Oberkampf', type: 'Café' }]) },
           { text: 'Parc Belleville', onPress: () => setPlaces((prev) => [...prev, { id: `sp-${Date.now()}`, name: 'Parc Belleville', type: 'Parc' }]) },
         ]);
@@ -66,12 +77,12 @@ export const CreateScreen: React.FC = () => {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (title.length < 5) e.title = 'Minimum 5 caractères';
-    if (selectedTags.length === 0) e.tags = 'Sélectionne au moins 1 catégorie';
-    if (places.length < 2) e.places = 'Ajoute au moins 2 lieux';
-    if (!price) e.price = 'Requis';
-    if (!duration) e.duration = 'Requis';
-    if (!transport) e.transport = 'Choisis un transport';
+    if (title.length < 5) e.title = t.create_error_title;
+    if (selectedTags.length === 0) e.tags = t.create_error_tags;
+    if (places.length < 2) e.places = t.create_error_places;
+    if (!price) e.price = t.create_error_required;
+    if (!duration) e.duration = t.create_error_required;
+    if (!transport) e.transport = t.create_error_transport;
     setErrors(e);
     if (Object.keys(e).length > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     return Object.keys(e).length === 0;
@@ -90,7 +101,7 @@ export const CreateScreen: React.FC = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSuccess(true);
     } catch {
-      Alert.alert('Erreur', 'Impossible de publier le plan');
+      Alert.alert(t.error, t.create_error_publish);
     } finally {
       setIsPublishing(false);
     }
@@ -101,12 +112,12 @@ export const CreateScreen: React.FC = () => {
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
         <View style={styles.successContainer}>
           <Text style={styles.successEmoji}>🎉</Text>
-          <Text style={[styles.successTitle, { color: C.black }]}>Plan publié !</Text>
-          <Text style={[styles.successDesc, { color: C.gray700 }]}>Ton plan est maintenant visible par toute la communauté.</Text>
+          <Text style={[styles.successTitle, { color: C.black }]}>{t.create_success_title}</Text>
+          <Text style={[styles.successDesc, { color: C.gray700 }]}>{t.create_success_desc}</Text>
           <View style={[styles.xpEarned, { backgroundColor: C.successBg }]}>
-            <Text style={[styles.xpEarnedText, { color: C.success }]}>+20 XP gagnés</Text>
+            <Text style={[styles.xpEarnedText, { color: C.success }]}>{t.create_success_xp}</Text>
           </View>
-          <PrimaryButton label="Retour au feed" onPress={() => { setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setPrice(''); setDuration(''); setTransport(null); navigation.navigate('FeedTab'); }} />
+          <PrimaryButton label={t.create_success_back} onPress={() => { setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setPrice(''); setDuration(''); setTransport(null); navigation.navigate('FeedTab'); }} />
         </View>
       </View>
     );
@@ -116,16 +127,16 @@ export const CreateScreen: React.FC = () => {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
-          <Text style={[styles.headerTitle, { color: C.black }]}>Créer un plan</Text>
+          <Text style={[styles.headerTitle, { color: C.black }]}>{t.create_title}</Text>
           <View style={[styles.costPill, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
-            <Text style={[styles.costText, { color: C.gold }]}>⭐ coûte 20 pts</Text>
+            <Text style={[styles.costText, { color: C.gold }]}>{t.create_cost}</Text>
           </View>
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <TextInput label="Titre du plan" placeholder="ex: Matinée cool à Pigalle..." value={title} onChangeText={setTitle} error={errors.title} />
+          <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
 
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Catégorie</Text>
+          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_category}</Text>
           <View style={styles.chipsWrap}>
             {CATEGORIES.map((cat) => (
               <Chip key={cat.name} label={`${cat.emoji} ${cat.name}`} variant={selectedTags.includes(cat.name) ? 'filled-black' : 'filled-gray'} onPress={() => toggleTag(cat.name)} />
@@ -133,7 +144,7 @@ export const CreateScreen: React.FC = () => {
           </View>
           {errors.tags && <Text style={styles.errorText}>{errors.tags}</Text>}
 
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Lieux du plan</Text>
+          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_places}</Text>
           {places.map((p) => (
             <View key={p.id} style={[styles.placeRow, { borderBottomColor: C.borderLight }]}>
               <View style={[styles.placeDot, { backgroundColor: C.primary }]} />
@@ -145,28 +156,28 @@ export const CreateScreen: React.FC = () => {
             </View>
           ))}
           <TouchableOpacity style={styles.addPlaceBtn} onPress={addPlace}>
-            <Text style={[styles.addPlaceText, { color: C.primary }]}>+ Ajouter un lieu</Text>
+            <Text style={[styles.addPlaceText, { color: C.primary }]}>{t.create_add_place}</Text>
           </TouchableOpacity>
           {errors.places && <Text style={styles.errorText}>{errors.places}</Text>}
 
           <View style={styles.halfRow}>
-            <TextInput label="Prix moyen" placeholder="ex: 25€" value={price} onChangeText={setPrice} error={errors.price} half />
+            <TextInput label={t.create_price_label} placeholder={t.create_price_placeholder} value={price} onChangeText={setPrice} error={errors.price} half />
             <View style={{ width: 12 }} />
-            <TextInput label="Durée" placeholder="ex: 4h" value={duration} onChangeText={setDuration} error={errors.duration} half />
+            <TextInput label={t.create_duration_label} placeholder={t.create_duration_placeholder} value={duration} onChangeText={setDuration} error={errors.duration} half />
           </View>
 
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Transport</Text>
+          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_transport}</Text>
           <View style={styles.chipsWrap}>
-            {TRANSPORT_OPTIONS.map((t) => (
-              <Chip key={t} label={t} variant={transport === t ? 'filled-black' : 'filled-gray'} onPress={() => setTransport(t)} />
+            {TRANSPORT_OPTIONS.map((opt) => (
+              <Chip key={opt} label={getTransportLabel(opt)} variant={transport === opt ? 'filled-black' : 'filled-gray'} onPress={() => setTransport(opt)} />
             ))}
           </View>
           {errors.transport && <Text style={styles.errorText}>{errors.transport}</Text>}
 
           <View style={styles.publishSection}>
-            <PrimaryButton label="Publier le plan" onPress={handlePublish} loading={isPublishing} />
+            <PrimaryButton label={t.create_publish} onPress={handlePublish} loading={isPublishing} />
             <Text style={[styles.costNote, { color: C.gray700 }]}>
-              Tu as <Text style={{ fontWeight: '700' }}>{userPts} pts</Text> · Il t'en restera{' '}
+              {t.create_points_have} <Text style={{ fontWeight: '700' }}>{userPts} {t.create_points_unit}</Text> · {t.create_points_remain}{' '}
               <Text style={{ fontWeight: '700' }}>{userPts - 20}</Text>
             </Text>
           </View>

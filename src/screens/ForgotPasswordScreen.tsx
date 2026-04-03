@@ -5,9 +5,11 @@ import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { PrimaryButton, TextInput } from '../components';
 import mockApi from '../services/mockApi';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const ForgotPasswordScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +18,7 @@ export const ForgotPasswordScreen: React.FC = () => {
 
   const handleSend = async () => {
     if (!email.includes('@')) {
-      setError('Email invalide');
+      setError(t.forgot_error_email);
       return;
     }
     setError('');
@@ -25,7 +27,7 @@ export const ForgotPasswordScreen: React.FC = () => {
       await mockApi.sendPasswordReset(email);
       setSent(true);
     } catch {
-      setError("Erreur lors de l'envoi");
+      setError(t.forgot_error_send);
     } finally {
       setLoading(false);
     }
@@ -43,36 +45,35 @@ export const ForgotPasswordScreen: React.FC = () => {
       {sent ? (
         <View style={styles.successContainer}>
           <Text style={styles.successEmoji}>{'✉️'}</Text>
-          <Text style={styles.successTitle}>Email envoyé !</Text>
+          <Text style={styles.successTitle}>{t.forgot_success_title}</Text>
           <Text style={styles.successSubtitle}>
-            Vérifie ta boîte mail et clique sur le lien pour
-            réinitialiser ton mot de passe.
+            {t.forgot_success_subtitle}
           </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.link}>Retour à la connexion</Text>
+            <Text style={styles.link}>{t.forgot_back_login}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.content}>
-          <Text style={styles.title}>Mot de passe oublié</Text>
+          <Text style={styles.title}>{t.forgot_title}</Text>
           <Text style={styles.description}>
-            Entre ton email, on t'envoie un lien de réinitialisation.
+            {t.forgot_description}
           </Text>
 
           <TextInput
-            label="Email"
+            label={t.login_email_label}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             error={error}
-            placeholder="ton@email.com"
+            placeholder={t.login_email_placeholder}
           />
 
           <View style={styles.spacer} />
 
           <PrimaryButton
-            label="Envoyer le lien"
+            label={t.forgot_submit}
             onPress={handleSend}
             loading={loading}
           />

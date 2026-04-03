@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { Avatar } from '../components';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { Place, Plan } from '../types';
 import mockApi from '../services/mockApi';
 
@@ -14,6 +15,7 @@ export const PlaceDetailModal: React.FC = () => {
   const route = useRoute<any>();
   const { placeId, planId } = route.params as { placeId: string; planId: string };
   const C = useColors();
+  const { t } = useTranslation();
 
   const [place, setPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +60,11 @@ export const PlaceDetailModal: React.FC = () => {
           <TouchableOpacity style={[styles.backBtn, { backgroundColor: C.gray200 }]} onPress={() => navigation.goBack()}>
             <Text style={[styles.backChevron, { color: C.black }]}>&#8249;</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: C.black }]}>Chargement...</Text>
+          <Text style={[styles.headerTitle, { color: C.black }]}>{t.loading}</Text>
           <View style={{ width: 34 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: C.gray700 }]}>Chargement...</Text>
+          <Text style={[styles.loadingText, { color: C.gray700 }]}>{t.loading}</Text>
         </View>
       </View>
     );
@@ -95,7 +97,7 @@ export const PlaceDetailModal: React.FC = () => {
           <View style={styles.ratingLeft}>
             <Text style={[styles.ratingBig, { color: C.black }]}>{place.rating}</Text>
             {renderStars(place.rating, 16)}
-            <Text style={[styles.reviewCountText, { color: C.gray700 }]}>{place.reviewCount} avis Proof</Text>
+            <Text style={[styles.reviewCountText, { color: C.gray700 }]}>{place.reviewCount} {t.place_reviews_proof}</Text>
             <View style={styles.addressRow}>
               <Text style={styles.addressPin}>📍</Text>
               <Text style={[styles.addressText, { color: C.gray700 }]} numberOfLines={2}>
@@ -127,7 +129,7 @@ export const PlaceDetailModal: React.FC = () => {
         </View>
 
         {/* Reviews Section */}
-        <Text style={[styles.sectionLabel, { color: C.black }]}>AVIS DE LA COMMUNAUTÉ PROOF</Text>
+        <Text style={[styles.sectionLabel, { color: C.black }]}>{t.place_community_reviews}</Text>
 
         {place.reviews.map((review) => (
           <View key={review.id} style={styles.reviewCard}>
@@ -153,9 +155,9 @@ export const PlaceDetailModal: React.FC = () => {
       {/* CTA Button */}
       <View style={[styles.ctaContainer, { paddingBottom: insets.bottom + 14, backgroundColor: C.white, borderTopColor: C.border }]}>
         <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8}>
-          <Text style={styles.ctaText}>📍 Noter ce lieu</Text>
+          <Text style={styles.ctaText}>{t.place_rate}</Text>
         </TouchableOpacity>
-        <Text style={[styles.ctaSubtitle, { color: C.gray700 }]}>Valide uniquement si tu as fait le plan</Text>
+        <Text style={[styles.ctaSubtitle, { color: C.gray700 }]}>{t.place_rate_condition}</Text>
       </View>
     </View>
   );

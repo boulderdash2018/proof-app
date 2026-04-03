@@ -4,3 +4,5 @@ export { useSavesStore } from './savesStore';
 export { useNotifStore } from './notifStore';
 export { useFriendsStore } from './friendsStore';
 export { useThemeStore } from './themeStore';
+export { useLanguageStore } from './languageStore';
+export type { Language } from './languageStore';

@@ -6,6 +6,7 @@ import { Colors, Layout } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useNotifStore } from '../store';
 import { Notification } from '../types';
+import { useTranslation } from '../hooks/useTranslation';
 
 const NOTIF_ICONS: Record<string, string> = {
   like: '❤️', follow: '👤', comment: '💬', xp_gained: '⭐', badge_unlocked: '🏆',
@@ -15,6 +16,7 @@ export const NotificationsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { notifications, fetchNotifications, markAllRead, markRead } = useNotifStore();
+  const { t } = useTranslation();
 
   useEffect(() => { fetchNotifications(); }, []);
 
@@ -40,15 +42,15 @@ export const NotificationsScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.back} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity onPress={markAllRead}><Text style={styles.markAll}>Tout lire</Text></TouchableOpacity>
+        <Text style={styles.headerTitle}>{t.notif_title}</Text>
+        <TouchableOpacity onPress={markAllRead}><Text style={styles.markAll}>{t.notif_mark_all}</Text></TouchableOpacity>
       </View>
       <FlatList
         data={notifications}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<EmptyState icon="🔔" title="Aucune notification" subtitle="Les interactions s'afficheront ici." />}
+        ListEmptyComponent={<EmptyState icon="🔔" title={t.notif_empty_title} subtitle={t.notif_empty_sub} />}
       />
     </View>
   );

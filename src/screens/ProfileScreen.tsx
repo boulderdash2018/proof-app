@@ -14,6 +14,7 @@ import { Layout } from '../constants';
 import { Avatar } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { Badge, BadgeId } from '../types';
 import mockApi from '../services/mockApi';
 
@@ -31,6 +32,7 @@ export const ProfileScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
   const C = useColors();
+  const { t } = useTranslation();
   const [badges, setBadges] = useState<Badge[]>([]);
   const [userPlans, setUserPlans] = useState<any[]>([]);
 
@@ -55,7 +57,7 @@ export const ProfileScreen: React.FC = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
-        <Text style={[styles.headerTitle, { color: C.black }]}>Mon profil</Text>
+        <Text style={[styles.headerTitle, { color: C.black }]}>{t.profile_title}</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => navigation.navigate('FriendRequests')} style={styles.friendReqBtn}>
             <Text style={styles.friendReqIcon}>👥</Text>
@@ -102,22 +104,22 @@ export const ProfileScreen: React.FC = () => {
         <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: C.black }]}>{user.planCount}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>plans</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers', { userId: user.id })}>
             <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.followersCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>followers</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
           </TouchableOpacity>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.likesReceived)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>likes reçus</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_likes_received}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.gray700 }]}>BADGES</Text>
+          <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_badges}</Text>
           <View style={styles.badgesGrid}>
             {badges.map((b) => (
               <View key={b.id} style={[styles.badgeItem, !b.isUnlocked && { opacity: 0.3 }]}>
@@ -132,7 +134,7 @@ export const ProfileScreen: React.FC = () => {
 
         {userPlans.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>MES PLANS RÉCENTS</Text>
+            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_recent_plans}</Text>
             <View style={styles.plansGrid}>
               {userPlans.map((plan) => {
                 const colors = parseGradient(plan.gradient);

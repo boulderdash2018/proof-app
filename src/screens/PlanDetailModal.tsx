@@ -8,6 +8,7 @@ import { Colors, Layout } from '../constants';
 import { Avatar, Chip, UserBadge, XpBadge } from '../components';
 import { useFeedStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
 import mockApi from '../services/mockApi';
 
@@ -27,6 +28,7 @@ export const PlanDetailModal: React.FC = () => {
   const route = useRoute<any>();
   const { planId } = route.params as { planId: string };
   const C = useColors();
+  const { t } = useTranslation();
 
   const feedPlans = useFeedStore((s) => s.plans);
   const { likedPlanIds, savedPlanIds, toggleLike, toggleSave } = useFeedStore();
@@ -65,7 +67,7 @@ export const PlanDetailModal: React.FC = () => {
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: C.gray700 }]}>Chargement...</Text>
+          <Text style={[styles.loadingText, { color: C.gray700 }]}>{t.plan_loading}</Text>
         </View>
       </View>
     );
@@ -86,7 +88,7 @@ export const PlanDetailModal: React.FC = () => {
       <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]} showsVerticalScrollIndicator={false}>
         <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
           <Text style={styles.bannerTitle}>{plan.title}</Text>
-          <Text style={styles.bannerSubtitle}>par {plan.author.displayName}</Text>
+          <Text style={styles.bannerSubtitle}>{t.plan_by} {plan.author.displayName}</Text>
         </LinearGradient>
 
         <View style={[styles.infoSection, { borderBottomColor: C.border }]}>
@@ -102,7 +104,7 @@ export const PlanDetailModal: React.FC = () => {
           </View>
         </View>
 
-        <Text style={[styles.sectionLabel, { color: C.gray700 }]}>LE PLAN COMPLET</Text>
+        <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.plan_full}</Text>
 
         {plan.places.map((place, index) => (
           <TouchableOpacity
@@ -120,7 +122,7 @@ export const PlanDetailModal: React.FC = () => {
               <View style={styles.ratingRow}>
                 <Text style={[styles.ratingStar, { color: C.primary }]}>★</Text>
                 <Text style={[styles.ratingNumber, { color: C.black }]}>{place.rating}</Text>
-                <Text style={[styles.ratingCount, { color: C.gray700 }]}>({place.reviewCount} avis)</Text>
+                <Text style={[styles.ratingCount, { color: C.gray700 }]}>({place.reviewCount} {t.plan_reviews})</Text>
               </View>
             </View>
             <Text style={[styles.placeChevron, { color: C.gray600 }]}>›</Text>
@@ -139,7 +141,7 @@ export const PlanDetailModal: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
           <Text style={styles.actionIcon}>{isSaved ? '🔖' : '📑'}</Text>
-          <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? 'Sauvé' : 'Sauver'}</Text>
+          <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
         </TouchableOpacity>
         <XpBadge xp={plan.xpReward} />
       </View>

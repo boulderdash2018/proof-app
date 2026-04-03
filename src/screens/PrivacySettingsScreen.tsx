@@ -3,23 +3,25 @@ import { View, Text, StyleSheet, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const PrivacySettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [isPrivate, setIsPrivate] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.back} onPress={() => navigation.goBack()}>‹ Retour</Text>
-        <Text style={styles.headerTitle}>Confidentialité</Text>
+        <Text style={styles.back} onPress={() => navigation.goBack()}>{t.back}</Text>
+        <Text style={styles.headerTitle}>{t.privacy_title}</Text>
         <View style={{ width: 60 }} />
       </View>
       <View style={styles.content}>
-        <View style={styles.row}><Text style={styles.label}>Compte privé</Text><Switch value={isPrivate} onValueChange={setIsPrivate} trackColor={{ true: Colors.primary }} /></View>
-        <View style={styles.row}><Text style={styles.label}>Approbation manuelle des followers</Text><Switch value={approvalRequired} onValueChange={setApprovalRequired} trackColor={{ true: Colors.primary }} /></View>
+        <View style={styles.row}><Text style={styles.label}>{t.privacy_private}</Text><Switch value={isPrivate} onValueChange={setIsPrivate} trackColor={{ true: Colors.primary }} /></View>
+        <View style={styles.row}><Text style={styles.label}>{t.privacy_approval}</Text><Switch value={approvalRequired} onValueChange={setApprovalRequired} trackColor={{ true: Colors.primary }} /></View>
       </View>
     </View>
   );

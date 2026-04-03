@@ -3,40 +3,58 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Layout } from '../constants';
-import { useAuthStore, useThemeStore } from '../store';
+import { useAuthStore, useThemeStore, useLanguageStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
+import type { Language } from '../store';
 
 export const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const logout = useAuthStore((s) => s.logout);
   const { isDark, toggleTheme } = useThemeStore();
+  const { language, setLanguage } = useLanguageStore();
   const C = useColors();
+  const { t } = useTranslation();
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
-      if (window.confirm('Tu es sûr de vouloir te déconnecter ?')) {
+      if (window.confirm(t.settings_logout_confirm)) {
         logout();
       }
     } else {
       const { Alert } = require('react-native');
-      Alert.alert('Se déconnecter', 'Tu es sûr ?', [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Se déconnecter', style: 'destructive', onPress: () => logout() },
+      Alert.alert(t.settings_logout, t.settings_logout_confirm_short, [
+        { text: t.cancel, style: 'cancel' },
+        { text: t.settings_logout, style: 'destructive', onPress: () => logout() },
       ]);
     }
   };
 
   const handleDeleteAccount = () => {
     if (Platform.OS === 'web') {
-      if (window.confirm('Cette action est irréversible. Tu es sûr ?')) {
+      if (window.confirm(t.settings_delete_confirm)) {
         logout();
       }
     } else {
       const { Alert } = require('react-native');
-      Alert.alert('Supprimer mon compte', 'Cette action est irréversible.', [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: () => logout() },
+      Alert.alert(t.settings_delete_confirm_title, t.settings_delete_confirm_body, [
+        { text: t.cancel, style: 'cancel' },
+        { text: t.delete, style: 'destructive', onPress: () => logout() },
+      ]);
+    }
+  };
+
+  const handleLanguage = () => {
+    if (Platform.OS === 'web') {
+      const next: Language = language === 'fr' ? 'en' : 'fr';
+      setLanguage(next);
+    } else {
+      const { Alert } = require('react-native');
+      Alert.alert(t.settings_language, '', [
+        { text: '🇫🇷 Français', onPress: () => setLanguage('fr') },
+        { text: '🇬🇧 English', onPress: () => setLanguage('en') },
+        { text: t.cancel, style: 'cancel' },
       ]);
     }
   };
@@ -51,45 +69,55 @@ export const SettingsScreen: React.FC = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <View style={[styles.header, { borderBottomColor: C.border }]}>
-        <Text style={[styles.back, { color: C.primary }]} onPress={() => navigation.goBack()}>‹ Retour</Text>
-        <Text style={[styles.headerTitle, { color: C.black }]}>Paramètres</Text>
+        <Text style={[styles.back, { color: C.primary }]} onPress={() => navigation.goBack()}>{t.back}</Text>
+        <Text style={[styles.headerTitle, { color: C.black }]}>{t.settings_title}</Text>
         <View style={{ width: 60 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>MON COMPTE</Text>
-        <SettingsRow label="Modifier le profil" onPress={() => navigation.navigate('EditProfile')} />
-        <SettingsRow label="Changer le mot de passe" onPress={() => {}} />
-        <SettingsRow label="Adresse email" onPress={() => {}} />
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_account}</Text>
+        <SettingsRow label={t.settings_edit_profile} onPress={() => navigation.navigate('EditProfile')} />
+        <SettingsRow label={t.settings_change_password} onPress={() => {}} />
+        <SettingsRow label={t.settings_email} onPress={() => {}} />
 
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>CONFIDENTIALITÉ</Text>
-        <SettingsRow label="Paramètres de confidentialité" onPress={() => navigation.navigate('PrivacySettings')} />
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_privacy_section}</Text>
+        <SettingsRow label={t.settings_privacy} onPress={() => navigation.navigate('PrivacySettings')} />
 
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>NOTIFICATIONS</Text>
-        <SettingsRow label="Préférences de notifications" onPress={() => navigation.navigate('NotificationsSettings')} />
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_notif_section}</Text>
+        <SettingsRow label={t.settings_notif} onPress={() => navigation.navigate('NotificationsSettings')} />
 
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>APPLICATION</Text>
-        <SettingsRow label="Langue" onPress={() => {}} />
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_app}</Text>
         <SettingsRow
-          label="Thème"
-          onPress={toggleTheme}
+          label={t.settings_language}
+          onPress={handleLanguage}
           right={
-            <View style={[styles.themeBadge, { backgroundColor: isDark ? C.primary : C.gray300 }]}>
-              <Text style={[styles.themeBadgeText, { color: isDark ? '#FFFFFF' : C.gray800 }]}>
-                {isDark ? '🌙 Sombre' : '☀️ Clair'}
+            <View style={[styles.themeBadge, { backgroundColor: C.gray300 }]}>
+              <Text style={[styles.themeBadgeText, { color: C.gray800 }]}>
+                {language === 'fr' ? t.settings_lang_french : t.settings_lang_english}
               </Text>
             </View>
           }
         />
-        <SettingsRow label="Vider le cache" onPress={() => {}} />
+        <SettingsRow
+          label={t.settings_theme}
+          onPress={toggleTheme}
+          right={
+            <View style={[styles.themeBadge, { backgroundColor: isDark ? C.primary : C.gray300 }]}>
+              <Text style={[styles.themeBadgeText, { color: isDark ? '#FFFFFF' : C.gray800 }]}>
+                {isDark ? t.settings_theme_dark : t.settings_theme_light}
+              </Text>
+            </View>
+          }
+        />
+        <SettingsRow label={t.settings_clear_cache} onPress={() => {}} />
 
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>LÉGAL</Text>
-        <SettingsRow label="Conditions d'utilisation" onPress={() => {}} />
-        <SettingsRow label="Politique de confidentialité" onPress={() => {}} />
-        <SettingsRow label="Mentions légales" onPress={() => {}} />
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_legal}</Text>
+        <SettingsRow label={t.settings_terms} onPress={() => {}} />
+        <SettingsRow label={t.settings_privacy_policy} onPress={() => {}} />
+        <SettingsRow label={t.settings_legal_mentions} onPress={() => {}} />
 
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>DANGER ZONE</Text>
-        <SettingsRow label="Se déconnecter" onPress={handleLogout} danger />
-        <SettingsRow label="Supprimer mon compte" onPress={handleDeleteAccount} danger />
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_danger}</Text>
+        <SettingsRow label={t.settings_logout} onPress={handleLogout} danger />
+        <SettingsRow label={t.settings_delete_account} onPress={handleDeleteAccount} danger />
       </ScrollView>
     </View>
   );

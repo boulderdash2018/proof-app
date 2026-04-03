@@ -11,11 +11,13 @@ import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout, CATEGORIES } from '../constants';
 import { PrimaryButton, TextInput, Avatar, Chip } from '../components';
 import { useAuthStore } from '../store';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const SetupProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const setUser = useAuthStore((s) => s.setUser);
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
 
   const [step, setStep] = useState(1);
 
@@ -73,14 +75,14 @@ export const SetupProfileScreen: React.FC = () => {
 
   const renderStep1 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Choisis ton pseudo</Text>
+      <Text style={styles.stepTitle}>{t.setup_choose_username}</Text>
 
       <View style={styles.usernameRow}>
         <Text style={styles.atPrefix}>@</Text>
         <TextInput
           value={username}
           onChangeText={setUsername}
-          placeholder="tonpseudo"
+          placeholder={t.setup_username_placeholder}
           autoCapitalize="none"
           style={styles.usernameInput}
         />
@@ -94,17 +96,17 @@ export const SetupProfileScreen: React.FC = () => {
           ]}
         >
           {usernameAvailable
-            ? '✅ Pseudo disponible'
-            : '❌ Pseudo déjà pris'}
+            ? t.setup_username_available
+            : t.setup_username_taken}
         </Text>
       )}
       {checkingUsername && (
-        <Text style={styles.checkingText}>Vérification...</Text>
+        <Text style={styles.checkingText}>{t.setup_checking}</Text>
       )}
 
       <View style={styles.stepBottom}>
         <PrimaryButton
-          label="Suivant"
+          label={t.next}
           onPress={() => setStep(2)}
           disabled={!username.trim() || !usernameAvailable}
         />
@@ -114,7 +116,7 @@ export const SetupProfileScreen: React.FC = () => {
 
   const renderStep2 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Ajoute une photo</Text>
+      <Text style={styles.stepTitle}>{t.setup_add_photo}</Text>
 
       <View style={styles.avatarCenter}>
         <Avatar
@@ -126,24 +128,24 @@ export const SetupProfileScreen: React.FC = () => {
       </View>
 
       <PrimaryButton
-        label="Choisir une photo"
-        onPress={() => Alert.alert('Image Picker simulé')}
+        label={t.setup_choose_photo}
+        onPress={() => Alert.alert(t.setup_image_picker)}
       />
 
       <TouchableOpacity
         style={styles.skipButton}
         onPress={() => setStep(3)}
       >
-        <Text style={styles.skipText}>Passer</Text>
+        <Text style={styles.skipText}>{t.setup_skip}</Text>
       </TouchableOpacity>
     </View>
   );
 
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Qu'est-ce qui te correspond ?</Text>
+      <Text style={styles.stepTitle}>{t.setup_interests}</Text>
       <Text style={styles.selectionCount}>
-        {selectedCategories.length}/12 sélectionnées
+        {selectedCategories.length}/12 {t.setup_selected}
       </Text>
 
       <View style={styles.chipGrid}>
@@ -160,7 +162,7 @@ export const SetupProfileScreen: React.FC = () => {
 
       <View style={styles.stepBottom}>
         <PrimaryButton
-          label="Terminer"
+          label={t.setup_finish}
           onPress={handleFinish}
           disabled={selectedCategories.length < 3}
         />

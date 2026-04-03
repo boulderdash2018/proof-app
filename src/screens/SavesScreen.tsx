@@ -12,6 +12,7 @@ import { Colors, Layout } from '../constants';
 import { Chip, EmptyState } from '../components';
 import { useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { SavedPlan } from '../types';
 
 export const SavesScreen: React.FC = () => {
@@ -20,6 +21,7 @@ export const SavesScreen: React.FC = () => {
   const { savedPlans, isLoading, fetchSaves, markAsDone, unsave } = useSavesStore();
   const [activeTab, setActiveTab] = useState<'todo' | 'done'>('todo');
   const C = useColors();
+  const { t } = useTranslation();
 
   useEffect(() => {
     fetchSaves();
@@ -39,12 +41,12 @@ export const SavesScreen: React.FC = () => {
         <Text style={[styles.saveItemTitle, { color: C.black }]} numberOfLines={1}>{item.plan.title}</Text>
         <View style={[styles.statusBadge, item.isDone ? styles.statusDone : styles.statusTodo]}>
           <Text style={[styles.statusText, { color: item.isDone ? C.success : C.primary }]}>
-            {item.isDone ? '✓ Faite' : 'À faire'}
+            {item.isDone ? t.saves_status_done : t.saves_status_todo}
           </Text>
         </View>
       </View>
       <View style={styles.saveItemMeta}>
-        <Text style={[styles.saveItemAuthor, { color: C.gray700 }]}>par {item.plan.author.username}</Text>
+        <Text style={[styles.saveItemAuthor, { color: C.gray700 }]}>{t.saves_by} {item.plan.author.username}</Text>
         <Text style={[styles.saveItemDot, { color: C.gray500 }]}>·</Text>
         <Text style={[styles.saveItemPrice, { color: C.gray800 }]}>{item.plan.price}</Text>
         <Text style={[styles.saveItemDot, { color: C.gray500 }]}>·</Text>
@@ -60,7 +62,7 @@ export const SavesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <Text style={[styles.pageTitle, { color: C.black }]}>Sauvegardes</Text>
+      <Text style={[styles.pageTitle, { color: C.black }]}>{t.saves_title}</Text>
 
       <View style={[styles.tabBar, { backgroundColor: C.gray300 }]}>
         <TouchableOpacity
@@ -68,7 +70,7 @@ export const SavesScreen: React.FC = () => {
           onPress={() => setActiveTab('todo')}
         >
           <Text style={[styles.tabText, { color: C.gray700 }, activeTab === 'todo' && { color: C.black }]}>
-            À faire
+            {t.saves_tab_todo}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -76,7 +78,7 @@ export const SavesScreen: React.FC = () => {
           onPress={() => setActiveTab('done')}
         >
           <Text style={[styles.tabText, { color: C.gray700 }, activeTab === 'done' && { color: C.black }]}>
-            Faites ✓
+            {t.saves_tab_done}
           </Text>
         </TouchableOpacity>
       </View>
@@ -89,9 +91,9 @@ export const SavesScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           activeTab === 'todo' ? (
-            <EmptyState icon="🔖" title="Aucune activité sauvegardée" subtitle="Sauvegarde des plans depuis le feed !" />
+            <EmptyState icon="🔖" title={t.saves_empty_todo_title} subtitle={t.saves_empty_todo_sub} />
           ) : (
-            <EmptyState icon="🗺️" title="Aucune activité faite" subtitle="Complète des plans pour les retrouver ici." />
+            <EmptyState icon="🗺️" title={t.saves_empty_done_title} subtitle={t.saves_empty_done_sub} />
           )
         }
       />

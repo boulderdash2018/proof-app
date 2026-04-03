@@ -13,6 +13,7 @@ import { Colors, Layout } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { FriendRequest } from '../types';
 
 type Tab = 'received' | 'sent';
@@ -32,6 +33,7 @@ export const FriendRequestsScreen: React.FC = () => {
   } = useFriendsStore();
 
   const C = useColors();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('received');
 
   useEffect(() => {
@@ -60,10 +62,10 @@ export const FriendRequestsScreen: React.FC = () => {
           <Text style={styles.rowUsername}>@{sender.username}</Text>
         </View>
         <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(item.id)}>
-          <Text style={styles.acceptText}>Accepter</Text>
+          <Text style={styles.acceptText}>{t.friend_requests_accept}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(item.id)}>
-          <Text style={styles.declineText}>Refuser</Text>
+          <Text style={styles.declineText}>{t.friend_requests_decline}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -80,7 +82,7 @@ export const FriendRequestsScreen: React.FC = () => {
           <Text style={styles.rowUsername}>@{recipient.username}</Text>
         </View>
         <View style={styles.pendingBadge}>
-          <Text style={styles.pendingText}>En attente</Text>
+          <Text style={styles.pendingText}>{t.friend_requests_pending}</Text>
         </View>
       </View>
     );
@@ -93,7 +95,7 @@ export const FriendRequestsScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.back} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={styles.headerTitle}>Demandes d'amis</Text>
+        <Text style={styles.headerTitle}>{t.friend_requests_title}</Text>
         <View style={{ width: 30 }} />
       </View>
 
@@ -104,7 +106,7 @@ export const FriendRequestsScreen: React.FC = () => {
           onPress={() => setTab('received')}
         >
           <Text style={[styles.tabText, tab === 'received' && styles.tabTextActive]}>
-            Reçues ({incomingRequests.length})
+            {t.friend_requests_received} ({incomingRequests.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -112,7 +114,7 @@ export const FriendRequestsScreen: React.FC = () => {
           onPress={() => setTab('sent')}
         >
           <Text style={[styles.tabText, tab === 'sent' && styles.tabTextActive]}>
-            Envoyées ({sentRequests.length})
+            {t.friend_requests_sent} ({sentRequests.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -128,8 +130,8 @@ export const FriendRequestsScreen: React.FC = () => {
           ListEmptyComponent={
             <EmptyState
               icon={tab === 'received' ? '📬' : '📤'}
-              title={tab === 'received' ? 'Aucune demande reçue' : 'Aucune demande envoyée'}
-              subtitle={tab === 'received' ? 'Quand quelqu\'un t\'ajoutera, ça apparaîtra ici' : 'Recherche des amis dans Explorer avec @pseudo'}
+              title={tab === 'received' ? t.friend_requests_empty_received : t.friend_requests_empty_sent}
+              subtitle={tab === 'received' ? t.friend_requests_empty_received_sub : t.friend_requests_empty_sent_sub}
             />
           }
         />

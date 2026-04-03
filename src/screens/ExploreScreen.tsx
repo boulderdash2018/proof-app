@@ -16,6 +16,7 @@ import { Avatar, EmptyState } from '../components';
 import { Plan, CategoryTag, User } from '../types';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import mockApi from '../services/mockApi';
 import { searchUsers } from '../services/friendsService';
 
@@ -33,6 +34,7 @@ export const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const currentUser = useAuthStore(s => s.user);
   const C = useColors();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryTag | null>(null);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
@@ -140,14 +142,14 @@ export const ExploreScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <Text style={[styles.pageTitle, { color: C.black }]}>Explorer</Text>
+      <Text style={[styles.pageTitle, { color: C.black }]}>{t.explore_title}</Text>
 
       {/* Search bar */}
       <View style={[styles.searchBar, { backgroundColor: C.gray200 }]}>
         <Text style={styles.searchIcon}>🔍</Text>
         <RNTextInput
           style={styles.searchInput}
-          placeholder="Recherche ou @pseudo pour trouver des amis"
+          placeholder={t.explore_search_placeholder}
           placeholderTextColor={C.gray600}
           value={searchQuery}
           onChangeText={handleSearch}
@@ -161,7 +163,7 @@ export const ExploreScreen: React.FC = () => {
 
       {showCategories ? (
         <>
-          <Text style={styles.sectionLabel}>CATÉGORIES</Text>
+          <Text style={styles.sectionLabel}>{t.explore_categories}</Text>
           <FlatList
             key="categories-grid"
             data={CATEGORIES}
@@ -176,7 +178,7 @@ export const ExploreScreen: React.FC = () => {
         <>
           <View style={styles.resultsHeader}>
             <Text style={styles.resultsTitle}>
-              Utilisateurs ({userResults.length})
+              {t.explore_users_count} ({userResults.length})
             </Text>
           </View>
           <FlatList
@@ -190,8 +192,8 @@ export const ExploreScreen: React.FC = () => {
               !isSearching ? (
                 <EmptyState
                   icon="👤"
-                  title="Aucun utilisateur trouvé"
-                  subtitle="Vérifie le pseudo et réessaie"
+                  title={t.explore_no_users}
+                  subtitle={t.explore_no_users_sub}
                 />
               ) : null
             }
@@ -208,12 +210,12 @@ export const ExploreScreen: React.FC = () => {
                   <Text style={styles.resultsCount}>({filteredPlans.length})</Text>
                 </Text>
                 <TouchableOpacity onPress={handleClear}>
-                  <Text style={styles.backLink}>← Catégories</Text>
+                  <Text style={styles.backLink}>{t.explore_back_categories}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <Text style={styles.resultsTitle}>
-                Résultats pour "{searchQuery}"
+                {t.explore_results_for} "{searchQuery}"
               </Text>
             )}
           </View>
@@ -229,8 +231,8 @@ export const ExploreScreen: React.FC = () => {
               !isSearching ? (
                 <EmptyState
                   icon="🔍"
-                  title="Aucun résultat"
-                  subtitle="Essaie 'marais', 'canal', 'montmartre'..."
+                  title={t.explore_no_results}
+                  subtitle={t.explore_no_results_sub}
                 />
               ) : null
             }

@@ -25,8 +25,9 @@ import { PrivacySettingsScreen } from '../screens/PrivacySettingsScreen';
 import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
-import { useThemeStore } from '../store';
+import { useThemeStore, useLanguageStore } from '../store';
 import { DarkColors, Colors } from '../constants';
+import { fr, en } from '../i18n';
 
 // Feed Stack
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
@@ -81,6 +82,8 @@ const ProfileStackNavigator: React.FC = () => (
 // Tab icon component
 const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused }) => {
   const color = focused ? '#000000' : '#AAAAAA';
+  const language = useLanguageStore((s) => s.language);
+  const t = language === 'fr' ? fr : en;
 
   const icons: Record<string, string> = {
     FeedTab: '\u2302',
@@ -90,10 +93,10 @@ const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused
   };
 
   const labels: Record<string, string> = {
-    FeedTab: 'Feed',
-    ExploreTab: 'Explore',
-    SavesTab: 'Saves',
-    ProfileTab: 'Profile',
+    FeedTab: t.tab_feed,
+    ExploreTab: t.tab_explore,
+    SavesTab: t.tab_saves,
+    ProfileTab: t.tab_profile,
   };
 
   return (

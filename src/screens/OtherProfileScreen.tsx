@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { Avatar, UserBadge, PrimaryButton, SecondaryButton } from '../components';
 import { useColors } from '../hooks/useColors';
+import { useTranslation } from '../hooks/useTranslation';
 import { User } from '../types';
 import { useAuthStore, useFriendsStore } from '../store';
 import { getUserById, getFriendshipStatus, getPendingRequestId } from '../services/friendsService';
@@ -22,6 +23,7 @@ export const OtherProfileScreen: React.FC = () => {
   const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const C = useColors();
+  const { t } = useTranslation();
   const [actionLoading, setActionLoading] = useState(false);
 
   const userId = route.params?.userId;
@@ -76,7 +78,7 @@ export const OtherProfileScreen: React.FC = () => {
 
   if (!user) return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <Text style={styles.loading}>Chargement...</Text>
+      <Text style={styles.loading}>{t.loading}</Text>
     </View>
   );
 
@@ -90,30 +92,30 @@ export const OtherProfileScreen: React.FC = () => {
       case 'none':
         return (
           <View style={{ marginTop: 12 }}>
-            <PrimaryButton label="Ajouter en ami" onPress={handleAddFriend} small />
+            <PrimaryButton label={t.other_profile_add} onPress={handleAddFriend} small />
           </View>
         );
       case 'pending_sent':
         return (
           <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>Demande envoyée</Text>
+            <Text style={styles.statusText}>{t.other_profile_request_sent}</Text>
           </View>
         );
       case 'pending_received':
         return (
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
-              <Text style={styles.acceptBtnText}>Accepter</Text>
+              <Text style={styles.acceptBtnText}>{t.other_profile_accept}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
-              <Text style={styles.declineBtnText}>Refuser</Text>
+              <Text style={styles.declineBtnText}>{t.other_profile_decline}</Text>
             </TouchableOpacity>
           </View>
         );
       case 'friends':
         return (
           <View style={{ marginTop: 12 }}>
-            <SecondaryButton label="Amis" onPress={handleRemoveFriend} />
+            <SecondaryButton label={t.other_profile_friends} onPress={handleRemoveFriend} />
           </View>
         );
     }
@@ -136,9 +138,9 @@ export const OtherProfileScreen: React.FC = () => {
         </View>
         {user.bio && <Text style={styles.bio}>{user.bio}</Text>}
         <View style={styles.statsRow}>
-          <View style={styles.stat}><Text style={styles.statValue}>{user.planCount}</Text><Text style={styles.statLabel}>plans</Text></View>
+          <View style={styles.stat}><Text style={styles.statValue}>{user.planCount}</Text><Text style={styles.statLabel}>{t.profile_plans}</Text></View>
           <View style={styles.statDivider} />
-          <View style={styles.stat}><Text style={styles.statValue}>{formatCount(user.followersCount)}</Text><Text style={styles.statLabel}>amis</Text></View>
+          <View style={styles.stat}><Text style={styles.statValue}>{formatCount(user.followersCount)}</Text><Text style={styles.statLabel}>{t.profile_friends}</Text></View>
           <View style={styles.statDivider} />
           <View style={styles.stat}><Text style={styles.statValue}>{formatCount(user.likesReceived)}</Text><Text style={styles.statLabel}>likes</Text></View>
         </View>
