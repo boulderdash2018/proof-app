@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Colors, Layout } from '../constants';
 import { Avatar, PrimaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
@@ -52,26 +52,31 @@ export const EditProfileScreen: React.FC = () => {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
+      quality: 0.5,
+      base64: true,
     });
 
     if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
+      const asset = result.assets[0];
       setIsUploading(true);
       try {
-        // Upload to Firebase Storage
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const fileName = `avatars/${user?.id}_${Date.now()}.jpg`;
-        const storageRef = ref(storage, fileName);
-        await uploadBytes(storageRef, blob);
-        const downloadUrl = await getDownloadURL(storageRef);
-        setAvatarUrl(downloadUrl);
+        if (asset.base64) {
+          // Upload base64 to Firebase Storage
+          const fileName = `avatars/${user?.id}_${Date.now()}.jpg`;
+          const storageRef = ref(storage, fileName);
+          const base64Data = `data:image/jpeg;base64,${asset.base64}`;
+          await uploadString(storageRef, base64Data, 'data_url');
+          const downloadUrl = await getDownloadURL(storageRef);
+          setAvatarUrl(downloadUrl);
+        } else {
+          // Fallback: use local URI (works for preview)
+          setAvatarUrl(asset.uri);
+        }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (err) {
         console.error('Upload error:', err);
-        // Fallback: use local URI directly (works for web)
-        setAvatarUrl(uri);
+        // Final fallback: use local URI
+        setAvatarUrl(asset.uri);
       } finally {
         setIsUploading(false);
       }
