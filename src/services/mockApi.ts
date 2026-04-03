@@ -35,7 +35,7 @@ const lucas: User = {
   avatarColor: '#0F6E56',
   badgeType: 'novice',
   bio: 'Nouveau sur Paris 🚴',
-  isPrivate: false,
+  isPrivate: true,
   xpPoints: 320,
   coins: 25,
   level: 4,

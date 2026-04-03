@@ -187,6 +187,10 @@ export const fr = {
   other_profile_accept: 'Accepter',
   other_profile_decline: 'Refuser',
   other_profile_friends: 'Amis',
+  other_profile_private_title: 'Ce compte est privé',
+  other_profile_private_subtitle: 'Ajoute cette personne en ami pour voir ses journées et activités.',
+  other_profile_plans_section: 'JOURNÉES PUBLIÉES',
+  other_profile_no_plans: 'Aucune journée publiée',
 
   // Friend requests
   friend_requests_title: "Demandes d'amis",

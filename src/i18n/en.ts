@@ -189,6 +189,10 @@ export const en: Record<TranslationKeys, string> = {
   other_profile_accept: 'Accept',
   other_profile_decline: 'Decline',
   other_profile_friends: 'Friends',
+  other_profile_private_title: 'This account is private',
+  other_profile_private_subtitle: 'Add this person as a friend to see their plans and activities.',
+  other_profile_plans_section: 'PUBLISHED PLANS',
+  other_profile_no_plans: 'No plans published',
 
   // Friend requests
   friend_requests_title: 'Friend requests',
