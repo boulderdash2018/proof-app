@@ -17,18 +17,44 @@ import { User, FriendRequest } from '../types';
 const USERS = 'users';
 const FRIEND_REQUESTS = 'friendRequests';
 
-// Search users by username prefix
+// Normalize string: remove accents and lowercase
+const normalize = (str: string): string =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Search users by username or displayName (accent-insensitive)
 export const searchUsers = async (searchQuery: string, currentUserId: string): Promise<User[]> => {
-  const q = query(
+  const normalizedQuery = normalize(searchQuery);
+
+  // Fetch by username prefix
+  const q1 = query(
     collection(db, USERS),
-    where('username', '>=', searchQuery.toLowerCase()),
-    where('username', '<=', searchQuery.toLowerCase() + '\uf8ff'),
-    limit(20)
+    where('username', '>=', normalizedQuery),
+    where('username', '<=', normalizedQuery + '\uf8ff'),
+    limit(30)
   );
-  const snap = await getDocs(q);
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as User))
-    .filter(u => u.id !== currentUserId);
+  // Fetch by displayName prefix
+  const q2 = query(
+    collection(db, USERS),
+    where('displayName', '>=', searchQuery),
+    where('displayName', '<=', searchQuery + '\uf8ff'),
+    limit(30)
+  );
+
+  const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+  const usersMap = new Map<string, User>();
+  [...snap1.docs, ...snap2.docs].forEach(d => {
+    const user = { id: d.id, ...d.data() } as User;
+    if (user.id !== currentUserId) {
+      usersMap.set(user.id, user);
+    }
+  });
+
+  // Also filter with accent-insensitive matching client-side
+  return Array.from(usersMap.values()).filter(u =>
+    normalize(u.username).includes(normalizedQuery) ||
+    normalize(u.displayName).includes(normalizedQuery)
+  );
 };
 
 // Get a user by ID

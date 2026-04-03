@@ -12,13 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout, CATEGORIES } from '../constants';
-import { Avatar, EmptyState } from '../components';
-import { Plan, CategoryTag, User } from '../types';
-import { useAuthStore } from '../store';
+import { EmptyState } from '../components';
+import { Plan, CategoryTag } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import mockApi from '../services/mockApi';
-import { searchUsers } from '../services/friendsService';
 
 const { width } = Dimensions.get('window');
 const CARD_GAP = 8;
@@ -32,14 +30,11 @@ const parseGradientColors = (gradient: string): string[] => {
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const currentUser = useAuthStore(s => s.user);
   const C = useColors();
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryTag | null>(null);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
-  const [userResults, setUserResults] = useState<User[]>([]);
-  const [searchMode, setSearchMode] = useState<'plans' | 'users'>('plans');
   const [isSearching, setIsSearching] = useState(false);
 
   const handleCategoryPress = useCallback(async (cat: CategoryTag) => {
@@ -54,48 +49,20 @@ export const ExploreScreen: React.FC = () => {
     setSearchQuery(query);
     if (query.length < 2) {
       setFilteredPlans([]);
-      setUserResults([]);
-      setSearchMode('plans');
       return;
     }
     setSelectedCategory(null);
     setIsSearching(true);
-
-    if (query.startsWith('@') && currentUser) {
-      setSearchMode('users');
-      const users = await searchUsers(query.slice(1), currentUser.id);
-      setUserResults(users);
-      setFilteredPlans([]);
-    } else {
-      setSearchMode('plans');
-      const plans = await mockApi.searchPlans(query);
-      setFilteredPlans(plans);
-      setUserResults([]);
-    }
+    const plans = await mockApi.searchPlans(query);
+    setFilteredPlans(plans);
     setIsSearching(false);
-  }, [currentUser]);
+  }, []);
 
   const handleClear = () => {
     setSearchQuery('');
     setSelectedCategory(null);
     setFilteredPlans([]);
-    setUserResults([]);
-    setSearchMode('plans');
   };
-
-  const renderUserResult = ({ item }: { item: User }) => (
-    <TouchableOpacity
-      style={styles.userRow}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('OtherProfile', { userId: item.id })}
-    >
-      <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl} />
-      <View style={styles.userInfo}>
-        <Text style={styles.userDisplayName}>{item.displayName}</Text>
-        <Text style={styles.userUsername}>@{item.username}</Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   const renderCategoryCard = ({ item, index }: { item: typeof CATEGORIES[0]; index: number }) => (
     <TouchableOpacity
@@ -172,31 +139,6 @@ export const ExploreScreen: React.FC = () => {
             numColumns={2}
             contentContainerStyle={styles.catGrid}
             showsVerticalScrollIndicator={false}
-          />
-        </>
-      ) : searchMode === 'users' ? (
-        <>
-          <View style={styles.resultsHeader}>
-            <Text style={styles.resultsTitle}>
-              {t.explore_users_count} ({userResults.length})
-            </Text>
-          </View>
-          <FlatList
-            key="user-results"
-            data={userResults}
-            renderItem={renderUserResult}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.resultsList}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              !isSearching ? (
-                <EmptyState
-                  icon="👤"
-                  title={t.explore_no_users}
-                  subtitle={t.explore_no_users_sub}
-                />
-              ) : null
-            }
           />
         </>
       ) : (
@@ -370,26 +312,5 @@ const styles = StyleSheet.create({
   compactMetaText: {
     fontSize: 12,
     color: Colors.gray800,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  userInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  userDisplayName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.black,
-  },
-  userUsername: {
-    fontSize: 12,
-    color: Colors.gray700,
-    marginTop: 1,
   },
 });

@@ -195,9 +195,13 @@ export const en: Record<TranslationKeys, string> = {
   other_profile_no_plans: 'No plans published',
 
   // Friend requests
-  friend_requests_title: 'Friend requests',
+  friend_requests_title: 'Friends',
+  friend_requests_search: 'Search',
   friend_requests_received: 'Received',
   friend_requests_sent: 'Sent',
+  friend_requests_search_placeholder: 'Search by name or username...',
+  friend_requests_search_empty: 'No results',
+  friend_requests_search_empty_sub: 'Try another name or username',
   friend_requests_accept: 'Accept',
   friend_requests_decline: 'Decline',
   friend_requests_pending: 'Pending',

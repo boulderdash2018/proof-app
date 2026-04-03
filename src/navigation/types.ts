@@ -30,6 +30,7 @@ export type SavesStackParamList = {
 export type ProfileStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
+  OtherProfile: { userId: string };
   Followers: { userId: string };
   Following: { userId: string };
   FriendRequests: undefined;

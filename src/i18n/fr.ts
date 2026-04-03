@@ -193,9 +193,13 @@ export const fr = {
   other_profile_no_plans: 'Aucune journée publiée',
 
   // Friend requests
-  friend_requests_title: "Demandes d'amis",
+  friend_requests_title: "Amis",
+  friend_requests_search: 'Rechercher',
   friend_requests_received: 'Reçues',
   friend_requests_sent: 'Envoyées',
+  friend_requests_search_placeholder: 'Rechercher par nom ou pseudo...',
+  friend_requests_search_empty: 'Aucun résultat',
+  friend_requests_search_empty_sub: 'Essaie un autre nom ou pseudo',
   friend_requests_accept: 'Accepter',
   friend_requests_decline: 'Refuser',
   friend_requests_pending: 'En attente',
