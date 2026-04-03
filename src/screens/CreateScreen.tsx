@@ -171,6 +171,17 @@ export const CreateScreen: React.FC = () => {
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] as TransportMode;
   }, [travels]);
 
+  // All unique transports chosen (in order of first appearance)
+  const uniqueTransports = useMemo((): TransportMode[] => {
+    if (travels.length === 0) return [];
+    const seen = new Set<TransportMode>();
+    const result: TransportMode[] = [];
+    travels.forEach((t) => {
+      if (!seen.has(t.transport)) { seen.add(t.transport); result.push(t.transport); }
+    });
+    return result;
+  }, [travels]);
+
   // Filter fictional places based on search + already added
   const addedIds = new Set(places.map((p) => p.id));
   const filteredPlaces = useMemo(() => {
@@ -526,9 +537,15 @@ export const CreateScreen: React.FC = () => {
                 </View>
                 <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
                 <View style={styles.totalItem}>
-                  <Text style={styles.totalEmoji}>{TRANSPORT_EMOJIS[mainTransport]}</Text>
                   <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_transport}</Text>
-                  <Text style={[styles.totalValue, { color: C.black }]}>{getTransportLabel(mainTransport)}</Text>
+                  <View style={styles.transportsList}>
+                    {uniqueTransports.map((mode) => (
+                      <View key={mode} style={[styles.transportTag, { backgroundColor: C.primary + '15' }]}>
+                        <Text style={styles.transportTagEmoji}>{TRANSPORT_EMOJIS[mode]}</Text>
+                        <Text style={[styles.transportTagText, { color: C.primary }]}>{getTransportLabel(mode)}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
             </View>
@@ -653,6 +670,10 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
   totalValue: { fontSize: 16, fontWeight: '800' },
   totalsDivider: { width: 1, height: 40 },
+  transportsList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginTop: 4 },
+  transportTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  transportTagEmoji: { fontSize: 11, marginRight: 3 },
+  transportTagText: { fontSize: 11, fontWeight: '700' },
 
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
