@@ -20,11 +20,19 @@ import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { CategoryTag, TransportMode } from '../types';
+import { CategoryTag, TransportMode, TravelSegment } from '../types';
 import { createPlan } from '../services/plansService';
 import { trackEvent } from '../services/posthogConfig';
 
 const TRANSPORT_OPTIONS: TransportMode[] = ['Métro', 'Vélo', 'À pied', 'Voiture', 'Trottinette'];
+
+const TRANSPORT_EMOJIS: Record<TransportMode, string> = {
+  'Métro': '🚇',
+  'Vélo': '🚲',
+  'À pied': '🚶',
+  'Voiture': '🚗',
+  'Trottinette': '🛴',
+};
 
 // ========== FICTIONAL PLACES ==========
 const FICTIONAL_PLACES = [
@@ -73,6 +81,30 @@ const PLACE_ADDRESSES: Record<string, string> = {
   'fp-20': '1 Bd Poissonnière, 75002 Paris',
 };
 
+// ========== TYPES ==========
+interface PlaceEntry {
+  id: string;
+  name: string;
+  type: string;
+  price: string;      // user input (numbers only)
+  duration: string;   // user input in minutes (numbers only)
+}
+
+interface TravelEntry {
+  fromId: string;
+  toId: string;
+  duration: string;   // user input in minutes (numbers only)
+  transport: TransportMode;
+}
+
+// Format minutes to readable duration
+const formatDuration = (totalMinutes: number): string => {
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${h}h`;
+};
+
 export const CreateScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -93,10 +125,8 @@ export const CreateScreen: React.FC = () => {
 
   const [title, setTitle] = useState('');
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
-  const [places, setPlaces] = useState<{ id: string; name: string; type: string }[]>([]);
-  const [price, setPrice] = useState('');
-  const [duration, setDuration] = useState('');
-  const [transport, setTransport] = useState<TransportMode | null>(null);
+  const [places, setPlaces] = useState<PlaceEntry[]>([]);
+  const [travels, setTravels] = useState<TravelEntry[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -113,6 +143,34 @@ export const CreateScreen: React.FC = () => {
     );
   };
 
+  // ========== AUTO-CALCULATED TOTALS ==========
+  const totalPrice = useMemo(() => {
+    return places.reduce((sum, p) => {
+      const val = parseInt(p.price, 10);
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+  }, [places]);
+
+  const totalDuration = useMemo(() => {
+    const placeTime = places.reduce((sum, p) => {
+      const val = parseInt(p.duration, 10);
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+    const travelTime = travels.reduce((sum, t) => {
+      const val = parseInt(t.duration, 10);
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+    return placeTime + travelTime;
+  }, [places, travels]);
+
+  // Get the most used transport mode for the plan's main transport
+  const mainTransport = useMemo((): TransportMode => {
+    if (travels.length === 0) return 'À pied';
+    const counts: Record<string, number> = {};
+    travels.forEach((t) => { counts[t.transport] = (counts[t.transport] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] as TransportMode;
+  }, [travels]);
+
   // Filter fictional places based on search + already added
   const addedIds = new Set(places.map((p) => p.id));
   const filteredPlaces = useMemo(() => {
@@ -126,23 +184,87 @@ export const CreateScreen: React.FC = () => {
 
   const selectPlace = (place: typeof FICTIONAL_PLACES[0]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPlaces((prev) => [...prev, { id: place.id, name: place.name, type: place.type }]);
+    const newPlace: PlaceEntry = { id: place.id, name: place.name, type: place.type, price: '', duration: '' };
+    const newPlaces = [...places, newPlace];
+    setPlaces(newPlaces);
+
+    // Auto-add travel segment if this isn't the first place
+    if (places.length > 0) {
+      const prevPlace = places[places.length - 1];
+      setTravels((prev) => [
+        ...prev,
+        { fromId: prevPlace.id, toId: place.id, duration: '', transport: 'À pied' },
+      ]);
+    }
+
     setShowPlacePicker(false);
     setPlaceSearch('');
   };
 
   const removePlace = (id: string) => {
-    setPlaces((prev) => prev.filter((p) => p.id !== id));
+    const index = places.findIndex((p) => p.id === id);
+    if (index === -1) return;
+
+    const newPlaces = places.filter((p) => p.id !== id);
+    setPlaces(newPlaces);
+
+    // Remove associated travel segments and rebuild
+    if (newPlaces.length <= 1) {
+      setTravels([]);
+    } else {
+      const newTravels: TravelEntry[] = [];
+      for (let i = 0; i < newPlaces.length - 1; i++) {
+        // Try to find existing travel between these two places
+        const existing = travels.find(
+          (t) => t.fromId === newPlaces[i].id && t.toId === newPlaces[i + 1].id
+        );
+        newTravels.push(
+          existing || { fromId: newPlaces[i].id, toId: newPlaces[i + 1].id, duration: '', transport: 'À pied' }
+        );
+      }
+      setTravels(newTravels);
+    }
   };
 
+  // ========== UPDATE HANDLERS ==========
+  const updatePlacePrice = (id: string, value: string) => {
+    // Only allow digits
+    const cleaned = value.replace(/[^0-9]/g, '');
+    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, price: cleaned } : p));
+  };
+
+  const updatePlaceDuration = (id: string, value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, duration: cleaned } : p));
+  };
+
+  const updateTravelDuration = (index: number, value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+    setTravels((prev) => prev.map((t, i) => i === index ? { ...t, duration: cleaned } : t));
+  };
+
+  const updateTravelTransport = (index: number, mode: TransportMode) => {
+    setTravels((prev) => prev.map((t, i) => i === index ? { ...t, transport: mode } : t));
+  };
+
+  // ========== VALIDATION ==========
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (title.length < 5) e.title = t.create_error_title;
     if (selectedTags.length === 0) e.tags = t.create_error_tags;
     if (places.length < 2) e.places = t.create_error_places;
-    if (!price) e.price = t.create_error_required;
-    if (!duration) e.duration = t.create_error_required;
-    if (!transport) e.transport = t.create_error_transport;
+
+    // Check each place has valid numbers
+    places.forEach((p, i) => {
+      if (!p.price || isNaN(parseInt(p.price, 10))) e[`place_price_${i}`] = t.create_error_numbers_only;
+      if (!p.duration || isNaN(parseInt(p.duration, 10))) e[`place_duration_${i}`] = t.create_error_numbers_only;
+    });
+
+    // Check each travel has valid duration
+    travels.forEach((tr, i) => {
+      if (!tr.duration || isNaN(parseInt(tr.duration, 10))) e[`travel_duration_${i}`] = t.create_error_numbers_only;
+    });
+
     setErrors(e);
     if (Object.keys(e).length > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     return Object.keys(e).length === 0;
@@ -152,6 +274,13 @@ export const CreateScreen: React.FC = () => {
     if (!validate() || !user) return;
     setIsPublishing(true);
     try {
+      const travelSegments: TravelSegment[] = travels.map((tr) => ({
+        fromPlaceId: tr.fromId,
+        toPlaceId: tr.toId,
+        duration: parseInt(tr.duration, 10),
+        transport: tr.transport,
+      }));
+
       const newPlan = await createPlan(
         {
           title,
@@ -165,17 +294,19 @@ export const CreateScreen: React.FC = () => {
             reviewCount: Math.floor(Math.random() * 200) + 10,
             ratingDistribution: [50, 25, 15, 7, 3] as [number, number, number, number, number],
             reviews: [],
+            placePrice: parseInt(p.price, 10) || 0,
+            placeDuration: parseInt(p.duration, 10) || 0,
           })),
-          price,
-          duration,
-          transport: transport!,
+          price: `${totalPrice}€`,
+          duration: formatDuration(totalDuration),
+          transport: mainTransport,
+          travelSegments,
         },
         user
       );
-      // Add to feed store + saves (as done) immediately
       addPlan(newPlan);
       addCreatedPlan(newPlan);
-      trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport });
+      trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport: mainTransport });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSuccess(true);
     } catch {
@@ -185,6 +316,7 @@ export const CreateScreen: React.FC = () => {
     }
   };
 
+  // ========== SUCCESS SCREEN ==========
   if (isSuccess) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -195,11 +327,146 @@ export const CreateScreen: React.FC = () => {
           <View style={[styles.xpEarned, { backgroundColor: C.successBg }]}>
             <Text style={[styles.xpEarnedText, { color: C.success }]}>{t.create_success_xp}</Text>
           </View>
-          <PrimaryButton label={t.create_success_back} onPress={() => { setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setPrice(''); setDuration(''); setTransport(null); navigation.navigate('FeedTab'); }} />
+          <PrimaryButton label={t.create_success_back} onPress={() => {
+            setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setTravels([]);
+            navigation.navigate('FeedTab');
+          }} />
         </View>
       </View>
     );
   }
+
+  // ========== RENDER PLACE + TRAVEL ITEMS ==========
+  const renderPlacesWithTravels = () => {
+    const items: React.ReactNode[] = [];
+
+    places.forEach((place, index) => {
+      // Place card
+      items.push(
+        <View key={`place-${place.id}`} style={[styles.placeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+          <View style={styles.placeCardHeader}>
+            <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
+              <Text style={styles.placeNumberText}>{index + 1}</Text>
+            </View>
+            <View style={styles.placeCardInfo}>
+              <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
+              <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type}</Text>
+            </View>
+            <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={[styles.placeRemove, { color: C.gray600 }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Per-place price & duration inputs */}
+          <View style={styles.placeInputsRow}>
+            <View style={styles.placeInputGroup}>
+              <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_price}</Text>
+              <View style={[styles.placeInputWrap, { backgroundColor: C.gray200, borderColor: errors[`place_price_${index}`] ? Colors.error : 'transparent' }]}>
+                <RNTextInput
+                  style={[styles.placeInput, { color: C.black }]}
+                  placeholder={t.create_place_price_placeholder}
+                  placeholderTextColor={C.gray500}
+                  value={place.price}
+                  onChangeText={(v) => updatePlacePrice(place.id, v)}
+                  keyboardType="numeric"
+                  maxLength={5}
+                />
+                <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>€</Text>
+              </View>
+              {errors[`place_price_${index}`] && (
+                <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
+              )}
+            </View>
+
+            <View style={{ width: 10 }} />
+
+            <View style={styles.placeInputGroup}>
+              <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_duration}</Text>
+              <View style={[styles.placeInputWrap, { backgroundColor: C.gray200, borderColor: errors[`place_duration_${index}`] ? Colors.error : 'transparent' }]}>
+                <RNTextInput
+                  style={[styles.placeInput, { color: C.black }]}
+                  placeholder={t.create_place_duration_placeholder}
+                  placeholderTextColor={C.gray500}
+                  value={place.duration}
+                  onChangeText={(v) => updatePlaceDuration(place.id, v)}
+                  keyboardType="numeric"
+                  maxLength={4}
+                />
+                <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>min</Text>
+              </View>
+              {errors[`place_duration_${index}`] && (
+                <Text style={styles.miniError}>{errors[`place_duration_${index}`]}</Text>
+              )}
+            </View>
+          </View>
+        </View>
+      );
+
+      // Travel segment between this place and the next one
+      if (index < places.length - 1 && index < travels.length) {
+        const travel = travels[index];
+        const nextPlace = places[index + 1];
+        items.push(
+          <View key={`travel-${index}`} style={[styles.travelCard, { backgroundColor: C.gray200 + '80' }]}>
+            <View style={styles.travelHeader}>
+              <Text style={styles.travelDots}>⋮</Text>
+              <Text style={[styles.travelLabel, { color: C.gray700 }]}>
+                {t.create_between_places} <Text style={{ fontWeight: '700', color: C.black }}>{place.name.split(' ')[0]}</Text> {t.create_and} <Text style={{ fontWeight: '700', color: C.black }}>{nextPlace.name.split(' ')[0]}</Text>
+              </Text>
+            </View>
+
+            <View style={styles.travelInputsRow}>
+              <View style={styles.travelInputGroup}>
+                <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_travel_time}</Text>
+                <View style={[styles.placeInputWrap, { backgroundColor: C.white, borderColor: errors[`travel_duration_${index}`] ? Colors.error : 'transparent' }]}>
+                  <RNTextInput
+                    style={[styles.placeInput, { color: C.black }]}
+                    placeholder={t.create_travel_time_placeholder}
+                    placeholderTextColor={C.gray500}
+                    value={travel.duration}
+                    onChangeText={(v) => updateTravelDuration(index, v)}
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                  <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>min</Text>
+                </View>
+                {errors[`travel_duration_${index}`] && (
+                  <Text style={styles.miniError}>{errors[`travel_duration_${index}`]}</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.travelTransportRow}>
+              {TRANSPORT_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[
+                    styles.transportMiniChip,
+                    {
+                      backgroundColor: travel.transport === opt ? C.primary : C.white,
+                      borderColor: travel.transport === opt ? C.primary : C.borderLight,
+                    },
+                  ]}
+                  onPress={() => updateTravelTransport(index, opt)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.transportMiniEmoji}>{TRANSPORT_EMOJIS[opt]}</Text>
+                  <Text style={[
+                    styles.transportMiniText,
+                    { color: travel.transport === opt ? '#FFFFFF' : C.gray800 },
+                  ]}>
+                    {getTransportLabel(opt)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        );
+      }
+    });
+
+    return items;
+  };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -228,20 +495,10 @@ export const CreateScreen: React.FC = () => {
               {places.length} {t.create_places_added}
             </Text>
           )}
-          {places.map((p, index) => (
-            <View key={p.id} style={[styles.placeRow, { borderBottomColor: C.borderLight }]}>
-              <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
-                <Text style={styles.placeNumberText}>{index + 1}</Text>
-              </View>
-              <View style={styles.placeInfo}>
-                <Text style={[styles.placeName, { color: C.black }]}>{p.name}</Text>
-                <Text style={[styles.placeType, { color: C.gray700 }]}>{p.type}</Text>
-              </View>
-              <TouchableOpacity onPress={() => removePlace(p.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text style={[styles.placeRemove, { color: C.gray600 }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+
+          {/* Places with travel segments */}
+          {renderPlacesWithTravels()}
+
           <TouchableOpacity
             style={[styles.addPlaceBtn, { backgroundColor: C.primary + '10', borderColor: C.primary + '30' }]}
             onPress={() => setShowPlacePicker(true)}
@@ -251,19 +508,31 @@ export const CreateScreen: React.FC = () => {
           </TouchableOpacity>
           {errors.places && <Text style={styles.errorText}>{errors.places}</Text>}
 
-          <View style={styles.halfRow}>
-            <TextInput label={t.create_price_label} placeholder={t.create_price_placeholder} value={price} onChangeText={setPrice} error={errors.price} half />
-            <View style={{ width: 12 }} />
-            <TextInput label={t.create_duration_label} placeholder={t.create_duration_placeholder} value={duration} onChangeText={setDuration} error={errors.duration} half />
-          </View>
-
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_transport}</Text>
-          <View style={styles.chipsWrap}>
-            {TRANSPORT_OPTIONS.map((opt) => (
-              <Chip key={opt} label={getTransportLabel(opt)} variant={transport === opt ? 'filled-black' : 'filled-gray'} onPress={() => setTransport(opt)} />
-            ))}
-          </View>
-          {errors.transport && <Text style={styles.errorText}>{errors.transport}</Text>}
+          {/* ========== AUTO-CALCULATED TOTALS ========== */}
+          {places.length >= 2 && (
+            <View style={[styles.totalsCard, { backgroundColor: C.primary + '08', borderColor: C.primary + '20' }]}>
+              <Text style={[styles.totalsTitle, { color: C.primary }]}>RECAP</Text>
+              <View style={styles.totalsRow}>
+                <View style={styles.totalItem}>
+                  <Text style={styles.totalEmoji}>💰</Text>
+                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_total_price}</Text>
+                  <Text style={[styles.totalValue, { color: C.black }]}>{totalPrice}€</Text>
+                </View>
+                <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
+                <View style={styles.totalItem}>
+                  <Text style={styles.totalEmoji}>⏱️</Text>
+                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_total_duration}</Text>
+                  <Text style={[styles.totalValue, { color: C.black }]}>{formatDuration(totalDuration)}</Text>
+                </View>
+                <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
+                <View style={styles.totalItem}>
+                  <Text style={styles.totalEmoji}>{TRANSPORT_EMOJIS[mainTransport]}</Text>
+                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_transport}</Text>
+                  <Text style={[styles.totalValue, { color: C.black }]}>{getTransportLabel(mainTransport)}</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           <View style={styles.publishSection}>
             <PrimaryButton label={t.create_publish} onPress={handlePublish} loading={isPublishing} />
@@ -277,7 +546,6 @@ export const CreateScreen: React.FC = () => {
         {/* ========== PLACE PICKER MODAL ========== */}
         <Modal visible={showPlacePicker} animationType="slide" presentationStyle="pageSheet">
           <View style={[styles.modalContainer, { paddingTop: insets.top, backgroundColor: C.white }]}>
-            {/* Modal header */}
             <View style={[styles.modalHeader, { borderBottomColor: C.borderLight }]}>
               <Text style={[styles.modalTitle, { color: C.black }]}>{t.create_add_place_title}</Text>
               <TouchableOpacity onPress={() => { setShowPlacePicker(false); setPlaceSearch(''); }}>
@@ -285,7 +553,6 @@ export const CreateScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Search bar */}
             <View style={[styles.modalSearch, { backgroundColor: C.gray200 }]}>
               <Text style={styles.searchIcon}>🔍</Text>
               <RNTextInput
@@ -305,7 +572,6 @@ export const CreateScreen: React.FC = () => {
 
             <Text style={[styles.modalSectionLabel, { color: C.gray700 }]}>{t.create_suggested_places}</Text>
 
-            {/* Places list */}
             <FlatList
               data={filteredPlaces}
               keyExtractor={(item) => item.id}
@@ -348,16 +614,48 @@ const styles = StyleSheet.create({
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
   errorText: { fontSize: 11, color: Colors.error, marginTop: -6, marginBottom: 8, marginLeft: 2 },
   placesCount: { fontSize: 11, marginBottom: 6, marginLeft: 2 },
-  placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, gap: 10 },
+
+  // Place card
+  placeCard: { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 0 },
+  placeCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   placeNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   placeNumberText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
-  placeInfo: { flex: 1 },
+  placeCardInfo: { flex: 1 },
   placeName: { fontSize: 13, fontWeight: '700' },
   placeType: { fontSize: 11, marginTop: 1 },
   placeRemove: { fontSize: 14, paddingHorizontal: 6 },
-  addPlaceBtn: { paddingVertical: 14, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
+  placeInputsRow: { flexDirection: 'row' },
+  placeInputGroup: { flex: 1 },
+  placeInputLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
+  placeInputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 10, height: 36, borderWidth: 1.5 },
+  placeInput: { flex: 1, fontSize: 14, fontWeight: '600', paddingVertical: 0 },
+  placeInputUnit: { fontSize: 12, fontWeight: '600', marginLeft: 4 },
+  miniError: { fontSize: 10, color: Colors.error, marginTop: 2 },
+
+  // Travel card
+  travelCard: { borderRadius: 12, padding: 10, marginVertical: 4 },
+  travelHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  travelDots: { fontSize: 16, marginRight: 8, color: '#999', fontWeight: '700' },
+  travelLabel: { fontSize: 11, flex: 1 },
+  travelInputsRow: { flexDirection: 'row', marginBottom: 8 },
+  travelInputGroup: { flex: 1, maxWidth: 160 },
+  travelTransportRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  transportMiniChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1 },
+  transportMiniEmoji: { fontSize: 12, marginRight: 4 },
+  transportMiniText: { fontSize: 11, fontWeight: '600' },
+
+  // Totals recap
+  totalsCard: { borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 16, marginBottom: 4 },
+  totalsTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 10, textAlign: 'center' },
+  totalsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  totalItem: { alignItems: 'center' },
+  totalEmoji: { fontSize: 18, marginBottom: 4 },
+  totalLabel: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
+  totalValue: { fontSize: 16, fontWeight: '800' },
+  totalsDivider: { width: 1, height: 40 },
+
+  addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
-  halfRow: { flexDirection: 'row' },
   publishSection: { marginTop: 20 },
   costNote: { fontSize: 12, textAlign: 'center', marginTop: 10 },
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },

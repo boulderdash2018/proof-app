@@ -52,6 +52,15 @@ export interface Place {
   reviewCount: number;
   ratingDistribution: [number, number, number, number, number];
   reviews: Review[];
+  placePrice?: number;       // price in € for this place
+  placeDuration?: number;    // time spent in minutes
+}
+
+export interface TravelSegment {
+  fromPlaceId: string;
+  toPlaceId: string;
+  duration: number;          // travel time in minutes
+  transport: TransportMode;
 }
 
 export interface Plan {
@@ -65,6 +74,7 @@ export interface Plan {
   price: string;
   duration: string;
   transport: TransportMode;
+  travelSegments?: TravelSegment[];
   likesCount: number;
   commentsCount: number;
   xpReward: number;

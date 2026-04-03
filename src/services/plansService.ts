@@ -11,7 +11,7 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode } from '../types';
+import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode, TravelSegment } from '../types';
 
 const PLANS = 'plans';
 const SAVED_PLANS = 'savedPlans';
@@ -53,6 +53,7 @@ export const createPlan = async (
     price: string;
     duration: string;
     transport: TransportMode;
+    travelSegments?: TravelSegment[];
   },
   author: User
 ): Promise<Plan> => {
@@ -71,6 +72,7 @@ export const createPlan = async (
     price: planData.price,
     duration: planData.duration,
     transport: planData.transport,
+    travelSegments: planData.travelSegments || [],
     likesCount: 0,
     commentsCount: 0,
     xpReward: 20,
