@@ -39,60 +39,72 @@ export const EditProfileScreen: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Convert a blob/file URI to a data URL for persistence
-  const uriToDataUrl = (uri: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.onload = () => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(xhr.response);
+  const pickImageWeb = () => {
+    // Create a native file input for web — most reliable approach
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setIsUploading(true);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarUrl(reader.result as string);
+        setIsUploading(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       };
-      xhr.onerror = reject;
-      xhr.open('GET', uri);
-      xhr.responseType = 'blob';
-      xhr.send();
-    });
+      reader.onerror = () => {
+        console.error('FileReader error');
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   };
 
-  const pickImage = async () => {
+  const pickImageNative = async () => {
     try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', "Autorise l'accès à tes photos.");
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: Platform.OS !== 'web',
+        allowsEditing: true,
         aspect: [1, 1],
         quality: 0.4,
+        base64: true,
       });
-
       if (result.canceled || !result.assets[0]) return;
-
       const asset = result.assets[0];
       setIsUploading(true);
-
-      try {
-        // Convert to data URL (works on web + native)
-        const dataUrl = await uriToDataUrl(asset.uri);
-        setAvatarUrl(dataUrl);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (err) {
-        console.error('Convert to data URL failed:', err);
-        // Last resort: use raw URI
+      if (asset.base64) {
+        setAvatarUrl(`data:image/jpeg;base64,${asset.base64}`);
+      } else {
         setAvatarUrl(asset.uri);
-      } finally {
-        setIsUploading(false);
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('Image picker error:', err);
+    } finally {
       setIsUploading(false);
+    }
+  };
+
+  const pickImage = () => {
+    if (Platform.OS === 'web') {
+      pickImageWeb();
+    } else {
+      pickImageNative();
     }
   };
 
   const handlePhotoPress = () => {
     if (Platform.OS === 'web') {
-      // On web, directly open picker
       pickImage();
     } else {
-      // On native, show action sheet
       Alert.alert(
         t.edit_profile_photo_title,
         '',
