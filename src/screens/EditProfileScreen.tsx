@@ -16,13 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Colors, Layout } from '../constants';
 import { Avatar, PrimaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { storage } from '../services/firebaseConfig';
 
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -40,53 +38,52 @@ export const EditProfileScreen: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const pickImage = async () => {
-    // Ask for permission
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Autorise l\'accès à tes photos pour changer ta photo de profil.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-      base64: true,
+  // Convert a blob/file URI to a data URL for persistence
+  const uriToDataUrl = (uri: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.onload = () => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(xhr.response);
+      };
+      xhr.onerror = reject;
+      xhr.open('GET', uri);
+      xhr.responseType = 'blob';
+      xhr.send();
     });
+  };
 
-    if (!result.canceled && result.assets[0]) {
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: Platform.OS !== 'web',
+        aspect: [1, 1],
+        quality: 0.4,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
       const asset = result.assets[0];
-      const base64DataUrl = asset.base64
-        ? `data:image/jpeg;base64,${asset.base64}`
-        : null;
-
       setIsUploading(true);
+
       try {
-        if (base64DataUrl) {
-          // Try Firebase Storage upload
-          const fileName = `avatars/${user?.id}_${Date.now()}.jpg`;
-          const storageRef = ref(storage, fileName);
-          await uploadString(storageRef, base64DataUrl, 'data_url');
-          const downloadUrl = await getDownloadURL(storageRef);
-          setAvatarUrl(downloadUrl);
-        } else {
-          // No base64 available, use URI
-          setAvatarUrl(asset.uri);
-        }
+        // Convert to data URL (works on web + native)
+        const dataUrl = await uriToDataUrl(asset.uri);
+        setAvatarUrl(dataUrl);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (err) {
-        console.error('Firebase Storage upload failed, using base64 fallback:', err);
-        // Fallback: store base64 data URL directly (works everywhere, persists in Firestore)
-        if (base64DataUrl) {
-          setAvatarUrl(base64DataUrl);
-        } else {
-          setAvatarUrl(asset.uri);
-        }
+        console.error('Convert to data URL failed:', err);
+        // Last resort: use raw URI
+        setAvatarUrl(asset.uri);
       } finally {
         setIsUploading(false);
       }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      setIsUploading(false);
     }
   };
 
