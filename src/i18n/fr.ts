@@ -156,6 +156,8 @@ export const fr = {
   plan_reviews: 'avis',
   plan_saved: 'Sauvé',
   plan_save: 'Sauver',
+  plan_mark_done: 'Fait ?',
+  plan_already_done: 'Fait ✓',
 
   // Place detail
   place_reviews_proof: 'avis Proof',

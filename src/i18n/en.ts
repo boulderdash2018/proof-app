@@ -158,6 +158,8 @@ export const en: Record<TranslationKeys, string> = {
   plan_reviews: 'reviews',
   plan_saved: 'Saved',
   plan_save: 'Save',
+  plan_mark_done: 'Done?',
+  plan_already_done: 'Done ✓',
 
   // Place detail
   place_reviews_proof: 'Proof reviews',

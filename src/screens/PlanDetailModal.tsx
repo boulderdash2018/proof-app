@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Colors, Layout } from '../constants';
 import { Avatar, Chip, UserBadge, XpBadge } from '../components';
-import { useFeedStore } from '../store';
+import { useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
@@ -32,10 +32,14 @@ export const PlanDetailModal: React.FC = () => {
 
   const feedPlans = useFeedStore((s) => s.plans);
   const { likedPlanIds, savedPlanIds, toggleLike, toggleSave } = useFeedStore();
+  const { savedPlans, markAsDone, fetchSaves } = useSavesStore();
 
   const [plan, setPlan] = useState<Plan | null>(
     feedPlans.find((p) => p.id === planId) || null
   );
+
+  const savedPlan = savedPlans.find((sp) => sp.planId === planId);
+  const isDone = savedPlan?.isDone ?? false;
 
   useEffect(() => {
     if (!plan) {
@@ -43,10 +47,17 @@ export const PlanDetailModal: React.FC = () => {
         if (result) setPlan(result);
       });
     }
+    // Ensure saved plans are loaded so we can check isDone
+    if (savedPlans.length === 0) fetchSaves();
   }, [planId]);
 
   const isLiked = likedPlanIds.has(planId);
   const isSaved = savedPlanIds.has(planId);
+
+  const handleMarkDone = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    markAsDone(planId);
+  };
 
   const handleLike = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -82,7 +93,29 @@ export const PlanDetailModal: React.FC = () => {
           <Text style={[styles.backChevron, { color: C.black }]}>&#8249;</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: C.black }]} numberOfLines={1}>{plan.title}</Text>
-        <View style={{ width: 34 }} />
+        {isSaved ? (
+          <TouchableOpacity
+            style={[
+              styles.doneBtn,
+              isDone
+                ? { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }
+                : { backgroundColor: C.primary + '15', borderColor: C.primary },
+            ]}
+            onPress={!isDone ? handleMarkDone : undefined}
+            activeOpacity={isDone ? 1 : 0.7}
+          >
+            <Text
+              style={[
+                styles.doneBtnText,
+                { color: isDone ? '#4CAF50' : C.primary },
+              ]}
+            >
+              {isDone ? t.plan_already_done : t.plan_mark_done}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 34 }} />
+        )}
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]} showsVerticalScrollIndicator={false}>
@@ -155,6 +188,8 @@ const styles = StyleSheet.create({
   backBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   backChevron: { fontSize: 20, fontWeight: '700', marginTop: -2 },
   headerTitle: { flex: 1, fontSize: 15, fontWeight: '700', textAlign: 'center', marginHorizontal: 10 },
+  doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1.5 },
+  doneBtnText: { fontSize: 12, fontWeight: '700' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { fontSize: 14 },
   scrollView: { flex: 1 },
