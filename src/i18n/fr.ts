@@ -205,6 +205,13 @@ export const fr = {
   edit_profile_bio: 'Bio',
   edit_profile_bio_placeholder: 'Dis quelque chose sur toi...',
   edit_profile_private: 'Compte privé',
+  edit_profile_confirm_title: 'Modifier le profil',
+  edit_profile_confirm_message: 'Es-tu sûr de vouloir modifier ton profil ?',
+  edit_profile_confirm_yes: 'Confirmer',
+  edit_profile_photo_title: 'Photo de profil',
+  edit_profile_photo_gallery: 'Choisir depuis la galerie',
+  edit_profile_photo_remove: 'Supprimer la photo',
+  edit_profile_uploading: 'Upload en cours...',
 
   // Other profile
   other_profile_add: 'Ajouter en ami',

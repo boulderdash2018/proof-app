@@ -207,6 +207,13 @@ export const en: Record<TranslationKeys, string> = {
   edit_profile_bio: 'Bio',
   edit_profile_bio_placeholder: 'Tell us about yourself...',
   edit_profile_private: 'Private account',
+  edit_profile_confirm_title: 'Edit profile',
+  edit_profile_confirm_message: 'Are you sure you want to update your profile?',
+  edit_profile_confirm_yes: 'Confirm',
+  edit_profile_photo_title: 'Profile photo',
+  edit_profile_photo_gallery: 'Choose from gallery',
+  edit_profile_photo_remove: 'Remove photo',
+  edit_profile_uploading: 'Uploading...',
 
   // Other profile
   other_profile_add: 'Add friend',
