@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Layout, CATEGORIES } from '../constants';
+import { Colors, Layout, CATEGORIES } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { Plan, CategoryTag, User } from '../types';
 import { useAuthStore } from '../store';

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Typography, Layout } from '../constants';
+import { Colors, Typography, Layout } from '../constants';
 import { PrimaryButton, SecondaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';

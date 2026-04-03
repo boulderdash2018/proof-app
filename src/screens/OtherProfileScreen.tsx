@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Layout } from '../constants';
+import { Colors, Layout } from '../constants';
 import { Avatar, UserBadge, PrimaryButton, SecondaryButton } from '../components';
 import { useColors } from '../hooks/useColors';
 import { User } from '../types';

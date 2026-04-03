@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Layout } from '../constants';
+import { Colors, Layout } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
