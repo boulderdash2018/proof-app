@@ -65,6 +65,10 @@ export const ProfileScreen: React.FC = () => {
   const donePlans = savedPlans.filter((sp) => sp.isDone);
   const todoPlans = savedPlans.filter((sp) => !sp.isDone);
 
+  // Compute real stats from fetched plans
+  const realPlanCount = userPlans.length;
+  const realLikesReceived = userPlans.reduce((sum: number, p: any) => sum + (p.likesCount || 0), 0);
+
   if (!user) return null;
 
   const xpProgress = user.xpPoints / user.xpForNextLevel;
@@ -124,7 +128,7 @@ export const ProfileScreen: React.FC = () => {
 
         <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
           <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: C.black }]}>{user.planCount}</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{realPlanCount}</Text>
             <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
@@ -134,7 +138,7 @@ export const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.likesReceived)}</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realLikesReceived)}</Text>
             <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_likes_received}</Text>
           </View>
         </View>

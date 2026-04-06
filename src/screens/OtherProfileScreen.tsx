@@ -121,6 +121,10 @@ export const OtherProfileScreen: React.FC = () => {
   const formatCount = (n: number) => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : n.toString();
   const canSeeContent = !user.isPrivate || friendStatus === 'friends';
 
+  // Compute real stats from fetched plans
+  const realPlanCount = userPlans.length;
+  const realLikesReceived = userPlans.reduce((sum, p) => sum + (p.likesCount || 0), 0);
+
   const renderFriendButton = () => {
     if (actionLoading) {
       return <ActivityIndicator color={C.primary} style={{ marginTop: 12 }} />;
@@ -173,7 +177,7 @@ export const OtherProfileScreen: React.FC = () => {
           <View style={styles.statsContainer}>
             <View style={styles.statsRow}>
               <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: C.black }]}>{user.planCount}</Text>
+                <Text style={[styles.statValue, { color: C.black }]}>{realPlanCount}</Text>
                 <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
               </View>
               <View style={styles.stat}>
@@ -181,7 +185,7 @@ export const OtherProfileScreen: React.FC = () => {
                 <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_friends}</Text>
               </View>
               <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(user.likesReceived)}</Text>
+                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realLikesReceived)}</Text>
                 <Text style={[styles.statLabel, { color: C.gray700 }]}>likes</Text>
               </View>
             </View>
