@@ -97,7 +97,7 @@ export const ExploreScreen: React.FC = () => {
             key={group.key}
             style={[
               styles.chip,
-              isActive ? { backgroundColor: C.black } : { backgroundColor: C.gray200, borderWidth: 1, borderColor: C.border },
+              isActive ? { backgroundColor: C.black, borderColor: C.black } : { backgroundColor: C.gray200, borderColor: C.border },
             ]}
             onPress={() => setSelectedGroup(group.key)}
             activeOpacity={0.8}
@@ -283,6 +283,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 20,
+    borderWidth: 1,
   },
   chipText: { fontSize: 13, fontWeight: '700' },
 
