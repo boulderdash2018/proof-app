@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore } from '../store';
@@ -85,7 +86,7 @@ export const ProfileScreen: React.FC = () => {
         <Text style={[styles.headerTitle, { color: C.black }]}>{t.profile_title}</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => navigation.navigate('FriendRequests')} style={styles.friendReqBtn}>
-            <Text style={styles.friendReqIcon}>👥</Text>
+            <Ionicons name="people-outline" size={22} color={C.gray800} />
             {incomingRequests.length > 0 && (
               <View style={[styles.badge, { backgroundColor: C.primary }]}>
                 <Text style={styles.badgeText}>{incomingRequests.length}</Text>
@@ -93,7 +94,7 @@ export const ProfileScreen: React.FC = () => {
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.settingsIcon}>⚙️</Text>
+            <Ionicons name="settings-outline" size={22} color={C.gray800} />
           </TouchableOpacity>
         </View>
       </View>

@@ -25,6 +25,7 @@ import { PrivacySettingsScreen } from '../screens/PrivacySettingsScreen';
 import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
+import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore } from '../store';
 import { Colors } from '../constants';
 import { fr, en } from '../i18n';
@@ -81,17 +82,19 @@ const ProfileStackNavigator: React.FC = () => (
 );
 
 // Tab icon component
+const TAB_ICONS: Record<string, [string, string]> = {
+  FeedTab: ['home-outline', 'home'],
+  ExploreTab: ['compass-outline', 'compass'],
+  SavesTab: ['bookmark-outline', 'bookmark'],
+  ProfileTab: ['person-outline', 'person'],
+};
+
 const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused }) => {
   const color = focused ? Colors.primary : Colors.gray600;
   const language = useLanguageStore((s) => s.language);
   const t = language === 'fr' ? fr : en;
 
-  const icons: Record<string, string> = {
-    FeedTab: '\u2302',
-    ExploreTab: '\u25CE',
-    SavesTab: '\u2630',
-    ProfileTab: '\u2603',
-  };
+  const [outline, filled] = TAB_ICONS[label] || ['ellipse-outline', 'ellipse'];
 
   const labels: Record<string, string> = {
     FeedTab: t.tab_feed,
@@ -102,7 +105,7 @@ const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused
 
   return (
     <View style={styles.tabIconContainer}>
-      <Text style={[styles.tabIcon, { color }]}>{icons[label]}</Text>
+      <Ionicons name={(focused ? filled : outline) as any} size={22} color={color} />
       <Text style={[styles.tabLabel, { color }]}>{labels[label]}</Text>
     </View>
   );
@@ -112,7 +115,7 @@ const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused
 const CreateTabButton: React.FC<{ onPress?: () => void }> = ({ onPress }) => (
   <TouchableOpacity style={styles.createButtonWrapper} onPress={onPress} activeOpacity={0.8}>
     <View style={styles.createButton}>
-      <Text style={styles.createButtonIcon}>+</Text>
+      <Ionicons name="add" size={26} color="#FFFFFF" />
     </View>
   </TouchableOpacity>
 );

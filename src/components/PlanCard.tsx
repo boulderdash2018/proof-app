@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Plan, TransportMode } from '../types';
 import { Colors, Layout, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
@@ -19,16 +20,16 @@ export function parseGradient(gradient: string): string[] {
   return matches ?? [Colors.primary, Colors.black];
 }
 
-const TRANSPORT_EMOJI: Record<TransportMode, string> = {
-  'Métro': '🚇',
-  'Vélo': '🚲',
-  'À pied': '🚶',
-  'Voiture': '🚗',
-  'Trottinette': '🛴',
+const TRANSPORT_ICONS: Record<TransportMode, string> = {
+  'Métro': 'train-outline',
+  'Vélo': 'bicycle-outline',
+  'À pied': 'walk-outline',
+  'Voiture': 'car-outline',
+  'Trottinette': 'flash-outline',
 };
 
-function getTransportEmoji(mode: TransportMode): string {
-  return TRANSPORT_EMOJI[mode] ?? '🚶';
+function getTransportIcon(mode: TransportMode): string {
+  return TRANSPORT_ICONS[mode] ?? 'walk-outline';
 }
 
 interface PlanCardProps {
@@ -57,13 +58,10 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: C.gray200, borderColor: C.cardBorder }]}
+      style={[styles.card, { backgroundColor: C.gray200, borderColor: C.border }]}
       activeOpacity={0.92}
       onPress={onPress}
     >
-      {/* Subtle accent line at top */}
-      <View style={styles.accentLine} />
-
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
         <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
         <View style={styles.userInfo}>
@@ -73,9 +71,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         <UserBadge type={plan.author.badgeType} small />
       </TouchableOpacity>
 
-      <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-        <Text style={styles.bannerTitle}>{plan.title}</Text>
-      </LinearGradient>
+      <View style={styles.bannerWrap}>
+        <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+          <Text style={styles.bannerTitle}>{plan.title}</Text>
+        </LinearGradient>
+      </View>
 
       {plan.tags.length > 0 && (
         <View style={styles.tagsRow}>
@@ -106,27 +106,30 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
       <View style={[styles.metaRow, { borderTopColor: C.border }]}>
         <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-          <Text style={[styles.metaItem, { color: C.gray800 }]}>💰 {plan.price}</Text>
+          <Ionicons name="cash-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+          <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
         </View>
         <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-          <Text style={[styles.metaItem, { color: C.gray800 }]}>⏱ {plan.duration}</Text>
+          <Ionicons name="time-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+          <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.duration}</Text>
         </View>
         <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-          <Text style={[styles.metaItem, { color: C.gray800 }]}>{getTransportEmoji(plan.transport)} {plan.transport}</Text>
+          <Ionicons name={getTransportIcon(plan.transport) as any} size={13} color={C.gold} style={{ marginRight: 4 }} />
+          <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.transport}</Text>
         </View>
       </View>
 
       <View style={[styles.actionBar, { borderTopColor: C.border }]}>
         <TouchableOpacity style={styles.actionButton} onPress={onLike} activeOpacity={0.7}>
-          <Text style={styles.actionIcon}>{isLiked ? '❤️' : '🤍'}</Text>
+          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? C.primary : C.gray600} />
           <Text style={[styles.actionCount, { color: isLiked ? C.primary : C.gray700 }]}>{plan.likesCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={onComment} activeOpacity={0.7}>
-          <Text style={styles.actionIcon}>💬</Text>
+          <Ionicons name="chatbubble-outline" size={16} color={C.gray600} />
           <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={onSave} activeOpacity={0.7}>
-          <Text style={styles.actionIcon}>{isSaved ? '🔖' : '🏷️'}</Text>
+          <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
         <XpBadge xp={plan.xpReward} />
@@ -140,24 +143,19 @@ const styles = StyleSheet.create({
     borderRadius: Layout.cardRadius,
     marginHorizontal: Layout.screenPadding,
     marginBottom: 16,
-    overflow: 'hidden',
     borderWidth: 1,
-    shadowColor: Colors.accentLine,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
     elevation: 3,
-  },
-  accentLine: {
-    height: 2,
-    backgroundColor: Colors.primary,
-    opacity: 0.5,
   },
   userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
   displayName: { fontSize: 14, fontWeight: '600' },
   timeAgo: { fontSize: 11, marginTop: 1 },
-  banner: { height: 152, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 16 },
+  bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden' },
+  banner: { height: 148, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
   bannerTitle: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12 },
   placesList: { paddingHorizontal: 16, paddingTop: 12 },
@@ -169,11 +167,10 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 13, fontWeight: '600' },
   placeType: { fontSize: 11, marginTop: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
-  metaPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  metaPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   metaItem: { fontSize: 11, fontWeight: '500' },
   actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
-  actionIcon: { fontSize: 16 },
   actionCount: { fontSize: 12, fontWeight: '600', marginLeft: 5 },
   actionSpacer: { flex: 1 },
 });

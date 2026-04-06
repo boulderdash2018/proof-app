@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, Chip, UserBadge, XpBadge } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
@@ -22,8 +23,8 @@ import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
 
-const TRANSPORT_EMOJIS: Record<TransportMode, string> = {
-  'Métro': '🚇', 'Vélo': '🚲', 'À pied': '🚶', 'Voiture': '🚗', 'Trottinette': '🛴',
+const TRANSPORT_ICONS: Record<TransportMode, string> = {
+  'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
 };
 
 const parseGradient = (g: string): string[] => {
@@ -196,11 +197,11 @@ export const PlanDetailModal: React.FC = () => {
               {plan.tags.map((tag) => (<Chip key={tag} label={tag} small />))}
             </View>
             <View style={styles.metaRow}>
-              <View style={styles.metaItem}><Text style={styles.metaEmoji}>💰</Text><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.price}</Text></View>
+              <View style={styles.metaItem}><Ionicons name="cash-outline" size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.price}</Text></View>
               <View style={[styles.metaDot, { backgroundColor: C.gray500 }]} />
-              <View style={styles.metaItem}><Text style={styles.metaEmoji}>⏱️</Text><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.duration}</Text></View>
+              <View style={styles.metaItem}><Ionicons name="time-outline" size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.duration}</Text></View>
               <View style={[styles.metaDot, { backgroundColor: C.gray500 }]} />
-              <View style={styles.metaItem}><Text style={styles.metaEmoji}>{getTransportEmoji(plan.transport)}</Text><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.transport}</Text></View>
+              <View style={styles.metaItem}><Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.transport}</Text></View>
             </View>
           </View>
 
@@ -232,7 +233,7 @@ export const PlanDetailModal: React.FC = () => {
                     <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
                     <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type} &middot; {place.address.split(',')[0]}</Text>
                     <View style={styles.ratingRow}>
-                      <Text style={[styles.ratingStar, { color: C.primary }]}>★</Text>
+                      <Ionicons name="star" size={12} color={C.primary} style={{ marginRight: 3 }} />
                       <Text style={[styles.ratingNumber, { color: C.black }]}>{place.rating}</Text>
                       <Text style={[styles.ratingCount, { color: C.gray700 }]}>({place.reviewCount} {t.plan_reviews})</Text>
                     </View>
@@ -241,18 +242,20 @@ export const PlanDetailModal: React.FC = () => {
                       <View style={styles.placeMeta}>
                         {place.placePrice != null && place.placePrice > 0 && (
                           <View style={[styles.placeMetaTag, { backgroundColor: C.gray200 }]}>
-                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>💰 {place.placePrice}€</Text>
+                            <Ionicons name="cash-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
+                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>{place.placePrice}€</Text>
                           </View>
                         )}
                         {place.placeDuration != null && place.placeDuration > 0 && (
                           <View style={[styles.placeMetaTag, { backgroundColor: C.gray200 }]}>
-                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>⏱️ {place.placeDuration}min</Text>
+                            <Ionicons name="time-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
+                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>{place.placeDuration}min</Text>
                           </View>
                         )}
                       </View>
                     )}
                   </View>
-                  <Text style={[styles.placeChevron, { color: C.gray600 }]}>›</Text>
+                  <Ionicons name="chevron-forward" size={18} color={C.gray600} />
                 </TouchableOpacity>
 
                 {/* Dashed line + travel segment between places */}
@@ -264,8 +267,9 @@ export const PlanDetailModal: React.FC = () => {
                     <View style={[styles.travelInfo, { backgroundColor: C.gray200 + '80' }]}>
                       {travelToNext ? (
                         <>
+                          <Ionicons name={(TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any} size={13} color={C.gold} style={{ marginRight: 4 }} />
                           <Text style={[styles.travelText, { color: C.gray700 }]}>
-                            {TRANSPORT_EMOJIS[travelToNext.transport]} {travelToNext.transport}
+                            {travelToNext.transport}
                           </Text>
                           <View style={[styles.travelDot, { backgroundColor: C.gray500 }]} />
                           <Text style={[styles.travelText, { color: C.gray700 }]}>
@@ -319,15 +323,15 @@ export const PlanDetailModal: React.FC = () => {
           {/* Action buttons */}
           <View style={styles.actionBar}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
-              <Text style={styles.actionIcon}>{isLiked ? '❤️' : '🤍'}</Text>
+              <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? C.primary : C.gray600} />
               <Text style={[styles.actionText, { color: isLiked ? C.primary : C.gray800 }]}>{localLikesCount}</Text>
             </TouchableOpacity>
             <View style={styles.actionBtn}>
-              <Text style={styles.actionIcon}>💬</Text>
+              <Ionicons name="chatbubble-outline" size={18} color={C.gray600} />
               <Text style={[styles.actionText, { color: C.gray800 }]}>{localCommentsCount}</Text>
             </View>
             <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
-              <Text style={styles.actionIcon}>{isSaved ? '🔖' : '📑'}</Text>
+              <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? C.primary : C.gray600} />
               <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
             </TouchableOpacity>
             <XpBadge xp={plan.xpReward} />

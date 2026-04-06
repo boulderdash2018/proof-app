@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants';
 
 interface PtsPillProps {
@@ -9,7 +10,7 @@ interface PtsPillProps {
 
 export const PtsPill: React.FC<PtsPillProps> = ({ points, label }) => (
   <View style={styles.pill}>
-    <Text style={styles.star}>⭐</Text>
+    <Ionicons name="star" size={12} color={Colors.gold} />
     <Text style={styles.text}>{label || `${points} XP pts`}</Text>
   </View>
 );
@@ -25,9 +26,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     gap: 4,
-  },
-  star: {
-    fontSize: 11,
   },
   text: {
     fontSize: 11,

@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { PlanCard, PtsPill, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore } from '../store';
@@ -67,7 +68,7 @@ export const FeedScreen: React.FC = () => {
             style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Text style={styles.bellIcon}>🔔</Text>
+            <Ionicons name="notifications-outline" size={18} color={C.gray800} />
             {unreadCount > 0 && <View style={styles.bellBadge} />}
           </TouchableOpacity>
         </View>
