@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useNotifStore } from '../store';
 import { Notification } from '../types';
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   back: { fontSize: 24, fontWeight: '600', color: Colors.black },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.black },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold, color: Colors.black },
   markAll: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   list: { paddingBottom: 20 },
   notifRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 12 },

@@ -1,18 +1,25 @@
 import { TextStyle } from 'react-native';
 
+export const Fonts = {
+  serif: 'PlayfairDisplay_400Regular',
+  serifMedium: 'PlayfairDisplay_500Medium',
+  serifSemiBold: 'PlayfairDisplay_600SemiBold',
+  serifBold: 'PlayfairDisplay_700Bold',
+} as const;
+
 export const Typography: Record<string, TextStyle> = {
-  logo: { fontSize: 26, fontWeight: '800', letterSpacing: -1.5 },
-  pageTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
-  cardTitle: { fontSize: 18, fontWeight: '800' },
+  logo: { fontSize: 28, fontFamily: Fonts.serifBold, letterSpacing: -1 },
+  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  cardTitle: { fontSize: 18, fontFamily: Fonts.serifBold },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 1.2,
   },
   body: { fontSize: 13, fontWeight: '400' },
-  bodyBold: { fontSize: 13, fontWeight: '700' },
+  bodyBold: { fontSize: 13, fontWeight: '600' },
   small: { fontSize: 11, fontWeight: '400' },
-  smallBold: { fontSize: 11, fontWeight: '700' },
-  micro: { fontSize: 10, fontWeight: '600' },
+  smallBold: { fontSize: 11, fontWeight: '600' },
+  micro: { fontSize: 10, fontWeight: '500' },
 };

@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, Chip, UserBadge, XpBadge } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
   backBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   backChevron: { fontSize: 20, fontWeight: '700', marginTop: -2 },
-  headerTitle: { flex: 1, fontSize: 15, fontWeight: '700', textAlign: 'center', marginHorizontal: 10 },
+  headerTitle: { flex: 1, fontSize: 15, fontFamily: Fonts.serifBold, textAlign: 'center', marginHorizontal: 10 },
   doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1.5 },
   doneBtnText: { fontSize: 12, fontWeight: '700' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 160 },
   banner: { height: 160, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 18 },
-  bannerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
+  bannerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFFFFF', marginBottom: 4 },
   bannerSubtitle: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.7)' },
   infoSection: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   metaEmoji: { fontSize: 14, marginRight: 4 },
   metaText: { fontSize: 13, fontWeight: '600' },
   metaDot: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 10 },
-  sectionLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1, paddingHorizontal: 18, marginTop: 18, marginBottom: 10 },
+  sectionLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 18, marginBottom: 10 },
   placeRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
   placeLeftCol: { alignItems: 'center', marginRight: 12 },
   placeNumber: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

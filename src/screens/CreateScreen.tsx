@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { Colors, Layout, CATEGORIES } from '../constants';
+import { Colors, Layout, Fonts, CATEGORIES } from '../constants';
 import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -622,7 +622,7 @@ export const CreateScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
   costPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   costText: { fontSize: 11, fontWeight: '700' },
   scroll: { flex: 1 },

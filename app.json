@@ -24,7 +24,8 @@
       "expo-secure-store",
       "expo-image-picker",
       "expo-notifications",
-      "expo-asset"
+      "expo-asset",
+      "expo-font"
     ]
   }
 }

@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../constants';
+import { Colors, Fonts } from '../constants';
 import { PlanCard, PtsPill, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
   },
-  logo: { fontSize: 26, fontWeight: '800', letterSpacing: -1.5 },
+  logo: { fontSize: 28, fontFamily: Fonts.serifBold, letterSpacing: -1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   bellBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   bellIcon: { fontSize: 16 },

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout, CATEGORIES } from '../constants';
+import { Colors, Layout, Fonts, CATEGORIES } from '../constants';
 import { PrimaryButton, TextInput, Avatar, Chip } from '../components';
 import { useAuthStore } from '../store';
 import { useTranslation } from '../hooks/useTranslation';
@@ -272,8 +272,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepTitle: {
-    fontSize: 21,
-    fontWeight: '800',
+    fontSize: 22,
+    fontFamily: Fonts.serifBold,
     color: Colors.black,
     marginBottom: 20,
   },

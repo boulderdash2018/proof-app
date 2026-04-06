@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -220,7 +220,7 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   friendReqBtn: { marginRight: 16, position: 'relative' },
   friendReqIcon: { fontSize: 22 },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   settingsIcon: { fontSize: 22 },
   scroll: { paddingBottom: 30 },
   hero: { alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1 },
-  displayName: { fontSize: 19, fontWeight: '800', marginTop: 10 },
+  displayName: { fontSize: 20, fontFamily: Fonts.serifBold, marginTop: 10 },
   rankBadge: { backgroundColor: '#2D2118', borderWidth: 1, borderColor: '#3D2E22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, marginTop: 6 },
   rankText: { fontSize: 11, fontWeight: '700' },
   bio: { fontSize: 13, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
@@ -245,11 +245,11 @@ const styles = StyleSheet.create({
   coinsPillText: { fontSize: 12, fontWeight: '700' },
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderBottomWidth: 1, marginHorizontal: Layout.screenPadding },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 17, fontWeight: '800' },
+  statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
   statLabel: { fontSize: 11, marginTop: 2 },
   statDivider: { width: 1, height: 28 },
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
+  sectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   badgesGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   badgeItem: { width: '25%', alignItems: 'center', marginBottom: 14 },
   badgeIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   badgeName: { fontSize: 9, marginTop: 4, textAlign: 'center' },
   plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end' },
-  miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
 });

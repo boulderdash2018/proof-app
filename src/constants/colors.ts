@@ -31,6 +31,11 @@ export const Colors = {
   borderLight: '#292421',
 
   unreadBg: '#2A2118',
+
+  // Card accents
+  cardBorder: '#3D352E',
+  cardGlow: 'rgba(212, 132, 90, 0.08)',
+  accentLine: '#D4845A',
 } as const;
 
 export type ThemeColors = typeof Colors;

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Chip, EmptyState } from '../components';
 import { useAuthStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -104,15 +104,15 @@ export const SavesScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  pageTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
+  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3, paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
   tabBar: { flexDirection: 'row', marginHorizontal: Layout.screenPadding, borderRadius: 14, padding: 3, marginBottom: 14 },
   tab: { flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center' },
   tabActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   tabText: { fontSize: 13, fontWeight: '600' },
   list: { paddingHorizontal: Layout.screenPadding, paddingBottom: 20 },
-  saveItem: { borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1 },
+  saveItem: { borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, shadowColor: Colors.accentLine, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   saveItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  saveItemTitle: { fontSize: 14, fontWeight: '700', flex: 1, marginRight: 8 },
+  saveItemTitle: { fontSize: 14, fontFamily: Fonts.serifBold, flex: 1, marginRight: 8 },
   statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1 },
   statusTodo: { backgroundColor: '#2D2118', borderColor: '#3D2E22' },
   statusDone: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { PrimaryButton } from '../components';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -108,8 +108,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontFamily: Fonts.serifBold,
     color: Colors.black,
     textAlign: 'center',
     marginBottom: 12,
@@ -136,7 +136,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   dotActive: {
-    backgroundColor: Colors.black,
+    backgroundColor: Colors.primary,
+    width: 20,
   },
   dotInactive: {
     backgroundColor: Colors.gray500,

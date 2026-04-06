@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plan, TransportMode } from '../types';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { Avatar } from './Avatar';
 import { UserBadge } from './UserBadge';
@@ -57,15 +57,20 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: C.white }]}
+      style={[styles.card, { backgroundColor: C.gray200, borderColor: C.cardBorder }]}
       activeOpacity={0.92}
       onPress={onPress}
     >
+      {/* Subtle accent line at top */}
+      <View style={styles.accentLine} />
+
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
         <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
-        <Text style={[styles.displayName, { color: C.black }]}>{plan.author.displayName}</Text>
+        <View style={styles.userInfo}>
+          <Text style={[styles.displayName, { color: C.black }]}>{plan.author.displayName}</Text>
+          <Text style={[styles.timeAgo, { color: C.gray600 }]}>{plan.timeAgo}</Text>
+        </View>
         <UserBadge type={plan.author.badgeType} small />
-        <Text style={[styles.timeAgo, { color: C.gray700 }]}>{plan.timeAgo}</Text>
       </TouchableOpacity>
 
       <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
@@ -86,29 +91,39 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <React.Fragment key={place.id}>
               {index > 0 && <View style={[styles.placeSeparator, { backgroundColor: C.border }]} />}
               <View style={styles.placeRow}>
-                <View style={[styles.orangeDot, { backgroundColor: C.primary }]} />
-                <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
-                <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type}</Text>
+                <View style={[styles.placeIndex, { backgroundColor: C.primary + '18' }]}>
+                  <Text style={[styles.placeIndexText, { color: C.primary }]}>{index + 1}</Text>
+                </View>
+                <View style={styles.placeInfo}>
+                  <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
+                  <Text style={[styles.placeType, { color: C.gray600 }]}>{place.type}</Text>
+                </View>
               </View>
             </React.Fragment>
           ))}
         </View>
       )}
 
-      <View style={styles.metaRow}>
-        <Text style={[styles.metaItem, { color: C.gray800 }]}>💰 {plan.price}</Text>
-        <Text style={[styles.metaItem, { color: C.gray800 }]}>⏱ {plan.duration}</Text>
-        <Text style={[styles.metaItem, { color: C.gray800 }]}>{getTransportEmoji(plan.transport)} {plan.transport}</Text>
+      <View style={[styles.metaRow, { borderTopColor: C.border }]}>
+        <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+          <Text style={[styles.metaItem, { color: C.gray800 }]}>💰 {plan.price}</Text>
+        </View>
+        <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+          <Text style={[styles.metaItem, { color: C.gray800 }]}>⏱ {plan.duration}</Text>
+        </View>
+        <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+          <Text style={[styles.metaItem, { color: C.gray800 }]}>{getTransportEmoji(plan.transport)} {plan.transport}</Text>
+        </View>
       </View>
 
-      <View style={[styles.actionBar, { borderTopColor: C.borderLight }]}>
+      <View style={[styles.actionBar, { borderTopColor: C.border }]}>
         <TouchableOpacity style={styles.actionButton} onPress={onLike} activeOpacity={0.7}>
           <Text style={styles.actionIcon}>{isLiked ? '❤️' : '🤍'}</Text>
-          <Text style={[styles.actionCount, { color: isLiked ? C.error : C.gray800 }]}>{plan.likesCount}</Text>
+          <Text style={[styles.actionCount, { color: isLiked ? C.primary : C.gray700 }]}>{plan.likesCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={onComment} activeOpacity={0.7}>
           <Text style={styles.actionIcon}>💬</Text>
-          <Text style={[styles.actionCount, { color: C.gray800 }]}>{plan.commentsCount}</Text>
+          <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={onSave} activeOpacity={0.7}>
           <Text style={styles.actionIcon}>{isSaved ? '🔖' : '🏷️'}</Text>
@@ -121,24 +136,44 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Layout.cardRadius, marginHorizontal: Layout.screenPadding, marginBottom: 14, overflow: 'hidden' },
-  userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 },
-  displayName: { fontSize: 14, fontWeight: '700', marginLeft: 8, marginRight: 6 },
-  timeAgo: { fontSize: 12, marginLeft: 'auto' },
-  banner: { height: 148, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 14 },
-  bannerTitle: { fontSize: 20, fontWeight: '800', color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14, paddingTop: 12 },
-  placesList: { paddingHorizontal: 14, paddingTop: 12 },
-  placeSeparator: { height: 1, marginVertical: 8 },
+  card: {
+    borderRadius: Layout.cardRadius,
+    marginHorizontal: Layout.screenPadding,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: Colors.accentLine,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  accentLine: {
+    height: 2,
+    backgroundColor: Colors.primary,
+    opacity: 0.5,
+  },
+  userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
+  userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
+  displayName: { fontSize: 14, fontWeight: '600' },
+  timeAgo: { fontSize: 11, marginTop: 1 },
+  banner: { height: 152, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 16 },
+  bannerTitle: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12 },
+  placesList: { paddingHorizontal: 16, paddingTop: 12 },
+  placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },
   placeRow: { flexDirection: 'row', alignItems: 'center' },
-  orangeDot: { width: 7, height: 7, borderRadius: 3.5, marginRight: 8 },
-  placeName: { fontSize: 13, fontWeight: '700', marginRight: 6 },
-  placeType: { fontSize: 12 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, gap: 14 },
-  metaItem: { fontSize: 12 },
-  actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
+  placeIndex: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  placeIndexText: { fontSize: 11, fontWeight: '700' },
+  placeInfo: { flex: 1 },
+  placeName: { fontSize: 13, fontWeight: '600' },
+  placeType: { fontSize: 11, marginTop: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
+  metaPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  metaItem: { fontSize: 11, fontWeight: '500' },
+  actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
   actionIcon: { fontSize: 16 },
-  actionCount: { fontSize: 12, fontWeight: '600', marginLeft: 4 },
+  actionCount: { fontSize: 12, fontWeight: '600', marginLeft: 5 },
   actionSpacer: { flex: 1 },
 });

@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, PrimaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1,
   },
   back: { fontSize: 16, fontWeight: '600', width: 60 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
   scroll: { padding: Layout.screenPadding, paddingBottom: 40 },
   avatarSection: { alignItems: 'center', marginBottom: 24, position: 'relative' },
   avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: Colors.primary },

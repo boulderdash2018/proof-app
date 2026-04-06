@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, UserBadge, PrimaryButton, SecondaryButton } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   back: { fontSize: 24, fontWeight: '600', width: 30 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingBottom: 30 },
 
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   stat: { alignItems: 'center' },
-  statValue: { fontSize: 17, fontWeight: '800' },
+  statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
   statLabel: { fontSize: 11, marginTop: 2 },
 
   // Info section
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding,
     paddingBottom: 10,
   },
-  displayName: { fontSize: 15, fontWeight: '700', marginBottom: 3 },
+  displayName: { fontSize: 16, fontFamily: Fonts.serifBold, marginBottom: 3 },
   badgeRow: { flexDirection: 'row', marginBottom: 4 },
   bio: { fontSize: 13, lineHeight: 18, marginTop: 2 },
 
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   planCardTitle: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: Fonts.serifBold,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -413,8 +413,8 @@ const styles = StyleSheet.create({
   },
   lockIcon: { fontSize: 28 },
   privateTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontFamily: Fonts.serifBold,
     marginBottom: 8,
   },
   privateSubtitle: {

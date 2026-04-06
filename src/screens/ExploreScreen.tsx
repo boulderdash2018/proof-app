@@ -12,7 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Layout, EXPLORE_GROUPS } from '../constants';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, Layout, Fonts, EXPLORE_GROUPS } from '../constants';
 import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
 import { EmptyState } from '../components';
 import { Plan } from '../types';
@@ -28,7 +29,7 @@ const CARD_WIDTH = (width - Layout.screenPadding * 2 - CARD_GAP) / 2;
 
 const parseGradientColors = (gradient: string): string[] => {
   const matches = gradient.match(/#[0-9A-Fa-f]{6}/g);
-  return matches && matches.length >= 2 ? matches : ['#FF6B35', '#C94520'];
+  return matches && matches.length >= 2 ? matches : ['#8B6A50', '#5C4030'];
 };
 
 export const ExploreScreen: React.FC = () => {
@@ -102,7 +103,7 @@ export const ExploreScreen: React.FC = () => {
             onPress={() => setSelectedGroup(group.key)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, { color: isActive ? '#FFFFFF' : C.black }]}>
+            <Text style={[styles.chipText, { color: isActive ? '#FFFFFF' : C.gray800 }]}>
               {group.emoji} {group.label}
             </Text>
           </TouchableOpacity>
@@ -124,7 +125,14 @@ export const ExploreScreen: React.FC = () => {
         end={{ x: 1, y: 1 }}
         style={styles.catCardGradient}
       >
-        <Text style={styles.catEmoji}>{item.emoji}</Text>
+        {/* Icon in top-right */}
+        <View style={styles.catIconWrap}>
+          <Ionicons
+            name={(item.icon || 'ellipse-outline') as any}
+            size={26}
+            color={Colors.gold}
+          />
+        </View>
         <View style={styles.catCardContent}>
           <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
           {item.subtitle ? <Text style={styles.catSubtitle}>{item.subtitle}</Text> : null}
@@ -136,7 +144,7 @@ export const ExploreScreen: React.FC = () => {
   const renderMoodItem = (item: ExploreCategoryItem) => (
     <TouchableOpacity
       key={item.name}
-      style={[styles.moodCard, { backgroundColor: C.gray100 }]}
+      style={[styles.moodCard, { backgroundColor: C.gray200, borderColor: C.border }]}
       activeOpacity={0.7}
       onPress={() => handleCategoryPress(item.name)}
     >
@@ -145,7 +153,7 @@ export const ExploreScreen: React.FC = () => {
         <Text style={[styles.moodName, { color: C.black }]}>{item.name}</Text>
         {item.subtitle ? <Text style={[styles.moodSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
       </View>
-      <Text style={[styles.moodChevron, { color: C.gray400 }]}>›</Text>
+      <Ionicons name="chevron-forward" size={18} color={C.gray500} />
     </TouchableOpacity>
   );
 
@@ -157,7 +165,7 @@ export const ExploreScreen: React.FC = () => {
       onPress={() => handleCategoryPress(item.name)}
     >
       <Text style={[styles.rankNumber, { color: C.primary }]}>{rank}</Text>
-      <View style={[styles.rankEmojiCircle, { backgroundColor: C.gray100 }]}>
+      <View style={[styles.rankEmojiCircle, { backgroundColor: C.gray200 }]}>
         <Text style={styles.rankEmoji}>{item.emoji}</Text>
       </View>
       <View style={styles.rankTextCol}>
@@ -165,8 +173,8 @@ export const ExploreScreen: React.FC = () => {
         {item.subtitle ? <Text style={[styles.rankSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
       </View>
       {item.hot ? (
-        <View style={styles.hotBadge}>
-          <Text style={styles.hotBadgeText}>🔥 chaud</Text>
+        <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
+          <Text style={[styles.hotBadgeText, { color: C.primary }]}>chaud</Text>
         </View>
       ) : item.planCount ? (
         <View style={[styles.planCountBadge, { backgroundColor: C.gray200 }]}>
@@ -199,7 +207,7 @@ export const ExploreScreen: React.FC = () => {
     const colors = parseGradientColors(item.gradient);
     return (
       <TouchableOpacity
-        style={styles.compactCard}
+        style={[styles.compactCard, { borderColor: C.cardBorder, backgroundColor: C.gray200 }]}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
       >
@@ -242,8 +250,8 @@ export const ExploreScreen: React.FC = () => {
       <Text style={[styles.pageTitle, { color: C.black }]}>{t.explore_title}</Text>
 
       {/* Search bar */}
-      <View style={[styles.searchBar, { backgroundColor: C.gray200 }]}>
-        <Text style={styles.searchIcon}>🔍</Text>
+      <View style={[styles.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}>
+        <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
         <RNTextInput
           style={[styles.searchInput, { color: C.black }]}
           placeholder={t.explore_search_placeholder}
@@ -253,7 +261,7 @@ export const ExploreScreen: React.FC = () => {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={handleClear}>
-            <Text style={[styles.clearBtn, { color: C.gray700 }]}>✕</Text>
+            <Ionicons name="close-circle" size={18} color={C.gray600} />
           </TouchableOpacity>
         )}
       </View>
@@ -270,7 +278,8 @@ export const ExploreScreen: React.FC = () => {
         <>
           {/* Search results */}
           <View style={styles.resultsHeader}>
-            <TouchableOpacity onPress={handleClear}>
+            <TouchableOpacity onPress={handleClear} style={styles.backLinkRow}>
+              <Ionicons name="arrow-back" size={16} color={C.primary} />
               <Text style={[styles.backLink, { color: C.primary }]}>{t.explore_back_categories}</Text>
             </TouchableOpacity>
           </View>
@@ -309,9 +318,9 @@ export const ExploreScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   pageTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 22,
+    fontFamily: Fonts.serifBold,
+    letterSpacing: -0.3,
     paddingHorizontal: Layout.screenPadding,
     paddingTop: 10,
     paddingBottom: 12,
@@ -320,14 +329,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 14,
+    borderWidth: 1,
     marginHorizontal: Layout.screenPadding,
     paddingHorizontal: 14,
     height: 44,
     marginBottom: 12,
   },
-  searchIcon: { fontSize: 15, marginRight: 8 },
   searchInput: { flex: 1, fontSize: 14 },
-  clearBtn: { fontSize: 16, paddingLeft: 8 },
 
   // Filter chips
   chipsScroll: { marginBottom: 8, flexGrow: 0 },
@@ -338,16 +346,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  chipText: { fontSize: 13, fontWeight: '700' },
+  chipText: { fontSize: 13, fontWeight: '600' },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
-  section: { marginTop: 16 },
+  section: { marginTop: 18 },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
     marginBottom: 10,
   },
   catGrid: {
@@ -366,25 +374,30 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     position: 'relative',
   },
-  catEmoji: {
+  catIconWrap: {
     position: 'absolute',
     top: 12,
     right: 14,
-    fontSize: 32,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   catCardContent: {},
   catName: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontFamily: Fonts.serifBold,
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   catSubtitle: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontWeight: '500',
     marginTop: 2,
   },
 
@@ -393,12 +406,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding,
     marginBottom: 12,
   },
+  backLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   backLink: { fontSize: 13, fontWeight: '600' },
   resultsSectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 1.2,
     marginBottom: 10,
   },
   resultsList: {
@@ -409,7 +423,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
     overflow: 'hidden',
   },
   compactBanner: {
@@ -420,7 +433,7 @@ const styles = StyleSheet.create({
   compactTitle: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: Fonts.serifBold,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -438,14 +451,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
+    borderWidth: 1,
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
   moodEmoji: { fontSize: 32, marginRight: 14 },
   moodTextCol: { flex: 1 },
-  moodName: { fontSize: 16, fontWeight: '700' },
-  moodSub: { fontSize: 13, marginTop: 2 },
-  moodChevron: { fontSize: 24, fontWeight: '300', marginLeft: 8 },
+  moodName: { fontSize: 15, fontFamily: Fonts.serifBold },
+  moodSub: { fontSize: 12, marginTop: 3 },
 
   // Ranked list layout
   rankedRow: {
@@ -454,7 +467,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
-  rankNumber: { fontSize: 22, fontWeight: '800', width: 32 },
+  rankNumber: { fontSize: 20, fontFamily: Fonts.serifBold, width: 32 },
   rankEmojiCircle: {
     width: 48,
     height: 48,
@@ -465,7 +478,7 @@ const styles = StyleSheet.create({
   },
   rankEmoji: { fontSize: 24 },
   rankTextCol: { flex: 1 },
-  rankName: { fontSize: 15, fontWeight: '700' },
+  rankName: { fontSize: 14, fontFamily: Fonts.serifBold },
   rankSub: { fontSize: 12, marginTop: 2 },
   hotBadge: {
     paddingHorizontal: 10,
@@ -473,14 +486,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginLeft: 8,
   },
-  hotBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+  hotBadgeText: { fontSize: 12, fontWeight: '600' },
   planCountBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     marginLeft: 8,
   },
-  planCountText: { fontSize: 12, fontWeight: '600' },
+  planCountText: { fontSize: 12, fontWeight: '500' },
 
   // User search results
   userRow: {
@@ -497,7 +510,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userInitials: { fontSize: 14, fontWeight: '700' },
-  userName: { fontSize: 14, fontWeight: '700' },
+  userInitials: { fontSize: 14, fontWeight: '600' },
+  userName: { fontSize: 14, fontWeight: '600' },
   userHandle: { fontSize: 12, marginTop: 1 },
 });

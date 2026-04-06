@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   back: { fontSize: 24, fontWeight: '600', width: 30 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
   tabs: {
     flexDirection: 'row',
     borderBottomWidth: 1,
