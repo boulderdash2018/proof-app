@@ -17,6 +17,13 @@ import { User, FriendRequest } from '../types';
 const USERS = 'users';
 const FRIEND_REQUESTS = 'friendRequests';
 
+// Check if a username is already taken
+export const isUsernameTaken = async (username: string): Promise<boolean> => {
+  const q = query(collection(db, USERS), where('username', '==', username), limit(1));
+  const snap = await getDocs(q);
+  return !snap.empty;
+};
+
 // Normalize string: remove accents and lowercase
 const normalize = (str: string): string =>
   str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
