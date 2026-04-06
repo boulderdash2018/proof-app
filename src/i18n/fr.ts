@@ -96,7 +96,7 @@ export const fr = {
 
   // Explore
   explore_title: 'Explorer',
-  explore_search_placeholder: 'Rechercher',
+  explore_search_placeholder: 'Restaurants, quartiers, vibes...',
   explore_categories: 'CATÉGORIES',
   explore_users_count: 'Utilisateurs',
   explore_no_users: 'Aucun utilisateur trouvé',

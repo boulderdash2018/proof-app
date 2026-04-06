@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   TextInput as RNTextInput,
   Dimensions,
@@ -11,15 +12,18 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Layout, CATEGORIES } from '../constants';
+import { Colors, Layout, EXPLORE_GROUPS } from '../constants';
+import { ExploreCategoryItem, ExploreSection } from '../constants/exploreCategories';
 import { EmptyState } from '../components';
-import { Plan, CategoryTag } from '../types';
+import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
+import { searchUsers } from '../services/friendsService';
+import { useAuthStore } from '../store';
 import mockApi from '../services/mockApi';
 
 const { width } = Dimensions.get('window');
-const CARD_GAP = 8;
+const CARD_GAP = 10;
 const CARD_WIDTH = (width - Layout.screenPadding * 2 - CARD_GAP) / 2;
 
 const parseGradientColors = (gradient: string): string[] => {
@@ -32,50 +36,110 @@ export const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const C = useColors();
   const { t } = useTranslation();
+  const currentUser = useAuthStore((s) => s.user);
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryTag | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState(EXPLORE_GROUPS[0].key);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
+  const [searchUsers_, setSearchUsers_] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const handleCategoryPress = useCallback(async (cat: CategoryTag) => {
-    setSelectedCategory(cat);
-    setIsSearching(true);
-    const plans = await mockApi.getPlansByCategory(cat);
-    setFilteredPlans(plans);
-    setIsSearching(false);
-  }, []);
+  const activeGroup = EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0];
 
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
     if (query.length < 2) {
       setFilteredPlans([]);
+      setSearchUsers_([]);
       return;
     }
-    setSelectedCategory(null);
     setIsSearching(true);
-    const plans = await mockApi.searchPlans(query);
-    setFilteredPlans(plans);
+    if (query.startsWith('@')) {
+      const users = await searchUsers(query.slice(1), currentUser?.id || '');
+      setSearchUsers_(users);
+      setFilteredPlans([]);
+    } else {
+      const plans = await mockApi.searchPlans(query);
+      setFilteredPlans(plans);
+      setSearchUsers_([]);
+    }
     setIsSearching(false);
-  }, []);
+  }, [currentUser]);
 
   const handleClear = () => {
     setSearchQuery('');
-    setSelectedCategory(null);
     setFilteredPlans([]);
+    setSearchUsers_([]);
   };
 
-  const renderCategoryCard = ({ item, index }: { item: typeof CATEGORIES[0]; index: number }) => (
+  const handleCategoryPress = useCallback(async (categoryName: string) => {
+    setSearchQuery(categoryName);
+    setIsSearching(true);
+    const plans = await mockApi.searchPlans(categoryName);
+    setFilteredPlans(plans);
+    setSearchUsers_([]);
+    setIsSearching(false);
+  }, []);
+
+  const showCategories = searchQuery.length < 2;
+
+  const renderFilterChips = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chipsContainer}
+      style={styles.chipsScroll}
+    >
+      {EXPLORE_GROUPS.map((group) => {
+        const isActive = group.key === selectedGroup;
+        return (
+          <TouchableOpacity
+            key={group.key}
+            style={[
+              styles.chip,
+              isActive ? { backgroundColor: C.black } : { backgroundColor: C.gray200, borderWidth: 1, borderColor: C.border },
+            ]}
+            onPress={() => setSelectedGroup(group.key)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.chipText, { color: isActive ? '#FFFFFF' : C.black }]}>
+              {group.emoji} {group.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+
+  const renderCategoryCard = (item: ExploreCategoryItem, index: number, rowLength: number) => (
     <TouchableOpacity
-      style={[
-        styles.catCard,
-        { backgroundColor: item.bg, marginRight: index % 2 === 0 ? CARD_GAP : 0 },
-      ]}
+      key={item.name}
+      style={[styles.catCard, { marginRight: index % 2 === 0 && rowLength > 1 ? CARD_GAP : 0 }]}
       activeOpacity={0.85}
       onPress={() => handleCategoryPress(item.name)}
     >
-      <Text style={styles.catEmoji}>{item.emoji}</Text>
-      <Text style={styles.catName}>{item.name}</Text>
+      <LinearGradient
+        colors={item.gradient as [string, string]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.catCardGradient}
+      >
+        <Text style={styles.catEmoji}>{item.emoji}</Text>
+        <View style={styles.catCardContent}>
+          <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
+          {item.subtitle ? <Text style={styles.catSubtitle}>{item.subtitle}</Text> : null}
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
+  );
+
+  const renderSection = (section: ExploreSection, idx: number) => (
+    <View key={`${section.title}-${idx}`} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: C.gray600 }]}>{section.title}</Text>
+      <View style={styles.catGrid}>
+        {section.items.map((item, i) => renderCategoryCard(item, i, section.items.length))}
+      </View>
+    </View>
   );
 
   const renderCompactPlan = ({ item }: { item: Plan }) => {
@@ -87,25 +151,38 @@ export const ExploreScreen: React.FC = () => {
         onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
       >
         <LinearGradient
-          colors={colors}
+          colors={colors as [string, string, ...string[]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.compactBanner}
         >
-          <Text style={styles.compactTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
+          <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
         </LinearGradient>
         <View style={styles.compactMeta}>
-          <Text style={styles.compactMetaText}>💰 {item.price}</Text>
-          <Text style={styles.compactMetaText}>⏱ {item.duration}</Text>
-          <Text style={styles.compactMetaText}>❤️ {item.likesCount}</Text>
+          <Text style={[styles.compactMetaText, { color: C.gray800 }]}>💰 {item.price}</Text>
+          <Text style={[styles.compactMetaText, { color: C.gray800 }]}>⏱ {item.duration}</Text>
+          <Text style={[styles.compactMetaText, { color: C.gray800 }]}>❤️ {item.likesCount}</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  const showCategories = !selectedCategory && searchQuery.length < 2;
+  const renderUserResult = (user: any) => (
+    <TouchableOpacity
+      key={user.id}
+      style={[styles.userRow, { borderBottomColor: C.borderLight }]}
+      onPress={() => navigation.navigate('OtherProfile', { userId: user.id })}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.userAvatar, { backgroundColor: user.avatarBg }]}>
+        <Text style={[styles.userInitials, { color: user.avatarColor }]}>{user.initials}</Text>
+      </View>
+      <View>
+        <Text style={[styles.userName, { color: C.black }]}>{user.displayName}</Text>
+        <Text style={[styles.userHandle, { color: C.gray600 }]}>@{user.username}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -115,7 +192,7 @@ export const ExploreScreen: React.FC = () => {
       <View style={[styles.searchBar, { backgroundColor: C.gray200 }]}>
         <Text style={styles.searchIcon}>🔍</Text>
         <RNTextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: C.black }]}
           placeholder={t.explore_search_placeholder}
           placeholderTextColor={C.gray600}
           value={searchQuery}
@@ -123,62 +200,53 @@ export const ExploreScreen: React.FC = () => {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={handleClear}>
-            <Text style={styles.clearBtn}>✕</Text>
+            <Text style={[styles.clearBtn, { color: C.gray700 }]}>✕</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {showCategories ? (
         <>
-          <Text style={styles.sectionLabel}>{t.explore_categories}</Text>
-          <FlatList
-            key="categories-grid"
-            data={CATEGORIES}
-            renderItem={renderCategoryCard}
-            keyExtractor={(item) => item.name}
-            numColumns={2}
-            contentContainerStyle={styles.catGrid}
-            showsVerticalScrollIndicator={false}
-          />
+          {renderFilterChips()}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            {activeGroup.sections.map((section, idx) => renderSection(section, idx))}
+            <View style={{ height: 30 }} />
+          </ScrollView>
         </>
       ) : (
         <>
-          {/* Results header */}
+          {/* Search results */}
           <View style={styles.resultsHeader}>
-            {selectedCategory ? (
-              <View style={styles.resultsHeaderRow}>
-                <Text style={styles.resultsTitle}>
-                  {selectedCategory}{' '}
-                  <Text style={styles.resultsCount}>({filteredPlans.length})</Text>
-                </Text>
-                <TouchableOpacity onPress={handleClear}>
-                  <Text style={styles.backLink}>{t.explore_back_categories}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <Text style={styles.resultsTitle}>
-                {t.explore_results_for} "{searchQuery}"
-              </Text>
-            )}
+            <TouchableOpacity onPress={handleClear}>
+              <Text style={[styles.backLink, { color: C.primary }]}>{t.explore_back_categories}</Text>
+            </TouchableOpacity>
           </View>
 
-          <FlatList
-            key="plan-results"
-            data={filteredPlans}
-            renderItem={renderCompactPlan}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.resultsList}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              !isSearching ? (
-                <EmptyState
-                  icon="🔍"
-                  title={t.explore_no_results}
-                  subtitle={t.explore_no_results_sub}
-                />
-              ) : null
-            }
-          />
+          {searchUsers_.length > 0 ? (
+            <ScrollView contentContainerStyle={styles.resultsList}>
+              <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>
+                {t.explore_users_count} ({searchUsers_.length})
+              </Text>
+              {searchUsers_.map(renderUserResult)}
+            </ScrollView>
+          ) : (
+            <FlatList
+              data={filteredPlans}
+              renderItem={renderCompactPlan}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.resultsList}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                !isSearching ? (
+                  <EmptyState
+                    icon="🔍"
+                    title={t.explore_no_results}
+                    subtitle={t.explore_no_results_sub}
+                  />
+                ) : null
+              }
+            />
+          )}
         </>
       )}
     </View>
@@ -186,14 +254,10 @@ export const ExploreScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.white,
-  },
+  container: { flex: 1 },
   pageTitle: {
     fontSize: 21,
     fontWeight: '800',
-    color: Colors.black,
     letterSpacing: -0.5,
     paddingHorizontal: Layout.screenPadding,
     paddingTop: 10,
@@ -202,89 +266,92 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.gray200,
     borderRadius: 14,
     marginHorizontal: Layout.screenPadding,
     paddingHorizontal: 14,
     height: 44,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  searchIcon: {
-    fontSize: 15,
-    marginRight: 8,
+  searchIcon: { fontSize: 15, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 14 },
+  clearBtn: { fontSize: 16, paddingLeft: 8 },
+
+  // Filter chips
+  chipsScroll: { marginBottom: 8, flexGrow: 0 },
+  chipsContainer: { paddingHorizontal: Layout.screenPadding, gap: 8 },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.black,
-  },
-  clearBtn: {
-    fontSize: 16,
-    color: Colors.gray700,
-    paddingLeft: 8,
-  },
-  sectionLabel: {
+  chipText: { fontSize: 13, fontWeight: '700' },
+
+  // Category sections
+  scrollContent: { paddingHorizontal: Layout.screenPadding },
+  section: { marginTop: 16 },
+  sectionTitle: {
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    color: Colors.gray700,
-    paddingHorizontal: Layout.screenPadding,
+    letterSpacing: 0.8,
     marginBottom: 10,
   },
   catGrid: {
-    paddingHorizontal: Layout.screenPadding,
-    paddingBottom: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   catCard: {
     width: CARD_WIDTH,
-    height: 78,
-    borderRadius: 18,
-    padding: 12,
     marginBottom: CARD_GAP,
-    justifyContent: 'flex-end',
+    borderRadius: 16,
     overflow: 'hidden',
+  },
+  catCardGradient: {
+    height: 110,
+    padding: 14,
+    justifyContent: 'flex-end',
+    position: 'relative',
   },
   catEmoji: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    fontSize: 28,
+    top: 12,
+    right: 14,
+    fontSize: 32,
   },
+  catCardContent: {},
   catName: {
-    color: Colors.white,
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
+  catSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // Results
   resultsHeader: {
     paddingHorizontal: Layout.screenPadding,
     marginBottom: 12,
   },
-  resultsHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  resultsTitle: {
-    fontSize: 15,
+  backLink: { fontSize: 13, fontWeight: '600' },
+  resultsSectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    color: Colors.black,
-  },
-  resultsCount: {
-    color: Colors.gray700,
-    fontWeight: '400',
-  },
-  backLink: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 10,
   },
   resultsList: {
     paddingHorizontal: Layout.screenPadding,
     paddingBottom: 20,
   },
   compactCard: {
-    backgroundColor: Colors.white,
     borderRadius: 18,
     marginBottom: 12,
     borderWidth: 1,
@@ -297,7 +364,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   compactTitle: {
-    color: Colors.white,
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.4)',
@@ -309,8 +376,24 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 14,
   },
-  compactMetaText: {
-    fontSize: 12,
-    color: Colors.gray800,
+  compactMetaText: { fontSize: 12 },
+
+  // User search results
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
   },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userInitials: { fontSize: 14, fontWeight: '700' },
+  userName: { fontSize: 14, fontWeight: '700' },
+  userHandle: { fontSize: 12, marginTop: 1 },
 });

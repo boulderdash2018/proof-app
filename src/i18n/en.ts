@@ -98,7 +98,7 @@ export const en: Record<TranslationKeys, string> = {
 
   // Explore
   explore_title: 'Explore',
-  explore_search_placeholder: 'Search',
+  explore_search_placeholder: 'Restaurants, neighborhoods, vibes...',
   explore_categories: 'CATEGORIES',
   explore_users_count: 'Users',
   explore_no_users: 'No users found',
