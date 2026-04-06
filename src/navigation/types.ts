@@ -43,6 +43,7 @@ export type ProfileStackParamList = {
 export type RootStackParamList = {
   Main: undefined;
   Auth: undefined;
+  SetupProfile: undefined;
   PlanDetail: { planId: string };
   PlaceDetail: { placeId: string; planId: string };
   Notifications: undefined;

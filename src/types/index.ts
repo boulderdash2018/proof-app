@@ -18,6 +18,7 @@ export interface User {
   badgeType: BadgeType;
   bio?: string;
   isPrivate: boolean;
+  setupComplete?: boolean;
   xpPoints: number;
   coins: number;
   level: number;

@@ -79,7 +79,7 @@ export const SetupProfileScreen: React.FC = () => {
 
     const timer = setTimeout(async () => {
       try {
-        const taken = await isUsernameTaken(username);
+        const taken = await isUsernameTaken(username, user?.id);
         setUsernameAvailable(!taken);
       } catch (err) {
         console.error('Username check error:', err);
@@ -102,11 +102,11 @@ export const SetupProfileScreen: React.FC = () => {
 
   const handleFinish = async () => {
     if (user) {
-      // Save username to Firestore
-      await updateProfile({ username });
-      setUser({ ...user, username, isAuthenticated: true } as any);
+      // Save username + mark setup complete in Firestore
+      await updateProfile({ username, setupComplete: true });
+      // Update local state — RootNavigator will auto-switch to Main
+      setUser({ ...user, username, setupComplete: true });
     }
-    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   };
 
   const getErrorMessage = (key: string | null): string => {

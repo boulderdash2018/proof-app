@@ -34,6 +34,7 @@ const newUserDefaults = (fbUser: FirebaseUser): User => {
     avatarColor: '#666666',
     badgeType: 'novice',
     isPrivate: false,
+    setupComplete: false,
     xpPoints: 0,
     coins: 0,
     level: 1,

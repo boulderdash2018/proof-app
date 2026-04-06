@@ -31,7 +31,6 @@ export const EditProfileScreen: React.FC = () => {
   const { t } = useTranslation();
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [isPrivate, setIsPrivate] = useState(user?.isPrivate || false);
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user?.avatarUrl);
@@ -146,7 +145,6 @@ export const EditProfileScreen: React.FC = () => {
     setIsSaving(true);
     await updateProfile({
       displayName,
-      username,
       bio,
       isPrivate,
       avatarUrl: avatarUrl || null,
@@ -190,7 +188,11 @@ export const EditProfileScreen: React.FC = () => {
 
           {/* Form fields */}
           <TextInput label={t.edit_profile_display_name} value={displayName} onChangeText={setDisplayName} />
-          <TextInput label={t.edit_profile_username} value={username} onChangeText={setUsername} autoCapitalize="none" />
+          <View style={styles.usernameLockedRow}>
+            <Text style={[styles.usernameLockedLabel, { color: C.gray700 }]}>{t.edit_profile_username}</Text>
+            <Text style={[styles.usernameLockedValue, { color: C.black }]}>@{user?.username}</Text>
+            <Text style={[styles.usernameLockedHint, { color: C.gray600 }]}>{t.edit_profile_username_locked}</Text>
+          </View>
           <TextInput label={t.edit_profile_bio} value={bio} onChangeText={setBio} multiline numberOfLines={3} maxLength={150} placeholder={t.edit_profile_bio_placeholder} />
           <Text style={[styles.charCount, { color: C.gray600 }]}>{bio.length}/150</Text>
 
@@ -226,6 +228,10 @@ const styles = StyleSheet.create({
   },
   cameraEmoji: { fontSize: 14 },
   changePhotoLink: { fontSize: 13, fontWeight: '600', marginTop: 10 },
+  usernameLockedRow: { marginBottom: 14 },
+  usernameLockedLabel: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  usernameLockedValue: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  usernameLockedHint: { fontSize: 11 },
   charCount: { fontSize: 11, textAlign: 'right', marginTop: -10, marginBottom: 14 },
   switchRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

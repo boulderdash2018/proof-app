@@ -17,11 +17,16 @@ import { User, FriendRequest } from '../types';
 const USERS = 'users';
 const FRIEND_REQUESTS = 'friendRequests';
 
-// Check if a username is already taken
-export const isUsernameTaken = async (username: string): Promise<boolean> => {
-  const q = query(collection(db, USERS), where('username', '==', username), limit(1));
+// Check if a username is already taken (excludes current user)
+export const isUsernameTaken = async (username: string, currentUserId?: string): Promise<boolean> => {
+  const q = query(collection(db, USERS), where('username', '==', username), limit(2));
   const snap = await getDocs(q);
-  return !snap.empty;
+  if (snap.empty) return false;
+  // If the only match is the current user, it's not "taken"
+  if (currentUserId) {
+    return snap.docs.some(d => d.id !== currentUserId);
+  }
+  return true;
 };
 
 // Normalize string: remove accents and lowercase

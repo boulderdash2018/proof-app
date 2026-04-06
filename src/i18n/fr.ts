@@ -209,6 +209,7 @@ export const fr = {
   edit_profile_change_photo: 'Changer la photo',
   edit_profile_display_name: 'Nom affiché',
   edit_profile_username: 'Pseudo (@)',
+  edit_profile_username_locked: 'Le pseudo ne peut pas être modifié',
   edit_profile_bio: 'Bio',
   edit_profile_bio_placeholder: 'Dis quelque chose sur toi...',
   edit_profile_private: 'Compte privé',

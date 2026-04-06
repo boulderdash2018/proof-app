@@ -211,6 +211,7 @@ export const en: Record<TranslationKeys, string> = {
   edit_profile_change_photo: 'Change photo',
   edit_profile_display_name: 'Display name',
   edit_profile_username: 'Username (@)',
+  edit_profile_username_locked: 'Username cannot be changed',
   edit_profile_bio: 'Bio',
   edit_profile_bio_placeholder: 'Tell us about yourself...',
   edit_profile_private: 'Private account',
