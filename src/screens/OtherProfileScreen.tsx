@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, UserBadge, PrimaryButton, SecondaryButton } from '../components';
 import { useColors } from '../hooks/useColors';
@@ -232,8 +233,14 @@ export const OtherProfileScreen: React.FC = () => {
                         >
                           <Text style={styles.planCardTitle} numberOfLines={2}>{plan.title}</Text>
                           <View style={styles.planCardMeta}>
-                            <Text style={styles.planCardMetaText}>❤️ {plan.likesCount}</Text>
-                            <Text style={styles.planCardMetaText}>💰 {plan.price}</Text>
+                            <View style={styles.planCardMetaItem}>
+                              <Ionicons name="heart" size={11} color="rgba(255,255,255,0.85)" />
+                              <Text style={styles.planCardMetaText}>{plan.likesCount}</Text>
+                            </View>
+                            <View style={styles.planCardMetaItem}>
+                              <Ionicons name="cash-outline" size={11} color="rgba(255,255,255,0.85)" />
+                              <Text style={styles.planCardMetaText}>{plan.price}</Text>
+                            </View>
                           </View>
                         </LinearGradient>
                       </TouchableOpacity>
@@ -251,7 +258,7 @@ export const OtherProfileScreen: React.FC = () => {
           /* Private account message */
           <View style={styles.privateSection}>
             <View style={[styles.lockCircle, { borderColor: C.gray400 }]}>
-              <Text style={styles.lockIcon}>🔒</Text>
+              <Ionicons name="lock-closed" size={28} color={C.gray600} />
             </View>
             <Text style={[styles.privateTitle, { color: C.black }]}>{t.other_profile_private_title}</Text>
             <Text style={[styles.privateSubtitle, { color: C.gray700 }]}>{t.other_profile_private_subtitle}</Text>
@@ -295,7 +302,7 @@ const styles = StyleSheet.create({
   },
   stat: { alignItems: 'center' },
   statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
-  statLabel: { fontSize: 11, marginTop: 2 },
+  statLabel: { fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.6 },
 
   // Info section
   infoSection: {
@@ -317,14 +324,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontFamily: Fonts.serifBold },
   secondaryBtn: {
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
     marginTop: 4,
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '600' },
+  secondaryBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   outlineBtn: {
     borderWidth: 1,
     borderRadius: 10,
@@ -333,7 +340,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  outlineBtnText: { fontSize: 14, fontWeight: '600' },
+  outlineBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   buttonRow: {
     flexDirection: 'row',
     marginTop: 4,
@@ -377,6 +384,11 @@ const styles = StyleSheet.create({
   planCardMeta: {
     flexDirection: 'row',
     gap: 10,
+  },
+  planCardMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   planCardMetaText: {
     color: 'rgba(255,255,255,0.85)',

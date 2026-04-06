@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 
 interface PrimaryButtonProps {
   label: string;
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   label: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: Fonts.serifBold,
   },
   labelSmall: {
     fontSize: 13,

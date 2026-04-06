@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 
 interface ChipProps {
   label: string;
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: Fonts.serifSemiBold,
   },
   labelSmall: {
     fontSize: 10,

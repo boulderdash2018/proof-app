@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +56,26 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 }) => {
   const C = useColors();
   const gradientColors = parseGradient(plan.gradient);
+
+  const likeScale = useRef(new Animated.Value(1)).current;
+  const saveScale = useRef(new Animated.Value(1)).current;
+
+  const animateBounce = (scale: Animated.Value) => {
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.35, useNativeDriver: true, friction: 3, tension: 200 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 4, tension: 120 }),
+    ]).start();
+  };
+
+  const handleLikePress = () => {
+    animateBounce(likeScale);
+    onLike();
+  };
+
+  const handleSavePress = () => {
+    animateBounce(saveScale);
+    onSave();
+  };
 
   return (
     <TouchableOpacity
@@ -120,16 +141,20 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       </View>
 
       <View style={[styles.actionBar, { borderTopColor: C.border }]}>
-        <TouchableOpacity style={styles.actionButton} onPress={onLike} activeOpacity={0.7}>
-          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? C.primary : C.gray600} />
+        <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>
+          <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? C.primary : C.gray600} />
+          </Animated.View>
           <Text style={[styles.actionCount, { color: isLiked ? C.primary : C.gray700 }]}>{plan.likesCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={onComment} activeOpacity={0.7}>
           <Ionicons name="chatbubble-outline" size={16} color={C.gray600} />
           <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={onSave} activeOpacity={0.7}>
-          <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
+        <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
+          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+            <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
+          </Animated.View>
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
         <XpBadge xp={plan.xpReward} />
@@ -152,7 +177,7 @@ const styles = StyleSheet.create({
   },
   userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
-  displayName: { fontSize: 14, fontWeight: '600' },
+  displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
   bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden' },
   banner: { height: 148, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },

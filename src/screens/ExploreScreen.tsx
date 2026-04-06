@@ -220,9 +220,18 @@ export const ExploreScreen: React.FC = () => {
           <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
         </LinearGradient>
         <View style={styles.compactMeta}>
-          <Text style={[styles.compactMetaText, { color: C.gray800 }]}>💰 {item.price}</Text>
-          <Text style={[styles.compactMetaText, { color: C.gray800 }]}>⏱ {item.duration}</Text>
-          <Text style={[styles.compactMetaText, { color: C.gray800 }]}>❤️ {item.likesCount}</Text>
+          <View style={styles.compactMetaItem}>
+            <Ionicons name="cash-outline" size={13} color={C.gold} />
+            <Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.price}</Text>
+          </View>
+          <View style={styles.compactMetaItem}>
+            <Ionicons name="time-outline" size={13} color={C.gold} />
+            <Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.duration}</Text>
+          </View>
+          <View style={styles.compactMetaItem}>
+            <Ionicons name="heart" size={13} color={C.gold} />
+            <Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.likesCount}</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -346,7 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  chipText: { fontSize: 13, fontWeight: '600' },
+  chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
@@ -442,6 +451,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 10,
     gap: 14,
+  },
+  compactMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   compactMetaText: { fontSize: 12 },
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants';
+import { Colors, Fonts } from '../constants';
 
 interface PtsPillProps {
   points: number;
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: Fonts.serifBold,
     color: Colors.gold,
   },
 });

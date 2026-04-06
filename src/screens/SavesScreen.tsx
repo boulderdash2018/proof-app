@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   tabBar: { flexDirection: 'row', marginHorizontal: Layout.screenPadding, borderRadius: 14, padding: 3, marginBottom: 14 },
   tab: { flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center' },
   tabActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 13, fontWeight: '600' },
+  tabText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   list: { paddingHorizontal: Layout.screenPadding, paddingBottom: 20 },
   saveItem: { borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, shadowColor: Colors.accentLine, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   saveItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },

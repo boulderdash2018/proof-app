@@ -27,7 +27,7 @@ import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore } from '../store';
-import { Colors } from '../constants';
+import { Colors, Fonts } from '../constants';
 import { fr, en } from '../i18n';
 
 // Feed Stack
@@ -188,6 +188,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 10,
     marginTop: 2,
+    fontFamily: Fonts.serifSemiBold,
   },
   createButtonWrapper: {
     flex: 1,

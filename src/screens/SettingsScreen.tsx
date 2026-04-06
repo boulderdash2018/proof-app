@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 40 },
   sectionTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, paddingHorizontal: Layout.screenPadding, paddingTop: 20, paddingBottom: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingVertical: 14, borderBottomWidth: 1 },
-  rowText: { fontSize: 14 },
+  rowText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   rowChevron: { fontSize: 18 },
   themeBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
   themeBadgeText: { fontSize: 12, fontWeight: '600' },
