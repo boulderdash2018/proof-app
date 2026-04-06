@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout, EXPLORE_GROUPS } from '../constants';
-import { ExploreCategoryItem, ExploreSection } from '../constants/exploreCategories';
+import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
 import { EmptyState } from '../components';
 import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
@@ -133,12 +133,65 @@ export const ExploreScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderSection = (section: ExploreSection, idx: number) => (
+  const renderMoodItem = (item: ExploreCategoryItem) => (
+    <TouchableOpacity
+      key={item.name}
+      style={[styles.moodCard, { backgroundColor: C.gray100 }]}
+      activeOpacity={0.7}
+      onPress={() => handleCategoryPress(item.name)}
+    >
+      <Text style={styles.moodEmoji}>{item.emoji}</Text>
+      <View style={styles.moodTextCol}>
+        <Text style={[styles.moodName, { color: C.black }]}>{item.name}</Text>
+        {item.subtitle ? <Text style={[styles.moodSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+      </View>
+      <Text style={[styles.moodChevron, { color: C.gray400 }]}>›</Text>
+    </TouchableOpacity>
+  );
+
+  const renderRankedItem = (item: ExploreCategoryItem, rank: number) => (
+    <TouchableOpacity
+      key={item.name}
+      style={[styles.rankedRow, { borderBottomColor: C.border }]}
+      activeOpacity={0.7}
+      onPress={() => handleCategoryPress(item.name)}
+    >
+      <Text style={[styles.rankNumber, { color: C.primary }]}>{rank}</Text>
+      <View style={[styles.rankEmojiCircle, { backgroundColor: C.gray100 }]}>
+        <Text style={styles.rankEmoji}>{item.emoji}</Text>
+      </View>
+      <View style={styles.rankTextCol}>
+        <Text style={[styles.rankName, { color: C.black }]}>{item.name}</Text>
+        {item.subtitle ? <Text style={[styles.rankSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+      </View>
+      {item.hot ? (
+        <View style={styles.hotBadge}>
+          <Text style={styles.hotBadgeText}>🔥 chaud</Text>
+        </View>
+      ) : item.planCount ? (
+        <View style={[styles.planCountBadge, { backgroundColor: C.gray200 }]}>
+          <Text style={[styles.planCountText, { color: C.gray700 }]}>{item.planCount} plans</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
+
+  const renderSection = (section: ExploreSection, idx: number, layout: ExploreLayout) => (
     <View key={`${section.title}-${idx}`} style={styles.section}>
       <Text style={[styles.sectionTitle, { color: C.gray600 }]}>{section.title}</Text>
-      <View style={styles.catGrid}>
-        {section.items.map((item, i) => renderCategoryCard(item, i, section.items.length))}
-      </View>
+      {layout === 'mood-list' ? (
+        <View style={styles.moodList}>
+          {section.items.map((item) => renderMoodItem(item))}
+        </View>
+      ) : layout === 'ranked-list' ? (
+        <View>
+          {section.items.map((item, i) => renderRankedItem(item, i + 1))}
+        </View>
+      ) : (
+        <View style={styles.catGrid}>
+          {section.items.map((item, i) => renderCategoryCard(item, i, section.items.length))}
+        </View>
+      )}
     </View>
   );
 
@@ -209,7 +262,7 @@ export const ExploreScreen: React.FC = () => {
         <>
           {renderFilterChips()}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {activeGroup.sections.map((section, idx) => renderSection(section, idx))}
+            {activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))}
             <View style={{ height: 30 }} />
           </ScrollView>
         </>
@@ -378,6 +431,56 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   compactMetaText: { fontSize: 12 },
+
+  // Mood list layout
+  moodList: { gap: 10 },
+  moodCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  moodEmoji: { fontSize: 32, marginRight: 14 },
+  moodTextCol: { flex: 1 },
+  moodName: { fontSize: 16, fontWeight: '700' },
+  moodSub: { fontSize: 13, marginTop: 2 },
+  moodChevron: { fontSize: 24, fontWeight: '300', marginLeft: 8 },
+
+  // Ranked list layout
+  rankedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  rankNumber: { fontSize: 22, fontWeight: '800', width: 32 },
+  rankEmojiCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rankEmoji: { fontSize: 24 },
+  rankTextCol: { flex: 1 },
+  rankName: { fontSize: 15, fontWeight: '700' },
+  rankSub: { fontSize: 12, marginTop: 2 },
+  hotBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  hotBadgeText: { fontSize: 12, fontWeight: '700', color: '#FF6B35' },
+  planCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  planCountText: { fontSize: 12, fontWeight: '600' },
 
   // User search results
   userRow: {

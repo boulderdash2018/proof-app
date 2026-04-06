@@ -3,6 +3,8 @@ export interface ExploreCategoryItem {
   emoji: string;
   gradient: [string, string];
   subtitle?: string;
+  planCount?: number;
+  hot?: boolean;
 }
 
 export interface ExploreSection {
@@ -10,10 +12,13 @@ export interface ExploreSection {
   items: ExploreCategoryItem[];
 }
 
+export type ExploreLayout = 'grid' | 'mood-list' | 'ranked-list';
+
 export interface ExploreGroup {
   key: string;
   label: string;
   emoji: string;
+  layout: ExploreLayout;
   sections: ExploreSection[];
 }
 
@@ -22,6 +27,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'date',
     label: 'Date',
     emoji: '👩‍❤️‍👨',
+    layout: 'grid',
     sections: [
       {
         title: 'PAR BUDGET',
@@ -45,6 +51,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'everyone',
     label: '4 Everyone',
     emoji: '🌍',
+    layout: 'grid',
     sections: [
       {
         title: 'FOOD & DRINK',
@@ -77,6 +84,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'friends',
     label: 'Friends',
     emoji: '👯',
+    layout: 'grid',
     sections: [
       {
         title: 'AVEC LA TEAM',
@@ -94,6 +102,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'alone',
     label: 'Solo',
     emoji: '🧘',
+    layout: 'grid',
     sections: [
       {
         title: 'SOLO VIBES',
@@ -112,16 +121,17 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'mood',
     label: 'Mood',
     emoji: '💭',
+    layout: 'mood-list',
     sections: [
       {
-        title: 'MOOD BASED',
+        title: 'COMMENT TU TE SENS ?',
         items: [
-          { name: 'Sad-day reset', emoji: '😢', gradient: ['#60A5FA', '#2563EB'], subtitle: '' },
-          { name: 'Romantic solo day', emoji: '💝', gradient: ['#F472B6', '#DB2777'], subtitle: '' },
-          { name: 'Breakup recovery', emoji: '💔', gradient: ['#8B5CF6', '#6D28D9'], subtitle: '' },
-          { name: 'Dopamine day', emoji: '⚡', gradient: ['#FBBF24', '#D97706'], subtitle: '' },
-          { name: 'Get your life together', emoji: '📋', gradient: ['#10B981', '#047857'], subtitle: '' },
-          { name: 'Productive reset day', emoji: '💪', gradient: ['#EF4444', '#B91C1C'], subtitle: '' },
+          { name: 'Sad-day reset', emoji: '😔', gradient: ['#60A5FA', '#2563EB'], subtitle: 'Plans doux pour repartir doucement' },
+          { name: 'Dopamine day', emoji: '⚡', gradient: ['#FBBF24', '#D97706'], subtitle: 'Boost garanti, \u00E9nergie max' },
+          { name: 'Breakup recovery', emoji: '💔', gradient: ['#8B5CF6', '#6D28D9'], subtitle: "Tu vas t'en remettre, promis" },
+          { name: 'Romantic solo day', emoji: '🌹', gradient: ['#F472B6', '#DB2777'], subtitle: 'Prendre soin de soi' },
+          { name: 'Get your life together', emoji: '📋', gradient: ['#10B981', '#047857'], subtitle: 'Productive reset day' },
+          { name: 'Productive reset day', emoji: '💪', gradient: ['#EF4444', '#B91C1C'], subtitle: 'Remise \u00E0 z\u00E9ro compl\u00E8te' },
         ],
       },
     ],
@@ -130,6 +140,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'occasion',
     label: 'Occasion',
     emoji: '🎉',
+    layout: 'grid',
     sections: [
       {
         title: 'SPECIAL OCCASION',
@@ -146,29 +157,19 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     key: 'trending',
     label: 'Tendance',
     emoji: '🔥',
+    layout: 'ranked-list',
     sections: [
       {
-        title: 'PAR BUDGET',
+        title: 'EN CE MOMENT \u00C0 PARIS',
         items: [
-          { name: 'Under 20\u20AC day', emoji: '💶', gradient: ['#10B981', '#047857'], subtitle: '' },
-          { name: 'Under 50\u20AC night', emoji: '🌙', gradient: ['#8B5CF6', '#6D28D9'], subtitle: '' },
-        ],
-      },
-      {
-        title: 'HIDDEN SPOTS',
-        items: [
-          { name: 'Hidden city only', emoji: '🏙️', gradient: ['#1E293B', '#475569'], subtitle: '' },
-          { name: 'No tourist spots', emoji: '🚫', gradient: ['#EF4444', '#B91C1C'], subtitle: '' },
-          { name: 'Only locals know', emoji: '📌', gradient: ['#F59E0B', '#D97706'], subtitle: '' },
-          { name: 'Best-rated in town', emoji: '⭐', gradient: ['#FF9A60', '#C94520'], subtitle: '' },
-          { name: 'Hidden gems', emoji: '💎', gradient: ['#60A5FA', '#2563EB'], subtitle: '' },
-        ],
-      },
-      {
-        title: 'LIFESTYLE',
-        items: [
-          { name: 'Cool girl sports', emoji: '🏄‍♀️', gradient: ['#EC4899', '#BE185D'], subtitle: '' },
-          { name: 'Meet finance bros', emoji: '💼', gradient: ['#1E293B', '#475569'], subtitle: '' },
+          { name: 'Best-rated spots', emoji: '🏆', gradient: ['#FF9A60', '#C94520'], subtitle: 'Les mieux not\u00E9s par Proof', hot: true },
+          { name: 'Hidden gems', emoji: '💎', gradient: ['#60A5FA', '#2563EB'], subtitle: 'Adresses que personne ne conna\u00EEt', planCount: 34 },
+          { name: 'Hidden city only', emoji: '🏙️', gradient: ['#1E293B', '#475569'], subtitle: 'Loin des guides touristiques', planCount: 27 },
+          { name: 'Under 20\u20AC day', emoji: '💰', gradient: ['#F59E0B', '#D97706'], subtitle: 'Budget mini, exp\u00E9rience maxi', planCount: 71 },
+          { name: 'Under 50\u20AC night', emoji: '🌃', gradient: ['#8B5CF6', '#6D28D9'], subtitle: 'Soir\u00E9e accessible', planCount: 58 },
+          { name: 'Cool girl sports', emoji: '🏄‍♀️', gradient: ['#EC4899', '#BE185D'], subtitle: 'Pilates, padel, climbing...', planCount: 18 },
+          { name: 'Only locals know', emoji: '🏘️', gradient: ['#3B82F6', '#1D4ED8'], subtitle: 'Spots 100% parisiens', planCount: 22 },
+          { name: 'Meet finance bros', emoji: '💼', gradient: ['#6B7280', '#374151'], subtitle: 'Networking d\u00E9guis\u00E9', planCount: 11 },
         ],
       },
     ],
