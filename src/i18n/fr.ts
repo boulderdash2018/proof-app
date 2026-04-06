@@ -298,7 +298,7 @@ export const fr = {
   // Privacy settings
   privacy_title: 'Confidentialité',
   privacy_private: 'Compte privé',
-  privacy_approval: 'Approbation manuelle des followers',
+  privacy_private_hint: 'Quand ton compte est privé, seuls tes amis peuvent voir tes plans et activités.',
 };
 
 export type TranslationKeys = keyof typeof fr;

@@ -9,6 +9,7 @@ import {
   savePlan as savePlanFS,
   unsavePlan as unsavePlanFS,
 } from '../services/plansService';
+import { getFriendIds } from '../services/friendsService';
 import { useSavesStore } from './savesStore';
 import { useAuthStore } from './authStore';
 
@@ -41,19 +42,25 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const uid = userId || getCurrentUserId();
     set({ isLoading: true });
     try {
-      const plans = await fetchFeedPlans();
-      const updates: Partial<FeedStore> = { plans, isLoading: false };
+      let plans = await fetchFeedPlans();
 
       if (uid) {
-        const [likedIds, savedIds] = await Promise.all([
+        const [likedIds, savedIds, friendIds] = await Promise.all([
           fetchLikedPlanIds(uid),
           fetchSavedPlanIds(uid),
+          getFriendIds(uid),
         ]);
-        updates.likedPlanIds = likedIds;
-        updates.savedPlanIds = savedIds;
+        // Filter out plans from private accounts (unless own or friend)
+        const friendSet = new Set(friendIds);
+        plans = plans.filter((p) =>
+          !p.author?.isPrivate || p.authorId === uid || friendSet.has(p.authorId)
+        );
+        set({ plans, isLoading: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
+      } else {
+        // Not logged in: filter out all private plans
+        plans = plans.filter((p) => !p.author?.isPrivate);
+        set({ plans, isLoading: false } as any);
       }
-
-      set(updates as any);
     } catch (err) {
       console.error('fetchFeed error:', err);
       set({ isLoading: false });
@@ -64,19 +71,23 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const uid = getCurrentUserId();
     set({ isRefreshing: true });
     try {
-      const plans = await fetchFeedPlans();
-      const updates: Partial<FeedStore> = { plans, isRefreshing: false };
+      let plans = await fetchFeedPlans();
 
       if (uid) {
-        const [likedIds, savedIds] = await Promise.all([
+        const [likedIds, savedIds, friendIds] = await Promise.all([
           fetchLikedPlanIds(uid),
           fetchSavedPlanIds(uid),
+          getFriendIds(uid),
         ]);
-        updates.likedPlanIds = likedIds;
-        updates.savedPlanIds = savedIds;
+        const friendSet = new Set(friendIds);
+        plans = plans.filter((p) =>
+          !p.author?.isPrivate || p.authorId === uid || friendSet.has(p.authorId)
+        );
+        set({ plans, isRefreshing: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
+      } else {
+        plans = plans.filter((p) => !p.author?.isPrivate);
+        set({ plans, isRefreshing: false } as any);
       }
-
-      set(updates as any);
     } catch {
       set({ isRefreshing: false });
     }

@@ -300,5 +300,5 @@ export const en: Record<TranslationKeys, string> = {
   // Privacy settings
   privacy_title: 'Privacy',
   privacy_private: 'Private account',
-  privacy_approval: 'Manual follower approval',
+  privacy_private_hint: 'When your account is private, only your friends can see your plans and activities.',
 };

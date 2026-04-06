@@ -3,12 +3,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SettingsStore {
-  // Privacy
-  isPrivate: boolean;
-  approvalRequired: boolean;
-  setIsPrivate: (v: boolean) => void;
-  setApprovalRequired: (v: boolean) => void;
-
   // Notification preferences
   notifLikes: boolean;
   notifFollowers: boolean;
@@ -23,12 +17,6 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      // Privacy defaults
-      isPrivate: false,
-      approvalRequired: false,
-      setIsPrivate: (v) => set({ isPrivate: v }),
-      setApprovalRequired: (v) => set({ approvalRequired: v }),
-
       // Notification defaults
       notifLikes: true,
       notifFollowers: true,

@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { useSettingsStore } from '../store';
+import { useAuthStore } from '../store';
 
 export const PrivacySettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -13,7 +13,12 @@ export const PrivacySettingsScreen: React.FC = () => {
   const C = useColors();
   const { t } = useTranslation();
 
-  const { isPrivate, approvalRequired, setIsPrivate, setApprovalRequired } = useSettingsStore();
+  const user = useAuthStore((s) => s.user);
+  const updateProfile = useAuthStore((s) => s.updateProfile);
+
+  const handleTogglePrivate = (value: boolean) => {
+    updateProfile({ isPrivate: value });
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -25,12 +30,9 @@ export const PrivacySettingsScreen: React.FC = () => {
       <View style={styles.content}>
         <View style={[styles.row, { borderBottomColor: C.borderLight }]}>
           <Text style={[styles.label, { color: C.black }]}>{t.privacy_private}</Text>
-          <Switch value={isPrivate} onValueChange={setIsPrivate} trackColor={{ true: C.primary }} />
+          <Switch value={user?.isPrivate || false} onValueChange={handleTogglePrivate} trackColor={{ true: C.primary }} />
         </View>
-        <View style={[styles.row, { borderBottomColor: C.borderLight }]}>
-          <Text style={[styles.label, { color: C.black }]}>{t.privacy_approval}</Text>
-          <Switch value={approvalRequired} onValueChange={setApprovalRequired} trackColor={{ true: C.primary }} />
-        </View>
+        <Text style={[styles.hint, { color: C.gray600 }]}>{t.privacy_private_hint}</Text>
       </View>
     </View>
   );
@@ -44,4 +46,5 @@ const styles = StyleSheet.create({
   content: { padding: Layout.screenPadding },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1 },
   label: { fontSize: 14 },
+  hint: { fontSize: 12, marginTop: 8, lineHeight: 17 },
 });
