@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
@@ -131,7 +132,7 @@ export const FriendRequestsScreen: React.FC = () => {
   const renderSearchContent = () => (
     <>
       <View style={[styles.searchBar, { backgroundColor: C.gray200 }]}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
         <RNTextInput
           style={[styles.searchInput, { color: C.black }]}
           placeholder={t.friend_requests_search_placeholder}
@@ -142,7 +143,7 @@ export const FriendRequestsScreen: React.FC = () => {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-            <Text style={[styles.clearBtn, { color: C.gray700 }]}>✕</Text>
+            <Ionicons name="close-circle" size={18} color={C.gray700} />
           </TouchableOpacity>
         )}
       </View>
@@ -200,15 +201,15 @@ export const FriendRequestsScreen: React.FC = () => {
           style={[styles.tab, tab === 'search' && [styles.tabActive, { borderBottomColor: C.black }]]}
           onPress={() => setTab('search')}
         >
-          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'search' && { color: C.black, fontWeight: '700' }]}>
-            🔍 {t.friend_requests_search}
+          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'search' && { color: C.black, fontFamily: Fonts.serifBold }]}>
+            {t.friend_requests_search}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'received' && [styles.tabActive, { borderBottomColor: C.black }]]}
           onPress={() => setTab('received')}
         >
-          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'received' && { color: C.black, fontWeight: '700' }]}>
+          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'received' && { color: C.black, fontFamily: Fonts.serifBold }]}>
             {t.friend_requests_received} ({incomingRequests.length})
           </Text>
         </TouchableOpacity>
@@ -216,7 +217,7 @@ export const FriendRequestsScreen: React.FC = () => {
           style={[styles.tab, tab === 'sent' && [styles.tabActive, { borderBottomColor: C.black }]]}
           onPress={() => setTab('sent')}
         >
-          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'sent' && { color: C.black, fontWeight: '700' }]}>
+          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'sent' && { color: C.black, fontFamily: Fonts.serifBold }]}>
             {t.friend_requests_sent} ({sentRequests.length})
           </Text>
         </TouchableOpacity>
@@ -251,7 +252,7 @@ const styles = StyleSheet.create({
   tabActive: {
     borderBottomWidth: 2,
   },
-  tabText: { fontSize: 13, fontWeight: '500' },
+  tabText: { fontSize: 13, fontFamily: Fonts.serifMedium },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   rowInfo: { flex: 1, marginLeft: 12 },
-  rowName: { fontSize: 14, fontWeight: '700' },
+  rowName: { fontSize: 14, fontFamily: Fonts.serifBold },
   rowUsername: { fontSize: 12, marginTop: 1 },
   acceptBtn: {
     borderRadius: 8,
@@ -281,18 +282,18 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     marginRight: 8,
   },
-  acceptText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  acceptText: { color: '#FFFFFF', fontSize: 12, fontFamily: Fonts.serifBold },
   declineBtn: {
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  declineText: { fontSize: 12, fontWeight: '600' },
+  declineText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
   pendingBadge: {
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  pendingText: { fontSize: 12, fontWeight: '600' },
+  pendingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
 });

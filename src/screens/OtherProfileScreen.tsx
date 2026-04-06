@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   stat: { alignItems: 'center' },
   statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
-  statLabel: { fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.6 },
+  statLabel: { fontSize: 11, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
 
   // Info section
   infoSection: {
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   },
   displayName: { fontSize: 16, fontFamily: Fonts.serifBold, marginBottom: 3 },
   badgeRow: { flexDirection: 'row', marginBottom: 4 },
-  bio: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  bio: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18, marginTop: 2 },
 
   // Action buttons
   actionSection: {
