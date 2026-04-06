@@ -1,4 +1,4 @@
-export { Colors, DarkColors } from './colors';
+export { Colors } from './colors';
 export type { ThemeColors } from './colors';
 export { Typography } from './typography';
 export { Layout } from './layout';

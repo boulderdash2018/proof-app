@@ -170,13 +170,13 @@ export const PlanDetailModal: React.FC = () => {
               style={[
                 styles.doneBtn,
                 isDone
-                  ? { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }
+                  ? { backgroundColor: Colors.successBg, borderColor: Colors.successBorder }
                   : { backgroundColor: C.primary + '15', borderColor: C.primary },
               ]}
               onPress={!isDone ? handleMarkDone : undefined}
               activeOpacity={isDone ? 1 : 0.7}
             >
-              <Text style={[styles.doneBtnText, { color: isDone ? '#4CAF50' : C.primary }]}>
+              <Text style={[styles.doneBtnText, { color: isDone ? Colors.success : C.primary }]}>
                 {isDone ? t.plan_already_done : t.plan_mark_done}
               </Text>
             </TouchableOpacity>

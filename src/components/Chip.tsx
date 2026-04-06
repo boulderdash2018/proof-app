@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Layout } from '../constants';
+import { Colors, Layout } from '../constants';
 
 interface ChipProps {
   label: string;
@@ -37,7 +37,7 @@ export const Chip: React.FC<ChipProps> = ({
           styles.label,
           small && styles.labelSmall,
           isBlack && styles.labelWhite,
-          isOutline && styles.labelBlack,
+          isOutline && styles.labelLight,
           !isBlack && !isOutline && styles.labelDark,
         ]}
       >
@@ -60,15 +60,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   chipBlack: {
-    backgroundColor: '#111111',
+    backgroundColor: Colors.primary,
   },
   chipGray: {
-    backgroundColor: '#F3F3F3',
+    backgroundColor: Colors.gray300,
   },
   chipOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#111111',
+    borderColor: Colors.gray600,
   },
   label: {
     fontSize: 12,
@@ -80,10 +80,10 @@ const styles = StyleSheet.create({
   labelWhite: {
     color: '#FFFFFF',
   },
-  labelBlack: {
-    color: '#111111',
+  labelLight: {
+    color: Colors.black,
   },
   labelDark: {
-    color: '#555555',
+    color: Colors.gray700,
   },
 });

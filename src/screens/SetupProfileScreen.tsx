@@ -263,10 +263,10 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFilled: {
-    backgroundColor: Colors.black,
+    backgroundColor: Colors.primary,
   },
   progressEmpty: {
-    backgroundColor: '#E8E8E8',
+    backgroundColor: Colors.gray400,
   },
   stepContent: {
     flex: 1,

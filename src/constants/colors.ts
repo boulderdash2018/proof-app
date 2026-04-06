@@ -1,65 +1,36 @@
+// Maison de Nuit — warm dark luxury palette
 export const Colors = {
-  primary: '#FF6B35',
-  black: '#111111',
-  white: '#FFFFFF',
-  success: '#0F9B68',
-  successBg: '#EDFAF5',
-  successBorder: '#B8EDD8',
-  error: '#FF3B30',
-  errorBg: '#FFF0F0',
-  purple: '#534AB7',
-  purpleBg: '#F0EEFF',
-  gold: '#B07800',
-  goldBg: '#FFF8E6',
-  goldBorder: '#FFE099',
-  pink: '#D4537E',
-  pinkBg: '#FFF0F5',
+  primary: '#D4845A',        // softened terracotta
+  black: '#E8E0D6',          // cream text (semantic: "foreground")
+  white: '#1C1917',          // warm brown-black (semantic: "background")
 
-  gray100: '#F8F8F8',
-  gray200: '#F5F5F5',
-  gray300: '#F0F0F0',
-  gray400: '#EEEEEE',
-  gray500: '#CCCCCC',
-  gray600: '#AAAAAA',
-  gray700: '#888888',
-  gray800: '#555555',
-
-  border: '#EEEEEE',
-  borderLight: '#F5F5F5',
-
-  unreadBg: '#FFF8F5',
-} as const;
-
-export const DarkColors = {
-  primary: '#FF6B35',
-  black: '#EEEEEE',
-  white: '#121212',
-  success: '#0F9B68',
-  successBg: '#1A2E25',
-  successBorder: '#1A3D2A',
-  error: '#FF6B6B',
-  errorBg: '#2D1A1A',
-  purple: '#7B6FDB',
-  purpleBg: '#1E1B2E',
-  gold: '#D4A017',
+  success: '#5B9A7B',
+  successBg: '#1E2A22',
+  successBorder: '#2D3D30',
+  error: '#C96B5A',
+  errorBg: '#2D1F1A',
+  errorBorder: '#3D2D25',
+  purple: '#8B7BA0',
+  purpleBg: '#2A2530',
+  gold: '#C9A84C',
   goldBg: '#2D2510',
   goldBorder: '#3D3318',
-  pink: '#E87DA0',
-  pinkBg: '#2D1A22',
+  pink: '#B07888',
+  pinkBg: '#2D1F25',
 
-  gray100: '#1A1A1A',
-  gray200: '#1E1E1E',
-  gray300: '#252525',
-  gray400: '#2A2A2A',
-  gray500: '#444444',
-  gray600: '#666666',
-  gray700: '#999999',
-  gray800: '#BBBBBB',
+  gray100: '#1E1B18',
+  gray200: '#292421',        // card surface / input bg
+  gray300: '#332E29',
+  gray400: '#3D352E',
+  gray500: '#5A5249',
+  gray600: '#8B7B6B',        // secondary text
+  gray700: '#A09585',
+  gray800: '#C4B8AA',
 
-  border: '#2A2A2A',
-  borderLight: '#1E1E1E',
+  border: '#3D352E',
+  borderLight: '#292421',
 
-  unreadBg: '#1F1510',
+  unreadBg: '#2A2118',
 } as const;
 
 export type ThemeColors = typeof Colors;

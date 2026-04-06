@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   saveItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   saveItemTitle: { fontSize: 14, fontWeight: '700', flex: 1, marginRight: 8 },
   statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1 },
-  statusTodo: { backgroundColor: '#FFF0EB', borderColor: '#FFE0D0' },
+  statusTodo: { backgroundColor: '#2D2118', borderColor: '#3D2E22' },
   statusDone: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },
   statusText: { fontSize: 10, fontWeight: '700' },
   saveItemMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 4 },

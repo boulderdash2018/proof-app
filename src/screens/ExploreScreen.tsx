@@ -97,7 +97,7 @@ export const ExploreScreen: React.FC = () => {
             key={group.key}
             style={[
               styles.chip,
-              isActive ? { backgroundColor: C.black, borderColor: C.black } : { backgroundColor: C.gray200, borderColor: C.border },
+              isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border },
             ]}
             onPress={() => setSelectedGroup(group.key)}
             activeOpacity={0.8}
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginLeft: 8,
   },
-  hotBadgeText: { fontSize: 12, fontWeight: '700', color: '#FF6B35' },
+  hotBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
   planCountBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,

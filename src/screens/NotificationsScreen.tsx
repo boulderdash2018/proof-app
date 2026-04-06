@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   markAll: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   list: { paddingBottom: 20 },
   notifRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, gap: 12 },
-  notifUnread: { backgroundColor: '#FFF8F5' },
+  notifUnread: { backgroundColor: Colors.unreadBg },
   iconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.gray200, alignItems: 'center', justifyContent: 'center' },
   notifIcon: { fontSize: 14 },
   notifContent: { flex: 1 },

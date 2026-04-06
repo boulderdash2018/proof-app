@@ -47,7 +47,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type = 'success', visible
           transform: [{ translateY }],
           bottom: insets.bottom + 20,
           backgroundColor: isError ? Colors.errorBg : Colors.successBg,
-          borderColor: isError ? '#FFD0D0' : Colors.successBorder,
+          borderColor: isError ? Colors.errorBorder : Colors.successBorder,
         },
       ]}
     >

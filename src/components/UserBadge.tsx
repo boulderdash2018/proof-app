@@ -13,13 +13,13 @@ const BADGE_CONFIG: Record<BadgeType, { label: string; bg: string; color: string
     label: 'Top Creator',
     bg: Colors.purpleBg,
     color: Colors.purple,
-    borderColor: '#D8D4F0',
+    borderColor: '#3D3050',
   },
   creator: {
     label: 'Creator',
-    bg: '#FFF0EB',
+    bg: '#2D2118',
     color: Colors.primary,
-    borderColor: '#FFE0D0',
+    borderColor: '#3D2E22',
   },
   novice: {
     label: 'Novice',

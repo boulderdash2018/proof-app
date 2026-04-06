@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Layout } from '../constants';
-import { useAuthStore, useThemeStore, useLanguageStore } from '../store';
+import { useAuthStore, useLanguageStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import type { Language } from '../store';
@@ -12,7 +12,6 @@ export const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const logout = useAuthStore((s) => s.logout);
-  const { isDark, toggleTheme } = useThemeStore();
   const { language, setLanguage } = useLanguageStore();
   const C = useColors();
   const { t } = useTranslation();
@@ -93,17 +92,6 @@ export const SettingsScreen: React.FC = () => {
             <View style={[styles.themeBadge, { backgroundColor: C.gray300 }]}>
               <Text style={[styles.themeBadgeText, { color: C.gray800 }]}>
                 {language === 'fr' ? t.settings_lang_french : t.settings_lang_english}
-              </Text>
-            </View>
-          }
-        />
-        <SettingsRow
-          label={t.settings_theme}
-          onPress={toggleTheme}
-          right={
-            <View style={[styles.themeBadge, { backgroundColor: isDark ? C.primary : C.gray300 }]}>
-              <Text style={[styles.themeBadgeText, { color: isDark ? '#FFFFFF' : C.gray800 }]}>
-                {isDark ? t.settings_theme_dark : t.settings_theme_light}
               </Text>
             </View>
           }

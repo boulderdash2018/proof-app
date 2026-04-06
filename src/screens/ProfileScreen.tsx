@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Layout } from '../constants';
+import { Colors, Layout } from '../constants';
 import { Avatar } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 30 },
   hero: { alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1 },
   displayName: { fontSize: 19, fontWeight: '800', marginTop: 10 },
-  rankBadge: { backgroundColor: '#FFF0EB', borderWidth: 1, borderColor: '#FFE0D0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, marginTop: 6 },
+  rankBadge: { backgroundColor: '#2D2118', borderWidth: 1, borderColor: '#3D2E22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, marginTop: 6 },
   rankText: { fontSize: 11, fontWeight: '700' },
   bio: { fontSize: 13, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
   xpSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 14 },
@@ -258,6 +258,6 @@ const styles = StyleSheet.create({
   plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end' },
   miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: '#4CAF50', alignItems: 'center', justifyContent: 'center' },
+  doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
 });

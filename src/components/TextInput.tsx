@@ -85,8 +85,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputFocused: {
-    borderColor: Colors.black,
-    backgroundColor: Colors.white,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.gray100,
   },
   inputError: {
     borderColor: Colors.error,

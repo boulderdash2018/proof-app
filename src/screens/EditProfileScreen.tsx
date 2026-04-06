@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 24, right: '50%', marginRight: -52,
     width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#FFFFFF',
+    borderWidth: 2, borderColor: Colors.border,
   },
   cameraEmoji: { fontSize: 14 },
   changePhotoLink: { fontSize: 13, fontWeight: '600', marginTop: 10 },

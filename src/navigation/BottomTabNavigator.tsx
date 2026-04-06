@@ -25,8 +25,8 @@ import { PrivacySettingsScreen } from '../screens/PrivacySettingsScreen';
 import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
-import { useThemeStore, useLanguageStore } from '../store';
-import { DarkColors, Colors } from '../constants';
+import { useLanguageStore } from '../store';
+import { Colors } from '../constants';
 import { fr, en } from '../i18n';
 
 // Feed Stack
@@ -82,7 +82,7 @@ const ProfileStackNavigator: React.FC = () => (
 
 // Tab icon component
 const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused }) => {
-  const color = focused ? '#000000' : '#AAAAAA';
+  const color = focused ? Colors.primary : Colors.gray600;
   const language = useLanguageStore((s) => s.language);
   const t = language === 'fr' ? fr : en;
 
@@ -120,14 +120,11 @@ const CreateTabButton: React.FC<{ onPress?: () => void }> = ({ onPress }) => (
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 export const BottomTabNavigator: React.FC = () => {
-  const isDark = useThemeStore((s) => s.isDark);
-  const C = isDark ? DarkColors : Colors;
-
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabBar, { backgroundColor: C.white, borderTopColor: C.border }],
+        tabBarStyle: [styles.tabBar],
         tabBarShowLabel: false,
       }}
     >
@@ -172,9 +169,9 @@ export const BottomTabNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.white,
     borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
+    borderTopColor: Colors.border,
     paddingTop: 6,
     height: 80,
   },
@@ -199,7 +196,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#000000',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

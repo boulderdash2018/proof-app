@@ -33,7 +33,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     activeOpacity={0.8}
   >
     {loading ? (
-      <ActivityIndicator color={Colors.white} size="small" />
+      <ActivityIndicator color="#FFFFFF" size="small" />
     ) : (
       <Text style={[styles.label, small && styles.labelSmall]}>{label}</Text>
     )}
@@ -42,7 +42,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: Colors.black,
+    backgroundColor: Colors.primary,
     borderRadius: Layout.buttonRadius,
     paddingVertical: 15,
     paddingHorizontal: 24,
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   label: {
-    color: Colors.white,
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
   },
