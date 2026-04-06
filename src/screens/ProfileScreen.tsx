@@ -105,6 +105,7 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.rankBadge}>
             <Text style={[styles.rankText, { color: C.primary }]}>{user.rank} · Lv. {user.level}</Text>
           </View>
+          {user.bio ? <Text style={[styles.bio, { color: C.gray800 }]}>{user.bio}</Text> : null}
         </View>
 
         <View style={styles.xpSection}>
@@ -231,6 +232,7 @@ const styles = StyleSheet.create({
   displayName: { fontSize: 19, fontWeight: '800', marginTop: 10 },
   rankBadge: { backgroundColor: '#FFF0EB', borderWidth: 1, borderColor: '#FFE0D0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, marginTop: 6 },
   rankText: { fontSize: 11, fontWeight: '700' },
+  bio: { fontSize: 13, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
   xpSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 14 },
   xpLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
   xpLabel: { fontSize: 10 },
