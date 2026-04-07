@@ -9,7 +9,7 @@ import {
   savePlan as savePlanFS,
   unsavePlan as unsavePlanFS,
 } from '../services/plansService';
-import { getFriendIds } from '../services/friendsService';
+import { getFriendIds, getMutualFollowIds, getFollowingIds } from '../services/friendsService';
 import { useSavesStore } from './savesStore';
 import { useAuthStore } from './authStore';
 
@@ -20,12 +20,17 @@ const getCurrentUserId = (): string | null => {
 
 interface FeedStore {
   plans: Plan[];
+  friendsPlans: Plan[];
   isLoading: boolean;
   isRefreshing: boolean;
+  isFriendsLoading: boolean;
+  isFriendsRefreshing: boolean;
   likedPlanIds: Set<string>;
   savedPlanIds: Set<string>;
   fetchFeed: (userId?: string, guestInterests?: string[]) => Promise<void>;
   refreshFeed: (guestInterests?: string[]) => Promise<void>;
+  fetchFriendsFeed: () => Promise<void>;
+  refreshFriendsFeed: () => Promise<void>;
   addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
   toggleSave: (planId: string) => void;
@@ -33,8 +38,11 @@ interface FeedStore {
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
   plans: [],
+  friendsPlans: [],
   isLoading: false,
   isRefreshing: false,
+  isFriendsLoading: false,
+  isFriendsRefreshing: false,
   likedPlanIds: new Set<string>(),
   savedPlanIds: new Set<string>(),
 
@@ -45,15 +53,16 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       let plans = await fetchFeedPlans();
 
       if (uid) {
-        const [likedIds, savedIds, friendIds] = await Promise.all([
+        const [likedIds, savedIds, friendIds, followingIds] = await Promise.all([
           fetchLikedPlanIds(uid),
           fetchSavedPlanIds(uid),
           getFriendIds(uid),
+          getFollowingIds(uid),
         ]);
-        // Filter out plans from private accounts (unless own or friend)
-        const friendSet = new Set(friendIds);
+        // Recommendations: public plans from followed accounts + own plans + friend plans
+        const followingSet = new Set([...friendIds, ...followingIds]);
         plans = plans.filter((p) =>
-          !p.author?.isPrivate || p.authorId === uid || friendSet.has(p.authorId)
+          !p.author?.isPrivate || p.authorId === uid || followingSet.has(p.authorId)
         );
         set({ plans, isLoading: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
       } else {
@@ -81,14 +90,15 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       let plans = await fetchFeedPlans();
 
       if (uid) {
-        const [likedIds, savedIds, friendIds] = await Promise.all([
+        const [likedIds, savedIds, friendIds, followingIds] = await Promise.all([
           fetchLikedPlanIds(uid),
           fetchSavedPlanIds(uid),
           getFriendIds(uid),
+          getFollowingIds(uid),
         ]);
-        const friendSet = new Set(friendIds);
+        const followingSet = new Set([...friendIds, ...followingIds]);
         plans = plans.filter((p) =>
-          !p.author?.isPrivate || p.authorId === uid || friendSet.has(p.authorId)
+          !p.author?.isPrivate || p.authorId === uid || followingSet.has(p.authorId)
         );
         set({ plans, isRefreshing: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
       } else {
@@ -106,6 +116,41 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
+  fetchFriendsFeed: async () => {
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    set({ isFriendsLoading: true });
+    try {
+      const [allPlans, mutualIds] = await Promise.all([
+        fetchFeedPlans(),
+        getMutualFollowIds(uid),
+      ]);
+      const mutualSet = new Set(mutualIds);
+      const friendsPlans = allPlans.filter((p) => mutualSet.has(p.authorId));
+      set({ friendsPlans, isFriendsLoading: false });
+    } catch (err) {
+      console.error('fetchFriendsFeed error:', err);
+      set({ isFriendsLoading: false });
+    }
+  },
+
+  refreshFriendsFeed: async () => {
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    set({ isFriendsRefreshing: true });
+    try {
+      const [allPlans, mutualIds] = await Promise.all([
+        fetchFeedPlans(),
+        getMutualFollowIds(uid),
+      ]);
+      const mutualSet = new Set(mutualIds);
+      const friendsPlans = allPlans.filter((p) => mutualSet.has(p.authorId));
+      set({ friendsPlans, isFriendsRefreshing: false });
+    } catch {
+      set({ isFriendsRefreshing: false });
+    }
+  },
+
   addPlan: (plan: Plan) => {
     const { plans } = get();
     set({ plans: [plan, ...plans] });
@@ -115,10 +160,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const uid = getCurrentUserId();
     if (!uid) { console.warn('[feedStore] toggleLike: no user id'); return; }
 
-    const { likedPlanIds, plans } = get();
+    const { likedPlanIds, plans, friendsPlans } = get();
     const newLiked = new Set(likedPlanIds);
     const isLiked = newLiked.has(planId);
-    const plan = plans.find((p) => p.id === planId);
+    const plan = plans.find((p) => p.id === planId) || friendsPlans.find((p) => p.id === planId);
 
     if (isLiked) {
       newLiked.delete(planId);
@@ -128,13 +173,14 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       if (plan) analytics.planLiked(planId, plan.title, plan.authorId);
     }
 
-    const updatedPlans = plans.map((p) =>
-      p.id === planId
-        ? { ...p, likesCount: p.likesCount + (isLiked ? -1 : 1) }
-        : p
-    );
+    const updateLikes = (p: Plan) =>
+      p.id === planId ? { ...p, likesCount: p.likesCount + (isLiked ? -1 : 1) } : p;
 
-    set({ likedPlanIds: newLiked, plans: updatedPlans });
+    set({
+      likedPlanIds: newLiked,
+      plans: plans.map(updateLikes),
+      friendsPlans: friendsPlans.map(updateLikes),
+    });
     // Persist to Firestore in background
     toggleLikePlan(uid, planId, isLiked).catch(console.error);
   },
@@ -143,9 +189,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const uid = getCurrentUserId();
     if (!uid) { console.warn('[feedStore] toggleSave: no user id'); return; }
 
-    const { savedPlanIds, plans } = get();
+    const { savedPlanIds, plans, friendsPlans } = get();
     const newSaved = new Set(savedPlanIds);
-    const plan = plans.find((p) => p.id === planId);
+    const plan = plans.find((p) => p.id === planId) || friendsPlans.find((p) => p.id === planId);
     const savesStore = useSavesStore.getState();
 
     if (newSaved.has(planId)) {

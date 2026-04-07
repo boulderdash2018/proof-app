@@ -283,6 +283,16 @@ export const getFollowingIds = async (userId: string): Promise<string[]> => {
   return snap.docs.map(d => d.data().followingId);
 };
 
+/** Get IDs of users with mutual follow (both follow each other) */
+export const getMutualFollowIds = async (userId: string): Promise<string[]> => {
+  const [followingIds, followerIds] = await Promise.all([
+    getFollowingIds(userId),
+    getFollowerIds(userId),
+  ]);
+  const followerSet = new Set(followerIds);
+  return followingIds.filter(id => followerSet.has(id));
+};
+
 /** Check if followerId follows followingId */
 export const isFollowingUser = async (followerId: string, followingId: string): Promise<boolean> => {
   const q = query(collection(db, FOLLOWS), where('followerId', '==', followerId), where('followingId', '==', followingId));
