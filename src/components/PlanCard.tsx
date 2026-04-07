@@ -10,6 +10,7 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  GestureResponderEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -93,6 +94,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const doubleTapHeartScale = useRef(new Animated.Value(0)).current;
   const doubleTapHeartOpacity = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef<number>(0);
+  const [heartPos, setHeartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const tapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const animateBounce = (scale: Animated.Value) => {
     Animated.sequence([
@@ -101,13 +104,16 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     ]).start();
   };
 
+  const handleBannerPressIn = (e: GestureResponderEvent) => {
+    tapPosRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+  };
+
   const handleDoubleTap = () => {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
-      // Double tap detected
       if (!isLiked) onLike();
       animateBounce(likeScale);
-      // Animate heart overlay
+      setHeartPos(tapPosRef.current);
       doubleTapHeartScale.setValue(0);
       doubleTapHeartOpacity.setValue(1);
       Animated.parallel([
@@ -144,7 +150,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.bannerWrap} activeOpacity={1} onPress={handleDoubleTap}>
+      <TouchableOpacity style={styles.bannerWrap} activeOpacity={1} onPressIn={handleBannerPressIn} onPress={handleDoubleTap}>
         {allPhotos.length > 0 ? (
           <>
             <FlatList
@@ -194,10 +200,15 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           pointerEvents="none"
           style={[
             styles.doubleTapHeart,
-            { opacity: doubleTapHeartOpacity, transform: [{ scale: doubleTapHeartScale }] },
+            {
+              left: heartPos.x - 35,
+              top: heartPos.y - 35,
+              opacity: doubleTapHeartOpacity,
+              transform: [{ scale: doubleTapHeartScale }],
+            },
           ]}
         >
-          <Ionicons name="heart" size={70} color="#FFFFFF" />
+          <Ionicons name="heart" size={70} color={Colors.primary} />
         </Animated.View>
       </TouchableOpacity>
 
@@ -292,7 +303,7 @@ const styles = StyleSheet.create({
   displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
   bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden', position: 'relative' } as any,
-  doubleTapHeart: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  doubleTapHeart: { position: 'absolute', width: 70, height: 70, alignItems: 'center', justifyContent: 'center' },
   banner: { height: 180, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
   bannerTitle: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   photoBanner: { height: 180 },
