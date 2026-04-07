@@ -97,6 +97,13 @@ export const GuestSurveyScreen: React.FC = () => {
           >
             <Text style={styles.btnText}>Continuer</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.loginBtn}
+            onPress={() => useGuestStore.getState().setWantsAuth(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.loginBtnText, { color: C.gray600 }]}>Déjà un compte ? <Text style={{ color: C.primary, fontWeight: '700' }}>Se connecter</Text></Text>
+          </TouchableOpacity>
         </View>
       ) : (
         /* ───── STEP 2: INTERESTS ───── */
@@ -205,7 +212,9 @@ const styles = StyleSheet.create({
   interestLabel: { fontSize: 13, fontFamily: Fonts.serifSemiBold, textTransform: 'capitalize' },
 
   // Buttons
-  btn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 'auto', marginBottom: 30 },
+  btn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 'auto', marginBottom: 12 },
+  loginBtn: { alignItems: 'center', marginBottom: 30 },
+  loginBtnText: { fontSize: 14, fontFamily: Fonts.serif },
   btnFlex: { flex: 1 },
   btnText: { color: '#FFFFFF', fontSize: 16, fontFamily: Fonts.serifBold },
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 'auto', marginBottom: 30 },
