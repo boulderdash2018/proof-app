@@ -41,6 +41,7 @@ export interface User {
   achievements_count?: number;
   last_active_dates?: string[];
   streak_count?: number;
+  isFounder?: boolean;
   createdAt: string;
 }
 

@@ -13,7 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, RankProgressBar, BadgeGrid } from '../components';
+import { Avatar, RankBadge, RankProgressBar, BadgeGrid, FounderBadge } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -122,7 +122,8 @@ export const ProfileScreen: React.FC = () => {
         <View style={[styles.hero, { borderBottomColor: C.border }]}>
           <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
           <Text style={[styles.displayName, { color: C.black }]}>{user.displayName}</Text>
-          <View style={{ marginTop: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            {user.isFounder && <FounderBadge />}
             <RankBadge rank={getRankForProofs(totalProofs)} />
           </View>
           {user.bio ? <Text style={[styles.bio, { color: C.gray800 }]}>{user.bio}</Text> : null}

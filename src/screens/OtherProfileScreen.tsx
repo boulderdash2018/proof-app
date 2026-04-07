@@ -5,7 +5,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, PrimaryButton, SecondaryButton } from '../components';
+import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
@@ -213,6 +213,7 @@ export const OtherProfileScreen: React.FC = () => {
         <View style={styles.infoSection}>
           <Text style={[styles.displayName, { color: C.black }]}>{user.displayName}</Text>
           <View style={styles.badgeRow}>
+            {user.isFounder && <FounderBadge small />}
             <RankBadge rank={getRankForProofs(user.total_proof_validations ?? 0)} small />
           </View>
           {canSeeContent && user.bio ? (

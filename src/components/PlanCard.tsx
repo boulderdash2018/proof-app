@@ -19,6 +19,7 @@ import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { Avatar } from './Avatar';
 import { RankBadge } from './RankBadge';
+import { FounderBadge } from './FounderBadge';
 import { Chip } from './Chip';
 import { MiniStampIcon } from './MiniStampIcon';
 
@@ -147,6 +148,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           <Text style={[styles.displayName, { color: C.black }]}>{plan.author.displayName}</Text>
           <Text style={[styles.timeAgo, { color: C.gray600 }]}>{plan.timeAgo}</Text>
         </View>
+        {plan.author.isFounder && <FounderBadge small />}
         <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />
       </TouchableOpacity>
 

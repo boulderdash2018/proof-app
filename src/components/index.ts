@@ -13,3 +13,4 @@ export { RankProgressBar } from './RankProgressBar';
 export { BadgeGrid } from './BadgeGrid';
 export { BadgeDetailSheet } from './BadgeDetailSheet';
 export { MiniStampIcon } from './MiniStampIcon';
+export { FounderBadge } from './FounderBadge';
