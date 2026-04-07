@@ -334,9 +334,6 @@ export const CreateScreen: React.FC = () => {
           <Text style={styles.successEmoji}>🎉</Text>
           <Text style={[styles.successTitle, { color: C.black }]}>{t.create_success_title}</Text>
           <Text style={[styles.successDesc, { color: C.gray700 }]}>{t.create_success_desc}</Text>
-          <View style={[styles.xpEarned, { backgroundColor: C.successBg }]}>
-            <Text style={[styles.xpEarnedText, { color: C.success }]}>{t.create_success_xp}</Text>
-          </View>
           <PrimaryButton label={t.create_success_back} onPress={() => {
             setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setTravels([]);
             navigation.navigate('FeedTab');
