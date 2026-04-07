@@ -6,9 +6,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { Place } from '../types';
+import { Place, PlaceReview } from '../types';
 import mockApi from '../services/mockApi';
 import { getPlaceDetails, getReadableType, priceLevelToSymbol, GooglePlaceDetails } from '../services/googlePlacesService';
+import { fetchPlaceReviews, getPlaceProofRating } from '../services/placeReviewService';
+import { Avatar } from '../components';
+
+const STAMP_PROOF = '#C8571A';
+
+const getReviewTimeAgo = (dateStr: string): string => {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}j`;
+  return `${Math.floor(days / 30)}m`;
+};
 
 export const PlaceDetailModal: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -26,15 +44,23 @@ export const PlaceDetailModal: React.FC = () => {
   const [googlePlace, setGooglePlace] = useState<GooglePlaceDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Proof community data
+  const [proofReviews, setProofReviews] = useState<PlaceReview[]>([]);
+  const [proofRating, setProofRating] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
+
   useEffect(() => {
     const load = async () => {
       try {
-        // If we have a googlePlaceId (from Explore or from a plan place with google data), fetch from API
         const gId = googlePlaceId || placeId;
         if (gId) {
           const details = await getPlaceDetails(gId);
           if (details) {
             setGooglePlace(details);
+            // Fetch Proof reviews for this place
+            const reviews = await fetchPlaceReviews(gId, googlePlaceId);
+            setProofReviews(reviews);
+            const rating = await getPlaceProofRating(gId, googlePlaceId);
+            setProofRating(rating);
             setLoading(false);
             return;
           }
@@ -44,7 +70,14 @@ export const PlaceDetailModal: React.FC = () => {
           const plan = await mockApi.getPlanById(planId);
           if (plan) {
             const found = plan.places.find((p) => p.id === placeId);
-            if (found) setPlace(found);
+            if (found) {
+              setPlace(found);
+              // Fetch Proof reviews for legacy place too
+              const reviews = await fetchPlaceReviews(placeId, found.googlePlaceId);
+              setProofReviews(reviews);
+              const rating = await getPlaceProofRating(placeId, found.googlePlaceId);
+              setProofRating(rating);
+            }
           }
         }
       } finally {
@@ -54,7 +87,8 @@ export const PlaceDetailModal: React.FC = () => {
     load();
   }, [planId, placeId, googlePlaceId]);
 
-  const renderStars = (rating: number, size: number = 14) => {
+  const renderStars = (rating: number, size: number = 14, color?: string) => {
+    const starColor = color || C.primary;
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       stars.push(
@@ -62,11 +96,66 @@ export const PlaceDetailModal: React.FC = () => {
           key={i}
           name={i <= Math.round(rating) ? 'star' : 'star-outline'}
           size={size}
-          color={i <= Math.round(rating) ? C.primary : C.gray400}
+          color={i <= Math.round(rating) ? starColor : C.gray400}
         />
       );
     }
     return <View style={{ flexDirection: 'row', gap: 1 }}>{stars}</View>;
+  };
+
+  const renderProofReviewsSection = () => {
+    if (proofReviews.length === 0 && proofRating.count === 0) return null;
+
+    return (
+      <View style={styles.reviewsSection}>
+        <Text style={[styles.sectionLabel, { color: C.black }]}>{t.place_proof_reviews} ({proofReviews.length})</Text>
+        {proofReviews.length === 0 ? (
+          <View style={styles.emptyProof}>
+            <Text style={[styles.emptyProofText, { color: C.gray600 }]}>{t.place_no_proof_reviews}</Text>
+            <Text style={[styles.emptyProofSub, { color: C.gray500 }]}>{t.place_no_proof_reviews_sub}</Text>
+          </View>
+        ) : (
+          proofReviews.map((review) => (
+            <View key={review.id} style={[styles.reviewCard, { borderBottomColor: C.borderLight }]}>
+              <View style={styles.reviewHeader}>
+                <Avatar
+                  initials={review.authorInitials}
+                  bg={review.authorAvatarBg}
+                  color={review.authorAvatarColor}
+                  size="S"
+                  avatarUrl={review.authorAvatarUrl ?? undefined}
+                />
+                <View style={styles.reviewContent}>
+                  <View style={styles.reviewTopRow}>
+                    <Text style={[styles.reviewAuthorName, { color: C.black }]}>{review.authorName}</Text>
+                    <Text style={[styles.reviewTime, { color: C.gray600 }]}>{getReviewTimeAgo(review.createdAt)}</Text>
+                  </View>
+                  {renderStars(review.rating, 12, STAMP_PROOF)}
+                  {review.text ? (
+                    <Text style={[styles.reviewText, { color: C.gray800 }]}>{review.text}</Text>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
+  const renderProofRatingBadge = () => {
+    if (proofRating.count === 0) return null;
+
+    return (
+      <View style={[styles.proofRatingBlock, { borderBottomColor: C.border }]}>
+        <View style={[styles.proofRatingPill, { backgroundColor: STAMP_PROOF + '12' }]}>
+          <Ionicons name="star" size={14} color={STAMP_PROOF} />
+          <Text style={[styles.proofRatingValue, { color: STAMP_PROOF }]}>{proofRating.average.toFixed(1)}</Text>
+          {renderStars(proofRating.average, 12, STAMP_PROOF)}
+          <Text style={[styles.proofRatingCount, { color: C.gray700 }]}>{proofRating.count} {t.place_proof_reviews_count}</Text>
+        </View>
+      </View>
+    );
   };
 
   if (loading) {
@@ -129,6 +218,17 @@ export const PlaceDetailModal: React.FC = () => {
                 )}
               </View>
             </View>
+            {/* Proof rating comparison */}
+            {proofRating.count > 0 && (
+              <View style={styles.ratingRight}>
+                <View style={[styles.proofCompare, { backgroundColor: STAMP_PROOF + '10', borderColor: STAMP_PROOF + '30' }]}>
+                  <Text style={[styles.proofCompareLabel, { color: STAMP_PROOF }]}>{t.place_proof_rating}</Text>
+                  <Text style={[styles.proofCompareBig, { color: STAMP_PROOF }]}>{proofRating.average.toFixed(1)}</Text>
+                  {renderStars(proofRating.average, 12, STAMP_PROOF)}
+                  <Text style={[styles.proofCompareCount, { color: C.gray600 }]}>{proofRating.count} avis</Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Address */}
@@ -189,6 +289,9 @@ export const PlaceDetailModal: React.FC = () => {
               ))}
             </View>
           )}
+
+          {/* Proof Community Reviews */}
+          {renderProofReviewsSection()}
         </ScrollView>
       </View>
     );
@@ -253,6 +356,9 @@ export const PlaceDetailModal: React.FC = () => {
           </View>
         </View>
 
+        {/* Proof community rating comparison */}
+        {renderProofRatingBadge()}
+
         {place.reviews.length > 0 && (
           <View style={styles.reviewsSection}>
             <Text style={[styles.sectionLabel, { color: C.black }]}>{t.place_community_reviews}</Text>
@@ -274,6 +380,9 @@ export const PlaceDetailModal: React.FC = () => {
             ))}
           </View>
         )}
+
+        {/* Proof Community Reviews (from Firestore) */}
+        {renderProofReviewsSection()}
       </ScrollView>
     </View>
   );
@@ -310,6 +419,18 @@ const styles = StyleSheet.create({
   histogramTrack: { width: 120, height: 8, borderRadius: 4, overflow: 'hidden' },
   histogramBar: { height: 8, borderRadius: 4 },
 
+  // Proof rating comparison
+  proofCompare: { padding: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
+  proofCompareLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  proofCompareBig: { fontSize: 28, fontFamily: Fonts.serifBold, lineHeight: 32 },
+  proofCompareCount: { fontSize: 10, fontFamily: Fonts.serif, marginTop: 2 },
+
+  // Proof rating badge (legacy view)
+  proofRatingBlock: { paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1 },
+  proofRatingPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, alignSelf: 'flex-start' },
+  proofRatingValue: { fontSize: 16, fontFamily: Fonts.serifBold },
+  proofRatingCount: { fontSize: 11, fontFamily: Fonts.serif, marginLeft: 4 },
+
   // Info section
   infoSection: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
@@ -333,4 +454,9 @@ const styles = StyleSheet.create({
   reviewAuthorName: { fontSize: 13, fontFamily: Fonts.serifBold },
   reviewTime: { fontSize: 11, fontFamily: Fonts.serif },
   reviewText: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18, marginTop: 6 },
+
+  // Empty proof state
+  emptyProof: { alignItems: 'center', paddingVertical: 16, paddingHorizontal: 18 },
+  emptyProofText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  emptyProofSub: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 4, textAlign: 'center' },
 });

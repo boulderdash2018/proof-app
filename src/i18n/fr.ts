@@ -316,6 +316,20 @@ export const fr = {
   proof_survey_hint: 'Ton avis aide les autres à choisir leurs sorties',
   proof_validated: 'Proof ✓',
   proof_declined: 'Passé',
+
+  // Place rating (ProofSurvey step 2)
+  proof_rate_title: 'Note les lieux',
+  proof_rate_subtitle: 'Optionnel — aide la communauté avec ton avis',
+  proof_rate_comment_placeholder: 'Un commentaire ? (optionnel)',
+  proof_rate_submit: 'Envoyer',
+  proof_rate_skip: 'Passer',
+
+  // Place detail — Proof section
+  place_proof_rating: 'Note Proof',
+  place_proof_reviews: 'AVIS DE LA COMMUNAUTÉ PROOF',
+  place_proof_reviews_count: 'avis Proof',
+  place_no_proof_reviews: 'Aucun avis Proof pour le moment',
+  place_no_proof_reviews_sub: 'Fais un plan avec ce lieu pour donner ton avis !',
 };
 
 export type TranslationKeys = keyof typeof fr;

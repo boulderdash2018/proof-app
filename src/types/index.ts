@@ -128,6 +128,22 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface PlaceReview {
+  id: string;
+  placeId: string;
+  googlePlaceId?: string;
+  planId: string;
+  authorId: string;
+  authorName: string;
+  authorInitials: string;
+  authorAvatarBg: string;
+  authorAvatarColor: string;
+  authorAvatarUrl?: string | null;
+  rating: number;
+  text?: string;
+  createdAt: string;
+}
+
 export type ProofStatus = 'validated' | 'declined';
 
 export interface SavedPlan {

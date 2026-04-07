@@ -8,13 +8,20 @@ import {
   Animated,
   Image,
   Dimensions,
+  ScrollView,
+  TextInput as RNTextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
+import { useAuthStore } from '../store';
+import { submitPlaceReviews } from '../services/placeReviewService';
 import Svg, { Circle, Line, G, Defs, ClipPath } from 'react-native-svg';
 
 const STAMP_PROOF = '#C8571A';
@@ -33,6 +40,13 @@ const parseGradient = (g: string): string[] => {
   return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
 };
 
+interface PlaceRating {
+  placeId: string;
+  googlePlaceId?: string;
+  rating: number;
+  comment: string;
+}
+
 interface Props {
   visible: boolean;
   plan: Plan;
@@ -43,12 +57,29 @@ interface Props {
 export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDecline }) => {
   const C = useColors();
   const { t } = useTranslation();
+  const currentUser = useAuthStore((s) => s.user);
   const [stampType, setStampType] = useState<'none' | 'proof' | 'declined'>('none');
+  const [step, setStep] = useState<'vote' | 'rate'>('vote');
+  const [pendingType, setPendingType] = useState<'proof' | 'declined'>('proof');
+  const [placeRatings, setPlaceRatings] = useState<PlaceRating[]>([]);
+  const [submitting, setSubmitting] = useState(false);
   const stampScale = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
+  const initPlaceRatings = () => {
+    setPlaceRatings(
+      plan.places.map((p) => ({
+        placeId: p.id,
+        googlePlaceId: p.googlePlaceId,
+        rating: 0,
+        comment: '',
+      }))
+    );
+  };
+
   const playStamp = (type: 'proof' | 'declined') => {
     setStampType(type);
+    setPendingType(type);
     Haptics.impactAsync(
       type === 'proof' ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light
     );
@@ -70,13 +101,63 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
       }),
     ]).start(() => {
       setTimeout(() => {
-        if (type === 'proof') onProof();
-        else onDecline();
+        // Transition to rating step instead of closing
         setStampType('none');
         stampScale.setValue(0);
         overlayOpacity.setValue(0);
+        initPlaceRatings();
+        setStep('rate');
       }, 900);
     });
+  };
+
+  const setRating = (placeId: string, rating: number) => {
+    setPlaceRatings((prev) =>
+      prev.map((pr) => (pr.placeId === placeId ? { ...pr, rating } : pr))
+    );
+  };
+
+  const setComment = (placeId: string, comment: string) => {
+    setPlaceRatings((prev) =>
+      prev.map((pr) => (pr.placeId === placeId ? { ...pr, comment } : pr))
+    );
+  };
+
+  const handleSubmitReviews = async () => {
+    const hasAnyRating = placeRatings.some((pr) => pr.rating > 0);
+    if (hasAnyRating && currentUser) {
+      setSubmitting(true);
+      try {
+        await submitPlaceReviews(
+          placeRatings
+            .filter((pr) => pr.rating > 0)
+            .map((pr) => ({
+              placeId: pr.placeId,
+              googlePlaceId: pr.googlePlaceId,
+              planId: plan.id,
+              rating: pr.rating,
+              text: pr.comment.trim() || undefined,
+            })),
+          currentUser
+        );
+      } catch (err) {
+        console.error('[ProofSurvey] submit reviews error:', err);
+      } finally {
+        setSubmitting(false);
+      }
+    }
+    finishAndClose();
+  };
+
+  const handleSkipReviews = () => {
+    finishAndClose();
+  };
+
+  const finishAndClose = () => {
+    setStep('vote');
+    setPlaceRatings([]);
+    if (pendingType === 'proof') onProof();
+    else onDecline();
   };
 
   // Get first available photo
@@ -91,151 +172,225 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
   const gradientColors = parseGradient(plan.gradient);
   const stampColor = stampType === 'proof' ? STAMP_PROOF : STAMP_DECLINE;
 
+  const renderStars = (placeId: string, currentRating: number) => {
+    return (
+      <View style={styles.starsRow}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity key={star} onPress={() => setRating(placeId, star)} activeOpacity={0.7}>
+            <Ionicons
+              name={star <= currentRating ? 'star' : 'star-outline'}
+              size={22}
+              color={star <= currentRating ? STAMP_PROOF : C.gray400}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={[styles.container, { backgroundColor: C.gray200 }]}>
-          {/* Header */}
-          <Text style={[styles.title, { color: C.black }]}>{t.proof_survey_title}</Text>
-          <Text style={[styles.subtitle, { color: C.gray600 }]}>{t.proof_survey_subtitle}</Text>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.backdrop}>
+          {step === 'vote' ? (
+            /* ========== STEP 1: Vote ========== */
+            <View style={[styles.container, { backgroundColor: C.gray200 }]}>
+              <Text style={[styles.title, { color: C.black }]}>{t.proof_survey_title}</Text>
+              <Text style={[styles.subtitle, { color: C.gray600 }]}>{t.proof_survey_subtitle}</Text>
 
-          {/* Card Preview */}
-          <View style={[styles.card, { width: CARD_WIDTH }]}>
-            {coverPhoto ? (
-              <Image source={{ uri: coverPhoto }} style={styles.cardImage} />
-            ) : (
-              <LinearGradient
-                colors={gradientColors as [string, string, ...string[]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.cardImage}
-              />
-            )}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.6)']}
-              style={styles.cardOverlay}
-            />
-            <View style={styles.cardTitleWrap}>
-              <Text style={styles.cardTitle}>{plan.title}</Text>
-              {plan.tags.length > 0 && (
-                <View style={[styles.cardTag, { backgroundColor: STAMP_PROOF }]}>
-                  <Text style={styles.cardTagText}>{plan.tags[0]}</Text>
+              <View style={[styles.card, { width: CARD_WIDTH }]}>
+                {coverPhoto ? (
+                  <Image source={{ uri: coverPhoto }} style={styles.cardImage} />
+                ) : (
+                  <LinearGradient
+                    colors={gradientColors as [string, string, ...string[]]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.cardImage}
+                  />
+                )}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.6)']}
+                  style={styles.cardOverlay}
+                />
+                <View style={styles.cardTitleWrap}>
+                  <Text style={styles.cardTitle}>{plan.title}</Text>
+                  {plan.tags.length > 0 && (
+                    <View style={[styles.cardTag, { backgroundColor: STAMP_PROOF }]}>
+                      <Text style={styles.cardTagText}>{plan.tags[0]}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            <View style={styles.cardMeta}>
-              <Text style={styles.cardMetaText}>💰 {plan.price}</Text>
-              <Text style={styles.cardMetaText}>⏱ {plan.duration}</Text>
-              <Text style={styles.cardMetaText}>{plan.transport}</Text>
-            </View>
+                <View style={styles.cardMeta}>
+                  <Text style={styles.cardMetaText}>{plan.price}</Text>
+                  <Text style={styles.cardMetaText}>{plan.duration}</Text>
+                  <Text style={styles.cardMetaText}>{plan.transport}</Text>
+                </View>
 
-            {/* Stamp Overlay */}
-            {stampType !== 'none' && (
-              <Animated.View
-                style={[
-                  styles.stampWrap,
-                  {
-                    opacity: overlayOpacity,
-                    transform: [{ scale: stampScale }, { rotate: '-18deg' }],
-                  },
-                ]}
+                {stampType !== 'none' && (
+                  <Animated.View
+                    style={[
+                      styles.stampWrap,
+                      {
+                        opacity: overlayOpacity,
+                        transform: [{ scale: stampScale }, { rotate: '-18deg' }],
+                      },
+                    ]}
+                  >
+                    <View style={[styles.stampContainer, { shadowColor: stampColor }]}>
+                      <Svg width={STAMP_SVG_SIZE} height={STAMP_SVG_SIZE} viewBox={`0 0 ${STAMP_SVG_SIZE} ${STAMP_SVG_SIZE}`}>
+                        <Defs>
+                          <ClipPath id="hatchClip">
+                            <Circle cx={STAMP_CTR} cy={STAMP_CTR} r={MAIN_R - STROKE_W / 2} />
+                          </ClipPath>
+                        </Defs>
+                        <G opacity={0.25}>
+                          {Array.from({ length: TICK_COUNT }).map((_, i) => {
+                            const angleRad = (i * 360 / TICK_COUNT) * Math.PI / 180;
+                            return (
+                              <Line
+                                key={i}
+                                x1={STAMP_CTR + Math.cos(angleRad) * TICK_INNER}
+                                y1={STAMP_CTR + Math.sin(angleRad) * TICK_INNER}
+                                x2={STAMP_CTR + Math.cos(angleRad) * TICK_OUTER}
+                                y2={STAMP_CTR + Math.sin(angleRad) * TICK_OUTER}
+                                stroke={stampColor}
+                                strokeWidth={4}
+                              />
+                            );
+                          })}
+                        </G>
+                        <Circle
+                          cx={STAMP_CTR}
+                          cy={STAMP_CTR}
+                          r={MAIN_R}
+                          fill={stampColor + '18'}
+                          stroke={stampColor}
+                          strokeWidth={STROKE_W}
+                        />
+                        {stampType === 'declined' && (
+                          <G clipPath="url(#hatchClip)" opacity={0.12}>
+                            {Array.from({ length: 25 }).map((_, i) => {
+                              const offset = (i - 12) * 7;
+                              return (
+                                <Line
+                                  key={`h${i}`}
+                                  x1={STAMP_CTR + offset - MAIN_R}
+                                  y1={STAMP_CTR - MAIN_R}
+                                  x2={STAMP_CTR + offset + MAIN_R}
+                                  y2={STAMP_CTR + MAIN_R}
+                                  stroke={stampColor}
+                                  strokeWidth={1}
+                                />
+                              );
+                            })}
+                          </G>
+                        )}
+                      </Svg>
+                      <View style={styles.stampTextOverlay}>
+                        <Text style={[styles.stampWord, { color: stampColor }]}>proof</Text>
+                        <Text
+                          style={[
+                            stampType === 'proof' ? styles.stampCheck : styles.stampX,
+                            { color: stampColor },
+                          ]}
+                        >
+                          {stampType === 'proof' ? '✓' : '✗'}
+                        </Text>
+                        <Text style={[styles.stampSub, { color: stampColor }]}>
+                          {stampType === 'proof' ? 'VERIFIED' : 'DECLINED'}
+                        </Text>
+                      </View>
+                    </View>
+                  </Animated.View>
+                )}
+              </View>
+
+              <View style={styles.btnRow}>
+                <TouchableOpacity
+                  style={[styles.btnProof, { backgroundColor: STAMP_PROOF }]}
+                  onPress={() => playStamp('proof')}
+                  activeOpacity={0.8}
+                  disabled={stampType !== 'none'}
+                >
+                  <Text style={styles.btnProofText}>Proof it ✓</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btnDecline, { backgroundColor: C.gray300, borderColor: C.border }]}
+                  onPress={() => playStamp('declined')}
+                  activeOpacity={0.8}
+                  disabled={stampType !== 'none'}
+                >
+                  <Text style={[styles.btnDeclineText, { color: STAMP_DECLINE }]}>Not for me ✗</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.hint, { color: C.gray500 }]}>{t.proof_survey_hint}</Text>
+            </View>
+          ) : (
+            /* ========== STEP 2: Rate Places ========== */
+            <View style={[styles.container, styles.rateContainer, { backgroundColor: C.gray200 }]}>
+              <Text style={[styles.title, { color: C.black }]}>{t.proof_rate_title}</Text>
+              <Text style={[styles.subtitle, { color: C.gray600 }]}>{t.proof_rate_subtitle}</Text>
+
+              <ScrollView
+                style={styles.rateScroll}
+                contentContainerStyle={styles.rateScrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                <View style={[styles.stampContainer, { shadowColor: stampColor }]}>
-                  <Svg width={STAMP_SVG_SIZE} height={STAMP_SVG_SIZE} viewBox={`0 0 ${STAMP_SVG_SIZE} ${STAMP_SVG_SIZE}`}>
-                    <Defs>
-                      <ClipPath id="hatchClip">
-                        <Circle cx={STAMP_CTR} cy={STAMP_CTR} r={MAIN_R - STROKE_W / 2} />
-                      </ClipPath>
-                    </Defs>
-                    {/* Serrated edge ticks */}
-                    <G opacity={0.25}>
-                      {Array.from({ length: TICK_COUNT }).map((_, i) => {
-                        const angleRad = (i * 360 / TICK_COUNT) * Math.PI / 180;
-                        return (
-                          <Line
-                            key={i}
-                            x1={STAMP_CTR + Math.cos(angleRad) * TICK_INNER}
-                            y1={STAMP_CTR + Math.sin(angleRad) * TICK_INNER}
-                            x2={STAMP_CTR + Math.cos(angleRad) * TICK_OUTER}
-                            y2={STAMP_CTR + Math.sin(angleRad) * TICK_OUTER}
-                            stroke={stampColor}
-                            strokeWidth={4}
-                          />
-                        );
-                      })}
-                    </G>
-                    {/* Main circle ring */}
-                    <Circle
-                      cx={STAMP_CTR}
-                      cy={STAMP_CTR}
-                      r={MAIN_R}
-                      fill={stampColor + '18'}
-                      stroke={stampColor}
-                      strokeWidth={STROKE_W}
-                    />
-                    {/* Diagonal hatching for declined */}
-                    {stampType === 'declined' && (
-                      <G clipPath="url(#hatchClip)" opacity={0.12}>
-                        {Array.from({ length: 25 }).map((_, i) => {
-                          const offset = (i - 12) * 7;
-                          return (
-                            <Line
-                              key={`h${i}`}
-                              x1={STAMP_CTR + offset - MAIN_R}
-                              y1={STAMP_CTR - MAIN_R}
-                              x2={STAMP_CTR + offset + MAIN_R}
-                              y2={STAMP_CTR + MAIN_R}
-                              stroke={stampColor}
-                              strokeWidth={1}
-                            />
-                          );
-                        })}
-                      </G>
-                    )}
-                  </Svg>
-                  {/* Text overlay */}
-                  <View style={styles.stampTextOverlay}>
-                    <Text style={[styles.stampWord, { color: stampColor }]}>proof</Text>
-                    <Text
-                      style={[
-                        stampType === 'proof' ? styles.stampCheck : styles.stampX,
-                        { color: stampColor },
-                      ]}
-                    >
-                      {stampType === 'proof' ? '✓' : '✗'}
-                    </Text>
-                    <Text style={[styles.stampSub, { color: stampColor }]}>
-                      {stampType === 'proof' ? 'VERIFIED' : 'DECLINED'}
-                    </Text>
-                  </View>
-                </View>
-              </Animated.View>
-            )}
-          </View>
+                {plan.places.map((place, index) => {
+                  const pr = placeRatings.find((r) => r.placeId === place.id);
+                  return (
+                    <View key={place.id} style={[styles.ratePlaceCard, { backgroundColor: C.white, borderColor: C.border }]}>
+                      <View style={styles.ratePlaceHeader}>
+                        <View style={[styles.ratePlaceIndex, { backgroundColor: STAMP_PROOF + '18' }]}>
+                          <Text style={[styles.ratePlaceIndexText, { color: STAMP_PROOF }]}>{index + 1}</Text>
+                        </View>
+                        <View style={styles.ratePlaceInfo}>
+                          <Text style={[styles.ratePlaceName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+                          <Text style={[styles.ratePlaceType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
+                        </View>
+                      </View>
+                      {renderStars(place.id, pr?.rating ?? 0)}
+                      {(pr?.rating ?? 0) > 0 && (
+                        <RNTextInput
+                          style={[styles.rateComment, { color: C.black, backgroundColor: C.gray200, borderColor: C.border }]}
+                          placeholder={t.proof_rate_comment_placeholder}
+                          placeholderTextColor={C.gray500}
+                          value={pr?.comment ?? ''}
+                          onChangeText={(text) => setComment(place.id, text)}
+                          multiline
+                          maxLength={300}
+                        />
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
 
-          {/* Buttons */}
-          <View style={styles.btnRow}>
-            <TouchableOpacity
-              style={[styles.btnProof, { backgroundColor: STAMP_PROOF }]}
-              onPress={() => playStamp('proof')}
-              activeOpacity={0.8}
-              disabled={stampType !== 'none'}
-            >
-              <Text style={styles.btnProofText}>Proof it ✓</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.btnDecline, { backgroundColor: C.gray300, borderColor: C.border }]}
-              onPress={() => playStamp('declined')}
-              activeOpacity={0.8}
-              disabled={stampType !== 'none'}
-            >
-              <Text style={[styles.btnDeclineText, { color: STAMP_DECLINE }]}>Not for me ✗</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={[styles.hint, { color: C.gray500 }]}>{t.proof_survey_hint}</Text>
+              <View style={styles.rateBtnRow}>
+                <TouchableOpacity
+                  style={[styles.btnProof, { backgroundColor: STAMP_PROOF, opacity: submitting ? 0.6 : 1 }]}
+                  onPress={handleSubmitReviews}
+                  activeOpacity={0.8}
+                  disabled={submitting}
+                >
+                  <Text style={styles.btnProofText}>{t.proof_rate_submit}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btnSkip]}
+                  onPress={handleSkipReviews}
+                  activeOpacity={0.7}
+                  disabled={submitting}
+                >
+                  <Text style={[styles.btnSkipText, { color: C.gray600 }]}>{t.proof_rate_skip}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -255,6 +410,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
+  rateContainer: {
+    maxHeight: '85%',
+  },
   title: {
     fontSize: 20,
     fontFamily: Fonts.serifBold,
@@ -266,7 +424,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  // Card
+  // Card (step 1)
   card: {
     borderRadius: 18,
     overflow: 'hidden',
@@ -376,7 +534,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Buttons
+  // Buttons (step 1)
   btnRow: {
     flexDirection: 'row',
     gap: 10,
@@ -410,5 +568,78 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: Fonts.serif,
     letterSpacing: 0.3,
+  },
+
+  // Step 2: Rate places
+  rateScroll: {
+    width: '100%',
+    flexGrow: 0,
+  },
+  rateScrollContent: {
+    gap: 10,
+    paddingBottom: 4,
+  },
+  ratePlaceCard: {
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+  },
+  ratePlaceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  ratePlaceIndex: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  ratePlaceIndexText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ratePlaceInfo: {
+    flex: 1,
+  },
+  ratePlaceName: {
+    fontSize: 13,
+    fontFamily: Fonts.serifBold,
+  },
+  ratePlaceType: {
+    fontSize: 11,
+    fontFamily: Fonts.serif,
+    marginTop: 1,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 4,
+  },
+  rateComment: {
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: Fonts.serif,
+    maxHeight: 80,
+    minHeight: 36,
+  },
+  rateBtnRow: {
+    width: '100%',
+    marginTop: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  btnSkip: {
+    paddingVertical: 8,
+  },
+  btnSkipText: {
+    fontSize: 13,
+    fontFamily: Fonts.serifSemiBold,
   },
 });

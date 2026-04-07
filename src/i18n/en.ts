@@ -318,4 +318,18 @@ export const en: Record<TranslationKeys, string> = {
   proof_survey_hint: 'Your feedback helps others choose their outings',
   proof_validated: 'Proof ✓',
   proof_declined: 'Passed',
+
+  // Place rating (ProofSurvey step 2)
+  proof_rate_title: 'Rate the places',
+  proof_rate_subtitle: 'Optional — help the community with your review',
+  proof_rate_comment_placeholder: 'A comment? (optional)',
+  proof_rate_submit: 'Submit',
+  proof_rate_skip: 'Skip',
+
+  // Place detail — Proof section
+  place_proof_rating: 'Proof rating',
+  place_proof_reviews: 'PROOF COMMUNITY REVIEWS',
+  place_proof_reviews_count: 'Proof reviews',
+  place_no_proof_reviews: 'No Proof reviews yet',
+  place_no_proof_reviews_sub: 'Complete a plan with this place to leave a review!',
 };
