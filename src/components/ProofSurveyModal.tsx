@@ -15,10 +15,18 @@ import { Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
+import Svg, { Circle, Line, G, Defs, ClipPath } from 'react-native-svg';
 
 const STAMP_PROOF = '#C8571A';
 const STAMP_DECLINE = '#6B7A8D';
 const CARD_WIDTH = Dimensions.get('window').width - 64;
+const STAMP_SVG_SIZE = 146;
+const STAMP_CTR = STAMP_SVG_SIZE / 2;
+const MAIN_R = 55;
+const STROKE_W = 5;
+const TICK_INNER = MAIN_R + STROKE_W / 2 + 2;
+const TICK_OUTER = TICK_INNER + 10;
+const TICK_COUNT = 30;
 
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
@@ -132,30 +140,74 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
                   },
                 ]}
               >
-                <View
-                  style={[
-                    styles.stampRing,
-                    {
-                      borderColor: stampColor,
-                      backgroundColor: stampColor + '18',
-                      shadowColor: stampColor,
-                    },
-                  ]}
-                >
-                  {/* Serrated edge simulation */}
-                  <View style={[styles.stampEdge, { borderColor: stampColor + '30' }]} />
-                  <Text style={[styles.stampWord, { color: stampColor }]}>proof</Text>
-                  <Text
-                    style={[
-                      stampType === 'proof' ? styles.stampCheck : styles.stampX,
-                      { color: stampColor },
-                    ]}
-                  >
-                    {stampType === 'proof' ? '✓' : '✗'}
-                  </Text>
-                  <Text style={[styles.stampSub, { color: stampColor }]}>
-                    {stampType === 'proof' ? 'VERIFIED' : 'DECLINED'}
-                  </Text>
+                <View style={[styles.stampContainer, { shadowColor: stampColor }]}>
+                  <Svg width={STAMP_SVG_SIZE} height={STAMP_SVG_SIZE} viewBox={`0 0 ${STAMP_SVG_SIZE} ${STAMP_SVG_SIZE}`}>
+                    <Defs>
+                      <ClipPath id="hatchClip">
+                        <Circle cx={STAMP_CTR} cy={STAMP_CTR} r={MAIN_R - STROKE_W / 2} />
+                      </ClipPath>
+                    </Defs>
+                    {/* Serrated edge ticks */}
+                    <G opacity={0.25}>
+                      {Array.from({ length: TICK_COUNT }).map((_, i) => {
+                        const angleRad = (i * 360 / TICK_COUNT) * Math.PI / 180;
+                        return (
+                          <Line
+                            key={i}
+                            x1={STAMP_CTR + Math.cos(angleRad) * TICK_INNER}
+                            y1={STAMP_CTR + Math.sin(angleRad) * TICK_INNER}
+                            x2={STAMP_CTR + Math.cos(angleRad) * TICK_OUTER}
+                            y2={STAMP_CTR + Math.sin(angleRad) * TICK_OUTER}
+                            stroke={stampColor}
+                            strokeWidth={4}
+                          />
+                        );
+                      })}
+                    </G>
+                    {/* Main circle ring */}
+                    <Circle
+                      cx={STAMP_CTR}
+                      cy={STAMP_CTR}
+                      r={MAIN_R}
+                      fill={stampColor + '18'}
+                      stroke={stampColor}
+                      strokeWidth={STROKE_W}
+                    />
+                    {/* Diagonal hatching for declined */}
+                    {stampType === 'declined' && (
+                      <G clipPath="url(#hatchClip)" opacity={0.12}>
+                        {Array.from({ length: 25 }).map((_, i) => {
+                          const offset = (i - 12) * 7;
+                          return (
+                            <Line
+                              key={`h${i}`}
+                              x1={STAMP_CTR + offset - MAIN_R}
+                              y1={STAMP_CTR - MAIN_R}
+                              x2={STAMP_CTR + offset + MAIN_R}
+                              y2={STAMP_CTR + MAIN_R}
+                              stroke={stampColor}
+                              strokeWidth={1}
+                            />
+                          );
+                        })}
+                      </G>
+                    )}
+                  </Svg>
+                  {/* Text overlay */}
+                  <View style={styles.stampTextOverlay}>
+                    <Text style={[styles.stampWord, { color: stampColor }]}>proof</Text>
+                    <Text
+                      style={[
+                        stampType === 'proof' ? styles.stampCheck : styles.stampX,
+                        { color: stampColor },
+                      ]}
+                    >
+                      {stampType === 'proof' ? '✓' : '✗'}
+                    </Text>
+                    <Text style={[styles.stampSub, { color: stampColor }]}>
+                      {stampType === 'proof' ? 'VERIFIED' : 'DECLINED'}
+                    </Text>
+                  </View>
                 </View>
               </Animated.View>
             )}
@@ -282,25 +334,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stampRing: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    borderWidth: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
+  stampContainer: {
+    width: STAMP_SVG_SIZE,
+    height: STAMP_SVG_SIZE,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 10,
   },
-  stampEdge: {
+  stampTextOverlay: {
     position: 'absolute',
-    width: 142,
-    height: 142,
-    borderRadius: 71,
-    borderWidth: 3,
-    borderStyle: 'dashed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stampWord: {
     fontSize: 26,

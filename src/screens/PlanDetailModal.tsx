@@ -118,11 +118,23 @@ export const PlanDetailModal: React.FC = () => {
   const handleProof = () => {
     markAsDone(planId, 'validated');
     setShowProofSurvey(false);
+    if (plan) setPlan({ ...plan, proofCount: (plan.proofCount ?? 0) + 1 });
+    useFeedStore.setState((state) => ({
+      plans: state.plans.map((p) =>
+        p.id === planId ? { ...p, proofCount: (p.proofCount ?? 0) + 1 } : p
+      ),
+    }));
   };
 
   const handleDeclineProof = () => {
     markAsDone(planId, 'declined');
     setShowProofSurvey(false);
+    if (plan) setPlan({ ...plan, declinedCount: (plan.declinedCount ?? 0) + 1 });
+    useFeedStore.setState((state) => ({
+      plans: state.plans.map((p) =>
+        p.id === planId ? { ...p, declinedCount: (p.declinedCount ?? 0) + 1 } : p
+      ),
+    }));
   };
 
   const handleLike = () => {
@@ -412,6 +424,12 @@ export const PlanDetailModal: React.FC = () => {
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? C.primary : C.gray600} />
               <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
             </TouchableOpacity>
+            {(plan.proofCount ?? 0) > 0 && (
+              <View style={styles.actionBtn}>
+                <Ionicons name="shield-checkmark" size={18} color="#C8571A" />
+                <Text style={[styles.actionText, { color: '#C8571A' }]}>{plan.proofCount}</Text>
+              </View>
+            )}
           </View>
 
           {/* Comment input */}

@@ -228,6 +228,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </Animated.View>
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
+        {(plan.proofCount ?? 0) > 0 && (
+          <View style={styles.proofIndicator}>
+            <Ionicons name="shield-checkmark" size={14} color="#C8571A" />
+            <Text style={styles.proofIndicatorText}>{plan.proofCount}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -275,4 +281,6 @@ const styles = StyleSheet.create({
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
   actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
   actionSpacer: { flex: 1 },
+  proofIndicator: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  proofIndicatorText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#C8571A' },
 });

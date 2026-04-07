@@ -84,6 +84,8 @@ export interface Plan {
   coverPhotos?: string[];
   likesCount: number;
   commentsCount: number;
+  proofCount: number;
+  declinedCount: number;
   xpReward: number;
   createdAt: string;
   timeAgo: string;

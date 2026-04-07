@@ -77,6 +77,8 @@ export const createPlan = async (
     coverPhotos: planData.coverPhotos || [],
     likesCount: 0,
     commentsCount: 0,
+    proofCount: 0,
+    declinedCount: 0,
     xpReward: 20,
     createdAt: now,
     timeAgo: 'maintenant',
@@ -226,6 +228,22 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
   const data: Record<string, any> = { isDone: true };
   if (proofStatus) data.proofStatus = proofStatus;
   await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data);
+
+  // Increment proof/declined count on the plan document
+  if (proofStatus) {
+    try {
+      const planRef = doc(db, PLANS, planId);
+      const planSnap = await getDoc(planRef);
+      if (planSnap.exists()) {
+        const planData = planSnap.data();
+        const field = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
+        const current = planData[field] || 0;
+        await updateDoc(planRef, { [field]: current + 1 });
+      }
+    } catch (err) {
+      console.error('[plansService] update proof count error:', err);
+    }
+  }
 };
 
 // ==================== COMMENTS ====================
