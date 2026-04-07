@@ -7,7 +7,7 @@ import { Avatar, EmptyState } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User } from '../types';
-import { getFriendIds, getUserById } from '../services/friendsService';
+import { getFollowerIds, getUserById } from '../services/friendsService';
 
 export const FollowersScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -19,15 +19,15 @@ export const FollowersScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadFriends = async () => {
+    const loadFollowers = async () => {
       const userId = route.params?.userId;
       if (!userId) { setLoading(false); return; }
-      const ids = await getFriendIds(userId);
+      const ids = await getFollowerIds(userId);
       const profiles = await Promise.all(ids.map(id => getUserById(id)));
       setUsers(profiles.filter((u): u is User => u !== null));
       setLoading(false);
     };
-    loadFriends();
+    loadFollowers();
   }, []);
 
   const renderItem = ({ item }: { item: User }) => (
@@ -48,7 +48,7 @@ export const FollowersScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <View style={[styles.header, { borderBottomColor: C.border }]}>
         <Text style={[styles.back, { color: C.black }]} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={[styles.headerTitle, { color: C.black }]}>{t.profile_friends}</Text>
+        <Text style={[styles.headerTitle, { color: C.black }]}>{t.profile_followers}</Text>
         <View style={{ width: 30 }} />
       </View>
       {loading ? (

@@ -199,7 +199,8 @@ export const en: Record<TranslationKeys, string> = {
   profile_title: 'My profile',
   profile_plans: 'plans',
   profile_followers: 'followers',
-  profile_likes_received: 'likes received',
+  profile_likes_received: 'likes',
+  profile_following: 'following',
   profile_badges: 'BADGES',
   profile_recent_plans: 'MY CREATED PLANS',
   profile_saved_plans: 'PLANS TO DO',
@@ -224,18 +225,19 @@ export const en: Record<TranslationKeys, string> = {
   edit_profile_uploading: 'Uploading...',
 
   // Other profile
-  other_profile_add: 'Add friend',
-  other_profile_request_sent: 'Request sent',
+  other_profile_add: 'Follow',
+  other_profile_request_sent: 'Requested',
   other_profile_accept: 'Accept',
   other_profile_decline: 'Decline',
-  other_profile_friends: 'Friends',
+  other_profile_friends: 'Following',
+  other_profile_follow_back: 'Follow back',
   other_profile_private_title: 'This account is private',
-  other_profile_private_subtitle: 'Add this person as a friend to see their plans and activities.',
+  other_profile_private_subtitle: 'Follow this person to see their plans and activities.',
   other_profile_plans_section: 'PUBLISHED PLANS',
   other_profile_no_plans: 'No plans published',
 
   // Friend requests
-  friend_requests_title: 'Friends',
+  friend_requests_title: 'Community',
   friend_requests_search: 'Search',
   friend_requests_received: 'Received',
   friend_requests_sent: 'Sent',
@@ -246,9 +248,9 @@ export const en: Record<TranslationKeys, string> = {
   friend_requests_decline: 'Decline',
   friend_requests_pending: 'Pending',
   friend_requests_empty_received: 'No requests received',
-  friend_requests_empty_received_sub: "When someone adds you, it'll appear here",
+  friend_requests_empty_received_sub: "When someone requests to follow you, it'll appear here",
   friend_requests_empty_sent: 'No requests sent',
-  friend_requests_empty_sent_sub: 'Search for friends in Explore with @username',
+  friend_requests_empty_sent_sub: 'Search for people in Explore',
 
   // Followers / Following
   followers_title: 'Followers',
@@ -308,5 +310,5 @@ export const en: Record<TranslationKeys, string> = {
   // Privacy settings
   privacy_title: 'Privacy',
   privacy_private: 'Private account',
-  privacy_private_hint: 'When your account is private, only your friends can see your plans and activities.',
+  privacy_private_hint: 'When your account is private, only your followers can see your plans and activities.',
 };

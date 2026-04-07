@@ -18,7 +18,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Badge, BadgeId } from '../types';
 import mockApi from '../services/mockApi';
-import { getFriendIds } from '../services/friendsService';
+import { getFollowerIds, getFollowingIds, migrateToFollows } from '../services/friendsService';
 import { fetchUserPlans } from '../services/plansService';
 
 const { width } = Dimensions.get('window');
@@ -39,14 +39,18 @@ export const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
   const [badges, setBadges] = useState<Badge[]>([]);
   const [userPlans, setUserPlans] = useState<any[]>([]);
-  const [friendCount, setFriendCount] = useState<number>(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     if (user) {
+      // One-time migration: convert old friends to mutual follows
+      migrateToFollows(user.id).catch(() => {});
       mockApi.getBadges(user.unlockedBadges).then(setBadges);
       fetchUserPlans(user.id).then(setUserPlans);
       fetchIncomingRequests(user.id);
-      getFriendIds(user.id).then(ids => setFriendCount(ids.length));
+      getFollowerIds(user.id).then(ids => setFollowersCount(ids.length));
+      getFollowingIds(user.id).then(ids => setFollowingCount(ids.length));
       fetchSaves(user.id);
     }
   }, [user]);
@@ -55,7 +59,8 @@ export const ProfileScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       if (user) {
-        getFriendIds(user.id).then(ids => setFriendCount(ids.length));
+        getFollowerIds(user.id).then(ids => setFollowersCount(ids.length));
+        getFollowingIds(user.id).then(ids => setFollowingCount(ids.length));
         fetchIncomingRequests(user.id);
         fetchUserPlans(user.id).then(setUserPlans);
         fetchSaves(user.id);
@@ -107,14 +112,14 @@ export const ProfileScreen: React.FC = () => {
         </View>
 
         <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
-          <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: C.black }]}>{realPlanCount}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
-          </View>
+          <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Following', { userId: user.id })}>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followingCount)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
+          </TouchableOpacity>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers', { userId: user.id })}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(friendCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_friends}</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followersCount)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
           </TouchableOpacity>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <View style={styles.stat}>

@@ -10,11 +10,10 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
 import { useAuthStore, useFriendsStore } from '../store';
-import { getUserById, getFriendshipStatus, getPendingRequestId, getFriendIds } from '../services/friendsService';
+import { getUserById, getFollowStatus, isFollowingUser, getFollowerIds, getFollowingIds, followUser, unfollowUser, sendFollowRequest, getPendingRequestId } from '../services/friendsService';
 import { fetchUserPlans } from '../services/plansService';
-import mockApi from '../services/mockApi';
 
-type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
+type FollowStatus = 'none' | 'following' | 'requested';
 
 const { width } = Dimensions.get('window');
 const CARD_GAP = 8;
@@ -30,13 +29,15 @@ export const OtherProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const currentUser = useAuthStore(s => s.user);
-  const { sendRequest, acceptRequest, declineRequest, removeFriend } = useFriendsStore();
+  const { acceptRequest, declineRequest } = useFriendsStore();
 
   const [user, setUser] = useState<User | null>(null);
-  const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
+  const [followStatus, setFollowStatus] = useState<FollowStatus>('none');
+  const [theyFollowMe, setTheyFollowMe] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [userPlans, setUserPlans] = useState<Plan[]>([]);
-  const [realFriendCount, setRealFriendCount] = useState<number | null>(null);
+  const [otherFollowersCount, setOtherFollowersCount] = useState(0);
+  const [otherFollowingCount, setOtherFollowingCount] = useState(0);
   const C = useColors();
   const { t } = useTranslation();
   const [actionLoading, setActionLoading] = useState(false);
@@ -45,64 +46,73 @@ export const OtherProfileScreen: React.FC = () => {
 
   const refreshCounts = useCallback(() => {
     if (!userId) return;
-    getFriendIds(userId).then(ids => setRealFriendCount(ids.length));
+    getFollowerIds(userId).then(ids => setOtherFollowersCount(ids.length));
+    getFollowingIds(userId).then(ids => setOtherFollowingCount(ids.length));
   }, [userId]);
 
   useEffect(() => {
     if (!userId || !currentUser) return;
     getUserById(userId).then(setUser);
-    getFriendshipStatus(currentUser.id, userId).then(async (status) => {
-      setFriendStatus(status);
-      if (status === 'pending_received') {
+    getFollowStatus(currentUser.id, userId).then(async (status) => {
+      setFollowStatus(status);
+      // If we're not following but have a pending request from them, get request ID
+      if (status === 'none') {
         const reqId = await getPendingRequestId(userId, currentUser.id);
-        setPendingRequestId(reqId);
+        if (reqId) setPendingRequestId(reqId);
       }
     });
+    // Check if they follow us (for "follow back" label)
+    isFollowingUser(userId, currentUser.id).then(setTheyFollowMe);
     fetchUserPlans(userId).then(setUserPlans);
     refreshCounts();
   }, [userId, currentUser]);
 
-  // Refresh counts when screen comes back into focus
   useFocusEffect(
     useCallback(() => {
       refreshCounts();
     }, [refreshCounts])
   );
 
-  const handleAddFriend = async () => {
-    if (!currentUser || !userId) return;
+  const handleFollow = async () => {
+    if (!currentUser || !userId || !user) return;
     setActionLoading(true);
     try {
-      await sendRequest(currentUser.id, userId);
-      setFriendStatus('pending_sent');
+      if (user.isPrivate) {
+        await sendFollowRequest(currentUser.id, userId);
+        setFollowStatus('requested');
+      } else {
+        await followUser(currentUser.id, userId);
+        setFollowStatus('following');
+        refreshCounts();
+      }
     } catch (e: any) {}
     setActionLoading(false);
   };
 
-  const handleAccept = async () => {
+  const handleUnfollow = async () => {
+    if (!currentUser || !userId) return;
+    setActionLoading(true);
+    await unfollowUser(currentUser.id, userId);
+    setFollowStatus('none');
+    refreshCounts();
+    setActionLoading(false);
+  };
+
+  const handleAcceptFollowRequest = async () => {
     if (!pendingRequestId || !currentUser) return;
     setActionLoading(true);
     await acceptRequest(pendingRequestId, currentUser.id);
-    setFriendStatus('friends');
+    setTheyFollowMe(true);
+    setPendingRequestId(null);
     refreshCounts();
     setActionLoading(false);
   };
 
-  const handleDecline = async () => {
+  const handleDeclineFollowRequest = async () => {
     if (!pendingRequestId || !currentUser) return;
     setActionLoading(true);
     await declineRequest(pendingRequestId, currentUser.id);
-    setFriendStatus('none');
-    refreshCounts();
-    setActionLoading(false);
-  };
-
-  const handleRemoveFriend = async () => {
-    if (!currentUser || !userId) return;
-    setActionLoading(true);
-    await removeFriend(currentUser.id, userId);
-    setFriendStatus('none');
-    refreshCounts();
+    setPendingRequestId(null);
     setActionLoading(false);
   };
 
@@ -120,43 +130,49 @@ export const OtherProfileScreen: React.FC = () => {
   );
 
   const formatCount = (n: number) => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : n.toString();
-  const canSeeContent = !user.isPrivate || friendStatus === 'friends';
+  const canSeeContent = !user.isPrivate || followStatus === 'following';
 
   // Compute real stats from fetched plans
   const realPlanCount = userPlans.length;
   const realLikesReceived = userPlans.reduce((sum, p) => sum + (p.likesCount || 0), 0);
 
-  const renderFriendButton = () => {
+  const renderFollowButton = () => {
     if (actionLoading) {
       return <ActivityIndicator color={C.primary} style={{ marginTop: 12 }} />;
     }
-    switch (friendStatus) {
+
+    // If they sent us a follow request (pending), show accept/decline
+    if (pendingRequestId && followStatus !== 'following') {
+      return (
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: C.primary, flex: 1, marginRight: 8 }]} onPress={handleAcceptFollowRequest}>
+            <Text style={styles.primaryBtnText}>{t.other_profile_accept}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.outlineBtn, { borderColor: C.border }]} onPress={handleDeclineFollowRequest}>
+            <Text style={[styles.outlineBtnText, { color: C.gray700 }]}>{t.other_profile_decline}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    switch (followStatus) {
       case 'none':
         return (
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: C.primary }]} onPress={handleAddFriend} activeOpacity={0.8}>
-            <Text style={styles.primaryBtnText}>{t.other_profile_add}</Text>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: C.primary }]} onPress={handleFollow} activeOpacity={0.8}>
+            <Text style={styles.primaryBtnText}>
+              {theyFollowMe ? t.other_profile_follow_back : t.other_profile_add}
+            </Text>
           </TouchableOpacity>
         );
-      case 'pending_sent':
+      case 'requested':
         return (
           <View style={[styles.secondaryBtn, { backgroundColor: C.gray200 }]}>
             <Text style={[styles.secondaryBtnText, { color: C.gray700 }]}>{t.other_profile_request_sent}</Text>
           </View>
         );
-      case 'pending_received':
+      case 'following':
         return (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: C.primary, flex: 1, marginRight: 8 }]} onPress={handleAccept}>
-              <Text style={styles.primaryBtnText}>{t.other_profile_accept}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.outlineBtn, { borderColor: C.border }]} onPress={handleDecline}>
-              <Text style={[styles.outlineBtnText, { color: C.gray700 }]}>{t.other_profile_decline}</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      case 'friends':
-        return (
-          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: C.gray200 }]} onPress={handleRemoveFriend} activeOpacity={0.7}>
+          <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: C.gray200 }]} onPress={handleUnfollow} activeOpacity={0.7}>
             <Text style={[styles.secondaryBtnText, { color: C.black }]}>✓ {t.other_profile_friends}</Text>
           </TouchableOpacity>
         );
@@ -177,17 +193,17 @@ export const OtherProfileScreen: React.FC = () => {
           <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
           <View style={styles.statsContainer}>
             <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: C.black }]}>{realPlanCount}</Text>
-                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: C.black }]}>{realFriendCount !== null ? formatCount(realFriendCount) : formatCount(user.followersCount)}</Text>
-                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_friends}</Text>
-              </View>
+              <TouchableOpacity style={styles.stat} onPress={() => navigation.push('Following', { userId: user.id })}>
+                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(otherFollowingCount)}</Text>
+                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.stat} onPress={() => navigation.push('Followers', { userId: user.id })}>
+                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(otherFollowersCount)}</Text>
+                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
+              </TouchableOpacity>
               <View style={styles.stat}>
                 <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realLikesReceived)}</Text>
-                <Text style={[styles.statLabel, { color: C.gray700 }]}>likes</Text>
+                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_likes_received}</Text>
               </View>
             </View>
           </View>
@@ -206,7 +222,7 @@ export const OtherProfileScreen: React.FC = () => {
 
         {/* Action button */}
         <View style={styles.actionSection}>
-          {renderFriendButton()}
+          {renderFollowButton()}
         </View>
 
         {/* Content area */}

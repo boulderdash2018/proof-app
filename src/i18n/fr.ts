@@ -196,8 +196,9 @@ export const fr = {
   // Profile
   profile_title: 'Mon profil',
   profile_plans: 'plans',
-  profile_followers: 'followers',
-  profile_likes_received: 'likes reçus',
+  profile_followers: 'abonnés',
+  profile_likes_received: "j'aime",
+  profile_following: 'suivis',
   profile_badges: 'BADGES',
   profile_recent_plans: 'MES PLANS CRÉÉS',
   profile_saved_plans: 'PLANS À FAIRE',
@@ -222,18 +223,19 @@ export const fr = {
   edit_profile_uploading: 'Upload en cours...',
 
   // Other profile
-  other_profile_add: 'Ajouter en ami',
-  other_profile_request_sent: 'Demande envoyée',
+  other_profile_add: 'Suivre',
+  other_profile_request_sent: 'Demandé',
   other_profile_accept: 'Accepter',
   other_profile_decline: 'Refuser',
-  other_profile_friends: 'Amis',
+  other_profile_friends: 'Suivi',
+  other_profile_follow_back: 'Suivre en retour',
   other_profile_private_title: 'Ce compte est privé',
-  other_profile_private_subtitle: 'Ajoute cette personne en ami pour voir ses journées et activités.',
+  other_profile_private_subtitle: 'Suis cette personne pour voir ses journées et activités.',
   other_profile_plans_section: 'JOURNÉES PUBLIÉES',
   other_profile_no_plans: 'Aucune journée publiée',
 
   // Friend requests
-  friend_requests_title: "Amis",
+  friend_requests_title: "Abonnements",
   friend_requests_search: 'Rechercher',
   friend_requests_received: 'Reçues',
   friend_requests_sent: 'Envoyées',
@@ -244,9 +246,9 @@ export const fr = {
   friend_requests_decline: 'Refuser',
   friend_requests_pending: 'En attente',
   friend_requests_empty_received: 'Aucune demande reçue',
-  friend_requests_empty_received_sub: "Quand quelqu'un t'ajoutera, ça apparaîtra ici",
+  friend_requests_empty_received_sub: "Quand quelqu'un demandera à te suivre, ça apparaîtra ici",
   friend_requests_empty_sent: 'Aucune demande envoyée',
-  friend_requests_empty_sent_sub: 'Recherche des amis dans Explorer avec @pseudo',
+  friend_requests_empty_sent_sub: 'Recherche des personnes dans Explorer',
 
   // Followers / Following
   followers_title: 'Followers',
@@ -306,7 +308,7 @@ export const fr = {
   // Privacy settings
   privacy_title: 'Confidentialité',
   privacy_private: 'Compte privé',
-  privacy_private_hint: 'Quand ton compte est privé, seuls tes amis peuvent voir tes plans et activités.',
+  privacy_private_hint: 'Quand ton compte est privé, seuls tes abonnés peuvent voir tes plans et activités.',
 };
 
 export type TranslationKeys = keyof typeof fr;

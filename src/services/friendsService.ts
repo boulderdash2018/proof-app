@@ -16,6 +16,7 @@ import { User, FriendRequest } from '../types';
 
 const USERS = 'users';
 const FRIEND_REQUESTS = 'friendRequests';
+const FOLLOWS = 'follows';
 
 // Check if a username is already taken (excludes current user)
 export const isUsernameTaken = async (username: string, currentUserId?: string): Promise<boolean> => {
@@ -104,9 +105,15 @@ export const sendFriendRequest = async (fromUserId: string, toUserId: string): P
   });
 };
 
-// Accept a friend request
+// Accept a follow request (creates a follow relationship)
 export const acceptFriendRequest = async (requestId: string): Promise<void> => {
+  const reqDoc = await getDoc(doc(db, FRIEND_REQUESTS, requestId));
   await updateDoc(doc(db, FRIEND_REQUESTS, requestId), { status: 'accepted' });
+  // Create follow: requester → target
+  if (reqDoc.exists()) {
+    const data = reqDoc.data();
+    await followUser(data.fromUserId, data.toUserId);
+  }
 };
 
 // Decline a friend request
@@ -239,4 +246,112 @@ export const getPendingRequestId = async (
   );
   const snap = await getDocs(q);
   return snap.empty ? null : snap.docs[0].id;
+};
+
+// ==================== FOLLOWS ====================
+
+/** Follow a user (instant for public accounts, called after accept for private) */
+export const followUser = async (followerId: string, followingId: string): Promise<void> => {
+  const q = query(collection(db, FOLLOWS), where('followerId', '==', followerId), where('followingId', '==', followingId));
+  const snap = await getDocs(q);
+  if (!snap.empty) return;
+  await addDoc(collection(db, FOLLOWS), {
+    followerId,
+    followingId,
+    createdAt: new Date().toISOString(),
+  });
+};
+
+/** Unfollow a user */
+export const unfollowUser = async (followerId: string, followingId: string): Promise<void> => {
+  const q = query(collection(db, FOLLOWS), where('followerId', '==', followerId), where('followingId', '==', followingId));
+  const snap = await getDocs(q);
+  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+};
+
+/** Get IDs of users who follow userId (followers / abonnés) */
+export const getFollowerIds = async (userId: string): Promise<string[]> => {
+  const q = query(collection(db, FOLLOWS), where('followingId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data().followerId);
+};
+
+/** Get IDs of users that userId follows (following / suivis) */
+export const getFollowingIds = async (userId: string): Promise<string[]> => {
+  const q = query(collection(db, FOLLOWS), where('followerId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data().followingId);
+};
+
+/** Check if followerId follows followingId */
+export const isFollowingUser = async (followerId: string, followingId: string): Promise<boolean> => {
+  const q = query(collection(db, FOLLOWS), where('followerId', '==', followerId), where('followingId', '==', followingId));
+  const snap = await getDocs(q);
+  return !snap.empty;
+};
+
+/** Get follow status from current user toward other user */
+export const getFollowStatus = async (
+  currentUserId: string,
+  otherUserId: string
+): Promise<'none' | 'following' | 'requested'> => {
+  const followQ = query(collection(db, FOLLOWS), where('followerId', '==', currentUserId), where('followingId', '==', otherUserId));
+  const followSnap = await getDocs(followQ);
+  if (!followSnap.empty) return 'following';
+
+  const reqQ = query(
+    collection(db, FRIEND_REQUESTS),
+    where('fromUserId', '==', currentUserId),
+    where('toUserId', '==', otherUserId),
+    where('status', '==', 'pending')
+  );
+  const reqSnap = await getDocs(reqQ);
+  if (!reqSnap.empty) return 'requested';
+
+  return 'none';
+};
+
+/** Send a follow request (for private accounts only) */
+export const sendFollowRequest = async (fromUserId: string, toUserId: string): Promise<void> => {
+  const already = await isFollowingUser(fromUserId, toUserId);
+  if (already) return;
+
+  const q = query(
+    collection(db, FRIEND_REQUESTS),
+    where('fromUserId', '==', fromUserId),
+    where('toUserId', '==', toUserId),
+    where('status', '==', 'pending')
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) throw new Error('Demande déjà envoyée');
+
+  await addDoc(collection(db, FRIEND_REQUESTS), {
+    fromUserId,
+    toUserId,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  });
+};
+
+/** Migrate accepted friendRequests to mutual follows for a user (one-time) */
+export const migrateToFollows = async (userId: string): Promise<void> => {
+  const userDoc = await getDoc(doc(db, USERS, userId));
+  if (userDoc.exists() && userDoc.data()?.followsMigrated) return;
+
+  const q1 = query(collection(db, FRIEND_REQUESTS), where('fromUserId', '==', userId), where('status', '==', 'accepted'));
+  const q2 = query(collection(db, FRIEND_REQUESTS), where('toUserId', '==', userId), where('status', '==', 'accepted'));
+  const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+  for (const d of snap1.docs) {
+    const data = d.data();
+    await followUser(userId, data.toUserId);
+    await followUser(data.toUserId, userId);
+  }
+  for (const d of snap2.docs) {
+    const data = d.data();
+    await followUser(data.fromUserId, userId);
+    await followUser(userId, data.fromUserId);
+  }
+
+  await updateDoc(doc(db, USERS, userId), { followsMigrated: true });
 };
