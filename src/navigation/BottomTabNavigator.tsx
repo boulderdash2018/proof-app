@@ -26,7 +26,8 @@ import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
 import { Ionicons } from '@expo/vector-icons';
-import { useLanguageStore } from '../store';
+import { useLanguageStore, useAuthStore } from '../store';
+import { useGuestStore } from '../store/guestStore';
 import { Colors, Fonts } from '../constants';
 import { fr, en } from '../i18n';
 
@@ -123,6 +124,22 @@ const CreateTabButton: React.FC<{ onPress?: () => void }> = ({ onPress }) => (
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 export const BottomTabNavigator: React.FC = () => {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
+  const isGuest = !isAuthenticated;
+
+  // Intercept tab press for guests on restricted tabs
+  const guestGuard = {
+    listeners: () => ({
+      tabPress: (e: any) => {
+        if (isGuest) {
+          e.preventDefault();
+          setShowAccountPrompt(true);
+        }
+      },
+    }),
+  };
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -144,12 +161,20 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="ExploreTab" focused={focused} />,
         }}
+        {...(isGuest ? guestGuard : {})}
       />
       <Tab.Screen
         name="CreateTab"
         component={CreateStackNavigator}
         options={{
-          tabBarButton: (props) => <CreateTabButton onPress={props.onPress} />,
+          tabBarButton: (props) => (
+            <CreateTabButton
+              onPress={() => {
+                if (isGuest) { setShowAccountPrompt(true); return; }
+                (props.onPress as any)?.();
+              }}
+            />
+          ),
         }}
       />
       <Tab.Screen
@@ -158,6 +183,7 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="SavesTab" focused={focused} />,
         }}
+        {...(isGuest ? guestGuard : {})}
       />
       <Tab.Screen
         name="ProfileTab"
@@ -165,6 +191,7 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="ProfileTab" focused={focused} />,
         }}
+        {...(isGuest ? guestGuard : {})}
       />
     </Tab.Navigator>
   );

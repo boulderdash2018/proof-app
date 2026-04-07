@@ -43,7 +43,12 @@ export type ProfileStackParamList = {
 export type RootStackParamList = {
   Main: undefined;
   Auth: undefined;
+  GuestSurvey: undefined;
+  GuestAuth: undefined;
   SetupProfile: undefined;
+  Login: undefined;
+  Signup: undefined;
+  ForgotPassword: undefined;
   PlanDetail: { planId: string };
   PlaceDetail: { placeId?: string; planId?: string; googlePlaceId?: string };
   Notifications: undefined;

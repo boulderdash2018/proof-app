@@ -24,8 +24,8 @@ interface FeedStore {
   isRefreshing: boolean;
   likedPlanIds: Set<string>;
   savedPlanIds: Set<string>;
-  fetchFeed: (userId?: string) => Promise<void>;
-  refreshFeed: () => Promise<void>;
+  fetchFeed: (userId?: string, guestInterests?: string[]) => Promise<void>;
+  refreshFeed: (guestInterests?: string[]) => Promise<void>;
   addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
   toggleSave: (planId: string) => void;
@@ -38,7 +38,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   likedPlanIds: new Set<string>(),
   savedPlanIds: new Set<string>(),
 
-  fetchFeed: async (userId?: string) => {
+  fetchFeed: async (userId?: string, guestInterests?: string[]) => {
     const uid = userId || getCurrentUserId();
     set({ isLoading: true });
     try {
@@ -59,6 +59,13 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       } else {
         // Not logged in: filter out all private plans
         plans = plans.filter((p) => !p.author?.isPrivate);
+        // Guest mode: filter by interests
+        if (guestInterests && guestInterests.length > 0) {
+          const interestsLower = guestInterests.map((i) => i.toLowerCase());
+          plans = plans.filter((p) =>
+            p.tags.some((tag) => interestsLower.includes(tag.toLowerCase()))
+          );
+        }
         set({ plans, isLoading: false } as any);
       }
     } catch (err) {
@@ -67,7 +74,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
-  refreshFeed: async () => {
+  refreshFeed: async (guestInterests?: string[]) => {
     const uid = getCurrentUserId();
     set({ isRefreshing: true });
     try {
@@ -86,6 +93,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         set({ plans, isRefreshing: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
       } else {
         plans = plans.filter((p) => !p.author?.isPrivate);
+        if (guestInterests && guestInterests.length > 0) {
+          const interestsLower = guestInterests.map((i) => i.toLowerCase());
+          plans = plans.filter((p) =>
+            p.tags.some((tag) => interestsLower.includes(tag.toLowerCase()))
+          );
+        }
         set({ plans, isRefreshing: false } as any);
       }
     } catch {

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore } from '../store';
+import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
@@ -22,6 +23,10 @@ export const FeedScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const guestInterests = useGuestStore((s) => s.interests);
+  const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
+  const isGuest = !isAuthenticated;
   const C = useColors();
   const { t } = useTranslation();
   const { plans, isLoading, isRefreshing, likedPlanIds, savedPlanIds, fetchFeed, refreshFeed, toggleLike, toggleSave } =
@@ -29,16 +34,23 @@ export const FeedScreen: React.FC = () => {
   const { unreadCount, fetchNotifications } = useNotifStore();
 
   useEffect(() => {
-    fetchFeed(user?.id);
-    fetchNotifications();
-  }, [user?.id]);
+    fetchFeed(user?.id, isGuest ? guestInterests : undefined);
+    if (!isGuest) fetchNotifications();
+  }, [user?.id, isGuest]);
+
+  const requireAuth = (): boolean => {
+    if (isGuest) { setShowAccountPrompt(true); return true; }
+    return false;
+  };
 
   const handleLike = (planId: string) => {
+    if (requireAuth()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleLike(planId);
   };
 
   const handleSave = (planId: string) => {
+    if (requireAuth()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleSave(planId);
   };
@@ -51,8 +63,14 @@ export const FeedScreen: React.FC = () => {
       onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
       onLike={() => handleLike(item.id)}
       onSave={() => handleSave(item.id)}
-      onComment={() => navigation.navigate('PlanDetail', { planId: item.id })}
-      onAuthorPress={() => navigation.navigate('OtherProfile', { userId: item.authorId })}
+      onComment={() => {
+        if (requireAuth()) return;
+        navigation.navigate('PlanDetail', { planId: item.id });
+      }}
+      onAuthorPress={() => {
+        if (requireAuth()) return;
+        navigation.navigate('OtherProfile', { userId: item.authorId });
+      }}
     />
   );
 
@@ -63,13 +81,22 @@ export const FeedScreen: React.FC = () => {
           proof<Text style={{ color: C.primary }}>.</Text>
         </Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Ionicons name="notifications-outline" size={18} color={C.gray800} />
-            {unreadCount > 0 && <View style={styles.bellBadge} />}
-          </TouchableOpacity>
+          {isGuest ? (
+            <TouchableOpacity
+              style={[styles.bellBtn, { backgroundColor: C.primary }]}
+              onPress={() => setShowAccountPrompt(true)}
+            >
+              <Ionicons name="person-add-outline" size={16} color="#FFF" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Ionicons name="notifications-outline" size={18} color={C.gray800} />
+              {unreadCount > 0 && <View style={styles.bellBadge} />}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -85,7 +112,7 @@ export const FeedScreen: React.FC = () => {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={refreshFeed}
+              onRefresh={() => refreshFeed(isGuest ? guestInterests : undefined)}
               tintColor={C.primary}
             />
           }
@@ -95,7 +122,10 @@ export const FeedScreen: React.FC = () => {
               title={t.feed_empty_title}
               subtitle={t.feed_empty_subtitle}
               ctaLabel={t.feed_empty_cta}
-              onCtaPress={() => navigation.navigate('ExploreTab')}
+              onCtaPress={() => {
+                if (isGuest) { setShowAccountPrompt(true); return; }
+                navigation.navigate('ExploreTab');
+              }}
             />
           }
         />

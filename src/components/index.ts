@@ -14,3 +14,4 @@ export { BadgeGrid } from './BadgeGrid';
 export { BadgeDetailSheet } from './BadgeDetailSheet';
 export { MiniStampIcon } from './MiniStampIcon';
 export { FounderBadge } from './FounderBadge';
+export { AccountPromptModal } from './AccountPromptModal';

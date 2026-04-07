@@ -6,3 +6,4 @@ export { useFriendsStore } from './friendsStore';
 export { useLanguageStore } from './languageStore';
 export type { Language } from './languageStore';
 export { useSettingsStore } from './settingsStore';
+export { useGuestStore } from './guestStore';

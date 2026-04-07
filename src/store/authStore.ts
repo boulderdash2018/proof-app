@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User, SignupData } from '../types';
 import { firebaseAuthService, updateUserProfile } from '../services/firebaseAuth';
 import { trackEvent, identifyUser, resetUser } from '../services/posthogConfig';
+import { useGuestStore } from './guestStore';
 
 interface AuthStore {
   user: User | null;
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const user = await firebaseAuthService.login(email, password);
       set({ user, isAuthenticated: true, isLoading: false });
+      useGuestStore.getState().reset();
 
       // Track login event
       trackEvent('user_login', { email });
@@ -42,6 +44,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const user = await firebaseAuthService.signInWithGoogle();
       set({ user, isAuthenticated: true, isLoading: false });
+      useGuestStore.getState().reset();
       trackEvent('user_login_google', { email: user.username });
       identifyUser(user.id, { email: user.id });
     } catch (error: any) {
@@ -56,6 +59,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const user = await firebaseAuthService.signup(data);
       set({ user, isAuthenticated: true, isLoading: false });
+      useGuestStore.getState().reset();
 
       // Track signup event
       trackEvent('user_signup', { email: data.email });

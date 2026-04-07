@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Typography, Layout } from '../constants';
 import { PrimaryButton, SecondaryButton, TextInput } from '../components';
-import { useAuthStore } from '../store';
+import { useAuthStore, useGuestStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -20,6 +20,8 @@ export const SignupScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const signup = useAuthStore((s) => s.signup);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
+  const guestWantsAuth = useGuestStore((s) => s.wantsAuth);
+  const setWantsAuth = useGuestStore((s) => s.setWantsAuth);
   const C = useColors();
   const { t } = useTranslation();
 
@@ -77,6 +79,15 @@ export const SignupScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {guestWantsAuth && (
+            <TouchableOpacity
+              style={styles.guestBackBtn}
+              onPress={() => setWantsAuth(false)}
+            >
+              <Text style={[styles.guestBackText, { color: C.gray700 }]}>← Continuer sans compte</Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={[styles.logo, { color: C.black }]}>
             proof<Text style={{ color: C.primary }}>.</Text>
           </Text>
@@ -265,5 +276,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.primary,
+  },
+  guestBackBtn: {
+    marginBottom: 16,
+  },
+  guestBackText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

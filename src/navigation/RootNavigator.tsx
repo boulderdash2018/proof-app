@@ -2,13 +2,19 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { useAuthStore } from '../store/authStore';
+import { useGuestStore } from '../store/guestStore';
 import { AuthNavigator } from './AuthNavigator';
 import { BottomTabNavigator } from './BottomTabNavigator';
 import { SetupProfileScreen } from '../screens/SetupProfileScreen';
+import { GuestSurveyScreen } from '../screens/GuestSurveyScreen';
+import { LoginScreen } from '../screens/LoginScreen';
+import { SignupScreen } from '../screens/SignupScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 
 import { PlanDetailModal } from '../screens/PlanDetailModal';
 import { PlaceDetailModal } from '../screens/PlaceDetailModal';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { AccountPromptModal } from '../components/AccountPromptModal';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -25,26 +31,51 @@ const isUsernameValid = (username?: string): boolean => {
 export const RootNavigator: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
+  const hasCompletedSurvey = useGuestStore((s) => s.hasCompletedSurvey);
+  const wantsAuth = useGuestStore((s) => s.wantsAuth);
 
   // User needs setup if: new account (setupComplete falsy) OR username doesn't conform
   const needsSetup = isAuthenticated && user && (!user.setupComplete || !isUsernameValid(user.username));
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {!isAuthenticated ? (
-        <Stack.Screen name="Auth" component={AuthNavigator} />
-      ) : needsSetup ? (
-        <Stack.Screen name="SetupProfile" component={SetupProfileScreen} />
-      ) : (
-        <>
-          <Stack.Screen name="Main" component={BottomTabNavigator} />
-          <Stack.Group screenOptions={{ presentation: 'modal' }}>
-            <Stack.Screen name="PlanDetail" component={PlanDetailModal} />
-            <Stack.Screen name="PlaceDetail" component={PlaceDetailModal} />
-            <Stack.Screen name="Notifications" component={NotificationsScreen} />
-          </Stack.Group>
-        </>
-      )}
-    </Stack.Navigator>
+    <>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          needsSetup ? (
+            <Stack.Screen name="SetupProfile" component={SetupProfileScreen} />
+          ) : (
+            <>
+              <Stack.Screen name="Main" component={BottomTabNavigator} />
+              <Stack.Group screenOptions={{ presentation: 'modal' }}>
+                <Stack.Screen name="PlanDetail" component={PlanDetailModal} />
+                <Stack.Screen name="PlaceDetail" component={PlaceDetailModal} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+              </Stack.Group>
+            </>
+          )
+        ) : wantsAuth ? (
+          /* Guest wants to create account → show auth screens directly */
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Signup" component={SignupScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          </>
+        ) : !hasCompletedSurvey ? (
+          /* First visit → survey */
+          <Stack.Screen name="GuestSurvey" component={GuestSurveyScreen} />
+        ) : (
+          /* Guest mode → feed with restrictions */
+          <>
+            <Stack.Screen name="Main" component={BottomTabNavigator} />
+            <Stack.Group screenOptions={{ presentation: 'modal' }}>
+              <Stack.Screen name="PlanDetail" component={PlanDetailModal} />
+              <Stack.Screen name="PlaceDetail" component={PlaceDetailModal} />
+            </Stack.Group>
+          </>
+        )}
+      </Stack.Navigator>
+      {/* Global account prompt modal for guest mode */}
+      <AccountPromptModal />
+    </>
   );
 };
