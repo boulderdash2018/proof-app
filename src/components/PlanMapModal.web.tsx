@@ -1,13 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
-const { width: SCREEN_W } = Dimensions.get('window');
-const MAP_W = Math.min(SCREEN_W - 40, 640);
-const MAP_H = Math.round(MAP_W * 0.65);
 
 interface PlaceCoord {
   name: string;
@@ -22,36 +19,21 @@ interface Props {
   title: string;
 }
 
-const buildStaticMapUrl = (places: PlaceCoord[]): string => {
-  const params = new URLSearchParams();
-  params.set('size', `${MAP_W * 2}x${MAP_H * 2}`);
-  params.set('scale', '2');
-  params.set('maptype', 'roadmap');
-  params.set('key', API_KEY);
+const buildEmbedUrl = (places: PlaceCoord[]): string => {
+  // Use Google Maps Embed API with directions mode to show the route
+  if (places.length === 1) {
+    return `https://www.google.com/maps/embed/v1/place?key=${API_KEY}&q=${places[0].latitude},${places[0].longitude}&zoom=15`;
+  }
 
-  // Custom map styling (Proof branding: muted tones, no POIs)
-  const styles = [
-    'feature:poi|visibility:off',
-    'feature:transit|visibility:off',
-    'element:geometry|color:0xF5F0EB',
-    'element:labels.text.fill|color:0x6B6560',
-    'feature:road|element:geometry|color:0xE8E0D8',
-    'feature:road.highway|element:geometry|color:0xDDD5CC',
-    'feature:water|element:geometry|color:0xC5D5DC',
-    'feature:park|element:geometry|color:0xD5DCC5',
-  ];
-  styles.forEach((s) => params.append('style', s));
+  const origin = `${places[0].latitude},${places[0].longitude}`;
+  const destination = `${places[places.length - 1].latitude},${places[places.length - 1].longitude}`;
+  const waypoints = places.length > 2
+    ? places.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|')
+    : '';
 
-  // Path (dashed line between places)
-  const pathCoords = places.map((p) => `${p.latitude},${p.longitude}`).join('|');
-  params.set('path', `color:0xD4845AFF|weight:3|${pathCoords}`);
-
-  // Numbered markers
-  places.forEach((place, i) => {
-    params.append('markers', `color:0xD4845A|label:${i + 1}|${place.latitude},${place.longitude}`);
-  });
-
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+  let url = `https://www.google.com/maps/embed/v1/directions?key=${API_KEY}&origin=${origin}&destination=${destination}&mode=walking`;
+  if (waypoints) url += `&waypoints=${waypoints}`;
+  return url;
 };
 
 export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title }) => {
@@ -59,7 +41,7 @@ export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title 
 
   if (!visible || places.length === 0) return null;
 
-  const mapUrl = buildStaticMapUrl(places);
+  const embedUrl = buildEmbedUrl(places);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -73,12 +55,14 @@ export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title 
           <View style={{ width: 34 }} />
         </View>
 
-        {/* Map image */}
+        {/* Map iframe */}
         <View style={styles.mapContainer}>
-          <Image
-            source={{ uri: mapUrl }}
-            style={[styles.mapImage, { width: MAP_W, height: MAP_H }]}
-            resizeMode="cover"
+          <iframe
+            src={embedUrl}
+            style={{ width: '100%', height: '100%', border: 'none', borderRadius: 0 } as any}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
           />
         </View>
 
@@ -113,11 +97,6 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, fontSize: 15, fontFamily: Fonts.serifBold, textAlign: 'center', marginHorizontal: 10 },
   mapContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapImage: {
-    borderRadius: 16,
   },
   legend: {
     paddingHorizontal: 18,
