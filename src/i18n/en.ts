@@ -332,4 +332,5 @@ export const en: Record<TranslationKeys, string> = {
   place_proof_reviews_count: 'Proof reviews',
   place_no_proof_reviews: 'No Proof reviews yet',
   place_no_proof_reviews_sub: 'Complete a plan with this place to leave a review!',
+  place_related_plans: 'PLANS WITH THIS PLACE',
 };

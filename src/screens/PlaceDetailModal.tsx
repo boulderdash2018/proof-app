@@ -6,11 +6,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { Place, PlaceReview } from '../types';
+import { Place, PlaceReview, Plan } from '../types';
 import mockApi from '../services/mockApi';
 import { getPlaceDetails, getReadableType, priceLevelToSymbol, GooglePlaceDetails } from '../services/googlePlacesService';
 import { fetchPlaceReviews, getPlaceProofRating } from '../services/placeReviewService';
+import { fetchPublicPlansWithPlace } from '../services/plansService';
 import { Avatar } from '../components';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const STAMP_PROOF = '#C8571A';
 
@@ -47,6 +49,7 @@ export const PlaceDetailModal: React.FC = () => {
   // Proof community data
   const [proofReviews, setProofReviews] = useState<PlaceReview[]>([]);
   const [proofRating, setProofRating] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
+  const [relatedPlans, setRelatedPlans] = useState<Plan[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -61,6 +64,9 @@ export const PlaceDetailModal: React.FC = () => {
             setProofReviews(reviews);
             const rating = await getPlaceProofRating(gId, googlePlaceId);
             setProofRating(rating);
+            // Fetch public plans containing this place
+            const plans = await fetchPublicPlansWithPlace(gId, googlePlaceId);
+            setRelatedPlans(plans);
             setLoading(false);
             return;
           }
@@ -77,6 +83,9 @@ export const PlaceDetailModal: React.FC = () => {
               setProofReviews(reviews);
               const rating = await getPlaceProofRating(placeId, found.googlePlaceId);
               setProofRating(rating);
+              // Fetch public plans containing this place
+              const plans = await fetchPublicPlansWithPlace(placeId, found.googlePlaceId);
+              setRelatedPlans(plans);
             }
           }
         }
@@ -154,6 +163,54 @@ export const PlaceDetailModal: React.FC = () => {
           {renderStars(proofRating.average, 12, STAMP_PROOF)}
           <Text style={[styles.proofRatingCount, { color: C.gray700 }]}>{proofRating.count} {t.place_proof_reviews_count}</Text>
         </View>
+      </View>
+    );
+  };
+
+  const parseGradient = (g: string): string[] => {
+    const m = g.match(/#[0-9A-Fa-f]{6}/g);
+    return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
+  };
+
+  const renderRelatedPlans = () => {
+    if (relatedPlans.length === 0) return null;
+
+    return (
+      <View style={styles.relatedSection}>
+        <Text style={[styles.sectionLabel, { color: C.black }]}>
+          {t.place_related_plans} ({relatedPlans.length})
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedScroll}>
+          {relatedPlans.map((plan) => {
+            const colors = parseGradient(plan.gradient);
+            return (
+              <TouchableOpacity
+                key={plan.id}
+                style={styles.relatedCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
+              >
+                <LinearGradient
+                  colors={colors as [string, string, ...string[]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.relatedGradient}
+                >
+                  <Text style={styles.relatedTitle} numberOfLines={2}>{plan.title}</Text>
+                  <View style={styles.relatedMeta}>
+                    <Text style={styles.relatedAuthor}>{plan.author.displayName}</Text>
+                    <View style={styles.relatedMetaRow}>
+                      <Ionicons name="heart" size={10} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.relatedMetaText}>{plan.likesCount}</Text>
+                      <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 6 }} />
+                      <Text style={styles.relatedMetaText}>{plan.duration}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
     );
   };
@@ -292,6 +349,9 @@ export const PlaceDetailModal: React.FC = () => {
 
           {/* Proof Community Reviews */}
           {renderProofReviewsSection()}
+
+          {/* Plans containing this place */}
+          {renderRelatedPlans()}
         </ScrollView>
       </View>
     );
@@ -383,6 +443,9 @@ export const PlaceDetailModal: React.FC = () => {
 
         {/* Proof Community Reviews (from Firestore) */}
         {renderProofReviewsSection()}
+
+        {/* Plans containing this place */}
+        {renderRelatedPlans()}
       </ScrollView>
     </View>
   );
@@ -459,4 +522,15 @@ const styles = StyleSheet.create({
   emptyProof: { alignItems: 'center', paddingVertical: 16, paddingHorizontal: 18 },
   emptyProofText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   emptyProofSub: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 4, textAlign: 'center' },
+
+  // Related plans
+  relatedSection: { paddingTop: 18, paddingBottom: 8 },
+  relatedScroll: { paddingHorizontal: 18, gap: 10 },
+  relatedCard: { width: 160, borderRadius: 14, overflow: 'hidden' },
+  relatedGradient: { height: 110, padding: 12, justifyContent: 'flex-end' },
+  relatedTitle: { color: '#FFFFFF', fontSize: 13, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  relatedMeta: { marginTop: 6 },
+  relatedAuthor: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontFamily: Fonts.serifSemiBold },
+  relatedMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  relatedMetaText: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
 });

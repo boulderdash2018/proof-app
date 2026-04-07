@@ -330,6 +330,7 @@ export const fr = {
   place_proof_reviews_count: 'avis Proof',
   place_no_proof_reviews: 'Aucun avis Proof pour le moment',
   place_no_proof_reviews_sub: 'Fais un plan avec ce lieu pour donner ton avis !',
+  place_related_plans: 'PLANS AVEC CE LIEU',
 };
 
 export type TranslationKeys = keyof typeof fr;

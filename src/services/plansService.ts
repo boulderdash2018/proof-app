@@ -267,6 +267,78 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
   }
 };
 
+// ==================== PUBLIC PLAN QUERIES ====================
+
+/** Fetch public plans that have a specific tag (category) */
+export const fetchPublicPlansByTag = async (tag: string): Promise<Plan[]> => {
+  try {
+    const q = query(collection(db, PLANS), where('tags', 'array-contains', tag));
+    const snap = await getDocs(q);
+    const plans = snap.docs
+      .map((d) => {
+        const data = d.data() as Plan;
+        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      })
+      .filter((p) => p.author?.isPrivate === false);
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchPublicPlansByTag error:', err);
+    return [];
+  }
+};
+
+/** Fetch public plans that contain a given place (by googlePlaceId or placeId) */
+export const fetchPublicPlansWithPlace = async (placeId: string, googlePlaceId?: string): Promise<Plan[]> => {
+  try {
+    const snap = await getDocs(collection(db, PLANS));
+    const plans = snap.docs
+      .map((d) => {
+        const data = d.data() as Plan;
+        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      })
+      .filter((p) => {
+        if (p.author?.isPrivate !== false) return false;
+        return p.places.some(
+          (place) =>
+            (googlePlaceId && place.googlePlaceId === googlePlaceId) ||
+            place.id === placeId
+        );
+      });
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchPublicPlansWithPlace error:', err);
+    return [];
+  }
+};
+
+/** Search public plans by query (title, place names, tags) */
+export const searchPublicPlans = async (queryStr: string): Promise<Plan[]> => {
+  try {
+    const snap = await getDocs(collection(db, PLANS));
+    const q = queryStr.toLowerCase();
+    const plans = snap.docs
+      .map((d) => {
+        const data = d.data() as Plan;
+        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      })
+      .filter((p) => {
+        if (p.author?.isPrivate !== false) return false;
+        return (
+          p.title.toLowerCase().includes(q) ||
+          p.places.some((pl) => pl.name.toLowerCase().includes(q)) ||
+          p.tags.some((t) => t.toLowerCase().includes(q))
+        );
+      });
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] searchPublicPlans error:', err);
+    return [];
+  }
+};
+
 // ==================== COMMENTS ====================
 
 const COMMENTS = 'comments';

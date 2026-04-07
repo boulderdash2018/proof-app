@@ -23,7 +23,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { searchUsers } from '../services/friendsService';
 import { useAuthStore } from '../store';
-import mockApi from '../services/mockApi';
+import { fetchPublicPlansByTag, searchPublicPlans } from '../services/plansService';
 import {
   searchPlacesNearby,
   getReadableType,
@@ -74,8 +74,8 @@ export const ExploreScreen: React.FC = () => {
       setGooglePlaces([]);
       setIsSearching(false);
     } else {
-      // Search plans immediately
-      const plans = await mockApi.searchPlans(query);
+      // Search public plans from Firestore
+      const plans = await searchPublicPlans(query);
       setFilteredPlans(plans);
       setSearchUsers_([]);
       // Debounce Google Places search
@@ -98,7 +98,7 @@ export const ExploreScreen: React.FC = () => {
     setSearchQuery(categoryName);
     setIsSearching(true);
     const [plans, places] = await Promise.all([
-      mockApi.searchPlans(categoryName),
+      fetchPublicPlansByTag(categoryName),
       searchPlacesNearby(categoryName + ' Paris', { lat: 48.8566, lng: 2.3522 }),
     ]);
     setFilteredPlans(plans);
