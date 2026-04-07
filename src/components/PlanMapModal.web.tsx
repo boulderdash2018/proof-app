@@ -19,22 +19,28 @@ interface Props {
   title: string;
 }
 
-// "Pale Dawn" style adapted for Proof — warm, clean, proven to render correctly
+// Warm brown/terracotta map style — "Proof" branding
 const PROOF_MAP_STYLE = [
-  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#8a7e72"},{"lightness":40}]},
-  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"on"},{"color":"#faf6f1"},{"lightness":16}]},
+  {"featureType":"all","elementType":"geometry","stylers":[{"color":"#E8DDD0"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#8C7A6B"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#F2EBE2"},{"weight":3}]},
   {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#faf6f1"},{"lightness":20}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#e0d6cb"},{"lightness":17},{"weight":1.2}]},
-  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#f0ebe4"},{"lightness":20}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#D4C4B0"}]},
+  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#A8937F"}]},
+  {"featureType":"landscape.natural","elementType":"geometry","stylers":[{"color":"#E8DDD0"}]},
+  {"featureType":"landscape.man_made","elementType":"geometry","stylers":[{"color":"#E2D5C6"}]},
   {"featureType":"poi","stylers":[{"visibility":"off"}]},
-  {"featureType":"poi.park","elementType":"geometry","stylers":[{"visibility":"on"},{"color":"#d4ddc4"},{"lightness":21}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#e0d6cb"},{"lightness":17}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#e0d6cb"},{"lightness":29},{"weight":0.2}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#e8e0d6"},{"lightness":18}]},
-  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#ede7df"},{"lightness":16}]},
+  {"featureType":"poi.park","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#C8D4AB"}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#D9CCBC"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#CCBDAC"},{"weight":0.5}]},
+  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#DED2C3"}]},
+  {"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"visibility":"off"}]},
+  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"color":"#EDE5DA"}]},
+  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"visibility":"off"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9C8B7A"}]},
   {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#c2d4dc"},{"lightness":17}]}
+  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#B8CAC0"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#8AA49A"}]}
 ];
 
 let googleMapsLoaded = false;
@@ -77,13 +83,18 @@ const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
         disableDefaultUI: true,
         zoomControl: false,
         gestureHandling: 'none',
-        backgroundColor: '#f0ebe4',
+        backgroundColor: '#E8DDD0',
       });
 
-      // Fit bounds
+      // Fit bounds — generous padding to see the city context
       const bounds = new gm.LatLngBounds();
       places.forEach(p => bounds.extend({ lat: p.latitude, lng: p.longitude }));
-      map.fitBounds(bounds, { top: 70, right: 70, bottom: 70, left: 70 });
+      map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
+
+      // Ensure we don't zoom in too much for close-together places
+      gm.event.addListenerOnce(map, 'bounds_changed', () => {
+        if (map.getZoom() > 14) map.setZoom(14);
+      });
 
       // Markers (pin SVG)
       places.forEach((p, i) => {
