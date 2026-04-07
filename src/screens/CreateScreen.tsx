@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,13 @@ import {
   TextInput as RNTextInput,
   FlatList,
   Modal,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES } from '../constants';
 import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
@@ -23,6 +26,12 @@ import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, TravelSegment } from '../types';
 import { createPlan } from '../services/plansService';
 import { trackEvent } from '../services/posthogConfig';
+import {
+  searchPlacesAutocomplete,
+  getPlaceDetails,
+  getReadableType,
+  GooglePlaceAutocomplete,
+} from '../services/googlePlacesService';
 
 const TRANSPORT_OPTIONS: TransportMode[] = ['Métro', 'Vélo', 'À pied', 'Voiture', 'Trottinette'];
 
@@ -34,58 +43,16 @@ const TRANSPORT_EMOJIS: Record<TransportMode, string> = {
   'Trottinette': '🛴',
 };
 
-// ========== FICTIONAL PLACES ==========
-const FICTIONAL_PLACES = [
-  { id: 'fp-1', name: 'Café Oberkampf', type: 'Café', emoji: '☕' },
-  { id: 'fp-2', name: 'Le Bouillon Chartier', type: 'Restaurant', emoji: '🍽️' },
-  { id: 'fp-3', name: 'Shakespeare and Company', type: 'Librairie', emoji: '📚' },
-  { id: 'fp-4', name: 'Musée Picasso', type: 'Musée', emoji: '🎨' },
-  { id: 'fp-5', name: 'Canal Saint-Martin', type: 'Balade', emoji: '🚶' },
-  { id: 'fp-6', name: 'Le Comptoir Général', type: 'Bar', emoji: '🍸' },
-  { id: 'fp-7', name: 'Marché des Enfants Rouges', type: 'Marché', emoji: '🛒' },
-  { id: 'fp-8', name: 'Parc des Buttes-Chaumont', type: 'Parc', emoji: '🌳' },
-  { id: 'fp-9', name: 'La REcyclerie', type: 'Café', emoji: '☕' },
-  { id: 'fp-10', name: 'Palais de Tokyo', type: 'Musée', emoji: '🏛️' },
-  { id: 'fp-11', name: 'Rosa Bonheur', type: 'Bar', emoji: '🍷' },
-  { id: 'fp-12', name: 'Ober Mamma', type: 'Restaurant', emoji: '🍝' },
-  { id: 'fp-13', name: 'Sacré-Cœur', type: 'Monument', emoji: '⛪' },
-  { id: 'fp-14', name: 'Jardin du Luxembourg', type: 'Parc', emoji: '🌷' },
-  { id: 'fp-15', name: 'Le Perchoir Marais', type: 'Rooftop', emoji: '🌇' },
-  { id: 'fp-16', name: 'Galerie Perrotin', type: 'Expo', emoji: '🖼️' },
-  { id: 'fp-17', name: 'La Maison Rose', type: 'Photo spot', emoji: '📸' },
-  { id: 'fp-18', name: 'Ten Belles Coffee', type: 'Café', emoji: '☕' },
-  { id: 'fp-19', name: 'Le Marais Vintage', type: 'Shopping', emoji: '🛍️' },
-  { id: 'fp-20', name: 'Cinéma Le Grand Rex', type: 'Cinéma', emoji: '🎬' },
-];
-
-const PLACE_ADDRESSES: Record<string, string> = {
-  'fp-1': '3 Rue Oberkampf, 75011 Paris',
-  'fp-2': '7 Rue du Faubourg Montmartre, 75009 Paris',
-  'fp-3': '37 Rue de la Bûcherie, 75005 Paris',
-  'fp-4': '5 Rue de Thorigny, 75003 Paris',
-  'fp-5': 'Quai de Jemmapes, 75010 Paris',
-  'fp-6': '80 Quai de Jemmapes, 75010 Paris',
-  'fp-7': '39 Rue de Bretagne, 75003 Paris',
-  'fp-8': '1 Rue Botzaris, 75019 Paris',
-  'fp-9': '83 Bd Ornano, 75018 Paris',
-  'fp-10': '13 Av. du Président Wilson, 75016 Paris',
-  'fp-11': 'Parc des Buttes-Chaumont, 75019 Paris',
-  'fp-12': '107 Bd Richard-Lenoir, 75011 Paris',
-  'fp-13': '35 Rue du Chevalier de la Barre, 75018 Paris',
-  'fp-14': '75006 Paris',
-  'fp-15': '33 Rue de la Verrerie, 75004 Paris',
-  'fp-16': '76 Rue de Turenne, 75003 Paris',
-  'fp-17': "2 Rue de l'Abreuvoir, 75018 Paris",
-  'fp-18': '10 Rue de la Grange aux Belles, 75010 Paris',
-  'fp-19': 'Rue des Rosiers, 75004 Paris',
-  'fp-20': '1 Bd Poissonnière, 75002 Paris',
-};
+// Paris center for location bias
+const PARIS_CENTER = { lat: 48.8566, lng: 2.3522 };
 
 // ========== TYPES ==========
 interface PlaceEntry {
   id: string;
+  googlePlaceId?: string;
   name: string;
   type: string;
+  address?: string;
   price: string;      // user input (numbers only)
   duration: string;   // user input in minutes (numbers only)
 }
@@ -134,7 +101,49 @@ export const CreateScreen: React.FC = () => {
   // Place picker state
   const [showPlacePicker, setShowPlacePicker] = useState(false);
   const [placeSearch, setPlaceSearch] = useState('');
+  const [placeResults, setPlaceResults] = useState<GooglePlaceAutocomplete[]>([]);
+  const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const handlePlaceSearch = useCallback((query: string) => {
+    setPlaceSearch(query);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (query.length < 2) { setPlaceResults([]); return; }
+    setIsSearchingPlaces(true);
+    searchTimerRef.current = setTimeout(async () => {
+      const results = await searchPlacesAutocomplete(query, PARIS_CENTER);
+      setPlaceResults(results);
+      setIsSearchingPlaces(false);
+    }, 350);
+  }, []);
+
+  const selectGooglePlace = useCallback(async (item: GooglePlaceAutocomplete) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const type = getReadableType(item.types);
+    const newPlace: PlaceEntry = {
+      id: item.placeId,
+      googlePlaceId: item.placeId,
+      name: item.name,
+      type,
+      address: item.address,
+      price: '',
+      duration: '',
+    };
+    const newPlaces = [...places, newPlace];
+    setPlaces(newPlaces);
+
+    if (places.length > 0) {
+      const prevPlace = places[places.length - 1];
+      setTravels((prev) => [
+        ...prev,
+        { fromId: prevPlace.id, toId: item.placeId, duration: '', transport: 'À pied' },
+      ]);
+    }
+
+    setShowPlacePicker(false);
+    setPlaceSearch('');
+    setPlaceResults([]);
+  }, [places]);
 
   const toggleTag = (tag: CategoryTag) => {
     setSelectedTags((prev) =>
@@ -181,35 +190,6 @@ export const CreateScreen: React.FC = () => {
     return result;
   }, [travels]);
 
-  // Filter fictional places based on search + already added
-  const addedIds = new Set(places.map((p) => p.id));
-  const filteredPlaces = useMemo(() => {
-    const available = FICTIONAL_PLACES.filter((p) => !addedIds.has(p.id));
-    if (!placeSearch.trim()) return available;
-    const q = placeSearch.toLowerCase();
-    return available.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.type.toLowerCase().includes(q)
-    );
-  }, [placeSearch, addedIds.size]);
-
-  const selectPlace = (place: typeof FICTIONAL_PLACES[0]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newPlace: PlaceEntry = { id: place.id, name: place.name, type: place.type, price: '', duration: '' };
-    const newPlaces = [...places, newPlace];
-    setPlaces(newPlaces);
-
-    // Auto-add travel segment if this isn't the first place
-    if (places.length > 0) {
-      const prevPlace = places[places.length - 1];
-      setTravels((prev) => [
-        ...prev,
-        { fromId: prevPlace.id, toId: place.id, duration: '', transport: 'À pied' },
-      ]);
-    }
-
-    setShowPlacePicker(false);
-    setPlaceSearch('');
-  };
 
   const removePlace = (id: string) => {
     const index = places.findIndex((p) => p.id === id);
@@ -297,12 +277,13 @@ export const CreateScreen: React.FC = () => {
           tags: selectedTags,
           places: places.map((p) => ({
             id: p.id,
+            googlePlaceId: p.googlePlaceId,
             name: p.name,
             type: p.type,
-            address: PLACE_ADDRESSES[p.id] || 'Paris, France',
-            rating: parseFloat((3.8 + Math.random() * 1.2).toFixed(1)),
-            reviewCount: Math.floor(Math.random() * 200) + 10,
-            ratingDistribution: [50, 25, 15, 7, 3] as [number, number, number, number, number],
+            address: p.address || 'Paris, France',
+            rating: 0,
+            reviewCount: 0,
+            ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
             reviews: [],
             placePrice: parseInt(p.price, 10) || 0,
             placeDuration: parseInt(p.duration, 10) || 0,
@@ -563,27 +544,33 @@ export const CreateScreen: React.FC = () => {
             </View>
 
             <View style={[styles.modalSearch, { backgroundColor: C.gray200 }]}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
               <RNTextInput
                 style={[styles.searchInput, { color: C.black }]}
                 placeholder={t.create_search_place}
                 placeholderTextColor={C.gray600}
                 value={placeSearch}
-                onChangeText={setPlaceSearch}
+                onChangeText={handlePlaceSearch}
                 autoFocus
               />
               {placeSearch.length > 0 && (
-                <TouchableOpacity onPress={() => setPlaceSearch('')}>
-                  <Text style={[styles.clearBtn, { color: C.gray700 }]}>✕</Text>
+                <TouchableOpacity onPress={() => { setPlaceSearch(''); setPlaceResults([]); }}>
+                  <Ionicons name="close-circle" size={18} color={C.gray700} />
                 </TouchableOpacity>
               )}
             </View>
 
-            <Text style={[styles.modalSectionLabel, { color: C.gray700 }]}>{t.create_suggested_places}</Text>
+            {isSearchingPlaces && placeSearch.length >= 2 && (
+              <ActivityIndicator color={C.primary} style={{ marginTop: 20 }} />
+            )}
+
+            {placeResults.length > 0 && (
+              <Text style={[styles.modalSectionLabel, { color: C.gray700 }]}>{t.create_suggested_places}</Text>
+            )}
 
             <FlatList
-              data={filteredPlaces}
-              keyExtractor={(item) => item.id}
+              data={placeResults}
+              keyExtractor={(item) => item.placeId}
               contentContainerStyle={styles.modalList}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -591,18 +578,35 @@ export const CreateScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[styles.placeOption, { borderBottomColor: C.borderLight }]}
                   activeOpacity={0.6}
-                  onPress={() => selectPlace(item)}
+                  onPress={() => selectGooglePlace(item)}
                 >
                   <View style={[styles.placeOptionEmoji, { backgroundColor: C.gray200 }]}>
-                    <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+                    <Ionicons name="location-outline" size={22} color={C.gold} />
                   </View>
                   <View style={styles.placeOptionInfo}>
                     <Text style={[styles.placeOptionName, { color: C.black }]}>{item.name}</Text>
-                    <Text style={[styles.placeOptionType, { color: C.gray700 }]}>{item.type} · Paris</Text>
+                    <Text style={[styles.placeOptionType, { color: C.gray700 }]} numberOfLines={1}>{item.address}</Text>
                   </View>
-                  <Text style={[styles.placeOptionAdd, { color: C.primary }]}>+</Text>
+                  <Ionicons name="add-circle-outline" size={24} color={C.primary} />
                 </TouchableOpacity>
               )}
+              ListEmptyComponent={
+                !isSearchingPlaces && placeSearch.length >= 2 ? (
+                  <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                    <Ionicons name="search" size={32} color={C.gray500} />
+                    <Text style={[styles.modalSectionLabel, { color: C.gray600, textAlign: 'center', marginTop: 12 }]}>
+                      Aucun résultat
+                    </Text>
+                  </View>
+                ) : placeSearch.length < 2 ? (
+                  <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                    <Ionicons name="location" size={32} color={C.gray500} />
+                    <Text style={[styles.modalSectionLabel, { color: C.gray600, textAlign: 'center', marginTop: 12 }]}>
+                      Recherche un lieu...
+                    </Text>
+                  </View>
+                ) : null
+              }
             />
           </View>
         </Modal>

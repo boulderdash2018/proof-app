@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   TextInput as RNTextInput,
   Dimensions,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +24,12 @@ import { useTranslation } from '../hooks/useTranslation';
 import { searchUsers } from '../services/friendsService';
 import { useAuthStore } from '../store';
 import mockApi from '../services/mockApi';
+import {
+  searchPlacesNearby,
+  getReadableType,
+  priceLevelToSymbol,
+  GooglePlaceDetails,
+} from '../services/googlePlacesService';
 
 const { width } = Dimensions.get('window');
 const CARD_GAP = 10;
@@ -43,15 +51,19 @@ export const ExploreScreen: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState(EXPLORE_GROUPS[0].key);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [searchUsers_, setSearchUsers_] = useState<any[]>([]);
+  const [googlePlaces, setGooglePlaces] = useState<GooglePlaceDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeGroup = EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0];
 
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     if (query.length < 2) {
       setFilteredPlans([]);
       setSearchUsers_([]);
+      setGooglePlaces([]);
       return;
     }
     setIsSearching(true);
@@ -59,25 +71,38 @@ export const ExploreScreen: React.FC = () => {
       const users = await searchUsers(query.slice(1), currentUser?.id || '');
       setSearchUsers_(users);
       setFilteredPlans([]);
+      setGooglePlaces([]);
+      setIsSearching(false);
     } else {
+      // Search plans immediately
       const plans = await mockApi.searchPlans(query);
       setFilteredPlans(plans);
       setSearchUsers_([]);
+      // Debounce Google Places search
+      searchTimerRef.current = setTimeout(async () => {
+        const places = await searchPlacesNearby(query + ' Paris', { lat: 48.8566, lng: 2.3522 });
+        setGooglePlaces(places);
+        setIsSearching(false);
+      }, 400);
     }
-    setIsSearching(false);
   }, [currentUser]);
 
   const handleClear = () => {
     setSearchQuery('');
     setFilteredPlans([]);
     setSearchUsers_([]);
+    setGooglePlaces([]);
   };
 
   const handleCategoryPress = useCallback(async (categoryName: string) => {
     setSearchQuery(categoryName);
     setIsSearching(true);
-    const plans = await mockApi.searchPlans(categoryName);
+    const [plans, places] = await Promise.all([
+      mockApi.searchPlans(categoryName),
+      searchPlacesNearby(categoryName + ' Paris', { lat: 48.8566, lng: 2.3522 }),
+    ]);
     setFilteredPlans(plans);
+    setGooglePlaces(places);
     setSearchUsers_([]);
     setIsSearching(false);
   }, []);
@@ -301,22 +326,68 @@ export const ExploreScreen: React.FC = () => {
               {searchUsers_.map(renderUserResult)}
             </ScrollView>
           ) : (
-            <FlatList
-              data={filteredPlans}
-              renderItem={renderCompactPlan}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.resultsList}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                !isSearching ? (
-                  <EmptyState
-                    icon="🔍"
-                    title={t.explore_no_results}
-                    subtitle={t.explore_no_results_sub}
-                  />
-                ) : null
-              }
-            />
+            <ScrollView contentContainerStyle={styles.resultsList} showsVerticalScrollIndicator={false}>
+              {/* Google Places results */}
+              {googlePlaces.length > 0 && (
+                <>
+                  <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>
+                    Lieux ({googlePlaces.length})
+                  </Text>
+                  {googlePlaces.map((place) => (
+                    <TouchableOpacity
+                      key={place.placeId}
+                      style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]}
+                      activeOpacity={0.7}
+                      onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}
+                    >
+                      {place.photoUrls.length > 0 ? (
+                        <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} />
+                      ) : (
+                        <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="location" size={24} color={C.gray600} />
+                        </View>
+                      )}
+                      <View style={styles.googlePlaceInfo}>
+                        <Text style={[styles.googlePlaceName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+                        <Text style={[styles.googlePlaceType, { color: C.gray700 }]} numberOfLines={1}>
+                          {getReadableType(place.types)} {place.priceLevel !== undefined ? '· ' + priceLevelToSymbol(place.priceLevel) : ''}
+                        </Text>
+                        {place.rating > 0 && (
+                          <View style={styles.googlePlaceRating}>
+                            <Ionicons name="star" size={12} color={C.primary} />
+                            <Text style={[styles.googlePlaceRatingText, { color: C.black }]}>{place.rating.toFixed(1)}</Text>
+                            <Text style={[styles.googlePlaceReviewCount, { color: C.gray600 }]}>({place.reviewCount})</Text>
+                          </View>
+                        )}
+                        <Text style={[styles.googlePlaceAddress, { color: C.gray600 }]} numberOfLines={1}>{place.address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+
+              {/* Plans results */}
+              {filteredPlans.length > 0 && (
+                <>
+                  <Text style={[styles.resultsSectionLabel, { color: C.gray700, marginTop: googlePlaces.length > 0 ? 16 : 0 }]}>
+                    Plans ({filteredPlans.length})
+                  </Text>
+                  {filteredPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                </>
+              )}
+
+              {isSearching && googlePlaces.length === 0 && filteredPlans.length === 0 && (
+                <ActivityIndicator color={C.primary} style={{ marginTop: 30 }} />
+              )}
+
+              {!isSearching && googlePlaces.length === 0 && filteredPlans.length === 0 && (
+                <EmptyState
+                  icon="🔍"
+                  title={t.explore_no_results}
+                  subtitle={t.explore_no_results_sub}
+                />
+              )}
+            </ScrollView>
           )}
         </>
       )}
@@ -527,4 +598,28 @@ const styles = StyleSheet.create({
   userInitials: { fontSize: 14, fontWeight: '600' },
   userName: { fontSize: 14, fontWeight: '600' },
   userHandle: { fontSize: 12, marginTop: 1 },
+
+  // Google Places cards
+  googlePlaceCard: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  googlePlacePhoto: {
+    width: 90,
+    height: 90,
+  },
+  googlePlaceInfo: {
+    flex: 1,
+    padding: 10,
+    justifyContent: 'center',
+  },
+  googlePlaceName: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 2 },
+  googlePlaceType: { fontSize: 12, marginBottom: 3 },
+  googlePlaceRating: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 2 },
+  googlePlaceRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  googlePlaceReviewCount: { fontSize: 11 },
+  googlePlaceAddress: { fontSize: 11 },
 });

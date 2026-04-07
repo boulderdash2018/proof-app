@@ -46,6 +46,7 @@ export interface Review {
 
 export interface Place {
   id: string;
+  googlePlaceId?: string;
   name: string;
   type: string;
   address: string;
@@ -53,6 +54,13 @@ export interface Place {
   reviewCount: number;
   ratingDistribution: [number, number, number, number, number];
   reviews: Review[];
+  photoUrls?: string[];
+  openingHours?: string[];
+  phoneNumber?: string;
+  website?: string;
+  latitude?: number;
+  longitude?: number;
+  priceLevel?: number;       // 0-4 Google price level
   placePrice?: number;       // price in € for this place
   placeDuration?: number;    // time spent in minutes
 }

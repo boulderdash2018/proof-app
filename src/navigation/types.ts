@@ -45,7 +45,7 @@ export type RootStackParamList = {
   Auth: undefined;
   SetupProfile: undefined;
   PlanDetail: { planId: string };
-  PlaceDetail: { placeId: string; planId: string };
+  PlaceDetail: { placeId?: string; planId?: string; googlePlaceId?: string };
   Notifications: undefined;
 };
 
