@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
@@ -19,29 +19,97 @@ interface Props {
   title: string;
 }
 
-const buildEmbedUrl = (places: PlaceCoord[]): string => {
-  // Use Google Maps Embed API with directions mode to show the route
-  if (places.length === 1) {
-    return `https://www.google.com/maps/embed/v1/place?key=${API_KEY}&q=${places[0].latitude},${places[0].longitude}&zoom=15`;
-  }
+const buildMapHtml = (places: PlaceCoord[]): string => {
+  const placesJson = JSON.stringify(places);
 
-  const origin = `${places[0].latitude},${places[0].longitude}`;
-  const destination = `${places[places.length - 1].latitude},${places[places.length - 1].longitude}`;
-  const waypoints = places.length > 2
-    ? places.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|')
-    : '';
+  return `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  *{margin:0;padding:0}
+  html,body,#map{width:100%;height:100%}
+</style>
+</head><body>
+<div id="map"></div>
+<script>
+function initMap(){
+  const places=${placesJson};
+  const mapStyle=[
+    {elementType:"geometry",stylers:[{color:"#F5F0EB"}]},
+    {elementType:"labels.text.fill",stylers:[{color:"#6B6560"}]},
+    {elementType:"labels.text.stroke",stylers:[{color:"#F5F0EB"}]},
+    {featureType:"road",elementType:"geometry",stylers:[{color:"#E8E0D8"}]},
+    {featureType:"road",elementType:"geometry.stroke",stylers:[{color:"#DDD5CC"}]},
+    {featureType:"road.highway",elementType:"geometry",stylers:[{color:"#DDD5CC"}]},
+    {featureType:"water",elementType:"geometry",stylers:[{color:"#C5D5DC"}]},
+    {featureType:"water",elementType:"labels.text.fill",stylers:[{color:"#8AA4B0"}]},
+    {featureType:"park",elementType:"geometry",stylers:[{color:"#D5DCC5"}]},
+    {featureType:"poi",stylers:[{visibility:"off"}]},
+    {featureType:"transit",stylers:[{visibility:"off"}]},
+    {featureType:"administrative",elementType:"geometry.stroke",stylers:[{color:"#DDD5CC"}]},
+    {featureType:"administrative.land_parcel",stylers:[{visibility:"off"}]},
+    {featureType:"administrative.neighborhood",stylers:[{visibility:"off"}]}
+  ];
 
-  let url = `https://www.google.com/maps/embed/v1/directions?key=${API_KEY}&origin=${origin}&destination=${destination}&mode=walking`;
-  if (waypoints) url += `&waypoints=${waypoints}`;
-  return url;
+  const map=new google.maps.Map(document.getElementById("map"),{
+    styles:mapStyle,
+    disableDefaultUI:true,
+    zoomControl:false,
+    gestureHandling:"none",
+    backgroundColor:"#F5F0EB"
+  });
+
+  const bounds=new google.maps.LatLngBounds();
+  places.forEach(p=>bounds.extend({lat:p.latitude,lng:p.longitude}));
+  map.fitBounds(bounds,{top:60,right:60,bottom:60,left:60});
+
+  // Dashed polyline
+  const path=places.map(p=>({lat:p.latitude,lng:p.longitude}));
+  const lineSymbol={path:"M 0,-1 0,1",strokeOpacity:1,strokeWeight:2.5,scale:3};
+  new google.maps.Polyline({
+    path:path,
+    strokeOpacity:0,
+    icons:[{icon:lineSymbol,offset:"0",repeat:"16px"}],
+    strokeColor:"#D4845A",
+    map:map
+  });
+
+  // Numbered markers
+  places.forEach((p,i)=>{
+    const marker=new google.maps.marker.AdvancedMarkerElement||null;
+    const div=document.createElement("div");
+    div.style.cssText="width:32px;height:32px;border-radius:50%;background:#D4845A;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);font-family:-apple-system,BlinkMacSystemFont,sans-serif";
+    div.textContent=String(i+1);
+
+    new google.maps.Marker({
+      position:{lat:p.latitude,lng:p.longitude},
+      map:map,
+      icon:{
+        url:"data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><circle cx="18" cy="18" r="15" fill="%23D4845A" stroke="white" stroke-width="3"/><text x="18" y="23" text-anchor="middle" fill="white" font-size="14" font-weight="800" font-family="sans-serif">'+(i+1)+'</text></svg>'
+        ),
+        scaledSize:new google.maps.Size(36,36),
+        anchor:new google.maps.Point(18,18)
+      },
+      clickable:false
+    });
+  });
+}
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap" async defer></script>
+</body></html>`;
 };
 
 export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title }) => {
   const C = useColors();
 
-  if (!visible || places.length === 0) return null;
+  const mapHtml = useMemo(() => {
+    if (places.length === 0) return '';
+    const html = buildMapHtml(places);
+    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  }, [places]);
 
-  const embedUrl = buildEmbedUrl(places);
+  if (!visible || places.length === 0) return null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -55,14 +123,12 @@ export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title 
           <View style={{ width: 34 }} />
         </View>
 
-        {/* Map iframe */}
+        {/* Map */}
         <View style={styles.mapContainer}>
           <iframe
-            src={embedUrl}
-            style={{ width: '100%', height: '100%', border: 'none', borderRadius: 0 } as any}
-            allowFullScreen
+            src={mapHtml}
+            style={{ width: '100%', height: '100%', border: 'none' } as any}
             loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
           />
         </View>
 
