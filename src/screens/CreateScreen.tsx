@@ -135,7 +135,6 @@ export const CreateScreen: React.FC = () => {
   const [showPlacePicker, setShowPlacePicker] = useState(false);
   const [placeSearch, setPlaceSearch] = useState('');
 
-  const userPts = user?.xpPoints ? user.xpPoints % 1000 : 240;
 
   const toggleTag = (tag: CategoryTag) => {
     setSelectedTags((prev) =>
@@ -553,10 +552,6 @@ export const CreateScreen: React.FC = () => {
 
           <View style={styles.publishSection}>
             <PrimaryButton label={t.create_publish} onPress={handlePublish} loading={isPublishing} />
-            <Text style={[styles.costNote, { color: C.gray700 }]}>
-              {t.create_points_have} <Text style={{ fontWeight: '700' }}>{userPts} {t.create_points_unit}</Text> · {t.create_points_remain}{' '}
-              <Text style={{ fontWeight: '700' }}>{userPts - 20}</Text>
-            </Text>
           </View>
         </ScrollView>
 

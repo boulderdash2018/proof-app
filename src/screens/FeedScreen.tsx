@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
-import { PlanCard, PtsPill, LoadingSkeleton, EmptyState } from '../components';
+import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -63,7 +63,6 @@ export const FeedScreen: React.FC = () => {
           proof<Text style={{ color: C.primary }}>.</Text>
         </Text>
         <View style={styles.headerRight}>
-          <PtsPill points={user?.xpPoints ? user.xpPoints % 1000 : 240} />
           <TouchableOpacity
             style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
             onPress={() => navigation.navigate('Notifications')}

@@ -20,8 +20,8 @@ export const fr = {
   onboarding_sub_1: 'Des journées entières, pas juste des adresses.',
   onboarding_title_2: 'Partagé par de vraies personnes',
   onboarding_sub_2: 'Tes amis, des créateurs locaux, des curieux comme toi.',
-  onboarding_title_3: 'Gagne des points en explorant',
-  onboarding_sub_3: 'XP, coins, badges — chaque sortie compte.',
+  onboarding_title_3: 'Collectionne des badges',
+  onboarding_sub_3: 'Explore, partage, et débloque des badges — chaque sortie compte.',
   onboarding_start: 'Commencer',
   onboarding_login: "J'ai déjà un compte",
 

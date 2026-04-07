@@ -22,8 +22,8 @@ export const en: Record<TranslationKeys, string> = {
   onboarding_sub_1: 'Full days out, not just addresses.',
   onboarding_title_2: 'Shared by real people',
   onboarding_sub_2: 'Your friends, local creators, curious minds like you.',
-  onboarding_title_3: 'Earn points by exploring',
-  onboarding_sub_3: 'XP, coins, badges — every outing counts.',
+  onboarding_title_3: 'Collect badges',
+  onboarding_sub_3: 'Explore, share, and unlock badges — every outing counts.',
   onboarding_start: 'Get Started',
   onboarding_login: 'I already have an account',
 

@@ -72,9 +72,6 @@ export const ProfileScreen: React.FC = () => {
 
   if (!user) return null;
 
-  const xpProgress = user.xpPoints / user.xpForNextLevel;
-  const displayXp = user.xpPoints % 1000 || user.xpPoints;
-
   const formatCount = (n: number): string => {
     if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'k';
     return n.toString();
@@ -104,28 +101,9 @@ export const ProfileScreen: React.FC = () => {
           <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
           <Text style={[styles.displayName, { color: C.black }]}>{user.displayName}</Text>
           <View style={styles.rankBadge}>
-            <Text style={[styles.rankText, { color: C.primary }]}>{user.rank} · Lv. {user.level}</Text>
+            <Text style={[styles.rankText, { color: C.primary }]}>{user.rank}</Text>
           </View>
           {user.bio ? <Text style={[styles.bio, { color: C.gray800 }]}>{user.bio}</Text> : null}
-        </View>
-
-        <View style={styles.xpSection}>
-          <View style={styles.xpLabels}>
-            <Text style={[styles.xpLabel, { color: C.gray700 }]}>XP {user.xpPoints} / {user.xpForNextLevel}</Text>
-            <Text style={[styles.xpLabel, { color: C.gray700 }]}>→ Lv. {user.level + 1}</Text>
-          </View>
-          <View style={[styles.xpBarBg, { backgroundColor: C.gray300 }]}>
-            <View style={[styles.xpBarFill, { width: `${Math.min(xpProgress * 100, 100)}%`, backgroundColor: C.primary }]} />
-          </View>
-        </View>
-
-        <View style={styles.currencyRow}>
-          <View style={[styles.xpPill, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
-            <Text style={[styles.xpPillText, { color: C.gold }]}>⭐ {displayXp} XP pts</Text>
-          </View>
-          <View style={[styles.coinsPill, { backgroundColor: C.successBg, borderColor: C.successBorder }]}>
-            <Text style={[styles.coinsPillText, { color: C.success }]}>+ {user.coins} coins</Text>
-          </View>
         </View>
 
         <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
@@ -234,16 +212,6 @@ const styles = StyleSheet.create({
   rankBadge: { backgroundColor: '#2D2118', borderWidth: 1, borderColor: '#3D2E22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, marginTop: 6 },
   rankText: { fontSize: 11, fontFamily: Fonts.serifBold },
   bio: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
-  xpSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 14 },
-  xpLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  xpLabel: { fontSize: 10 },
-  xpBarBg: { height: 5, borderRadius: 3, overflow: 'hidden' },
-  xpBarFill: { height: 5, borderRadius: 3 },
-  currencyRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, paddingVertical: 14 },
-  xpPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
-  xpPillText: { fontSize: 12, fontFamily: Fonts.serifBold },
-  coinsPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
-  coinsPillText: { fontSize: 12, fontFamily: Fonts.serifBold },
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderBottomWidth: 1, marginHorizontal: Layout.screenPadding },
   stat: { flex: 1, alignItems: 'center' },
   statValue: { fontSize: 18, fontFamily: Fonts.serifBold },

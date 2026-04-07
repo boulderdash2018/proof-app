@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
-import { Avatar, Chip, UserBadge, XpBadge } from '../components';
+import { Avatar, Chip, UserBadge } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -334,7 +334,6 @@ export const PlanDetailModal: React.FC = () => {
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? C.primary : C.gray600} />
               <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
             </TouchableOpacity>
-            <XpBadge xp={plan.xpReward} />
           </View>
 
           {/* Comment input */}

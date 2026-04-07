@@ -14,7 +14,6 @@ import { useColors } from '../hooks/useColors';
 import { Avatar } from './Avatar';
 import { UserBadge } from './UserBadge';
 import { Chip } from './Chip';
-import { XpBadge } from './XpBadge';
 
 export function parseGradient(gradient: string): string[] {
   const matches = gradient.match(/#[0-9A-Fa-f]{3,8}/g);
@@ -157,7 +156,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </Animated.View>
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
-        <XpBadge xp={plan.xpReward} />
       </View>
     </TouchableOpacity>
   );
