@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +22,14 @@ const CARD_WIDTH = (width - Layout.screenPadding * 2 - CARD_GAP) / 2;
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
   return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
+};
+
+const getPlanPhoto = (plan: { coverPhotos?: string[]; places: { photoUrls?: string[] }[] }): string | null => {
+  if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos[0];
+  for (const p of plan.places) {
+    if (p.photoUrls && p.photoUrls.length > 0) return p.photoUrls[0];
+  }
+  return null;
 };
 
 export const OtherProfileScreen: React.FC = () => {
@@ -236,18 +244,25 @@ export const OtherProfileScreen: React.FC = () => {
                 <View style={styles.plansGrid}>
                   {userPlans.map((plan) => {
                     const colors = parseGradient(plan.gradient);
+                    const photo = getPlanPhoto(plan);
                     return (
                       <TouchableOpacity
                         key={plan.id}
                         activeOpacity={0.85}
                         onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
                       >
-                        <LinearGradient
-                          colors={colors as [string, string, ...string[]]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.planCard}
-                        >
+                        <View style={styles.planCard}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.planCardImage} />
+                          ) : (
+                            <LinearGradient
+                              colors={colors as [string, string, ...string[]]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={StyleSheet.absoluteFill}
+                            />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.planCardOverlay} />
                           <Text style={styles.planCardTitle} numberOfLines={2}>{plan.title}</Text>
                           <View style={styles.planCardMeta}>
                             <View style={styles.planCardMetaItem}>
@@ -259,7 +274,7 @@ export const OtherProfileScreen: React.FC = () => {
                               <Text style={styles.planCardMetaText}>{plan.price}</Text>
                             </View>
                           </View>
-                        </LinearGradient>
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
@@ -388,6 +403,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  planCardImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  planCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 70,
   },
   planCardTitle: {
     color: '#FFFFFF',
