@@ -29,6 +29,7 @@ import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
+import { PlanMapModal } from '../components/PlanMapModal';
 
 const TRANSPORT_ICONS: Record<TransportMode, string> = {
   'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
@@ -85,6 +86,7 @@ export const PlanDetailModal: React.FC = () => {
   const savedPlan = savedPlans.find((sp) => sp.planId === planId);
   const isDone = savedPlan?.isDone ?? false;
   const [showProofSurvey, setShowProofSurvey] = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
   // Sync likes count from feed store
   useEffect(() => {
@@ -300,6 +302,15 @@ export const PlanDetailModal: React.FC = () => {
               <View style={styles.metaItem}><Ionicons name="time-outline" size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.duration}</Text></View>
               <View style={[styles.metaDot, { backgroundColor: C.gray500 }]} />
               <View style={styles.metaItem}><Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.transport}</Text></View>
+              {plan.places.some((p) => p.latitude && p.longitude) && (
+                <>
+                  <View style={[styles.metaDot, { backgroundColor: C.gray500 }]} />
+                  <TouchableOpacity style={styles.mapBtn} onPress={() => setShowMap(true)} activeOpacity={0.7}>
+                    <Ionicons name="map-outline" size={14} color={C.primary} />
+                    <Text style={[styles.mapBtnText, { color: C.primary }]}>Voir map</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
 
@@ -480,12 +491,22 @@ export const PlanDetailModal: React.FC = () => {
       </View>
 
       {plan && (
-        <ProofSurveyModal
-          visible={showProofSurvey}
-          plan={plan}
-          onProof={handleProof}
-          onDecline={handleDeclineProof}
-        />
+        <>
+          <ProofSurveyModal
+            visible={showProofSurvey}
+            plan={plan}
+            onProof={handleProof}
+            onDecline={handleDeclineProof}
+          />
+          <PlanMapModal
+            visible={showMap}
+            onClose={() => setShowMap(false)}
+            title={plan.title}
+            places={plan.places
+              .filter((p) => p.latitude && p.longitude)
+              .map((p) => ({ name: p.name, latitude: p.latitude!, longitude: p.longitude! }))}
+          />
+        </>
       )}
     </KeyboardAvoidingView>
   );
@@ -514,6 +535,8 @@ const styles = StyleSheet.create({
   metaEmoji: { fontSize: 14, marginRight: 4 },
   metaText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   metaDot: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 10 },
+  mapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  mapBtnText: { fontSize: 13, fontFamily: Fonts.serifBold },
   sectionLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 18, marginBottom: 10 },
   placeRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
   placeLeftCol: { alignItems: 'center', marginRight: 12 },

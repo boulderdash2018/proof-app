@@ -388,9 +388,10 @@ export const CreateScreen: React.FC = () => {
       const placesWithPhotos = await Promise.all(
         places.map(async (p) => {
           let photoUrls: string[] = [];
+          let details: any = null;
           if (p.googlePlaceId) {
             try {
-              const details = await getPlaceDetails(p.googlePlaceId);
+              details = await getPlaceDetails(p.googlePlaceId);
               if (details && details.photoUrls.length > 0) {
                 photoUrls = details.photoUrls.slice(0, 2);
               }
@@ -402,11 +403,13 @@ export const CreateScreen: React.FC = () => {
             name: p.name,
             type: p.type,
             address: p.address || 'Paris, France',
-            rating: 0,
-            reviewCount: 0,
+            rating: details?.rating || 0,
+            reviewCount: details?.reviewCount || 0,
             ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
             reviews: [],
             photoUrls,
+            latitude: details?.latitude || undefined,
+            longitude: details?.longitude || undefined,
             placePrice: parseInt(p.price, 10) || 0,
             placeDuration: parseInt(p.duration, 10) || 0,
           };
