@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
@@ -19,133 +19,158 @@ interface Props {
   title: string;
 }
 
-const buildMapHtml = (places: PlaceCoord[]): string => {
-  const placesJson = JSON.stringify(places);
+// "Pale Dawn" style adapted for Proof — warm, clean, proven to render correctly
+const PROOF_MAP_STYLE = [
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#8a7e72"},{"lightness":40}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"on"},{"color":"#faf6f1"},{"lightness":16}]},
+  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#faf6f1"},{"lightness":20}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#e0d6cb"},{"lightness":17},{"weight":1.2}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#f0ebe4"},{"lightness":20}]},
+  {"featureType":"poi","stylers":[{"visibility":"off"}]},
+  {"featureType":"poi.park","elementType":"geometry","stylers":[{"visibility":"on"},{"color":"#d4ddc4"},{"lightness":21}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#e0d6cb"},{"lightness":17}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#e0d6cb"},{"lightness":29},{"weight":0.2}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#e8e0d6"},{"lightness":18}]},
+  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#ede7df"},{"lightness":16}]},
+  {"featureType":"transit","stylers":[{"visibility":"off"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#c2d4dc"},{"lightness":17}]}
+];
 
-  return `<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>*{margin:0;padding:0}html,body,#map{width:100%;height:100%}</style>
-</head><body>
-<div id="map"></div>
-<script>
-function initMap(){
-  const places=${placesJson};
+let googleMapsLoaded = false;
+let googleMapsLoading = false;
+const loadCallbacks: (() => void)[] = [];
 
-  const mapStyle=[
-    {elementType:"geometry",stylers:[{color:"#F5F0EB"}]},
-    {elementType:"labels.text.fill",stylers:[{color:"#6B6560"}]},
-    {elementType:"labels.text.stroke",stylers:[{color:"#F5F0EB"}]},
-    {featureType:"road",elementType:"geometry",stylers:[{color:"#E8E0D8"}]},
-    {featureType:"road",elementType:"geometry.stroke",stylers:[{color:"#DDD5CC"}]},
-    {featureType:"road",elementType:"labels.text.fill",stylers:[{color:"#9E9689"}]},
-    {featureType:"road.highway",elementType:"geometry",stylers:[{color:"#DDD5CC"}]},
-    {featureType:"water",elementType:"geometry",stylers:[{color:"#C5D5DC"}]},
-    {featureType:"water",elementType:"labels.text.fill",stylers:[{color:"#8AA4B0"}]},
-    {featureType:"park",elementType:"geometry",stylers:[{color:"#D5DCC5"}]},
-    {featureType:"poi",stylers:[{visibility:"off"}]},
-    {featureType:"transit",stylers:[{visibility:"off"}]},
-    {featureType:"administrative",elementType:"geometry.stroke",stylers:[{color:"#DDD5CC"}]},
-    {featureType:"administrative.land_parcel",stylers:[{visibility:"off"}]},
-    {featureType:"administrative.neighborhood",elementType:"labels.text.fill",stylers:[{color:"#B5ADA5"}]}
-  ];
+function loadGoogleMaps(callback: () => void) {
+  if (googleMapsLoaded && (window as any).google?.maps) {
+    callback();
+    return;
+  }
+  loadCallbacks.push(callback);
+  if (googleMapsLoading) return;
+  googleMapsLoading = true;
 
-  const map=new google.maps.Map(document.getElementById("map"),{
-    styles:mapStyle,
-    disableDefaultUI:true,
-    zoomControl:false,
-    gestureHandling:"none",
-    backgroundColor:"#F5F0EB"
-  });
+  (window as any).__gmCallback = () => {
+    googleMapsLoaded = true;
+    googleMapsLoading = false;
+    loadCallbacks.forEach(cb => cb());
+    loadCallbacks.length = 0;
+  };
 
-  // Fit to show all places
-  const bounds=new google.maps.LatLngBounds();
-  places.forEach(p=>bounds.extend({lat:p.latitude,lng:p.longitude}));
-  map.fitBounds(bounds,{top:70,right:70,bottom:70,left:70});
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=__gmCallback`;
+  script.async = true;
+  script.defer = true;
+  document.head.appendChild(script);
+}
 
-  // Add numbered pin markers
-  places.forEach((p,i)=>{
-    new google.maps.Marker({
-      position:{lat:p.latitude,lng:p.longitude},
-      map:map,
-      icon:{
-        url:"data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(
-          '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52">'
-          +'<path d="M20 50 C20 50 2 32 2 18 A18 18 0 1 1 38 18 C38 32 20 50 20 50Z" fill="%23D4845A" stroke="white" stroke-width="2.5"/>'
-          +'<circle cx="20" cy="18" r="11" fill="white" opacity="0.25"/>'
-          +'<text x="20" y="23" text-anchor="middle" fill="white" font-size="15" font-weight="800" font-family="-apple-system,BlinkMacSystemFont,sans-serif">'+(i+1)+'</text>'
-          +'</svg>'
-        ),
-        scaledSize:new google.maps.Size(34,44),
-        anchor:new google.maps.Point(17,44)
-      },
-      clickable:false,
-      zIndex:100+i
-    });
-  });
+const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
+  const mapDivRef = useRef<HTMLDivElement>(null);
 
-  // Draw real walking routes between consecutive places
-  if(places.length>=2){
-    const ds=new google.maps.DirectionsService();
-    const origin={lat:places[0].latitude,lng:places[0].longitude};
-    const dest={lat:places[places.length-1].latitude,lng:places[places.length-1].longitude};
-    const waypoints=places.slice(1,-1).map(p=>({location:{lat:p.latitude,lng:p.longitude},stopover:true}));
+  useEffect(() => {
+    loadGoogleMaps(() => {
+      if (!mapDivRef.current || !places.length) return;
+      const gm = (window as any).google.maps;
 
-    ds.route({
-      origin:origin,
-      destination:dest,
-      waypoints:waypoints,
-      travelMode:google.maps.TravelMode.WALKING,
-      optimizeWaypoints:false
-    },function(result,status){
-      if(status==="OK"&&result){
-        // Draw each leg as a dashed polyline
-        result.routes[0].legs.forEach(function(leg){
-          const dashSymbol={path:"M 0,-1 0,1",strokeOpacity:1,strokeWeight:3,scale:3};
-          new google.maps.Polyline({
-            path:leg.steps.reduce(function(acc,step){return acc.concat(step.path)},[]),
-            strokeOpacity:0,
-            icons:[{icon:dashSymbol,offset:"0",repeat:"18px"}],
-            strokeColor:"#D4845A",
-            map:map,
-            zIndex:50
-          });
+      const map = new gm.Map(mapDivRef.current, {
+        styles: PROOF_MAP_STYLE,
+        disableDefaultUI: true,
+        zoomControl: false,
+        gestureHandling: 'none',
+        backgroundColor: '#f0ebe4',
+      });
+
+      // Fit bounds
+      const bounds = new gm.LatLngBounds();
+      places.forEach(p => bounds.extend({ lat: p.latitude, lng: p.longitude }));
+      map.fitBounds(bounds, { top: 70, right: 70, bottom: 70, left: 70 });
+
+      // Markers (pin SVG)
+      places.forEach((p, i) => {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46"><path d="M18 44C18 44 2 28 2 16A16 16 0 1 1 34 16C34 28 18 44 18 44Z" fill="%23D4845A" stroke="white" stroke-width="2.5"/><text x="18" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="800" font-family="-apple-system,sans-serif">${i + 1}</text></svg>`;
+        new gm.Marker({
+          position: { lat: p.latitude, lng: p.longitude },
+          map,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+            scaledSize: new gm.Size(32, 40),
+            anchor: new gm.Point(16, 40),
+          },
+          clickable: false,
+          zIndex: 100 + i,
         });
-      }else{
-        // Fallback: straight dashed lines if directions fail
-        const dashSymbol={path:"M 0,-1 0,1",strokeOpacity:1,strokeWeight:2.5,scale:3};
-        new google.maps.Polyline({
-          path:places.map(function(p){return{lat:p.latitude,lng:p.longitude}}),
-          strokeOpacity:0,
-          icons:[{icon:dashSymbol,offset:"0",repeat:"16px"}],
-          strokeColor:"#D4845A",
-          map:map,
-          zIndex:50
+      });
+
+      // Routes via Directions Service
+      if (places.length >= 2) {
+        const ds = new gm.DirectionsService();
+        const origin = { lat: places[0].latitude, lng: places[0].longitude };
+        const dest = { lat: places[places.length - 1].latitude, lng: places[places.length - 1].longitude };
+        const waypoints = places.slice(1, -1).map(p => ({
+          location: { lat: p.latitude, lng: p.longitude },
+          stopover: true,
+        }));
+
+        ds.route({
+          origin,
+          destination: dest,
+          waypoints,
+          travelMode: gm.TravelMode.WALKING,
+          optimizeWaypoints: false,
+        }, (result: any, status: string) => {
+          if (status === 'OK' && result) {
+            result.routes[0].legs.forEach((leg: any) => {
+              const path = leg.steps.reduce((acc: any[], step: any) => acc.concat(step.path), []);
+              // Dashed polyline
+              new gm.Polyline({
+                path,
+                strokeOpacity: 0,
+                icons: [{
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeWeight: 3, scale: 3 },
+                  offset: '0',
+                  repeat: '18px',
+                }],
+                strokeColor: '#D4845A',
+                map,
+                zIndex: 50,
+              });
+            });
+          } else {
+            // Fallback: straight dashed lines
+            new gm.Polyline({
+              path: places.map(p => ({ lat: p.latitude, lng: p.longitude })),
+              strokeOpacity: 0,
+              icons: [{
+                icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeWeight: 2.5, scale: 3 },
+                offset: '0',
+                repeat: '16px',
+              }],
+              strokeColor: '#D4845A',
+              map,
+              zIndex: 50,
+            });
+          }
         });
       }
     });
-  }
-}
-</script>
-<script src="https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap" async defer></script>
-</body></html>`;
+  }, [places]);
+
+  return (
+    <div
+      ref={mapDivRef}
+      style={{ width: '100%', height: '100%' }}
+    />
+  );
 };
 
 export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title }) => {
   const C = useColors();
-
-  const mapHtml = useMemo(() => {
-    if (places.length === 0) return '';
-    const html = buildMapHtml(places);
-    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-  }, [places]);
 
   if (!visible || places.length === 0) return null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: C.white }]}>
-        {/* Header */}
         <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
           <TouchableOpacity style={[styles.closeBtn, { backgroundColor: C.gray200 }]} onPress={onClose}>
             <Ionicons name="close" size={20} color={C.black} />
@@ -154,16 +179,10 @@ export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title 
           <View style={{ width: 34 }} />
         </View>
 
-        {/* Map */}
         <View style={styles.mapContainer}>
-          <iframe
-            src={mapHtml}
-            style={{ width: '100%', height: '100%', border: 'none' } as any}
-            loading="lazy"
-          />
+          <MapRenderer places={places} />
         </View>
 
-        {/* Legend */}
         <View style={[styles.legend, { borderTopColor: C.borderLight }]}>
           {places.map((place, index) => (
             <View key={index} style={styles.legendItem}>
