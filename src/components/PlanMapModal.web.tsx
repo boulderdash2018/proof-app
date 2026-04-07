@@ -96,16 +96,21 @@ const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
         if (map.getZoom() > 14) map.setZoom(14);
       });
 
-      // Markers (pin SVG)
+      // Markers — minimal circle + stem, Proof style
       places.forEach((p, i) => {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46"><path d="M18 44C18 44 2 28 2 16A16 16 0 1 1 34 16C34 28 18 44 18 44Z" fill="%23D4845A" stroke="white" stroke-width="2.5"/><text x="18" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="800" font-family="-apple-system,sans-serif">${i + 1}</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="56" viewBox="0 0 44 56">
+          <line x1="22" y1="38" x2="22" y2="52" stroke="%23D4845A" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="22" cy="22" r="18" fill="%23D4845A"/>
+          <circle cx="22" cy="22" r="15.5" fill="none" stroke="white" stroke-width="1.5" opacity="0.4"/>
+          <text x="22" y="27" text-anchor="middle" fill="white" font-size="15" font-weight="700" font-family="-apple-system,BlinkMacSystemFont,sans-serif" letter-spacing="-0.5">${i + 1}</text>
+        </svg>`;
         new gm.Marker({
           position: { lat: p.latitude, lng: p.longitude },
           map,
           icon: {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-            scaledSize: new gm.Size(32, 40),
-            anchor: new gm.Point(16, 40),
+            scaledSize: new gm.Size(38, 48),
+            anchor: new gm.Point(19, 48),
           },
           clickable: false,
           zIndex: 100 + i,
