@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -27,6 +27,7 @@ import { AccountSettingsScreen } from '../screens/AccountSettingsScreen';
 import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useLanguageStore, useAuthStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { Colors, Fonts } from '../constants';
@@ -129,6 +130,8 @@ export const BottomTabNavigator: React.FC = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
   const isGuest = !isAuthenticated;
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const navigationRef = useNavigation<any>();
 
   // Intercept tab press for guests on restricted tabs
   const guestGuard = {
@@ -143,6 +146,7 @@ export const BottomTabNavigator: React.FC = () => {
   };
 
   return (
+    <>
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
@@ -173,7 +177,7 @@ export const BottomTabNavigator: React.FC = () => {
             <CreateTabButton
               onPress={() => {
                 if (isGuest) { setShowAccountPrompt(true); return; }
-                (props.onPress as any)?.();
+                setShowCreateModal(true);
               }}
             />
           ),
@@ -196,6 +200,58 @@ export const BottomTabNavigator: React.FC = () => {
         {...(isGuest ? guestGuard : {})}
       />
     </Tab.Navigator>
+
+    {/* Create choice modal */}
+    <Modal visible={showCreateModal} transparent animationType="fade" onRequestClose={() => setShowCreateModal(false)}>
+      <TouchableWithoutFeedback onPress={() => setShowCreateModal(false)}>
+        <View style={styles.createModalOverlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.createModalCard}>
+              <TouchableOpacity
+                style={styles.createModalOption}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  // Navigate to existing create flow
+                  const nav = navigationRef;
+                  nav.navigate('CreateTab', { screen: 'Create' });
+                }}
+              >
+                <View style={[styles.createModalIcon, { backgroundColor: Colors.primary + '15' }]}>
+                  <Ionicons name="camera-outline" size={24} color={Colors.primary} />
+                </View>
+                <View style={styles.createModalText}>
+                  <Text style={styles.createModalTitle}>Publier un plan</Text>
+                  <Text style={styles.createModalDesc}>Partage une journée que tu as kiffée avec la communauté</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
+              </TouchableOpacity>
+
+              <View style={styles.createModalDivider} />
+
+              <TouchableOpacity
+                style={styles.createModalOption}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  // TODO: future planning flow
+                }}
+              >
+                <View style={[styles.createModalIcon, { backgroundColor: '#C9A84C15' }]}>
+                  <Ionicons name="calendar-outline" size={24} color="#C9A84C" />
+                </View>
+                <View style={styles.createModalText}>
+                  <Text style={styles.createModalTitle}>Organiser une journée</Text>
+                  <Text style={styles.createModalDesc}>Planifie ta prochaine sortie avec l'aide de la communauté</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+    </>
   );
 };
 
@@ -238,5 +294,55 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '300',
     lineHeight: 28,
+  },
+  createModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    paddingBottom: 100,
+    paddingHorizontal: 16,
+  },
+  createModalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  createModalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 14,
+  },
+  createModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createModalText: {
+    flex: 1,
+  },
+  createModalTitle: {
+    fontSize: 15,
+    fontFamily: Fonts.serifBold,
+    color: Colors.black,
+    marginBottom: 3,
+  },
+  createModalDesc: {
+    fontSize: 12,
+    fontFamily: Fonts.serif,
+    color: Colors.gray600,
+    lineHeight: 16,
+  },
+  createModalDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: 16,
   },
 });
