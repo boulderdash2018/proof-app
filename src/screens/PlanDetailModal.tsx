@@ -514,12 +514,15 @@ export const PlanDetailModal: React.FC = () => {
           {/* Do it now button */}
           {!isGuest && plan.places.some((p) => p.latitude && p.longitude) && (
             <TouchableOpacity
-              style={[styles.doItNowBtn, { backgroundColor: C.primary }]}
-              onPress={() => setShowTransportChooser(true)}
-              activeOpacity={0.8}
+              style={[styles.doItNowBtn, { backgroundColor: isDone ? C.gray300 : C.primary }]}
+              onPress={isDone ? undefined : () => setShowTransportChooser(true)}
+              activeOpacity={isDone ? 1 : 0.8}
+              disabled={isDone}
             >
-              <Text style={styles.doItNowText}>Do it now ?</Text>
-              <Text style={styles.doItNowEmoji}>🗺</Text>
+              <Text style={[styles.doItNowText, isDone && { color: C.gray600 }]}>
+                {isDone ? 'Already done it ✓' : 'Do it now ?'}
+              </Text>
+              {!isDone && <Text style={styles.doItNowEmoji}>🗺</Text>}
             </TouchableOpacity>
           )}
           {/* Action buttons */}
