@@ -27,6 +27,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
+import { getPlaceDetails } from '../services/googlePlacesService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
 import { PlanMapModal } from '../components/PlanMapModal';
@@ -112,6 +113,29 @@ export const PlanDetailModal: React.FC = () => {
     // Ensure saved plans are loaded
     if (savedPlans.length === 0 && currentUser) fetchSaves(currentUser.id);
   }, [planId]);
+
+  // Backfill missing coordinates from Google Places
+  useEffect(() => {
+    if (!plan) return;
+    const missing = plan.places.filter((p) => !p.latitude && p.googlePlaceId);
+    if (missing.length === 0) return;
+
+    Promise.all(
+      plan.places.map(async (p) => {
+        if (p.latitude && p.longitude) return p;
+        if (!p.googlePlaceId) return p;
+        try {
+          const details = await getPlaceDetails(p.googlePlaceId);
+          if (details?.latitude && details?.longitude) {
+            return { ...p, latitude: details.latitude, longitude: details.longitude };
+          }
+        } catch {}
+        return p;
+      })
+    ).then((updatedPlaces) => {
+      setPlan({ ...plan, places: updatedPlaces });
+    });
+  }, [plan?.id]);
 
   const isLiked = likedPlanIds.has(planId);
   const isSaved = savedPlanIds.has(planId);
