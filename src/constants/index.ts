@@ -6,3 +6,7 @@ export { CATEGORIES } from './categories';
 export type { CategoryDef } from './categories';
 export { EXPLORE_GROUPS } from './exploreCategories';
 export type { ExploreGroup, ExploreSection, ExploreCategoryItem, ExploreLayout } from './exploreCategories';
+export { RANKS, getRankForProofs, getNextRank, getRankProgress } from './ranks';
+export type { RankDef, RankId } from './ranks';
+export { ACHIEVEMENTS, TOTAL_ACHIEVEMENTS, ACHIEVEMENTS_BY_CATEGORY } from './achievements';
+export type { AchievementDef, AchievementId, AchievementCategory } from './achievements';

@@ -1,5 +1,9 @@
 export type BadgeType = 'top_creator' | 'creator' | 'novice';
 
+// Re-export rank/achievement types from constants
+export type { RankId } from '../constants/ranks';
+export type { AchievementId, AchievementCategory } from '../constants/achievements';
+
 export type TransportMode = 'Métro' | 'Vélo' | 'À pied' | 'Voiture' | 'Trottinette';
 
 export type CategoryTag = string;
@@ -26,6 +30,17 @@ export interface User {
   followingCount: number;
   likesReceived: number;
   unlockedBadges: BadgeId[];
+  // Badge/rank stats
+  total_proof_validations?: number;
+  comments_given_count?: number;
+  places_rated_count?: number;
+  plans_saved_count?: number;
+  plans_completed_count?: number;
+  cities_posted?: string[];
+  achievements?: string[];
+  achievements_count?: number;
+  last_active_dates?: string[];
+  streak_count?: number;
   createdAt: string;
 }
 

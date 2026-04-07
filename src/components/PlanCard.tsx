@@ -14,10 +14,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Plan, TransportMode } from '../types';
-import { Colors, Layout, Fonts } from '../constants';
+import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { Avatar } from './Avatar';
-import { UserBadge } from './UserBadge';
+import { RankBadge } from './RankBadge';
 import { Chip } from './Chip';
 import { MiniStampIcon } from './MiniStampIcon';
 
@@ -118,7 +118,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           <Text style={[styles.displayName, { color: C.black }]}>{plan.author.displayName}</Text>
           <Text style={[styles.timeAgo, { color: C.gray600 }]}>{plan.timeAgo}</Text>
         </View>
-        <UserBadge type={plan.author.badgeType} small />
+        <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />
       </TouchableOpacity>
 
       <View style={styles.bannerWrap}>
