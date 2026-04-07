@@ -96,21 +96,16 @@ const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
         if (map.getZoom() > 14) map.setZoom(14);
       });
 
-      // Markers — minimal circle + stem, Proof style
+      // Markers — small clean dot with number
       places.forEach((p, i) => {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="56" viewBox="0 0 44 56">
-          <line x1="22" y1="38" x2="22" y2="52" stroke="%23D4845A" stroke-width="2.5" stroke-linecap="round"/>
-          <circle cx="22" cy="22" r="18" fill="%23D4845A"/>
-          <circle cx="22" cy="22" r="15.5" fill="none" stroke="white" stroke-width="1.5" opacity="0.4"/>
-          <text x="22" y="27" text-anchor="middle" fill="white" font-size="15" font-weight="700" font-family="-apple-system,BlinkMacSystemFont,sans-serif" letter-spacing="-0.5">${i + 1}</text>
-        </svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="%23D4845A" stroke="white" stroke-width="2"/><text x="14" y="18.5" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="-apple-system,sans-serif">${i + 1}</text></svg>`;
         new gm.Marker({
           position: { lat: p.latitude, lng: p.longitude },
           map,
           icon: {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-            scaledSize: new gm.Size(38, 48),
-            anchor: new gm.Point(19, 48),
+            scaledSize: new gm.Size(26, 26),
+            anchor: new gm.Point(13, 13),
           },
           clickable: false,
           zIndex: 100 + i,
@@ -137,31 +132,24 @@ const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
           if (status === 'OK' && result) {
             result.routes[0].legs.forEach((leg: any) => {
               const path = leg.steps.reduce((acc: any[], step: any) => acc.concat(step.path), []);
-              // Dashed polyline
               new gm.Polyline({
                 path,
-                strokeOpacity: 0,
-                icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeWeight: 3, scale: 3 },
-                  offset: '0',
-                  repeat: '18px',
-                }],
                 strokeColor: '#D4845A',
+                strokeOpacity: 0.85,
+                strokeWeight: 4,
+                geodesic: true,
                 map,
                 zIndex: 50,
               });
             });
           } else {
-            // Fallback: straight dashed lines
+            // Fallback: straight solid lines
             new gm.Polyline({
               path: places.map(p => ({ lat: p.latitude, lng: p.longitude })),
-              strokeOpacity: 0,
-              icons: [{
-                icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeWeight: 2.5, scale: 3 },
-                offset: '0',
-                repeat: '16px',
-              }],
               strokeColor: '#D4845A',
+              strokeOpacity: 0.85,
+              strokeWeight: 4,
+              geodesic: true,
               map,
               zIndex: 50,
             });
