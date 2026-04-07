@@ -111,10 +111,13 @@ export interface Notification {
   createdAt: string;
 }
 
+export type ProofStatus = 'validated' | 'declined';
+
 export interface SavedPlan {
   planId: string;
   plan: Plan;
   isDone: boolean;
+  proofStatus?: ProofStatus;
   savedAt: string;
 }
 

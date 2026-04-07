@@ -40,9 +40,22 @@ export const SavesScreen: React.FC = () => {
     >
       <View style={styles.saveItemHeader}>
         <Text style={[styles.saveItemTitle, { color: C.black }]} numberOfLines={1}>{item.plan.title}</Text>
-        <View style={[styles.statusBadge, item.isDone ? styles.statusDone : styles.statusTodo]}>
-          <Text style={[styles.statusText, { color: item.isDone ? C.success : C.primary }]}>
-            {item.isDone ? t.saves_status_done : t.saves_status_todo}
+        <View style={[
+          styles.statusBadge,
+          item.isDone
+            ? item.proofStatus === 'validated'
+              ? styles.statusProof
+              : styles.statusDone
+            : styles.statusTodo,
+        ]}>
+          <Text style={[styles.statusText, {
+            color: item.isDone
+              ? item.proofStatus === 'validated' ? '#C8571A' : C.success
+              : C.primary
+          }]}>
+            {item.isDone
+              ? item.proofStatus === 'validated' ? t.proof_validated : t.saves_status_done
+              : t.saves_status_todo}
           </Text>
         </View>
       </View>
@@ -116,6 +129,7 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1 },
   statusTodo: { backgroundColor: '#2D2118', borderColor: '#3D2E22' },
   statusDone: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },
+  statusProof: { backgroundColor: '#C8571A20', borderColor: '#C8571A' },
   statusText: { fontSize: 10, fontWeight: '700' },
   saveItemMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 4 },
   saveItemAuthor: { fontSize: 11 },

@@ -27,6 +27,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
+import { ProofSurveyModal } from '../components/ProofSurveyModal';
 
 const TRANSPORT_ICONS: Record<TransportMode, string> = {
   'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
@@ -79,6 +80,7 @@ export const PlanDetailModal: React.FC = () => {
 
   const savedPlan = savedPlans.find((sp) => sp.planId === planId);
   const isDone = savedPlan?.isDone ?? false;
+  const [showProofSurvey, setShowProofSurvey] = useState(false);
 
   // Sync likes count from feed store
   useEffect(() => {
@@ -110,7 +112,17 @@ export const PlanDetailModal: React.FC = () => {
 
   const handleMarkDone = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    markAsDone(planId);
+    setShowProofSurvey(true);
+  };
+
+  const handleProof = () => {
+    markAsDone(planId, 'validated');
+    setShowProofSurvey(false);
+  };
+
+  const handleDeclineProof = () => {
+    markAsDone(planId, 'declined');
+    setShowProofSurvey(false);
   };
 
   const handleLike = () => {
@@ -200,14 +212,18 @@ export const PlanDetailModal: React.FC = () => {
               style={[
                 styles.doneBtn,
                 isDone
-                  ? { backgroundColor: Colors.successBg, borderColor: Colors.successBorder }
+                  ? savedPlan?.proofStatus === 'validated'
+                    ? { backgroundColor: '#C8571A20', borderColor: '#C8571A' }
+                    : { backgroundColor: Colors.successBg, borderColor: Colors.successBorder }
                   : { backgroundColor: C.primary + '15', borderColor: C.primary },
               ]}
               onPress={!isDone ? handleMarkDone : undefined}
               activeOpacity={isDone ? 1 : 0.7}
             >
-              <Text style={[styles.doneBtnText, { color: isDone ? Colors.success : C.primary }]}>
-                {isDone ? t.plan_already_done : t.plan_mark_done}
+              <Text style={[styles.doneBtnText, { color: isDone ? (savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.success) : C.primary }]}>
+                {isDone
+                  ? savedPlan?.proofStatus === 'validated' ? 'Proof ✓' : t.plan_already_done
+                  : t.plan_mark_done}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -423,6 +439,15 @@ export const PlanDetailModal: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {plan && (
+        <ProofSurveyModal
+          visible={showProofSurvey}
+          plan={plan}
+          onProof={handleProof}
+          onDecline={handleDeclineProof}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };

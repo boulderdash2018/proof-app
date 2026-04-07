@@ -309,6 +309,13 @@ export const fr = {
   privacy_title: 'Confidentialité',
   privacy_private: 'Compte privé',
   privacy_private_hint: 'Quand ton compte est privé, seuls tes abonnés peuvent voir tes plans et activités.',
+
+  // Proof survey
+  proof_survey_title: 'Tu as fait ce plan ?',
+  proof_survey_subtitle: 'Donne ton avis pour aider la communauté',
+  proof_survey_hint: 'Ton avis aide les autres à choisir leurs sorties',
+  proof_validated: 'Proof ✓',
+  proof_declined: 'Passé',
 };
 
 export type TranslationKeys = keyof typeof fr;

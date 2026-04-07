@@ -178,10 +178,10 @@ export const fetchSavedPlans = async (userId: string): Promise<SavedPlan[]> => {
 
     const results: SavedPlan[] = [];
     for (const d of snap.docs) {
-      const data = d.data() as { isDone: boolean; savedAt: string };
+      const data = d.data() as { isDone: boolean; proofStatus?: 'validated' | 'declined'; savedAt: string };
       const plan = await fetchPlanById(d.id);
       if (plan) {
-        results.push({ planId: d.id, plan, isDone: data.isDone, savedAt: data.savedAt });
+        results.push({ planId: d.id, plan, isDone: data.isDone, proofStatus: data.proofStatus, savedAt: data.savedAt });
       }
     }
     // Sort client-side
@@ -221,9 +221,11 @@ export const unsavePlan = async (userId: string, planId: string): Promise<void> 
   await deleteDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId));
 };
 
-/** Mark a saved plan as done */
-export const markPlanAsDone = async (userId: string, planId: string): Promise<void> => {
-  await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), { isDone: true });
+/** Mark a saved plan as done with optional proof status */
+export const markPlanAsDone = async (userId: string, planId: string, proofStatus?: 'validated' | 'declined'): Promise<void> => {
+  const data: Record<string, any> = { isDone: true };
+  if (proofStatus) data.proofStatus = proofStatus;
+  await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data);
 };
 
 // ==================== COMMENTS ====================

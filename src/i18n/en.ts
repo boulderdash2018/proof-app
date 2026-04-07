@@ -311,4 +311,11 @@ export const en: Record<TranslationKeys, string> = {
   privacy_title: 'Privacy',
   privacy_private: 'Private account',
   privacy_private_hint: 'When your account is private, only your followers can see your plans and activities.',
+
+  // Proof survey
+  proof_survey_title: 'You did this plan?',
+  proof_survey_subtitle: 'Share your opinion to help the community',
+  proof_survey_hint: 'Your feedback helps others choose their outings',
+  proof_validated: 'Proof ✓',
+  proof_declined: 'Passed',
 };

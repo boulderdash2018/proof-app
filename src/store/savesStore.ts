@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Plan, SavedPlan } from '../types';
+import { Plan, SavedPlan, ProofStatus } from '../types';
 import {
   fetchSavedPlans,
   markPlanAsDone,
@@ -16,7 +16,7 @@ interface SavesStore {
   savedPlans: SavedPlan[];
   isLoading: boolean;
   fetchSaves: (userId?: string) => Promise<void>;
-  markAsDone: (planId: string) => void;
+  markAsDone: (planId: string, proofStatus?: ProofStatus) => void;
   addCreatedPlan: (plan: Plan) => void;
   unsave: (planId: string) => void;
 }
@@ -38,14 +38,14 @@ export const useSavesStore = create<SavesStore>((set, get) => ({
     }
   },
 
-  markAsDone: (planId: string) => {
+  markAsDone: (planId: string, proofStatus?: ProofStatus) => {
     const uid = getCurrentUserId();
     const { savedPlans } = get();
     const updated = savedPlans.map((sp) =>
-      sp.planId === planId ? { ...sp, isDone: true } : sp
+      sp.planId === planId ? { ...sp, isDone: true, proofStatus } : sp
     );
     set({ savedPlans: updated });
-    if (uid) markPlanAsDone(uid, planId).catch(console.error);
+    if (uid) markPlanAsDone(uid, planId, proofStatus).catch(console.error);
   },
 
   addCreatedPlan: (plan: Plan) => {
