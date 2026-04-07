@@ -28,6 +28,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
+import { MiniStampIcon } from '../components/MiniStampIcon';
 
 const TRANSPORT_ICONS: Record<TransportMode, string> = {
   'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
@@ -424,10 +425,12 @@ export const PlanDetailModal: React.FC = () => {
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? C.primary : C.gray600} />
               <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
             </TouchableOpacity>
-            {(plan.proofCount ?? 0) > 0 && (
-              <View style={styles.actionBtn}>
-                <Ionicons name="shield-checkmark" size={18} color="#C8571A" />
-                <Text style={[styles.actionText, { color: '#C8571A' }]}>{plan.proofCount}</Text>
+            {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
+              <View style={styles.proofStatsRow}>
+                <MiniStampIcon type="proof" size={16} />
+                <Text style={styles.proofStatText}>{plan.proofCount ?? 0}</Text>
+                <MiniStampIcon type="declined" size={16} />
+                <Text style={styles.declinedStatText}>{plan.declinedCount ?? 0}</Text>
               </View>
             )}
           </View>
@@ -533,6 +536,9 @@ const styles = StyleSheet.create({
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, paddingTop: 8 },
   actionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 18, marginBottom: 8 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  proofStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  proofStatText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, color: '#C8571A' },
+  declinedStatText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, color: '#6B7A8D' },
   actionIcon: { fontSize: 18 },
   actionText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, minHeight: 38 },

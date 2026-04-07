@@ -19,6 +19,7 @@ import { useColors } from '../hooks/useColors';
 import { Avatar } from './Avatar';
 import { UserBadge } from './UserBadge';
 import { Chip } from './Chip';
+import { MiniStampIcon } from './MiniStampIcon';
 
 export function parseGradient(gradient: string): string[] {
   const matches = gradient.match(/#[0-9A-Fa-f]{3,8}/g);
@@ -228,10 +229,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </Animated.View>
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
-        {(plan.proofCount ?? 0) > 0 && (
-          <View style={styles.proofIndicator}>
-            <Ionicons name="shield-checkmark" size={14} color="#C8571A" />
-            <Text style={styles.proofIndicatorText}>{plan.proofCount}</Text>
+        {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
+          <View style={styles.proofStats}>
+            <MiniStampIcon type="proof" size={14} />
+            <Text style={styles.proofCountText}>{plan.proofCount ?? 0}</Text>
+            <MiniStampIcon type="declined" size={14} />
+            <Text style={styles.declinedCountText}>{plan.declinedCount ?? 0}</Text>
           </View>
         )}
       </View>
@@ -281,6 +284,7 @@ const styles = StyleSheet.create({
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
   actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
   actionSpacer: { flex: 1 },
-  proofIndicator: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  proofIndicatorText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#C8571A' },
+  proofStats: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  proofCountText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#C8571A' },
+  declinedCountText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#6B7A8D' },
 });

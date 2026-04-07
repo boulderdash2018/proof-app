@@ -223,25 +223,46 @@ export const unsavePlan = async (userId: string, planId: string): Promise<void> 
   await deleteDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId));
 };
 
-/** Mark a saved plan as done with optional proof status */
+/** Mark a saved plan as done with optional proof status (unique vote per user) */
 export const markPlanAsDone = async (userId: string, planId: string, proofStatus?: 'validated' | 'declined'): Promise<void> => {
   const data: Record<string, any> = { isDone: true };
   if (proofStatus) data.proofStatus = proofStatus;
   await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data);
 
-  // Increment proof/declined count on the plan document
+  // Handle unique proof vote per user per plan
   if (proofStatus) {
     try {
+      const voteRef = doc(db, `${PLANS}/${planId}/proofVotes`, userId);
+      const voteSnap = await getDoc(voteRef);
       const planRef = doc(db, PLANS, planId);
-      const planSnap = await getDoc(planRef);
-      if (planSnap.exists()) {
-        const planData = planSnap.data();
-        const field = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
-        const current = planData[field] || 0;
-        await updateDoc(planRef, { [field]: current + 1 });
+
+      if (voteSnap.exists()) {
+        const existingStatus = voteSnap.data().status;
+        if (existingStatus === proofStatus) return; // Same vote, no change
+        // Changed vote: swap counts
+        const planSnap = await getDoc(planRef);
+        if (planSnap.exists()) {
+          const pd = planSnap.data();
+          const oldField = existingStatus === 'validated' ? 'proofCount' : 'declinedCount';
+          const newField = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
+          await updateDoc(planRef, {
+            [oldField]: Math.max(0, (pd[oldField] || 0) - 1),
+            [newField]: (pd[newField] || 0) + 1,
+          });
+        }
+      } else {
+        // New vote: increment
+        const planSnap = await getDoc(planRef);
+        if (planSnap.exists()) {
+          const pd = planSnap.data();
+          const field = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
+          await updateDoc(planRef, { [field]: (pd[field] || 0) + 1 });
+        }
       }
+      // Save/update the vote record
+      await setDoc(voteRef, { status: proofStatus, votedAt: new Date().toISOString() });
     } catch (err) {
-      console.error('[plansService] update proof count error:', err);
+      console.error('[plansService] update proof vote error:', err);
     }
   }
 };
