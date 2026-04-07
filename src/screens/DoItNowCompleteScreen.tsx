@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useDoItNowStore } from '../store/doItNowStore';
 import { useAuthStore } from '../store/authStore';
 import { useFeedStore } from '../store/feedStore';
 import { saveSession, recordPlanCompletion } from '../services/doItNowService';
+import { ProofSurveyModal } from '../components/ProofSurveyModal';
 
 export const DoItNowCompleteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -23,6 +24,7 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const C = useColors();
   const { session, plan, clearSession } = useDoItNowStore();
   const currentUser = useAuthStore((s) => s.user);
+  const [showSurvey, setShowSurvey] = useState(false);
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -61,6 +63,10 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const estimatedMinutes = durationMatch ? parseInt(durationMatch[1], 10) * (planDuration.includes('h') ? 60 : 1) : 999;
   const isSpeedRun = totalMinutes < estimatedMinutes && totalMinutes > 0;
 
+  const handleTerminer = () => {
+    setShowSurvey(true);
+  };
+
   const handleProofIt = () => {
     // Use existing proof system
     const { toggleSave } = useFeedStore.getState();
@@ -80,9 +86,17 @@ export const DoItNowCompleteScreen: React.FC = () => {
     }));
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowSurvey(false);
+    clearSession();
+    navigation.popToTop();
   };
 
-  const handleDone = () => {
+  const handleDecline = () => {
+    // Mark as done but declined
+    const savesStore = require('../store').useSavesStore;
+    savesStore.getState().markAsDone(plan.id, 'declined');
+
+    setShowSurvey(false);
     clearSession();
     navigation.popToTop();
   };
@@ -156,22 +170,22 @@ export const DoItNowCompleteScreen: React.FC = () => {
         {/* Actions */}
         <TouchableOpacity
           style={[styles.proofBtn, { backgroundColor: C.primary }]}
-          onPress={handleProofIt}
+          onPress={handleTerminer}
           activeOpacity={0.8}
         >
-          <Text style={styles.proofBtnText}>Proof it ✓</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.secondaryBtn, { borderColor: C.borderLight }]}
-          onPress={handleDone}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.secondaryBtnText, { color: C.gray700 }]}>Retour au feed</Text>
+          <Text style={styles.proofBtnText}>Terminer</Text>
         </TouchableOpacity>
 
         <View style={{ height: insets.bottom + 20 }} />
       </ScrollView>
+
+      <ProofSurveyModal
+        visible={showSurvey}
+        plan={plan}
+        onProof={handleProofIt}
+        onDecline={handleDecline}
+        skipRating
+      />
     </View>
   );
 };
@@ -202,6 +216,4 @@ const styles = StyleSheet.create({
 
   proofBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 24 },
   proofBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
-  secondaryBtn: { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 10, borderWidth: 1 },
-  secondaryBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
 });

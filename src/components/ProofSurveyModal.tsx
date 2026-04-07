@@ -52,9 +52,10 @@ interface Props {
   plan: Plan;
   onProof: () => void;
   onDecline: () => void;
+  skipRating?: boolean;
 }
 
-export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDecline }) => {
+export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDecline, skipRating }) => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
@@ -101,12 +102,19 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
       }),
     ]).start(() => {
       setTimeout(() => {
-        // Transition to rating step instead of closing
-        setStampType('none');
-        stampScale.setValue(0);
-        overlayOpacity.setValue(0);
-        initPlaceRatings();
-        setStep('rate');
+        if (skipRating) {
+          setStampType('none');
+          stampScale.setValue(0);
+          overlayOpacity.setValue(0);
+          finishAndClose();
+        } else {
+          // Transition to rating step instead of closing
+          setStampType('none');
+          stampScale.setValue(0);
+          overlayOpacity.setValue(0);
+          initPlaceRatings();
+          setStep('rate');
+        }
       }, 900);
     });
   };
