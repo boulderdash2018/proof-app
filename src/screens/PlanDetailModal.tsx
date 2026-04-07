@@ -22,7 +22,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, Chip, UserBadge } from '../components';
-import { useAuthStore, useFeedStore, useSavesStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore, useGuestStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
@@ -66,6 +66,9 @@ export const PlanDetailModal: React.FC = () => {
   const { t } = useTranslation();
 
   const currentUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
+  const isGuest = !isAuthenticated;
   const feedPlans = useFeedStore((s) => s.plans);
   const { likedPlanIds, savedPlanIds, toggleLike, toggleSave } = useFeedStore();
   const { savedPlans, markAsDone, fetchSaves } = useSavesStore();
@@ -139,12 +142,14 @@ export const PlanDetailModal: React.FC = () => {
   };
 
   const handleLike = () => {
+    if (isGuest) { setShowAccountPrompt(true); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLocalLikesCount((prev) => prev + (isLiked ? -1 : 1));
     toggleLike(planId);
   };
 
   const handleSave = () => {
+    if (isGuest) { setShowAccountPrompt(true); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleSave(planId);
   };
@@ -436,28 +441,38 @@ export const PlanDetailModal: React.FC = () => {
           </View>
 
           {/* Comment input */}
-          <View style={[styles.commentInputRow, { backgroundColor: C.gray200 }]}>
-            <RNTextInput
-              style={[styles.commentInput, { color: C.black }]}
-              placeholder={t.plan_comment_placeholder}
-              placeholderTextColor={C.gray600}
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-              maxLength={500}
-            />
+          {isGuest ? (
             <TouchableOpacity
-              onPress={handleSendComment}
-              disabled={!commentText.trim() || isSending}
-              style={[styles.sendBtn, { opacity: commentText.trim() ? 1 : 0.4 }]}
+              style={[styles.commentInputRow, { backgroundColor: C.gray200 }]}
+              onPress={() => setShowAccountPrompt(true)}
+              activeOpacity={0.7}
             >
-              {isSending ? (
-                <ActivityIndicator size="small" color={C.primary} />
-              ) : (
-                <Text style={[styles.sendBtnText, { color: C.primary }]}>{t.plan_comment_send}</Text>
-              )}
+              <Text style={[styles.commentInput, { color: C.gray600 }]}>{t.plan_comment_placeholder}</Text>
             </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={[styles.commentInputRow, { backgroundColor: C.gray200 }]}>
+              <RNTextInput
+                style={[styles.commentInput, { color: C.black }]}
+                placeholder={t.plan_comment_placeholder}
+                placeholderTextColor={C.gray600}
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                onPress={handleSendComment}
+                disabled={!commentText.trim() || isSending}
+                style={[styles.sendBtn, { opacity: commentText.trim() ? 1 : 0.4 }]}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color={C.primary} />
+                ) : (
+                  <Text style={[styles.sendBtnText, { color: C.primary }]}>{t.plan_comment_send}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
 
