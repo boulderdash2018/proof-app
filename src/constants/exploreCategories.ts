@@ -45,6 +45,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
         items: [
           { name: 'Artistic date', icon: 'color-palette-outline', emoji: '🎨', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
           { name: 'Original / niche', icon: 'compass-outline', emoji: '🔮', gradient: ['#5A6880', '#3A4858'], subtitle: '' },
+          { name: 'Picnic date', icon: 'sunny-outline', emoji: '🧺', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
         ],
       },
     ],
@@ -60,6 +61,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
         items: [
           { name: 'Food-lover day', icon: 'restaurant-outline', emoji: '🍕', gradient: ['#8B6A50', '#5C4030'], subtitle: '' },
           { name: 'Coffee-lover day', icon: 'cafe-outline', emoji: '☕', gradient: ['#6B5A70', '#4A3D55'], subtitle: '' },
+          { name: 'Brunch crawl', icon: 'sunny-outline', emoji: '🥞', gradient: ['#8B7530', '#5C4E20'], subtitle: '', hot: true },
         ],
       },
       {
@@ -69,6 +71,8 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'Vinyl dig', icon: 'musical-notes-outline', emoji: '🎵', gradient: ['#5A5048', '#3D352E'], subtitle: '' },
           { name: 'Cinephile day', icon: 'film-outline', emoji: '🎬', gradient: ['#7B4A4A', '#553030'], subtitle: '' },
           { name: 'Theatre lover day', icon: 'ticket-outline', emoji: '🎭', gradient: ['#6B5080', '#4A3560'], subtitle: '' },
+          { name: 'Gallery hopping', icon: 'images-outline', emoji: '🖼️', gradient: ['#6B5080', '#4A3560'], subtitle: '' },
+          { name: 'Bookshop crawl', icon: 'book-outline', emoji: '📚', gradient: ['#5A5048', '#3D352E'], subtitle: '' },
         ],
       },
       {
@@ -78,6 +82,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'Touristic day', icon: 'map-outline', emoji: '🗺️', gradient: ['#5A6878', '#3A4858'], subtitle: 'Cheap / medium / expensive' },
           { name: 'Running day', icon: 'fitness-outline', emoji: '🏃', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
           { name: 'Meet new people', icon: 'people-outline', emoji: '🤝', gradient: ['#7B6840', '#5C4E28'], subtitle: '' },
+          { name: 'Thrift & vintage', icon: 'shirt-outline', emoji: '👕', gradient: ['#7B6088', '#4A3555'], subtitle: 'Fripes & pépites' },
         ],
       },
     ],
@@ -96,6 +101,8 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'Girls day', icon: 'heart-outline', emoji: '💅', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
           { name: 'Cheap & nice spot', icon: 'cash-outline', emoji: '💰', gradient: ['#8B6A50', '#5C4030'], subtitle: 'For the crew' },
           { name: 'Rainy day with friends', icon: 'rainy-outline', emoji: '🌧️', gradient: ['#5A6880', '#3A4858'], subtitle: '' },
+          { name: 'Wine bar crawl', icon: 'wine-outline', emoji: '🍷', gradient: ['#7B4A4A', '#553030'], subtitle: '', hot: true },
+          { name: 'Padel & chill', icon: 'tennisball-outline', emoji: '🏓', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
         ],
       },
     ],
@@ -115,6 +122,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'Meet new people', icon: 'people-outline', emoji: '🤝', gradient: ['#7B6840', '#5C4E28'], subtitle: '' },
           { name: 'Sports day solo', icon: 'barbell-outline', emoji: '🏋️', gradient: ['#5A6878', '#3A4858'], subtitle: '' },
           { name: 'Rainy day solo', icon: 'cloudy-outline', emoji: '🌧️', gradient: ['#5A5048', '#3D352E'], subtitle: '' },
+          { name: 'Wellness day', icon: 'water-outline', emoji: '🧖', gradient: ['#4A7068', '#2D4A44'], subtitle: '' },
         ],
       },
     ],
@@ -151,6 +159,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'After-work plan', icon: 'moon-outline', emoji: '🍸', gradient: ['#6B5080', '#4A3560'], subtitle: '' },
           { name: 'Hangover recovery', icon: 'medical-outline', emoji: '🥴', gradient: ['#4A7068', '#2D4A44'], subtitle: '' },
           { name: 'Birthday', icon: 'gift-outline', emoji: '🎂', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
+          { name: 'Rooftop night', icon: 'business-outline', emoji: '🌃', gradient: ['#5A6880', '#3A4858'], subtitle: '', hot: true },
         ],
       },
     ],
