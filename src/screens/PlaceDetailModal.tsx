@@ -172,6 +172,14 @@ export const PlaceDetailModal: React.FC = () => {
     return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
   };
 
+  const getPlanPhoto = (p: Plan): string | null => {
+    if (p.coverPhotos && p.coverPhotos.length > 0) return p.coverPhotos[0];
+    for (const pl of p.places) {
+      if (pl.photoUrls && pl.photoUrls.length > 0) return pl.photoUrls[0];
+    }
+    return null;
+  };
+
   const renderRelatedPlans = () => {
     if (relatedPlans.length === 0) return null;
 
@@ -183,6 +191,7 @@ export const PlaceDetailModal: React.FC = () => {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedScroll}>
           {relatedPlans.map((plan) => {
             const colors = parseGradient(plan.gradient);
+            const photo = getPlanPhoto(plan);
             return (
               <TouchableOpacity
                 key={plan.id}
@@ -190,12 +199,18 @@ export const PlaceDetailModal: React.FC = () => {
                 activeOpacity={0.85}
                 onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
               >
-                <LinearGradient
-                  colors={colors as [string, string, ...string[]]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.relatedGradient}
-                >
+                <View style={styles.relatedGradient}>
+                  {photo ? (
+                    <Image source={{ uri: photo }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  ) : (
+                    <LinearGradient
+                      colors={colors as [string, string, ...string[]]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  )}
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.relatedOverlay} />
                   <Text style={styles.relatedTitle} numberOfLines={2}>{plan.title}</Text>
                   <View style={styles.relatedMeta}>
                     <Text style={styles.relatedAuthor}>{plan.author.displayName}</Text>
@@ -206,7 +221,7 @@ export const PlaceDetailModal: React.FC = () => {
                       <Text style={styles.relatedMetaText}>{plan.duration}</Text>
                     </View>
                   </View>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -527,7 +542,8 @@ const styles = StyleSheet.create({
   relatedSection: { paddingTop: 18, paddingBottom: 8 },
   relatedScroll: { paddingHorizontal: 18, gap: 10 },
   relatedCard: { width: 160, borderRadius: 14, overflow: 'hidden' },
-  relatedGradient: { height: 110, padding: 12, justifyContent: 'flex-end' },
+  relatedGradient: { height: 110, padding: 12, justifyContent: 'flex-end', overflow: 'hidden' },
+  relatedOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
   relatedTitle: { color: '#FFFFFF', fontSize: 13, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   relatedMeta: { marginTop: 6 },
   relatedAuthor: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontFamily: Fonts.serifSemiBold },

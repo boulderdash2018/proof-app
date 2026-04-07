@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -27,6 +28,14 @@ const MINI_CARD_W = (width - Layout.screenPadding * 2 - 8) / 2;
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
   return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
+};
+
+const getPlanPhoto = (plan: { coverPhotos?: string[]; places: { photoUrls?: string[] }[] }): string | null => {
+  if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos[0];
+  for (const p of plan.places) {
+    if (p.photoUrls && p.photoUrls.length > 0) return p.photoUrls[0];
+  }
+  return null;
 };
 
 export const ProfileScreen: React.FC = () => {
@@ -154,11 +163,18 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.plansGrid}>
               {userPlans.map((plan) => {
                 const colors = parseGradient(plan.gradient);
+                const photo = getPlanPhoto(plan);
                 return (
                   <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
-                    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.miniCard}>
+                    <View style={styles.miniCard}>
+                      {photo ? (
+                        <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                      ) : (
+                        <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                      )}
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
                       <Text style={styles.miniCardTitle} numberOfLines={2}>{plan.title}</Text>
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -172,12 +188,19 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.plansGrid}>
               {donePlans.map((sp) => {
                 const colors = parseGradient(sp.plan.gradient);
+                const photo = getPlanPhoto(sp.plan);
                 return (
                   <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
-                    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.miniCard}>
+                    <View style={styles.miniCard}>
+                      {photo ? (
+                        <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                      ) : (
+                        <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                      )}
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
                       <View style={styles.doneCheck}><Text style={styles.doneCheckText}>✓</Text></View>
                       <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -191,11 +214,18 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.plansGrid}>
               {todoPlans.map((sp) => {
                 const colors = parseGradient(sp.plan.gradient);
+                const photo = getPlanPhoto(sp.plan);
                 return (
                   <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
-                    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.miniCard}>
+                    <View style={styles.miniCard}>
+                      {photo ? (
+                        <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                      ) : (
+                        <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                      )}
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
                       <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -229,7 +259,9 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
   sectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end' },
+  miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end', overflow: 'hidden' },
+  miniCardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
+  miniCardOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 50 },
   miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },

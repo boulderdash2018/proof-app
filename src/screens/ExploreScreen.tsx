@@ -228,22 +228,37 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
+  const getPlanPhoto = (plan: Plan): string | null => {
+    if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos[0];
+    for (const place of plan.places) {
+      if (place.photoUrls && place.photoUrls.length > 0) return place.photoUrls[0];
+    }
+    return null;
+  };
+
   const renderCompactPlan = ({ item }: { item: Plan }) => {
     const colors = parseGradientColors(item.gradient);
+    const photo = getPlanPhoto(item);
     return (
       <TouchableOpacity
         style={[styles.compactCard, { borderColor: C.cardBorder, backgroundColor: C.gray200 }]}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
       >
-        <LinearGradient
-          colors={colors as [string, string, ...string[]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.compactBanner}
-        >
+        <View style={styles.compactBanner}>
+          {photo ? (
+            <Image source={{ uri: photo }} style={styles.compactBannerImage} />
+          ) : (
+            <LinearGradient
+              colors={colors as [string, string, ...string[]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.compactBannerOverlay} />
           <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
-        </LinearGradient>
+        </View>
         <View style={styles.compactMeta}>
           <View style={styles.compactMetaItem}>
             <Ionicons name="cash-outline" size={13} color={C.gold} />
@@ -509,6 +524,20 @@ const styles = StyleSheet.create({
     height: 90,
     justifyContent: 'flex-end',
     padding: 12,
+    overflow: 'hidden',
+  },
+  compactBannerImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  compactBannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
   },
   compactTitle: {
     color: '#FFFFFF',
