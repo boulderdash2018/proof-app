@@ -14,6 +14,8 @@ import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { PlanDetailModal } from '../screens/PlanDetailModal';
 import { PlaceDetailModal } from '../screens/PlaceDetailModal';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { DoItNowScreen } from '../screens/DoItNowScreen';
+import { DoItNowCompleteScreen } from '../screens/DoItNowCompleteScreen';
 import { AccountPromptModal } from '../components/AccountPromptModal';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -51,6 +53,8 @@ export const RootNavigator: React.FC = () => {
                 <Stack.Screen name="PlaceDetail" component={PlaceDetailModal} />
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
               </Stack.Group>
+              <Stack.Screen name="DoItNow" component={DoItNowScreen} options={{ animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="DoItNowComplete" component={DoItNowCompleteScreen} options={{ animation: 'slide_from_right' }} />
             </>
           )
         ) : wantsAuth ? (

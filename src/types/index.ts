@@ -183,3 +183,42 @@ export interface FriendRequest {
   status: 'pending' | 'accepted' | 'declined';
   createdAt: string;
 }
+
+// ==================== DO IT NOW ====================
+
+export type DoItNowTransport = 'walking' | 'transit' | 'bicycling' | 'driving';
+
+export interface DoItNowPlaceVisit {
+  placeId: string;
+  placeName: string;
+  arrivedAt: string;
+  leftAt?: string;
+  timeSpentMinutes?: number;
+  photoUrl?: string;
+  rating?: number;
+  reviewText?: string;
+}
+
+export interface DoItNowSession {
+  id: string;
+  planId: string;
+  planTitle: string;
+  userId: string;
+  transport: DoItNowTransport;
+  startedAt: string;
+  completedAt?: string;
+  currentPlaceIndex: number;
+  placesVisited: DoItNowPlaceVisit[];
+  totalDurationMinutes?: number;
+  isPaused: boolean;
+  status: 'active' | 'paused' | 'completed';
+}
+
+export interface PlanPhoto {
+  planId: string;
+  planTitle: string;
+  placeId: string;
+  placeName: string;
+  photoUrl: string;
+  takenAt: string;
+}

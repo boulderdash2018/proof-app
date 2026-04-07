@@ -33,7 +33,14 @@
       "expo-image-picker",
       "expo-notifications",
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Proof needs your location to guide you through plans.",
+          "locationWhenInUsePermission": "Proof needs your location to guide you through plans."
+        }
+      ]
     ]
   }
 }

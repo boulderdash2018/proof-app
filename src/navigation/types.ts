@@ -53,6 +53,8 @@ export type RootStackParamList = {
   PlanDetail: { planId: string };
   PlaceDetail: { placeId?: string; planId?: string; googlePlaceId?: string };
   Notifications: undefined;
+  DoItNow: { planId: string };
+  DoItNowComplete: undefined;
 };
 
 export type BottomTabParamList = {

@@ -31,6 +31,8 @@ import { getPlaceDetails } from '../services/googlePlacesService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
 import { PlanMapModal } from '../components/PlanMapModal';
+import { TransportChooser } from '../components/TransportChooser';
+import { useDoItNowStore } from '../store/doItNowStore';
 
 const TRANSPORT_ICONS: Record<TransportMode, string> = {
   'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
@@ -89,6 +91,7 @@ export const PlanDetailModal: React.FC = () => {
   const [showProofSurvey, setShowProofSurvey] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
+  const [showTransportChooser, setShowTransportChooser] = useState(false);
 
   const isOwner = currentUser && plan && plan.authorId === currentUser.id;
 
@@ -508,6 +511,17 @@ export const PlanDetailModal: React.FC = () => {
 
         {/* ========== BOTTOM BAR: Actions + Comment Input ========== */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8, backgroundColor: C.white, borderTopColor: C.border }]}>
+          {/* Do it now button */}
+          {!isGuest && plan.places.some((p) => p.latitude && p.longitude) && (
+            <TouchableOpacity
+              style={[styles.doItNowBtn, { backgroundColor: C.primary }]}
+              onPress={() => setShowTransportChooser(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.doItNowText}>Do it now ?</Text>
+              <Text style={styles.doItNowEmoji}>🗺</Text>
+            </TouchableOpacity>
+          )}
           {/* Action buttons */}
           <View style={styles.actionBar}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
@@ -585,6 +599,17 @@ export const PlanDetailModal: React.FC = () => {
               .filter((p) => p.latitude && p.longitude)
               .map((p) => ({ name: p.name, latitude: p.latitude!, longitude: p.longitude! }))}
           />
+          <TransportChooser
+            visible={showTransportChooser}
+            onClose={() => setShowTransportChooser(false)}
+            recommendedTransport={plan.transport}
+            authorName={plan.author.username}
+            onSelect={(transport) => {
+              setShowTransportChooser(false);
+              useDoItNowStore.getState().startSession(plan, transport, currentUser!.id);
+              navigation.navigate('DoItNow', { planId: plan.id });
+            }}
+          />
         </>
       )}
     </KeyboardAvoidingView>
@@ -622,6 +647,9 @@ const styles = StyleSheet.create({
   planMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   planMenuText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   planMenuDivider: { height: 1, marginHorizontal: 10 },
+  doItNowBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 18, marginBottom: 10, paddingVertical: 12, borderRadius: 12 },
+  doItNowText: { color: '#FFF', fontSize: 15, fontFamily: Fonts.serifBold },
+  doItNowEmoji: { fontSize: 16 },
   sectionLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 18, marginBottom: 10 },
   placeRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
   placeLeftCol: { alignItems: 'center', marginRight: 12 },
