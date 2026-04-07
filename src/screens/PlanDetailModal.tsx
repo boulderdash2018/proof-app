@@ -150,6 +150,8 @@ export const PlanDetailModal: React.FC = () => {
 
   const handleSave = () => {
     if (isGuest) { setShowAccountPrompt(true); return; }
+    // Block unsave if user already submitted a proof
+    if (isSaved && isDone) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleSave(planId);
   };
@@ -426,9 +428,10 @@ export const PlanDetailModal: React.FC = () => {
               <Ionicons name="chatbubble-outline" size={18} color={C.gray600} />
               <Text style={[styles.actionText, { color: C.gray800 }]}>{localCommentsCount}</Text>
             </View>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSave} activeOpacity={isSaved && isDone ? 1 : 0.2}>
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? C.primary : C.gray600} />
               <Text style={[styles.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
+              {isSaved && isDone && <Ionicons name="lock-closed" size={10} color={C.gray500} style={{ marginLeft: 2 }} />}
             </TouchableOpacity>
             {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
               <View style={styles.proofStatsRow}>

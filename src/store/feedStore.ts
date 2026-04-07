@@ -195,6 +195,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const savesStore = useSavesStore.getState();
 
     if (newSaved.has(planId)) {
+      // Block unsave if user already submitted a proof for this plan
+      const savedEntry = savesStore.savedPlans.find((sp) => sp.planId === planId);
+      if (savedEntry?.isDone) return;
+
       newSaved.delete(planId);
       analytics.planUnsaved(planId);
       savesStore.unsave(planId);
