@@ -2,10 +2,7 @@ export type BadgeType = 'top_creator' | 'creator' | 'novice';
 
 export type TransportMode = 'Métro' | 'Vélo' | 'À pied' | 'Voiture' | 'Trottinette';
 
-export type CategoryTag =
-  | 'cheap date' | 'w the bro' | 'alone' | 'tiktokable' | 'niche'
-  | 'soirée' | 'sport' | 'famille' | 'culture' | 'outdoor'
-  | 'foodie' | 'fashion' | 'romantique' | 'solo vibe';
+export type CategoryTag = string;
 
 export interface User {
   id: string;
@@ -84,6 +81,7 @@ export interface Plan {
   duration: string;
   transport: TransportMode;
   travelSegments?: TravelSegment[];
+  coverPhotos?: string[];
   likesCount: number;
   commentsCount: number;
   xpReward: number;

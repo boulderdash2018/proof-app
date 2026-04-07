@@ -54,6 +54,7 @@ export const createPlan = async (
     duration: string;
     transport: TransportMode;
     travelSegments?: TravelSegment[];
+    coverPhotos?: string[];
   },
   author: User
 ): Promise<Plan> => {
@@ -73,6 +74,7 @@ export const createPlan = async (
     duration: planData.duration,
     transport: planData.transport,
     travelSegments: planData.travelSegments || [],
+    coverPhotos: planData.coverPhotos || [],
     likesCount: 0,
     commentsCount: 0,
     xpReward: 20,

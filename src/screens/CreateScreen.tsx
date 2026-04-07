@@ -17,8 +17,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts, CATEGORIES } from '../constants';
+import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS } from '../constants';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -30,6 +34,7 @@ import {
   searchPlacesAutocomplete,
   getPlaceDetails,
   getReadableType,
+  computeTravelDuration,
   GooglePlaceAutocomplete,
 } from '../services/googlePlacesService';
 
@@ -91,12 +96,95 @@ export const CreateScreen: React.FC = () => {
   };
 
   const [title, setTitle] = useState('');
+  const [coverPhotos, setCoverPhotos] = useState<string[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(EXPLORE_GROUPS[0].key);
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
   const [travels, setTravels] = useState<TravelEntry[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ========== PHOTO PICKER ==========
+  const readFileAsDataUrl = (file: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const uploadPhoto = async (dataUrl: string): Promise<string> => {
+    const filename = `plans/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    const storageRef = ref(storage, filename);
+    await uploadString(storageRef, dataUrl, 'data_url');
+    return getDownloadURL(storageRef);
+  };
+
+  const pickPhotos = async () => {
+    if (Platform.OS === 'web') {
+      // On web, create and click a hidden file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.onchange = async () => {
+        const files = input.files;
+        if (!files || files.length === 0) return;
+        setIsUploadingPhotos(true);
+        try {
+          const maxFiles = Math.min(files.length, 7 - coverPhotos.length);
+          // Copy files to array and read all data URLs first (avoids FileList reference issues)
+          const fileArray: File[] = [];
+          for (let i = 0; i < maxFiles; i++) fileArray.push(files[i]);
+          const dataUrls = await Promise.all(fileArray.map((f) => readFileAsDataUrl(f)));
+          // Upload sequentially to avoid overwhelming Firebase
+          const urls: string[] = [];
+          for (const dataUrl of dataUrls) {
+            const url = await uploadPhoto(dataUrl);
+            urls.push(url);
+          }
+          setCoverPhotos((prev) => [...prev, ...urls].slice(0, 7));
+        } catch (err) {
+          console.error('Photo upload error:', err);
+          Alert.alert('Erreur', "Impossible d'uploader les photos. Vérifiez les règles Firebase Storage.");
+        } finally {
+          setIsUploadingPhotos(false);
+        }
+      };
+      input.click();
+      return;
+    }
+    // On native, use expo-image-picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 7 - coverPhotos.length,
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets) return;
+
+    setIsUploadingPhotos(true);
+    try {
+      const urls: string[] = [];
+      for (const asset of result.assets) {
+        const dataUrl = await readFileAsDataUrl(await (await fetch(asset.uri)).blob());
+        urls.push(await uploadPhoto(dataUrl));
+      }
+      setCoverPhotos((prev) => [...prev, ...urls].slice(0, 7));
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      Alert.alert('Erreur', "Impossible d'uploader les photos");
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setCoverPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Place picker state
   const [showPlacePicker, setShowPlacePicker] = useState(false);
@@ -134,10 +222,23 @@ export const CreateScreen: React.FC = () => {
 
     if (places.length > 0) {
       const prevPlace = places[places.length - 1];
+      const defaultTransport: TransportMode = 'À pied';
       setTravels((prev) => [
         ...prev,
-        { fromId: prevPlace.id, toId: item.placeId, duration: '', transport: 'À pied' },
+        { fromId: prevPlace.id, toId: item.placeId, duration: '...', transport: defaultTransport },
       ]);
+      // Auto-compute travel duration
+      computeTravelDuration(prevPlace.id, item.placeId, defaultTransport).then((mins) => {
+        if (mins !== null) {
+          setTravels((prev) => prev.map((t) =>
+            t.fromId === prevPlace.id && t.toId === item.placeId ? { ...t, duration: String(mins) } : t
+          ));
+        } else {
+          setTravels((prev) => prev.map((t) =>
+            t.fromId === prevPlace.id && t.toId === item.placeId && t.duration === '...' ? { ...t, duration: '' } : t
+          ));
+        }
+      });
     }
 
     setShowPlacePicker(false);
@@ -234,7 +335,18 @@ export const CreateScreen: React.FC = () => {
   };
 
   const updateTravelTransport = (index: number, mode: TransportMode) => {
-    setTravels((prev) => prev.map((t, i) => i === index ? { ...t, transport: mode } : t));
+    setTravels((prev) => prev.map((t, i) => i === index ? { ...t, transport: mode, duration: '...' } : t));
+    // Auto-compute new travel duration
+    const travel = travels[index];
+    if (travel) {
+      computeTravelDuration(travel.fromId, travel.toId, mode).then((mins) => {
+        setTravels((prev) => prev.map((t, i) => {
+          if (i !== index) return t;
+          if (mins !== null) return { ...t, duration: String(mins) };
+          return { ...t, duration: '' };
+        }));
+      });
+    }
   };
 
   // ========== VALIDATION ==========
@@ -250,9 +362,10 @@ export const CreateScreen: React.FC = () => {
       if (!p.duration || isNaN(parseInt(p.duration, 10))) e[`place_duration_${i}`] = t.create_error_numbers_only;
     });
 
-    // Check each travel has valid duration
+    // Check each travel has valid duration (skip if still loading '...')
     travels.forEach((tr, i) => {
-      if (!tr.duration || isNaN(parseInt(tr.duration, 10))) e[`travel_duration_${i}`] = t.create_error_numbers_only;
+      if (tr.duration === '...') e[`travel_duration_${i}`] = t.create_travel_loading || 'Calcul en cours...';
+      else if (!tr.duration || isNaN(parseInt(tr.duration, 10))) e[`travel_duration_${i}`] = t.create_error_numbers_only;
     });
 
     setErrors(e);
@@ -271,11 +384,19 @@ export const CreateScreen: React.FC = () => {
         transport: tr.transport,
       }));
 
-      const newPlan = await createPlan(
-        {
-          title,
-          tags: selectedTags,
-          places: places.map((p) => ({
+      // Fetch Google Place photos for each place (for fallback carousel)
+      const placesWithPhotos = await Promise.all(
+        places.map(async (p) => {
+          let photoUrls: string[] = [];
+          if (p.googlePlaceId) {
+            try {
+              const details = await getPlaceDetails(p.googlePlaceId);
+              if (details && details.photoUrls.length > 0) {
+                photoUrls = details.photoUrls.slice(0, 2);
+              }
+            } catch {}
+          }
+          return {
             id: p.id,
             googlePlaceId: p.googlePlaceId,
             name: p.name,
@@ -285,13 +406,23 @@ export const CreateScreen: React.FC = () => {
             reviewCount: 0,
             ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
             reviews: [],
+            photoUrls,
             placePrice: parseInt(p.price, 10) || 0,
             placeDuration: parseInt(p.duration, 10) || 0,
-          })),
+          };
+        })
+      );
+
+      const newPlan = await createPlan(
+        {
+          title,
+          tags: selectedTags,
+          places: placesWithPhotos,
           price: `${totalPrice}€`,
           duration: formatDuration(totalDuration),
           transport: mainTransport,
           travelSegments,
+          coverPhotos,
         },
         user
       );
@@ -407,15 +538,16 @@ export const CreateScreen: React.FC = () => {
               <View style={styles.travelInputGroup}>
                 <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_travel_time}</Text>
                 <View style={[styles.placeInputWrap, { backgroundColor: C.white, borderColor: errors[`travel_duration_${index}`] ? Colors.error : 'transparent' }]}>
-                  <RNTextInput
-                    style={[styles.placeInput, { color: C.black }]}
-                    placeholder={t.create_travel_time_placeholder}
-                    placeholderTextColor={C.gray500}
-                    value={travel.duration}
-                    onChangeText={(v) => updateTravelDuration(index, v)}
-                    keyboardType="numeric"
-                    maxLength={4}
-                  />
+                  {travel.duration === '...' ? (
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 }}>
+                      <ActivityIndicator size="small" color={C.primary} />
+                      <Text style={[styles.placeInput, { color: C.gray500 }]}>Calcul...</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.placeInput, { color: travel.duration ? C.black : C.gray500, paddingHorizontal: 8, paddingVertical: 6 }]}>
+                      {travel.duration ? `${travel.duration}` : 'Auto'}
+                    </Text>
+                  )}
                   <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>min</Text>
                 </View>
                 {errors[`travel_duration_${index}`] && (
@@ -469,12 +601,107 @@ export const CreateScreen: React.FC = () => {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
 
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_category}</Text>
-          <View style={styles.chipsWrap}>
-            {CATEGORIES.map((cat) => (
-              <Chip key={cat.name} label={`${cat.emoji} ${cat.name}`} variant={selectedTags.includes(cat.name) ? 'filled-black' : 'filled-gray'} onPress={() => toggleTag(cat.name)} />
+          {/* Cover Photos */}
+          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Photos de couverture</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosPickerScroll} contentContainerStyle={styles.photosPickerContainer}>
+            {coverPhotos.map((uri, i) => (
+              <View key={i} style={styles.photoThumbWrap}>
+                <Image source={{ uri }} style={styles.photoThumb} />
+                <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(i)}>
+                  <Ionicons name="close-circle" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
             ))}
-          </View>
+            {coverPhotos.length < 7 && (
+              <TouchableOpacity
+                style={[styles.photoAddBtn, { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+                onPress={pickPhotos}
+                disabled={isUploadingPhotos}
+              >
+                {isUploadingPhotos ? (
+                  <ActivityIndicator size="small" color={C.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="camera-outline" size={24} color={C.gray600} />
+                    <Text style={[styles.photoAddText, { color: C.gray600 }]}>Ajouter</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+          <Text style={[styles.photoHint, { color: C.gray500 }]}>
+            {coverPhotos.length === 0 ? 'Optionnel · Les photos des lieux seront utilisées par défaut' : `${coverPhotos.length}/7 photos`}
+          </Text>
+
+          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_category}</Text>
+          {/* Group filter chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
+            {EXPLORE_GROUPS.map((group) => (
+              <TouchableOpacity
+                key={group.key}
+                style={[
+                  styles.groupChip,
+                  { backgroundColor: selectedGroup === group.key ? C.primary : C.gray200, borderColor: selectedGroup === group.key ? C.primary : C.borderLight },
+                ]}
+                onPress={() => setSelectedGroup(group.key)}
+              >
+                <Text style={styles.groupChipEmoji}>{group.emoji}</Text>
+                <Text style={[styles.groupChipText, { color: selectedGroup === group.key ? '#FFF' : C.gray800 }]}>{group.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {/* Category cards from selected group */}
+          {(EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
+            <View key={section.title} style={styles.categorySectionWrap}>
+              <Text style={[styles.categorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
+              <View style={styles.categoryGrid}>
+                {section.items.map((item) => {
+                  const isSelected = selectedTags.includes(item.name);
+                  const gradColors = item.gradient as [string, string];
+                  return (
+                    <TouchableOpacity
+                      key={item.name}
+                      style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
+                      onPress={() => toggleTag(item.name)}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.categoryCardGradient, isSelected && { borderColor: C.primary, borderWidth: 2 }]}>
+                        {item.icon && (
+                          <View style={styles.categoryCardIconWrap}>
+                            <Ionicons name={item.icon as any} size={18} color="rgba(255,255,255,0.5)" />
+                          </View>
+                        )}
+                        {!item.icon && item.emoji && (
+                          <View style={styles.categoryCardIconWrap}>
+                            <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+                          </View>
+                        )}
+                        <View style={styles.categoryCardBottom}>
+                          <Text style={styles.categoryCardName}>{item.name}</Text>
+                          {item.subtitle ? <Text style={styles.categoryCardSub}>{item.subtitle}</Text> : null}
+                        </View>
+                        {isSelected && (
+                          <View style={styles.categoryCardCheck}>
+                            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                          </View>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+          {selectedTags.length > 0 && (
+            <View style={styles.selectedTagsWrap}>
+              {selectedTags.map((tag) => (
+                <TouchableOpacity key={tag} style={[styles.selectedTagChip, { backgroundColor: C.primary + '20', borderColor: C.primary }]} onPress={() => toggleTag(tag)}>
+                  <Text style={[styles.selectedTagText, { color: C.primary }]}>{tag}</Text>
+                  <Ionicons name="close" size={14} color={C.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
           {errors.tags && <Text style={styles.errorText}>{errors.tags}</Text>}
 
           <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_places}</Text>
@@ -699,4 +926,39 @@ const styles = StyleSheet.create({
   placeOptionName: { fontSize: 14, fontWeight: '700' },
   placeOptionType: { fontSize: 12, marginTop: 2 },
   placeOptionAdd: { fontSize: 24, fontWeight: '600', paddingLeft: 10 },
+
+  // Photo picker
+  photosPickerScroll: { flexGrow: 0, marginBottom: 4 },
+  photosPickerContainer: { gap: 8 },
+  photoThumbWrap: { position: 'relative' },
+  photoThumb: { width: 90, height: 90, borderRadius: 12 },
+  photoRemoveBtn: { position: 'absolute', top: -6, right: -6 },
+  photoAddBtn: { width: 90, height: 90, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  photoAddText: { fontSize: 10, fontFamily: Fonts.serifSemiBold, marginTop: 4 },
+  photoHint: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 12 },
+
+  // Category group chips
+  groupChipsScroll: { flexGrow: 0, marginBottom: 12 },
+  groupChipsContainer: { gap: 8 },
+  groupChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  groupChipEmoji: { fontSize: 13, marginRight: 5 },
+  groupChipText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+
+  // Category sections & cards
+  categorySectionWrap: { marginBottom: 12 },
+  categorySectionTitle: { fontSize: 10, fontFamily: Fonts.serifSemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryCard: { width: '48%' as any, borderRadius: 14, overflow: 'hidden' },
+  categoryCardSelected: {},
+  categoryCardGradient: { padding: 12, minHeight: 80, justifyContent: 'flex-end', borderRadius: 14 },
+  categoryCardIconWrap: { position: 'absolute', top: 10, right: 10 },
+  categoryCardBottom: {},
+  categoryCardName: { fontSize: 13, fontFamily: Fonts.serifBold, color: '#FFF' },
+  categoryCardSub: { fontSize: 10, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  categoryCardCheck: { position: 'absolute', top: 10, left: 10 },
+
+  // Selected tags
+  selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },
+  selectedTagChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
+  selectedTagText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
 });

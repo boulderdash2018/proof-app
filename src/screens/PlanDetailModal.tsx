@@ -4,11 +4,16 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput as RNTextInput,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -157,6 +162,30 @@ export const PlanDetailModal: React.FC = () => {
   }
 
   const gradientColors = parseGradient(plan.gradient);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+
+  // Collect photos: custom cover photos first, then Google Places photos as fallback
+  const allPhotos: string[] = (() => {
+    if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos;
+    const placePhotos: string[] = [];
+    for (const place of plan.places) {
+      if (place.photoUrls) {
+        for (const url of place.photoUrls) {
+          placePhotos.push(url);
+          if (placePhotos.length >= 7) break;
+        }
+      }
+      if (placePhotos.length >= 7) break;
+    }
+    return placePhotos;
+  })();
+
+  const detailBannerWidth = Dimensions.get('window').width;
+
+  const handleDetailPhotoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    setActivePhotoIndex(Math.round(x / detailBannerWidth));
+  };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -187,10 +216,43 @@ export const PlanDetailModal: React.FC = () => {
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 140 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-            <Text style={styles.bannerTitle}>{plan.title}</Text>
-            <Text style={styles.bannerSubtitle}>{t.plan_by} {plan.author.displayName}</Text>
-          </LinearGradient>
+          {allPhotos.length > 0 ? (
+            <View style={styles.bannerWrap}>
+              <FlatList
+                data={allPhotos}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleDetailPhotoScroll}
+                scrollEventThrottle={16}
+                keyExtractor={(_, i) => String(i)}
+                style={{ height: 200 }}
+                nestedScrollEnabled
+                renderItem={({ item }) => (
+                  <View style={{ width: detailBannerWidth, height: 200 }}>
+                    <Image source={{ uri: item }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }} />
+                  </View>
+                )}
+              />
+              <View style={{ position: 'absolute', bottom: 16, left: 18, right: 18 }} pointerEvents="none">
+                <Text style={styles.bannerTitle}>{plan.title}</Text>
+                <Text style={styles.bannerSubtitle}>{t.plan_by} {plan.author.displayName}</Text>
+              </View>
+              {allPhotos.length > 1 && (
+                <View style={{ position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 }} pointerEvents="none">
+                  {allPhotos.map((_, i) => (
+                    <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === activePhotoIndex ? '#FFF' : 'rgba(255,255,255,0.4)' }} />
+                  ))}
+                </View>
+              )}
+            </View>
+          ) : (
+            <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+              <Text style={styles.bannerTitle}>{plan.title}</Text>
+              <Text style={styles.bannerSubtitle}>{t.plan_by} {plan.author.displayName}</Text>
+            </LinearGradient>
+          )}
 
           <View style={[styles.infoSection, { borderBottomColor: C.border }]}>
             <View style={styles.tagsRow}>
@@ -377,7 +439,8 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 160 },
-  banner: { height: 160, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 18 },
+  bannerWrap: { position: 'relative', overflow: 'hidden' },
+  banner: { height: 200, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 18 },
   bannerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFFFFF', marginBottom: 4 },
   bannerSubtitle: { fontSize: 13, fontFamily: Fonts.serifMedium, color: 'rgba(255,255,255,0.7)' },
   infoSection: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1 },

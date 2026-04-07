@@ -1,5 +1,10 @@
+import { Platform } from 'react-native';
+
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
 const BASE_URL = 'https://places.googleapis.com/v1/places';
+
+// On web, use Vercel API routes to avoid CORS; on native, call Google directly
+const isWeb = Platform.OS === 'web';
 
 export interface GooglePlaceAutocomplete {
   placeId: string;
@@ -67,6 +72,9 @@ function getReadableType(types: string[]): string {
 }
 
 function getPhotoUrl(photoName: string, maxWidth: number = 400): string {
+  if (isWeb) {
+    return `/api/places-photo?photoName=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
+  }
   return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&key=${API_KEY}`;
 }
 
@@ -93,12 +101,13 @@ export async function searchPlacesAutocomplete(
   }
 
   try {
-    const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+    const url = isWeb ? '/api/places-autocomplete' : 'https://places.googleapis.com/v1/places:autocomplete';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (!isWeb) headers['X-Goog-Api-Key'] = API_KEY;
+
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': API_KEY,
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -138,14 +147,14 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceDetai
   ];
 
   try {
-    const res = await fetch(`${BASE_URL}/${placeId}`, {
-      method: 'GET',
-      headers: {
-        'X-Goog-Api-Key': API_KEY,
-        'X-Goog-FieldMask': fields.join(','),
-        'Accept-Language': 'fr',
-      },
-    });
+    const url = isWeb
+      ? `/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
+      : `${BASE_URL}/${placeId}`;
+    const headers: Record<string, string> = isWeb
+      ? {}
+      : { 'X-Goog-Api-Key': API_KEY, 'X-Goog-FieldMask': fields.join(','), 'Accept-Language': 'fr' };
+
+    const res = await fetch(url, { method: 'GET', headers });
 
     const data = await res.json();
     if (!data.displayName) return null;
@@ -215,13 +224,16 @@ export async function searchPlacesNearby(
   ];
 
   try {
-    const res = await fetch(`${BASE_URL}:searchText`, {
+    const url = isWeb ? '/api/places-search' : `${BASE_URL}:searchText`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (!isWeb) {
+      headers['X-Goog-Api-Key'] = API_KEY;
+      headers['X-Goog-FieldMask'] = fields.join(',');
+    }
+
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': API_KEY,
-        'X-Goog-FieldMask': fields.join(','),
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -262,6 +274,63 @@ function parsePriceLevel(level: string): number {
 export function priceLevelToSymbol(level?: number): string {
   if (level === undefined) return '';
   return '€'.repeat(Math.max(level, 1));
+}
+
+// ==================== ROUTES / TRAVEL TIME ====================
+const TRANSPORT_TO_TRAVEL_MODE: Record<string, string> = {
+  'Métro': 'TRANSIT',
+  'Vélo': 'BICYCLE',
+  'À pied': 'WALK',
+  'Voiture': 'DRIVE',
+  'Trottinette': 'BICYCLE', // closest match
+};
+
+export async function computeTravelDuration(
+  originPlaceId: string,
+  destinationPlaceId: string,
+  transportMode: string,
+): Promise<number | null> {
+  const travelMode = TRANSPORT_TO_TRAVEL_MODE[transportMode] || 'WALK';
+
+  try {
+    if (isWeb) {
+      const res = await fetch('/api/routes-duration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originPlaceId, destinationPlaceId, travelMode }),
+      });
+      const data = await res.json();
+      if (data.routes && data.routes.length > 0) {
+        const seconds = parseInt(data.routes[0].duration.replace('s', ''), 10);
+        return Math.round(seconds / 60);
+      }
+      return null;
+    } else {
+      const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': API_KEY,
+          'X-Goog-FieldMask': 'routes.duration',
+        },
+        body: JSON.stringify({
+          origin: { placeId: originPlaceId },
+          destination: { placeId: destinationPlaceId },
+          travelMode,
+          languageCode: 'fr',
+        }),
+      });
+      const data = await res.json();
+      if (data.routes && data.routes.length > 0) {
+        const seconds = parseInt(data.routes[0].duration.replace('s', ''), 10);
+        return Math.round(seconds / 60);
+      }
+      return null;
+    }
+  } catch (err) {
+    console.error('Routes API error:', err);
+    return null;
+  }
 }
 
 export { getReadableType };

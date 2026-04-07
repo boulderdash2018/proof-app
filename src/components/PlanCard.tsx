@@ -1,10 +1,15 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
+  FlatList,
+  Image,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +60,32 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 }) => {
   const C = useColors();
   const gradientColors = parseGradient(plan.gradient);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+
+  // Collect photos: custom cover photos first, then Google Places photos as fallback
+  const allPhotos: string[] = (() => {
+    if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos;
+    // Fallback: collect photos from places
+    const placePhotos: string[] = [];
+    for (const place of plan.places) {
+      if (place.photoUrls) {
+        for (const url of place.photoUrls) {
+          placePhotos.push(url);
+          if (placePhotos.length >= 7) break;
+        }
+      }
+      if (placePhotos.length >= 7) break;
+    }
+    return placePhotos;
+  })();
+
+  const bannerWidth = Dimensions.get('window').width - Layout.screenPadding * 2 - 24; // card padding
+
+  const handlePhotoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const idx = Math.round(x / bannerWidth);
+    setActivePhotoIndex(idx);
+  };
 
   const likeScale = useRef(new Animated.Value(1)).current;
   const saveScale = useRef(new Animated.Value(1)).current;
@@ -77,10 +108,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   };
 
   return (
-    <TouchableOpacity
+    <View
       style={[styles.card, { backgroundColor: C.gray200, borderColor: C.border }]}
-      activeOpacity={0.92}
-      onPress={onPress}
     >
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
         <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
@@ -92,52 +121,95 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       </TouchableOpacity>
 
       <View style={styles.bannerWrap}>
-        <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-          <Text style={styles.bannerTitle}>{plan.title}</Text>
-        </LinearGradient>
-      </View>
-
-      {plan.tags.length > 0 && (
-        <View style={styles.tagsRow}>
-          {plan.tags.map((tag, index) => (
-            <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
-          ))}
-        </View>
-      )}
-
-      {plan.places.length > 0 && (
-        <View style={styles.placesList}>
-          {plan.places.map((place, index) => (
-            <React.Fragment key={place.id}>
-              {index > 0 && <View style={[styles.placeSeparator, { backgroundColor: C.border }]} />}
-              <View style={styles.placeRow}>
-                <View style={[styles.placeIndex, { backgroundColor: C.primary + '18' }]}>
-                  <Text style={[styles.placeIndexText, { color: C.primary }]}>{index + 1}</Text>
+        {allPhotos.length > 0 ? (
+          <>
+            <FlatList
+              data={allPhotos}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={handlePhotoScroll}
+              scrollEventThrottle={16}
+              keyExtractor={(_, i) => String(i)}
+              style={styles.photoBanner}
+              nestedScrollEnabled
+              renderItem={({ item }) => (
+                <View style={[styles.photoSlide, { width: bannerWidth }]}>
+                  <Image source={{ uri: item }} style={styles.photoImage} />
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.55)']}
+                    style={styles.photoOverlay}
+                  />
                 </View>
-                <View style={styles.placeInfo}>
-                  <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
-                  <Text style={[styles.placeType, { color: C.gray600 }]}>{place.type}</Text>
-                </View>
+              )}
+            />
+            <View style={styles.photoTitleWrap} pointerEvents="none">
+              <Text style={styles.bannerTitle}>{plan.title}</Text>
+            </View>
+            {allPhotos.length > 1 && (
+              <View style={styles.photoDots} pointerEvents="none">
+                {allPhotos.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.photoDot,
+                      { backgroundColor: i === activePhotoIndex ? '#FFF' : 'rgba(255,255,255,0.4)' },
+                    ]}
+                  />
+                ))}
               </View>
-            </React.Fragment>
-          ))}
-        </View>
-      )}
-
-      <View style={[styles.metaRow, { borderTopColor: C.border }]}>
-        <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-          <Ionicons name="cash-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
-          <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
-        </View>
-        <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-          <Ionicons name="time-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
-          <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.duration}</Text>
-        </View>
-        <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-          <Ionicons name={getTransportIcon(plan.transport) as any} size={13} color={C.gold} style={{ marginRight: 4 }} />
-          <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.transport}</Text>
-        </View>
+            )}
+          </>
+        ) : (
+          <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+            <Text style={styles.bannerTitle}>{plan.title}</Text>
+          </LinearGradient>
+        )}
       </View>
+
+      <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
+        {plan.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {plan.tags.map((tag, index) => (
+              <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
+            ))}
+          </View>
+        )}
+
+        {plan.places.length > 0 && (
+          <View style={styles.placesList}>
+            {plan.places.map((place, index) => (
+              <React.Fragment key={place.id}>
+                {index > 0 && <View style={[styles.placeSeparator, { backgroundColor: C.border }]} />}
+                <View style={styles.placeRow}>
+                  <View style={[styles.placeIndex, { backgroundColor: C.primary + '18' }]}>
+                    <Text style={[styles.placeIndexText, { color: C.primary }]}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.placeInfo}>
+                    <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
+                    <Text style={[styles.placeType, { color: C.gray600 }]}>{place.type}</Text>
+                  </View>
+                </View>
+              </React.Fragment>
+            ))}
+          </View>
+        )}
+
+        <View style={[styles.metaRow, { borderTopColor: C.border }]}>
+          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+            <Ionicons name="cash-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
+          </View>
+          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+            <Ionicons name="time-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.duration}</Text>
+          </View>
+          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+            <Ionicons name={getTransportIcon(plan.transport) as any} size={13} color={C.gold} style={{ marginRight: 4 }} />
+            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.transport}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
 
       <View style={[styles.actionBar, { borderTopColor: C.border }]}>
         <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>
@@ -157,7 +229,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
       </View>
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -177,9 +249,16 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
   displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
-  bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden' },
-  banner: { height: 148, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
+  bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  banner: { height: 180, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
   bannerTitle: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  photoBanner: { height: 180 },
+  photoSlide: { height: 180 },
+  photoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  photoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
+  photoTitleWrap: { position: 'absolute', bottom: 14, left: 16, right: 16 },
+  photoDots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 },
+  photoDot: { width: 6, height: 6, borderRadius: 3 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12 },
   placesList: { paddingHorizontal: 16, paddingTop: 12 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },
