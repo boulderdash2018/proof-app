@@ -90,12 +90,35 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
   const likeScale = useRef(new Animated.Value(1)).current;
   const saveScale = useRef(new Animated.Value(1)).current;
+  const doubleTapHeartScale = useRef(new Animated.Value(0)).current;
+  const doubleTapHeartOpacity = useRef(new Animated.Value(0)).current;
+  const lastTapRef = useRef<number>(0);
 
   const animateBounce = (scale: Animated.Value) => {
     Animated.sequence([
       Animated.spring(scale, { toValue: 1.35, useNativeDriver: true, friction: 3, tension: 200 }),
       Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 4, tension: 120 }),
     ]).start();
+  };
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap detected
+      if (!isLiked) onLike();
+      animateBounce(likeScale);
+      // Animate heart overlay
+      doubleTapHeartScale.setValue(0);
+      doubleTapHeartOpacity.setValue(1);
+      Animated.parallel([
+        Animated.spring(doubleTapHeartScale, { toValue: 1, friction: 3, tension: 150, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(600),
+          Animated.timing(doubleTapHeartOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }
+    lastTapRef.current = now;
   };
 
   const handleLikePress = () => {
@@ -121,7 +144,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />
       </TouchableOpacity>
 
-      <View style={styles.bannerWrap}>
+      <TouchableOpacity style={styles.bannerWrap} activeOpacity={1} onPress={handleDoubleTap}>
         {allPhotos.length > 0 ? (
           <>
             <FlatList
@@ -166,7 +189,17 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <Text style={styles.bannerTitle}>{plan.title}</Text>
           </LinearGradient>
         )}
-      </View>
+        {/* Double-tap heart overlay */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.doubleTapHeart,
+            { opacity: doubleTapHeartOpacity, transform: [{ scale: doubleTapHeartScale }] },
+          ]}
+        >
+          <Ionicons name="heart" size={70} color="#FFFFFF" />
+        </Animated.View>
+      </TouchableOpacity>
 
       <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
         {plan.tags.length > 0 && (
@@ -258,7 +291,8 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
   displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
-  bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden', position: 'relative' } as any,
+  doubleTapHeart: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   banner: { height: 180, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
   bannerTitle: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   photoBanner: { height: 180 },
