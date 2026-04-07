@@ -26,7 +26,7 @@ import { useAuthStore, useFeedStore, useSavesStore, useGuestStore } from '../sto
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
-import { fetchPlanById, fetchComments, addComment } from '../services/plansService';
+import { fetchPlanById, fetchComments, addComment, deletePlan, archivePlan } from '../services/plansService';
 import { getPlaceDetails } from '../services/googlePlacesService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
@@ -88,6 +88,40 @@ export const PlanDetailModal: React.FC = () => {
   const isDone = savedPlan?.isDone ?? false;
   const [showProofSurvey, setShowProofSurvey] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [showPlanMenu, setShowPlanMenu] = useState(false);
+
+  const isOwner = currentUser && plan && plan.authorId === currentUser.id;
+
+  const handleDeletePlan = () => {
+    setShowPlanMenu(false);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Supprimer ce plan définitivement ?')) {
+        deletePlan(planId).then(() => {
+          useFeedStore.setState((s) => ({ plans: s.plans.filter((p) => p.id !== planId) }));
+          navigation.goBack();
+        });
+      }
+    } else {
+      const { Alert } = require('react-native');
+      Alert.alert('Supprimer ce plan', 'Cette action est irréversible.', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => {
+          deletePlan(planId).then(() => {
+            useFeedStore.setState((s) => ({ plans: s.plans.filter((p) => p.id !== planId) }));
+            navigation.goBack();
+          });
+        }},
+      ]);
+    }
+  };
+
+  const handleArchivePlan = () => {
+    setShowPlanMenu(false);
+    archivePlan(planId).then(() => {
+      useFeedStore.setState((s) => ({ plans: s.plans.filter((p) => p.id !== planId) }));
+      navigation.goBack();
+    });
+  };
 
   // Sync likes count from feed store
   useEffect(() => {
@@ -253,29 +287,50 @@ export const PlanDetailModal: React.FC = () => {
             <Text style={[styles.backChevron, { color: C.black }]}>&#8249;</Text>
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: C.black }]} numberOfLines={1}>{plan.title}</Text>
-          {isSaved ? (
-            <TouchableOpacity
-              style={[
-                styles.doneBtn,
-                isDone
-                  ? savedPlan?.proofStatus === 'validated'
-                    ? { backgroundColor: '#C8571A20', borderColor: '#C8571A' }
-                    : { backgroundColor: Colors.successBg, borderColor: Colors.successBorder }
-                  : { backgroundColor: C.primary + '15', borderColor: C.primary },
-              ]}
-              onPress={!isDone ? handleMarkDone : undefined}
-              activeOpacity={isDone ? 1 : 0.7}
-            >
-              <Text style={[styles.doneBtnText, { color: isDone ? (savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.success) : C.primary }]}>
-                {isDone
-                  ? savedPlan?.proofStatus === 'validated' ? 'Proof ✓' : t.plan_already_done
-                  : t.plan_mark_done}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 34 }} />
-          )}
+          <View style={styles.headerRight}>
+            {isSaved && (
+              <TouchableOpacity
+                style={[
+                  styles.doneBtn,
+                  isDone
+                    ? savedPlan?.proofStatus === 'validated'
+                      ? { backgroundColor: '#C8571A20', borderColor: '#C8571A' }
+                      : { backgroundColor: Colors.successBg, borderColor: Colors.successBorder }
+                    : { backgroundColor: C.primary + '15', borderColor: C.primary },
+                ]}
+                onPress={!isDone ? handleMarkDone : undefined}
+                activeOpacity={isDone ? 1 : 0.7}
+              >
+                <Text style={[styles.doneBtnText, { color: isDone ? (savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.success) : C.primary }]}>
+                  {isDone
+                    ? savedPlan?.proofStatus === 'validated' ? 'Proof ✓' : t.plan_already_done
+                    : t.plan_mark_done}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {isOwner && (
+              <TouchableOpacity onPress={() => setShowPlanMenu(!showPlanMenu)} style={styles.menuBtn}>
+                <Ionicons name="ellipsis-horizontal" size={20} color={C.gray700} />
+              </TouchableOpacity>
+            )}
+            {!isSaved && !isOwner && <View style={{ width: 34 }} />}
+          </View>
         </View>
+
+        {/* Plan owner menu dropdown */}
+        {showPlanMenu && (
+          <View style={[styles.planMenu, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+            <TouchableOpacity style={styles.planMenuItem} onPress={handleArchivePlan}>
+              <Ionicons name="archive-outline" size={18} color={C.gray700} />
+              <Text style={[styles.planMenuText, { color: C.black }]}>Archiver</Text>
+            </TouchableOpacity>
+            <View style={[styles.planMenuDivider, { backgroundColor: C.borderLight }]} />
+            <TouchableOpacity style={styles.planMenuItem} onPress={handleDeletePlan}>
+              <Ionicons name="trash-outline" size={18} color={Colors.error} />
+              <Text style={[styles.planMenuText, { color: Colors.error }]}>Supprimer</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 140 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {allPhotos.length > 0 ? (
@@ -561,6 +616,12 @@ const styles = StyleSheet.create({
   metaDot: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 10 },
   mapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   mapBtnText: { fontSize: 13, fontFamily: Fonts.serifBold },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  menuBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  planMenu: { position: 'absolute', top: 90, right: 14, borderRadius: 12, borderWidth: 1, paddingVertical: 4, zIndex: 999, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, minWidth: 160 },
+  planMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  planMenuText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  planMenuDivider: { height: 1, marginHorizontal: 10 },
   sectionLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 18, marginBottom: 10 },
   placeRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
   placeLeftCol: { alignItems: 'center', marginRight: 12 },

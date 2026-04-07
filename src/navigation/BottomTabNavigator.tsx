@@ -18,6 +18,7 @@ import { SavesScreen } from '../screens/SavesScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ArchivesScreen } from '../screens/ArchivesScreen';
 import { FollowersScreen } from '../screens/FollowersScreen';
 import { FollowingScreen } from '../screens/FollowingScreen';
 import { NotificationsSettingsScreen } from '../screens/NotificationsSettingsScreen';
@@ -76,6 +77,7 @@ const ProfileStackNavigator: React.FC = () => (
     <ProfileStack.Screen name="Following" component={FollowingScreen} />
     <ProfileStack.Screen name="FriendRequests" component={FriendRequestsScreen} />
     <ProfileStack.Screen name="Settings" component={SettingsScreen} />
+    <ProfileStack.Screen name="Archives" component={ArchivesScreen} />
     <ProfileStack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
     <ProfileStack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
     <ProfileStack.Screen name="AccountSettings" component={AccountSettingsScreen} />

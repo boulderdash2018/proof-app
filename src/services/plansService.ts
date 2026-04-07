@@ -96,7 +96,7 @@ export const fetchFeedPlans = async (): Promise<Plan[]> => {
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
       return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
-    });
+    }).filter((p) => !(p as any).archived);
     // Sort client-side (avoids Firestore index requirement)
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
@@ -115,11 +115,43 @@ export const fetchUserPlans = async (userId: string): Promise<Plan[]> => {
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
       return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
-    });
+    }).filter((p) => !(p as any).archived);
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
   } catch (err) {
     console.error('[plansService] fetchUserPlans error:', err);
+    return [];
+  }
+};
+
+/** Delete a plan permanently */
+export const deletePlan = async (planId: string): Promise<void> => {
+  await deleteDoc(doc(db, PLANS, planId));
+};
+
+/** Archive a plan (soft-delete — hidden from feed but recoverable) */
+export const archivePlan = async (planId: string): Promise<void> => {
+  await updateDoc(doc(db, PLANS, planId), { archived: true });
+};
+
+/** Unarchive (republish) a plan */
+export const unarchivePlan = async (planId: string): Promise<void> => {
+  await updateDoc(doc(db, PLANS, planId), { archived: false });
+};
+
+/** Fetch archived plans for a user */
+export const fetchArchivedPlans = async (userId: string): Promise<Plan[]> => {
+  try {
+    const q = query(collection(db, PLANS), where('authorId', '==', userId), where('archived', '==', true));
+    const snap = await getDocs(q);
+    const plans = snap.docs.map((d) => {
+      const data = d.data() as Plan;
+      return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+    });
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchArchivedPlans error:', err);
     return [];
   }
 };

@@ -78,6 +78,9 @@ export const SettingsScreen: React.FC = () => {
         <SettingsRow label={t.settings_change_password} onPress={() => {}} />
         <SettingsRow label={t.settings_email} onPress={() => {}} />
 
+        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>MES PLANS</Text>
+        <SettingsRow label="Archives" onPress={() => navigation.navigate('Archives')} />
+
         <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_privacy_section}</Text>
         <SettingsRow label={t.settings_privacy} onPress={() => navigation.navigate('PrivacySettings')} />
 

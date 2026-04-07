@@ -35,6 +35,7 @@ export type ProfileStackParamList = {
   Following: { userId: string };
   FriendRequests: undefined;
   Settings: undefined;
+  Archives: undefined;
   NotificationsSettings: undefined;
   PrivacySettings: undefined;
   AccountSettings: undefined;
