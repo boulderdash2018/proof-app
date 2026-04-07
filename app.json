@@ -12,13 +12,21 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.proof.app"
+      "bundleIdentifier": "com.proof.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDW8Yq6u3_IaOWTnUyy_SLlW96pkmPaWoA"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.proof.app"
+      "package": "com.proof.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDW8Yq6u3_IaOWTnUyy_SLlW96pkmPaWoA"
+        }
+      }
     },
     "plugins": [
       "expo-secure-store",
