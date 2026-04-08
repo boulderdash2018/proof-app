@@ -23,6 +23,7 @@ import { RankBadge } from './RankBadge';
 import { FounderBadge } from './FounderBadge';
 import { Chip } from './Chip';
 import { MiniStampIcon } from './MiniStampIcon';
+import * as Haptics from 'expo-haptics';
 
 export function parseGradient(gradient: string): string[] {
   const matches = gradient.match(/#[0-9A-Fa-f]{3,8}/g);
@@ -143,11 +144,19 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
   const handleLikePress = () => {
     animateBounce(likeScale);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onLike();
   };
 
   const handleSavePress = () => {
-    animateBounce(saveScale);
+    // Stronger pop for save (1.4x) + haptic feedback
+    Animated.sequence([
+      Animated.spring(saveScale, { toValue: 1.4, useNativeDriver: true, friction: 3, tension: 400 }),
+      Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 200 }),
+    ]).start();
+    Haptics.impactAsync(
+      isSaved ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
+    );
     onSave();
   };
 
