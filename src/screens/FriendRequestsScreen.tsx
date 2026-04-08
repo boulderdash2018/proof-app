@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
-import { Avatar, EmptyState } from '../components';
+import { Avatar, EmptyState, LoadingSkeleton } from '../components';
 import { useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -148,7 +148,7 @@ export const FriendRequestsScreen: React.FC = () => {
         )}
       </View>
       {isSearching ? (
-        <ActivityIndicator style={{ marginTop: 30 }} color={C.primary} />
+        <LoadingSkeleton variant="list" />
       ) : (
         <FlatList
           data={searchResults}
@@ -168,7 +168,7 @@ export const FriendRequestsScreen: React.FC = () => {
   const renderRequestsContent = () => {
     const data = tab === 'received' ? incomingRequests : sentRequests;
     return isLoading ? (
-      <ActivityIndicator style={{ marginTop: 40 }} color={C.primary} />
+      <LoadingSkeleton variant="list" />
     ) : (
       <FlatList
         data={data}

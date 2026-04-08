@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Layout } from '../constants';
-import { Avatar, EmptyState } from '../components';
+import { Avatar, EmptyState, LoadingSkeleton } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User } from '../types';
@@ -52,7 +52,7 @@ export const FollowingScreen: React.FC = () => {
         <View style={{ width: 30 }} />
       </View>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={C.primary} />
+        <LoadingSkeleton variant="list" />
       ) : (
         <FlatList
           data={users}

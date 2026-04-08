@@ -5,7 +5,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton } from '../components';
+import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton, LoadingSkeleton } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
@@ -131,9 +131,7 @@ export const OtherProfileScreen: React.FC = () => {
         <Text style={[styles.headerTitle, { color: C.black }]}>{t.loading}</Text>
         <View style={{ width: 30 }} />
       </View>
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={C.primary} />
-      </View>
+      <LoadingSkeleton variant="profile" />
     </View>
   );
 

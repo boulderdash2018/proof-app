@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout, Fonts } from '../constants';
-import { Chip, EmptyState } from '../components';
+import { Chip, EmptyState, LoadingSkeleton } from '../components';
 import { Plan } from '../types';
 import { useAuthStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -127,20 +127,24 @@ export const SavesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={filteredPlans}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.planId}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          activeTab === 'todo' ? (
-            <EmptyState icon="🔖" title={t.saves_empty_todo_title} subtitle={t.saves_empty_todo_sub} />
-          ) : (
-            <EmptyState icon="🗺️" title={t.saves_empty_done_title} subtitle={t.saves_empty_done_sub} />
-          )
-        }
-      />
+      {isLoading ? (
+        <LoadingSkeleton variant="saves" />
+      ) : (
+        <FlatList
+          data={filteredPlans}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.planId}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            activeTab === 'todo' ? (
+              <EmptyState icon="🔖" title={t.saves_empty_todo_title} subtitle={t.saves_empty_todo_sub} />
+            ) : (
+              <EmptyState icon="🗺️" title={t.saves_empty_done_title} subtitle={t.saves_empty_done_sub} />
+            )
+          }
+        />
+      )}
     </View>
   );
 };

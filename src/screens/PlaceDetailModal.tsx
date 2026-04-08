@@ -11,7 +11,7 @@ import mockApi from '../services/mockApi';
 import { getPlaceDetails, getReadableType, priceLevelToSymbol, GooglePlaceDetails } from '../services/googlePlacesService';
 import { fetchPlaceReviews, getPlaceProofRating } from '../services/placeReviewService';
 import { fetchPublicPlansWithPlace } from '../services/plansService';
-import { Avatar } from '../components';
+import { Avatar, LoadingSkeleton } from '../components';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const STAMP_PROOF = '#C8571A';
@@ -240,9 +240,7 @@ export const PlaceDetailModal: React.FC = () => {
           <Text style={[styles.headerTitle, { color: C.black }]}>{t.loading}</Text>
           <View style={{ width: 34 }} />
         </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={C.primary} size="large" />
-        </View>
+        <LoadingSkeleton variant="profile" />
       </View>
     );
   }

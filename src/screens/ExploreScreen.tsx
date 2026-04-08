@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
 import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
-import { EmptyState } from '../components';
+import { EmptyState, LoadingSkeleton } from '../components';
 import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -435,7 +435,7 @@ export const ExploreScreen: React.FC = () => {
 
                 {/* Filter results */}
                 {isFilterLoading ? (
-                  <ActivityIndicator color={C.primary} style={{ marginTop: 16 }} />
+                  <LoadingSkeleton variant="list" />
                 ) : displayedPlans.length > 0 ? (
                   <View style={{ marginTop: 12 }}>
                     <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({displayedPlans.length})</Text>
@@ -489,7 +489,7 @@ export const ExploreScreen: React.FC = () => {
                   {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
                 </>
               )}
-              {isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <ActivityIndicator color={C.primary} style={{ marginTop: 30 }} />}
+              {isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <LoadingSkeleton variant="list" />}
               {!isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />}
             </ScrollView>
           )}
