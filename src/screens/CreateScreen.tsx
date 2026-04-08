@@ -661,12 +661,20 @@ export const CreateScreen: React.FC = () => {
           <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 8 }]}>Par thème</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
             {EXPLORE_GROUPS.map((group) => {
-              const isActive = selectedGroup === group.key;
+              const isActive = showSubcategories
+                ? selectedGroup === group.key
+                : selectedTags.includes(group.label);
               return (
                 <TouchableOpacity
                   key={group.key}
                   style={[styles.groupChip, { backgroundColor: isActive ? C.primary : C.gray200, borderColor: isActive ? C.primary : C.borderLight }]}
-                  onPress={() => setSelectedGroup(group.key)}
+                  onPress={() => {
+                    if (showSubcategories) {
+                      setSelectedGroup(group.key);
+                    } else {
+                      toggleTag(group.label);
+                    }
+                  }}
                 >
                   <Text style={styles.groupChipEmoji}>{group.emoji}</Text>
                   <Text style={[styles.groupChipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.label}</Text>

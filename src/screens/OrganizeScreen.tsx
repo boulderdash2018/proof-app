@@ -238,12 +238,20 @@ export const OrganizeScreen: React.FC = () => {
           <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 10 }]}>Par thème</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
             {EXPLORE_GROUPS.map((group) => {
-              const isActive = selectedGroup === group.key;
+              const isActive = showSubcategories
+                ? selectedGroup === group.key
+                : selectedTags.includes(group.label);
               return (
                 <TouchableOpacity
                   key={group.key}
                   style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-                  onPress={() => setSelectedGroup(group.key)}
+                  onPress={() => {
+                    if (showSubcategories) {
+                      setSelectedGroup(group.key);
+                    } else {
+                      toggleTag(group.label);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.chipEmoji}>{group.emoji}</Text>
