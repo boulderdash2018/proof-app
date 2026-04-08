@@ -677,8 +677,8 @@ export const CreateScreen: React.FC = () => {
               style={[styles.groupChip, { backgroundColor: showSubcategories ? Colors.gold : C.gray200, borderColor: showSubcategories ? Colors.gold : C.borderLight }]}
               onPress={() => setShowSubcategories(!showSubcategories)}
             >
-              <Ionicons name={showSubcategories ? 'chevron-up' : 'add'} size={14} color={showSubcategories ? '#FFF' : C.gray800} />
-              <Text style={[styles.groupChipText, { color: showSubcategories ? '#FFF' : C.gray800 }]}>Voir +</Text>
+              <Text style={[styles.groupChipText, { color: showSubcategories ? '#FFF' : C.gray800, fontWeight: '700' }]}>Voir +</Text>
+              <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray800} />
             </TouchableOpacity>
           </ScrollView>
 

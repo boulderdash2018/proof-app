@@ -173,8 +173,8 @@ export const ExploreScreen: React.FC = () => {
           onPress={() => setShowSubcategories(!showSubcategories)}
           activeOpacity={0.8}
         >
-          <Ionicons name={showSubcategories ? 'chevron-up' : 'add'} size={14} color={showSubcategories ? '#FFF' : C.gray800} />
-          <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray800 }]}>Voir +</Text>
+          <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray800, fontWeight: '700' }]}>Voir +</Text>
+          <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray800} />
         </TouchableOpacity>
       </ScrollView>
     </View>

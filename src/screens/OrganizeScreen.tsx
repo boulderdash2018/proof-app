@@ -256,8 +256,8 @@ export const OrganizeScreen: React.FC = () => {
               onPress={() => setShowSubcategories(!showSubcategories)}
               activeOpacity={0.7}
             >
-              <Ionicons name={showSubcategories ? 'chevron-up' : 'add'} size={14} color={showSubcategories ? '#FFF' : C.gray700} />
-              <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray700 }]}>Voir +</Text>
+              <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray700, fontWeight: '700' }]}>Voir +</Text>
+              <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray700} />
             </TouchableOpacity>
           </ScrollView>
 
