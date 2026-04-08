@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts, CATEGORIES } from '../constants';
+import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '../hooks/useColors';
 import { useAuthStore } from '../store/authStore';
 import { useDoItNowStore } from '../store/doItNowStore';
@@ -49,6 +50,8 @@ export const OrganizeScreen: React.FC = () => {
   // ── State ──
   const [title, setTitle] = useState('');
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState(EXPLORE_GROUPS[0].key);
+  const [showSubcategories, setShowSubcategories] = useState(false);
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showTransport, setShowTransport] = useState(false);
@@ -210,30 +213,88 @@ export const OrganizeScreen: React.FC = () => {
           <Text style={[styles.charCount, { color: C.gray500 }]}>{title.length}/60</Text>
 
           {/* ── Categories ── */}
-          <Text style={[styles.sectionLabel, { color: C.gray800, marginTop: 20 }]}>Catégories</Text>
-          <Text style={[styles.sectionHint, { color: C.gray500 }]}>Choisis le vibe de ta journée</Text>
-          <View style={styles.chipsWrap}>
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedTags.includes(cat.name);
+          <Text style={[styles.sectionLabel, { color: C.gray800, marginTop: 20 }]}>Catégorie</Text>
+
+          {/* Row 1: Par personne */}
+          <Text style={[styles.filterRowLabel, { color: C.gray500 }]}>Par personne</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
+            {PERSON_FILTERS.map((p) => {
+              const isSelected = selectedTags.includes(p.label);
               return (
                 <TouchableOpacity
-                  key={cat.name}
-                  style={[
-                    styles.chip,
-                    isSelected
-                      ? { backgroundColor: cat.bg + '20', borderColor: cat.bg }
-                      : { backgroundColor: C.gray200, borderColor: C.borderLight },
-                  ]}
-                  onPress={() => toggleTag(cat.name)}
+                  key={p.key}
+                  style={[styles.chip, isSelected ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+                  onPress={() => toggleTag(p.label)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.chipEmoji}>{cat.emoji}</Text>
-                  <Text style={[styles.chipText, { color: isSelected ? cat.bg : C.gray700 }]}>{cat.name}</Text>
-                  {isSelected && <Ionicons name="checkmark" size={14} color={cat.bg} />}
+                  <Text style={styles.chipEmoji}>{p.emoji}</Text>
+                  <Text style={[styles.chipText, { color: isSelected ? '#FFF' : C.gray700 }]}>{p.label}</Text>
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
+
+          {/* Row 2: Par thème + Voir + */}
+          <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 10 }]}>Par thème</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
+            {EXPLORE_GROUPS.map((group) => {
+              const isActive = selectedGroup === group.key;
+              return (
+                <TouchableOpacity
+                  key={group.key}
+                  style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+                  onPress={() => setSelectedGroup(group.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.chipEmoji}>{group.emoji}</Text>
+                  <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray700 }]}>{group.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[styles.chip, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+              onPress={() => setShowSubcategories(!showSubcategories)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={showSubcategories ? 'chevron-up' : 'add'} size={14} color={showSubcategories ? '#FFF' : C.gray700} />
+              <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray700 }]}>Voir +</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Subcategory cards */}
+          {showSubcategories && (EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
+            <View key={section.title} style={styles.subcategorySection}>
+              <Text style={[styles.subcategorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
+              <View style={styles.subcategoryGrid}>
+                {section.items.map((item) => {
+                  const isSelected = selectedTags.includes(item.name);
+                  return (
+                    <TouchableOpacity key={item.name} style={styles.subcategoryCard} onPress={() => toggleTag(item.name)} activeOpacity={0.8}>
+                      <LinearGradient colors={item.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.subcategoryGradient, isSelected && { borderColor: Colors.primary, borderWidth: 2 }]}>
+                        {item.icon && (
+                          <View style={styles.subcategoryIconWrap}><Ionicons name={item.icon as any} size={18} color="rgba(255,255,255,0.5)" /></View>
+                        )}
+                        <Text style={styles.subcategoryName}>{item.name}</Text>
+                        {isSelected && <View style={styles.subcategoryCheck}><Ionicons name="checkmark-circle" size={18} color="#FFF" /></View>}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+
+          {/* Selected tags display */}
+          {selectedTags.length > 0 && (
+            <View style={styles.selectedTagsWrap}>
+              {selectedTags.map((tag) => (
+                <TouchableOpacity key={tag} style={[styles.selectedTag, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleTag(tag)}>
+                  <Text style={[styles.selectedTagText, { color: Colors.primary }]}>{tag}</Text>
+                  <Ionicons name="close" size={14} color={Colors.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* ── Places ── */}
           <Text style={[styles.sectionLabel, { color: C.gray800, marginTop: 20 }]}>Lieux</Text>
@@ -402,8 +463,10 @@ const styles = StyleSheet.create({
   textInput: { flex: 1, fontSize: 15, fontFamily: Fonts.serif, paddingVertical: 0 },
   charCount: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'right', marginTop: 4, marginBottom: 4 },
 
-  // Category chips
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // Filter rows
+  filterRowLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  filterScroll: { flexGrow: 0, marginBottom: 12 },
+  filterChips: { gap: 8 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -415,6 +478,21 @@ const styles = StyleSheet.create({
   },
   chipEmoji: { fontSize: 14 },
   chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+
+  // Subcategory cards
+  subcategorySection: { marginBottom: 12 },
+  subcategorySectionTitle: { fontSize: 10, fontFamily: Fonts.serifSemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  subcategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  subcategoryCard: { width: '48%' as any, borderRadius: 14, overflow: 'hidden' },
+  subcategoryGradient: { padding: 12, minHeight: 80, justifyContent: 'flex-end', borderRadius: 14 },
+  subcategoryIconWrap: { position: 'absolute', top: 10, right: 10 },
+  subcategoryName: { fontSize: 13, fontFamily: Fonts.serifBold, color: '#FFF' },
+  subcategoryCheck: { position: 'absolute', top: 10, left: 10 },
+
+  // Selected tags
+  selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },
+  selectedTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
+  selectedTagText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
 
   // Places
   placesList: { gap: 8, marginBottom: 12 },
