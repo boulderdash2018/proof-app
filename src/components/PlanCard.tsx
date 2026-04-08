@@ -103,18 +103,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const [heartPos, setHeartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // ── Save particles burst ──
-  const PARTICLE_COUNT = 8;
-  const particleAnims = useRef(
-    Array.from({ length: PARTICLE_COUNT }, () => ({
-      progress: new Animated.Value(0),
-      angle: Math.random() * Math.PI * 2,
-      distance: 18 + Math.random() * 14,
-      size: 3 + Math.random() * 3,
-    }))
-  ).current;
-  const [showParticles, setShowParticles] = useState(false);
-  const PARTICLE_COLORS = [Colors.primary, Colors.gold, '#E8A87C', '#D4725C', '#FFD166'];
+  // ── Save ring pulse + toast ──
+  const saveRingScale = useRef(new Animated.Value(0)).current;
+  const saveRingOpacity = useRef(new Animated.Value(0)).current;
+  const saveToastY = useRef(new Animated.Value(0)).current;
+  const saveToastOpacity = useRef(new Animated.Value(0)).current;
+  const [showSaveToast, setShowSaveToast] = useState(false);
 
   // Emil: snappy spring — fast attack (high tension), quick settle (high friction)
   const animateBounce = (scale: Animated.Value) => {
@@ -171,21 +165,25 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       isSaved ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
     );
 
-    // Particle burst on save (not unsave)
+    // Ring pulse + floating toast on save (not unsave)
     if (!isSaved) {
-      setShowParticles(true);
-      // Randomize angles for each burst
-      particleAnims.forEach((p) => {
-        p.angle = Math.random() * Math.PI * 2;
-        p.distance = 18 + Math.random() * 14;
-        p.progress.setValue(0);
-      });
-      Animated.stagger(
-        30,
-        particleAnims.map((p) =>
-          Animated.timing(p.progress, { toValue: 1, duration: 500, useNativeDriver: true })
-        )
-      ).start(() => setShowParticles(false));
+      // Ring pulse around icon
+      saveRingScale.setValue(0.3);
+      saveRingOpacity.setValue(0.6);
+      Animated.parallel([
+        Animated.timing(saveRingScale, { toValue: 2.5, duration: 450, useNativeDriver: true }),
+        Animated.timing(saveRingOpacity, { toValue: 0, duration: 450, useNativeDriver: true }),
+      ]).start();
+
+      // Floating "Sauvegardé" toast
+      setShowSaveToast(true);
+      saveToastY.setValue(0);
+      saveToastOpacity.setValue(1);
+      Animated.sequence([
+        Animated.spring(saveToastY, { toValue: -50, useNativeDriver: true, friction: 6, tension: 100 }),
+        Animated.delay(600),
+        Animated.timing(saveToastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => setShowSaveToast(false));
     }
 
     onSave();
@@ -328,26 +326,17 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <Animated.View style={{ transform: [{ scale: saveScale }] }}>
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
             </Animated.View>
-            {showParticles && particleAnims.map((p, i) => (
-              <Animated.View
-                key={i}
-                style={[
-                  styles.particle,
-                  {
-                    backgroundColor: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
-                    width: p.size,
-                    height: p.size,
-                    borderRadius: p.size / 2,
-                    opacity: p.progress.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 0] }),
-                    transform: [
-                      { translateX: p.progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(p.angle) * p.distance] }) },
-                      { translateY: p.progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(p.angle) * p.distance] }) },
-                      { scale: p.progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1.2, 0.3] }) },
-                    ],
-                  },
-                ]}
-              />
-            ))}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.saveRing,
+                {
+                  borderColor: C.primary,
+                  opacity: saveRingOpacity,
+                  transform: [{ scale: saveRingScale }],
+                },
+              ]}
+            />
           </View>
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
@@ -360,6 +349,23 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         )}
       </View>
+      {/* Floating save toast */}
+      {showSaveToast && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.saveToast,
+            {
+              backgroundColor: C.primary,
+              opacity: saveToastOpacity,
+              transform: [{ translateY: saveToastY }],
+            },
+          ]}
+        >
+          <Ionicons name="bookmark" size={11} color="#FFF" style={{ marginRight: 4 }} />
+          <Text style={styles.saveToastText}>Sauvegardé !</Text>
+        </Animated.View>
+      )}
     </Animated.View>
     </ReAnimated.View>
   );
@@ -406,8 +412,10 @@ const styles = StyleSheet.create({
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
   actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
-  saveIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  particle: { position: 'absolute' },
+  saveIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', overflow: 'visible' as any },
+  saveRing: { position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 2 },
+  saveToast: { position: 'absolute', bottom: 44, right: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  saveToastText: { color: '#FFF', fontSize: 11, fontFamily: Fonts.serifBold },
   actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
   actionSpacer: { flex: 1 },
   proofStats: { flexDirection: 'row', alignItems: 'center', gap: 3 },
