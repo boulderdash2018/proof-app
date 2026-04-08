@@ -103,6 +103,19 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const [heartPos, setHeartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // ── Save particles burst ──
+  const PARTICLE_COUNT = 8;
+  const particleAnims = useRef(
+    Array.from({ length: PARTICLE_COUNT }, () => ({
+      progress: new Animated.Value(0),
+      angle: Math.random() * Math.PI * 2,
+      distance: 18 + Math.random() * 14,
+      size: 3 + Math.random() * 3,
+    }))
+  ).current;
+  const [showParticles, setShowParticles] = useState(false);
+  const PARTICLE_COLORS = [Colors.primary, Colors.gold, '#E8A87C', '#D4725C', '#FFD166'];
+
   // Emil: snappy spring — fast attack (high tension), quick settle (high friction)
   const animateBounce = (scale: Animated.Value) => {
     Animated.sequence([
@@ -149,7 +162,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   };
 
   const handleSavePress = () => {
-    // Stronger pop for save (1.4x) + haptic feedback
+    // Pop + haptic
     Animated.sequence([
       Animated.spring(saveScale, { toValue: 1.4, useNativeDriver: true, friction: 3, tension: 400 }),
       Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 200 }),
@@ -157,6 +170,24 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     Haptics.impactAsync(
       isSaved ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
     );
+
+    // Particle burst on save (not unsave)
+    if (!isSaved) {
+      setShowParticles(true);
+      // Randomize angles for each burst
+      particleAnims.forEach((p) => {
+        p.angle = Math.random() * Math.PI * 2;
+        p.distance = 18 + Math.random() * 14;
+        p.progress.setValue(0);
+      });
+      Animated.stagger(
+        30,
+        particleAnims.map((p) =>
+          Animated.timing(p.progress, { toValue: 1, duration: 500, useNativeDriver: true })
+        )
+      ).start(() => setShowParticles(false));
+    }
+
     onSave();
   };
 
@@ -293,9 +324,31 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
-          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-            <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
-          </Animated.View>
+          <View style={styles.saveIconWrap}>
+            <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+              <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
+            </Animated.View>
+            {showParticles && particleAnims.map((p, i) => (
+              <Animated.View
+                key={i}
+                style={[
+                  styles.particle,
+                  {
+                    backgroundColor: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+                    width: p.size,
+                    height: p.size,
+                    borderRadius: p.size / 2,
+                    opacity: p.progress.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 0] }),
+                    transform: [
+                      { translateX: p.progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(p.angle) * p.distance] }) },
+                      { translateY: p.progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(p.angle) * p.distance] }) },
+                      { scale: p.progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1.2, 0.3] }) },
+                    ],
+                  },
+                ]}
+              />
+            ))}
+          </View>
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
         {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
@@ -353,6 +406,8 @@ const styles = StyleSheet.create({
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
   actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
+  saveIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  particle: { position: 'absolute' },
   actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
   actionSpacer: { flex: 1 },
   proofStats: { flexDirection: 'row', alignItems: 'center', gap: 3 },
