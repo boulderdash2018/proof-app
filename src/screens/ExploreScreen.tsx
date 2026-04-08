@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -58,6 +59,14 @@ export const ExploreScreen: React.FC = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Advanced filters
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [maxBudget, setMaxBudget] = useState('');
+  const [maxDuration, setMaxDuration] = useState('');
+  const [minLikes, setMinLikes] = useState('');
+  const [minProofs, setMinProofs] = useState('');
+  const hasAdvancedFilters = maxBudget !== '' || maxDuration !== '' || minLikes !== '' || minProofs !== '';
 
   const activeGroup = EXPLORE_GROUPS.find((g) => g.key === selectedTheme) || EXPLORE_GROUPS[0];
 
@@ -114,6 +123,40 @@ export const ExploreScreen: React.FC = () => {
     setFilteredPlans([]);
     setSearchUsers_([]);
     setGooglePlaces([]);
+  };
+
+  // ── Parse helpers for plan fields ──
+  const parsePrice = (p: string): number => {
+    const m = p.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  const parseDuration = (d: string): number => {
+    let mins = 0;
+    const h = d.match(/(\d+)\s*h/);
+    const m = d.match(/(\d+)\s*min/);
+    if (h) mins += parseInt(h[1], 10) * 60;
+    if (m) mins += parseInt(m[1], 10);
+    return mins;
+  };
+
+  const applyAdvancedFilters = (plans: Plan[]): Plan[] => {
+    if (!hasAdvancedFilters) return plans;
+    return plans.filter((p) => {
+      if (maxBudget !== '' && parsePrice(p.price) > parseInt(maxBudget, 10)) return false;
+      if (maxDuration !== '' && parseDuration(p.duration) > parseInt(maxDuration, 10)) return false;
+      if (minLikes !== '' && p.likesCount < parseInt(minLikes, 10)) return false;
+      if (minProofs !== '' && p.proofCount < parseInt(minProofs, 10)) return false;
+      return true;
+    });
+  };
+
+  const displayedPlans = applyAdvancedFilters(filteredPlans);
+
+  const clearAdvancedFilters = () => {
+    setMaxBudget('');
+    setMaxDuration('');
+    setMinLikes('');
+    setMinProofs('');
   };
 
   const showCategories = searchQuery.length < 2;
@@ -305,7 +348,17 @@ export const ExploreScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <Text style={[styles.pageTitle, { color: C.black }]}>{t.explore_title}</Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.pageTitle, { color: C.black }]}>{t.explore_title}</Text>
+        <TouchableOpacity
+          style={[styles.filterBtn, hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: C.gray200 }]}
+          onPress={() => setShowFiltersModal(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="options-outline" size={18} color={hasAdvancedFilters ? '#FFF' : C.gray700} />
+          {hasAdvancedFilters && <View style={styles.filterBtnDot} />}
+        </TouchableOpacity>
+      </View>
 
       {/* Search bar */}
       <View style={[styles.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}>
@@ -341,10 +394,10 @@ export const ExploreScreen: React.FC = () => {
                 {/* Filter results */}
                 {isFilterLoading ? (
                   <ActivityIndicator color={C.primary} style={{ marginTop: 16 }} />
-                ) : filteredPlans.length > 0 ? (
+                ) : displayedPlans.length > 0 ? (
                   <View style={{ marginTop: 12 }}>
-                    <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({filteredPlans.length})</Text>
-                    {filteredPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                    <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({displayedPlans.length})</Text>
+                    {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
                   </View>
                 ) : (
                   <View style={{ alignItems: 'center', paddingTop: 20 }}>
@@ -388,25 +441,119 @@ export const ExploreScreen: React.FC = () => {
                   ))}
                 </>
               )}
-              {filteredPlans.length > 0 && (
+              {displayedPlans.length > 0 && (
                 <>
-                  <Text style={[styles.resultsSectionLabel, { color: C.gray700, marginTop: googlePlaces.length > 0 ? 16 : 0 }]}>Plans ({filteredPlans.length})</Text>
-                  {filteredPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                  <Text style={[styles.resultsSectionLabel, { color: C.gray700, marginTop: googlePlaces.length > 0 ? 16 : 0 }]}>Plans ({displayedPlans.length})</Text>
+                  {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
                 </>
               )}
-              {isSearching && googlePlaces.length === 0 && filteredPlans.length === 0 && <ActivityIndicator color={C.primary} style={{ marginTop: 30 }} />}
-              {!isSearching && googlePlaces.length === 0 && filteredPlans.length === 0 && <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />}
+              {isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <ActivityIndicator color={C.primary} style={{ marginTop: 30 }} />}
+              {!isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />}
             </ScrollView>
           )}
         </>
       )}
+
+      {/* ── Filters Modal ── */}
+      <Modal visible={showFiltersModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.filtersModal, { backgroundColor: C.white }]}>
+            <View style={[styles.filtersHeader, { borderBottomColor: C.borderLight }]}>
+              <Text style={[styles.filtersTitle, { color: C.black }]}>Filtres</Text>
+              <TouchableOpacity onPress={() => setShowFiltersModal(false)}>
+                <Ionicons name="close" size={22} color={C.gray700} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.filtersBody} showsVerticalScrollIndicator={false}>
+              {/* Budget max */}
+              <View style={styles.filterField}>
+                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Budget maximum</Text>
+                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                  <Ionicons name="cash-outline" size={16} color={C.gray600} />
+                  <RNTextInput
+                    style={[styles.filterInput, { color: C.black }]}
+                    placeholder="Ex: 50"
+                    placeholderTextColor={C.gray500}
+                    value={maxBudget}
+                    onChangeText={setMaxBudget}
+                    keyboardType="numeric"
+                  />
+                  <Text style={[styles.filterUnit, { color: C.gray600 }]}>€</Text>
+                </View>
+              </View>
+
+              {/* Duration max */}
+              <View style={styles.filterField}>
+                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Temps maximum</Text>
+                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                  <Ionicons name="time-outline" size={16} color={C.gray600} />
+                  <RNTextInput
+                    style={[styles.filterInput, { color: C.black }]}
+                    placeholder="Ex: 120"
+                    placeholderTextColor={C.gray500}
+                    value={maxDuration}
+                    onChangeText={setMaxDuration}
+                    keyboardType="numeric"
+                  />
+                  <Text style={[styles.filterUnit, { color: C.gray600 }]}>min</Text>
+                </View>
+              </View>
+
+              {/* Min likes */}
+              <View style={styles.filterField}>
+                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Likes minimum</Text>
+                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                  <Ionicons name="heart-outline" size={16} color={C.gray600} />
+                  <RNTextInput
+                    style={[styles.filterInput, { color: C.black }]}
+                    placeholder="Ex: 5"
+                    placeholderTextColor={C.gray500}
+                    value={minLikes}
+                    onChangeText={setMinLikes}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              {/* Min proofs */}
+              <View style={styles.filterField}>
+                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Proof it minimum</Text>
+                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                  <Ionicons name="checkmark-circle-outline" size={16} color={C.gray600} />
+                  <RNTextInput
+                    style={[styles.filterInput, { color: C.black }]}
+                    placeholder="Ex: 3"
+                    placeholderTextColor={C.gray500}
+                    value={minProofs}
+                    onChangeText={setMinProofs}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.filtersFooter, { borderTopColor: C.borderLight }]}>
+              <TouchableOpacity onPress={clearAdvancedFilters} style={[styles.filtersClearBtn, { borderColor: C.borderLight }]}>
+                <Text style={[styles.filtersClearText, { color: C.gray700 }]}>Réinitialiser</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowFiltersModal(false)} style={[styles.filtersApplyBtn, { backgroundColor: C.primary }]}>
+                <Text style={styles.filtersApplyText}>Appliquer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3, paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
+  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  filterBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  filterBtnDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, marginHorizontal: Layout.screenPadding, paddingHorizontal: 14, height: 44, marginBottom: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
@@ -492,4 +639,21 @@ const styles = StyleSheet.create({
   activeFilterText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
   clearFiltersText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, marginLeft: 4 },
   noResultText: { fontSize: 13, fontFamily: Fonts.serif },
+
+  // Filters modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  filtersModal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },
+  filtersHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
+  filtersTitle: { fontSize: 18, fontFamily: Fonts.serifBold },
+  filtersBody: { padding: 20 },
+  filterField: { marginBottom: 20 },
+  filterFieldLabel: { fontSize: 13, fontFamily: Fonts.serifBold, marginBottom: 8 },
+  filterInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 46 },
+  filterInput: { flex: 1, fontSize: 15, fontFamily: Fonts.serif, paddingVertical: 0 },
+  filterUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  filtersFooter: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1 },
+  filtersClearBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
+  filtersClearText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  filtersApplyBtn: { flex: 2, alignItems: 'center', paddingVertical: 14, borderRadius: 12 },
+  filtersApplyText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
 });
