@@ -103,12 +103,10 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const [heartPos, setHeartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // ── Save ring pulse + toast ──
-  const saveRingScale = useRef(new Animated.Value(0)).current;
-  const saveRingOpacity = useRef(new Animated.Value(0)).current;
-  const saveToastY = useRef(new Animated.Value(0)).current;
-  const saveToastOpacity = useRef(new Animated.Value(0)).current;
-  const [showSaveToast, setShowSaveToast] = useState(false);
+  // ── Save flash + inline label ──
+  const saveFlashOpacity = useRef(new Animated.Value(0)).current;
+  const saveLabelOpacity = useRef(new Animated.Value(0)).current;
+  const [showSaveLabel, setShowSaveLabel] = useState(false);
 
   // Emil: snappy spring — fast attack (high tension), quick settle (high friction)
   const animateBounce = (scale: Animated.Value) => {
@@ -165,25 +163,19 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       isSaved ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
     );
 
-    // Ring pulse + floating toast on save (not unsave)
+    // Flash + inline label on save (not unsave)
     if (!isSaved) {
-      // Ring pulse around icon
-      saveRingScale.setValue(0.3);
-      saveRingOpacity.setValue(0.6);
-      Animated.parallel([
-        Animated.timing(saveRingScale, { toValue: 2.5, duration: 450, useNativeDriver: true }),
-        Animated.timing(saveRingOpacity, { toValue: 0, duration: 450, useNativeDriver: true }),
-      ]).start();
+      // Flash circle behind icon
+      saveFlashOpacity.setValue(0.45);
+      Animated.timing(saveFlashOpacity, { toValue: 0, duration: 600, useNativeDriver: true }).start();
 
-      // Floating "Sauvegardé" toast
-      setShowSaveToast(true);
-      saveToastY.setValue(0);
-      saveToastOpacity.setValue(1);
+      // Inline "Sauvegardé !" label
+      setShowSaveLabel(true);
+      saveLabelOpacity.setValue(1);
       Animated.sequence([
-        Animated.spring(saveToastY, { toValue: -50, useNativeDriver: true, friction: 6, tension: 100 }),
-        Animated.delay(600),
-        Animated.timing(saveToastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]).start(() => setShowSaveToast(false));
+        Animated.delay(1200),
+        Animated.timing(saveLabelOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => setShowSaveLabel(false));
     }
 
     onSave();
@@ -323,21 +315,16 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
           <View style={styles.saveIconWrap}>
+            <Animated.View pointerEvents="none" style={[styles.saveFlash, { backgroundColor: C.primary, opacity: saveFlashOpacity }]} />
             <Animated.View style={{ transform: [{ scale: saveScale }] }}>
               <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
             </Animated.View>
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.saveRing,
-                {
-                  borderColor: C.primary,
-                  opacity: saveRingOpacity,
-                  transform: [{ scale: saveRingScale }],
-                },
-              ]}
-            />
           </View>
+          {showSaveLabel && (
+            <Animated.Text style={[styles.saveLabel, { color: C.primary, opacity: saveLabelOpacity }]}>
+              Sauvegardé !
+            </Animated.Text>
+          )}
         </TouchableOpacity>
         <View style={styles.actionSpacer} />
         {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
@@ -349,23 +336,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         )}
       </View>
-      {/* Floating save toast */}
-      {showSaveToast && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.saveToast,
-            {
-              backgroundColor: C.primary,
-              opacity: saveToastOpacity,
-              transform: [{ translateY: saveToastY }],
-            },
-          ]}
-        >
-          <Ionicons name="bookmark" size={11} color="#FFF" style={{ marginRight: 4 }} />
-          <Text style={styles.saveToastText}>Sauvegardé !</Text>
-        </Animated.View>
-      )}
     </Animated.View>
     </ReAnimated.View>
   );
@@ -412,10 +382,9 @@ const styles = StyleSheet.create({
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
   actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
-  saveIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', overflow: 'visible' as any },
-  saveRing: { position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 2 },
-  saveToast: { position: 'absolute', bottom: 44, right: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  saveToastText: { color: '#FFF', fontSize: 11, fontFamily: Fonts.serifBold },
+  saveIconWrap: { position: 'relative', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  saveFlash: { position: 'absolute', width: 28, height: 28, borderRadius: 14 },
+  saveLabel: { fontSize: 11, fontFamily: Fonts.serifBold, marginLeft: 4 },
   actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
   actionSpacer: { flex: 1 },
   proofStats: { flexDirection: 'row', alignItems: 'center', gap: 3 },
