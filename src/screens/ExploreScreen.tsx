@@ -140,18 +140,28 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Row 2: Theme filters + Voir + ──
+  // ── Row 2: Theme chips ──
+  // Closed: chips are multi-select filters (like person row)
+  // Open:   chips are tabs to pick which subcategories to show
   const renderThemeRow = () => (
     <View style={styles.filterSection}>
       <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par thème</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
         {EXPLORE_GROUPS.map((group) => {
-          const isActive = group.key === selectedTheme;
+          const isActive = showSubcategories
+            ? group.key === selectedTheme
+            : selectedFilters.includes(group.label);
           return (
             <TouchableOpacity
               key={group.key}
               style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border }]}
-              onPress={() => setSelectedTheme(group.key)}
+              onPress={() => {
+                if (showSubcategories) {
+                  setSelectedTheme(group.key);
+                } else {
+                  toggleFilter(group.label);
+                }
+              }}
               activeOpacity={0.8}
             >
               <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.emoji} {group.label}</Text>
