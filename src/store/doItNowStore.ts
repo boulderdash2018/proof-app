@@ -92,10 +92,12 @@ export const useDoItNowStore = create<DoItNowStore>((set, get) => ({
     const visits = [...session.placesVisited];
     const current = visits[visits.length - 1];
     if (current && !current.leftAt) {
-      const arrivedTime = new Date(current.arrivedAt).getTime();
-      const now = Date.now();
       current.leftAt = new Date().toISOString();
-      current.timeSpentMinutes = Math.round((now - arrivedTime) / 60000);
+      // Only auto-calculate if not already manually set
+      if (current.timeSpentMinutes === undefined) {
+        const arrivedTime = new Date(current.arrivedAt).getTime();
+        current.timeSpentMinutes = Math.round((Date.now() - arrivedTime) / 60000);
+      }
     }
     set({ session: { ...session, placesVisited: visits } });
   },

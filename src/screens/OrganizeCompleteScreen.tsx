@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -99,13 +100,38 @@ export const OrganizeCompleteScreen: React.FC = () => {
         let travelMinutes = 10; // fallback
 
         if (from.latitude && from.longitude && to.latitude && to.longitude) {
-          const directions = await getDirections(
-            { lat: from.latitude, lng: from.longitude },
-            { lat: to.latitude, lng: to.longitude },
-            s.transport as DoItNowTransport
-          );
-          if (directions) {
-            travelMinutes = Math.max(1, Math.round(directions.durationSeconds / 60));
+          if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).google?.maps) {
+            // Web: use Google Maps JS API DirectionsService (REST API has CORS issues)
+            const gmTransport: Record<string, string> = {
+              walking: 'WALKING', driving: 'DRIVING', transit: 'TRANSIT', bicycling: 'BICYCLING',
+            };
+            try {
+              const result = await new Promise<number>((resolve) => {
+                const svc = new (window as any).google.maps.DirectionsService();
+                svc.route({
+                  origin: { lat: from.latitude, lng: from.longitude },
+                  destination: { lat: to.latitude, lng: to.longitude },
+                  travelMode: gmTransport[s.transport] || 'WALKING',
+                }, (res: any, status: string) => {
+                  if (status === 'OK' && res?.routes?.[0]?.legs?.[0]) {
+                    resolve(Math.max(1, Math.round(res.routes[0].legs[0].duration.value / 60)));
+                  } else {
+                    resolve(10);
+                  }
+                });
+              });
+              travelMinutes = result;
+            } catch { /* fallback */ }
+          } else {
+            // Native: use REST API
+            const directions = await getDirections(
+              { lat: from.latitude, lng: from.longitude },
+              { lat: to.latitude, lng: to.longitude },
+              s.transport as DoItNowTransport
+            );
+            if (directions) {
+              travelMinutes = Math.max(1, Math.round(directions.durationSeconds / 60));
+            }
           }
         }
 
