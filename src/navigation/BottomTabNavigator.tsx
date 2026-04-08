@@ -14,6 +14,7 @@ import {
 import { FeedScreen } from '../screens/FeedScreen';
 import { ExploreScreen } from '../screens/ExploreScreen';
 import { CreateScreen } from '../screens/CreateScreen';
+import { OrganizeScreen } from '../screens/OrganizeScreen';
 import { SavesScreen } from '../screens/SavesScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
@@ -56,6 +57,7 @@ const CreateStack = createNativeStackNavigator<CreateStackParamList>();
 const CreateStackNavigator: React.FC = () => (
   <CreateStack.Navigator screenOptions={{ headerShown: false }}>
     <CreateStack.Screen name="Create" component={CreateScreen} />
+    <CreateStack.Screen name="Organize" component={OrganizeScreen} />
   </CreateStack.Navigator>
 );
 
@@ -234,7 +236,7 @@ export const BottomTabNavigator: React.FC = () => {
                 activeOpacity={0.7}
                 onPress={() => {
                   setShowCreateModal(false);
-                  // TODO: future planning flow
+                  navigationRef.navigate('CreateTab', { screen: 'Organize' });
                 }}
               >
                 <View style={[styles.createModalIcon, { backgroundColor: '#C9A84C15' }]}>

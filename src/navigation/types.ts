@@ -21,6 +21,7 @@ export type ExploreStackParamList = {
 
 export type CreateStackParamList = {
   Create: undefined;
+  Organize: undefined;
 };
 
 export type SavesStackParamList = {
