@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS } from '../constants';
+import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
@@ -99,6 +99,7 @@ export const CreateScreen: React.FC = () => {
   const [coverPhotos, setCoverPhotos] = useState<string[]>([]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(EXPLORE_GROUPS[0].key);
+  const [showSubcategories, setShowSubcategories] = useState(false);
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
   const [travels, setTravels] = useState<TravelEntry[]>([]);
@@ -637,24 +638,52 @@ export const CreateScreen: React.FC = () => {
           </Text>
 
           <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_category}</Text>
-          {/* Group filter chips */}
+
+          {/* Row 1: Par personne */}
+          <Text style={[styles.filterRowLabel, { color: C.gray500 }]}>Par personne</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
-            {EXPLORE_GROUPS.map((group) => (
-              <TouchableOpacity
-                key={group.key}
-                style={[
-                  styles.groupChip,
-                  { backgroundColor: selectedGroup === group.key ? C.primary : C.gray200, borderColor: selectedGroup === group.key ? C.primary : C.borderLight },
-                ]}
-                onPress={() => setSelectedGroup(group.key)}
-              >
-                <Text style={styles.groupChipEmoji}>{group.emoji}</Text>
-                <Text style={[styles.groupChipText, { color: selectedGroup === group.key ? '#FFF' : C.gray800 }]}>{group.label}</Text>
-              </TouchableOpacity>
-            ))}
+            {PERSON_FILTERS.map((p) => {
+              const isSelected = selectedTags.includes(p.label);
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.groupChip, { backgroundColor: isSelected ? C.primary : C.gray200, borderColor: isSelected ? C.primary : C.borderLight }]}
+                  onPress={() => toggleTag(p.label)}
+                >
+                  <Text style={styles.groupChipEmoji}>{p.emoji}</Text>
+                  <Text style={[styles.groupChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{p.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
-          {/* Category cards from selected group */}
-          {(EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
+
+          {/* Row 2: Par thème + Voir + */}
+          <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 8 }]}>Par thème</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
+            {EXPLORE_GROUPS.map((group) => {
+              const isActive = selectedGroup === group.key;
+              return (
+                <TouchableOpacity
+                  key={group.key}
+                  style={[styles.groupChip, { backgroundColor: isActive ? C.primary : C.gray200, borderColor: isActive ? C.primary : C.borderLight }]}
+                  onPress={() => setSelectedGroup(group.key)}
+                >
+                  <Text style={styles.groupChipEmoji}>{group.emoji}</Text>
+                  <Text style={[styles.groupChipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[styles.groupChip, { backgroundColor: showSubcategories ? Colors.gold : C.gray200, borderColor: showSubcategories ? Colors.gold : C.borderLight }]}
+              onPress={() => setShowSubcategories(!showSubcategories)}
+            >
+              <Ionicons name={showSubcategories ? 'chevron-up' : 'add'} size={14} color={showSubcategories ? '#FFF' : C.gray800} />
+              <Text style={[styles.groupChipText, { color: showSubcategories ? '#FFF' : C.gray800 }]}>Voir +</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Subcategory cards (visible when Voir + toggled) */}
+          {showSubcategories && (EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
             <View key={section.title} style={styles.categorySectionWrap}>
               <Text style={[styles.categorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
               <View style={styles.categoryGrid}>
@@ -941,6 +970,7 @@ const styles = StyleSheet.create({
   photoHint: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 12 },
 
   // Category group chips
+  filterRowLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
   groupChipsScroll: { flexGrow: 0, marginBottom: 12 },
   groupChipsContainer: { gap: 8 },
   groupChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },

@@ -1,7 +1,7 @@
 export interface ExploreCategoryItem {
   name: string;
-  emoji: string;       // kept for mood/tendance (actual emoji)
-  icon?: string;       // Ionicons icon name for grid categories
+  emoji: string;
+  icon?: string;
   gradient: [string, string];
   subtitle?: string;
   planCount?: number;
@@ -23,110 +23,125 @@ export interface ExploreGroup {
   sections: ExploreSection[];
 }
 
-// Warm, muted luxury gradients for the Maison de Nuit palette
+// ═══════════════════════════════════════════════
+// ROW 1 — Par personne
+// ═══════════════════════════════════════════════
+
+export interface PersonFilter {
+  key: string;
+  label: string;
+  emoji: string;
+}
+
+export const PERSON_FILTERS: PersonFilter[] = [
+  { key: 'date', label: 'Date', emoji: '👩‍❤️‍👨' },
+  { key: 'friends', label: 'Friends', emoji: '👯' },
+  { key: 'solo', label: 'Solo', emoji: '🧘' },
+  { key: 'family', label: 'Family', emoji: '👨‍👩‍👧' },
+  { key: 'pet-friendly', label: 'Pet-Friendly', emoji: '🐾' },
+  { key: 'co-worker', label: 'Co-Worker', emoji: '💼' },
+  { key: 'around-you', label: 'Around You', emoji: '📍' },
+];
+
+// ═══════════════════════════════════════════════
+// ROW 2 — Par thème / Catégorie
+// ═══════════════════════════════════════════════
+
 export const EXPLORE_GROUPS: ExploreGroup[] = [
+  // ── FOOD & DRINKS ──
   {
-    key: 'date',
-    label: 'Date',
-    emoji: '👩‍❤️‍👨',
+    key: 'food-drinks',
+    label: 'Food & Drinks',
+    emoji: '🍽️',
     layout: 'grid',
     sections: [
       {
-        title: 'PAR BUDGET',
+        title: 'FOOD & DRINKS',
         items: [
-          { name: 'Cheap date', icon: 'wallet-outline', emoji: '💸', gradient: ['#8B6A50', '#5C4030'], subtitle: 'Day & night' },
-          { name: 'Medium price', icon: 'wine-outline', emoji: '🥂', gradient: ['#7B6088', '#4A3555'], subtitle: 'Day & night' },
-          { name: 'Expensive date', icon: 'diamond-outline', emoji: '✨', gradient: ['#8B7530', '#5C4E20'], subtitle: '' },
-          { name: 'Rainy-day date', icon: 'umbrella-outline', emoji: '🌧️', gradient: ['#4A7068', '#2D4A44'], subtitle: '' },
-        ],
-      },
-      {
-        title: 'PAR VIBE',
-        items: [
-          { name: 'Artistic date', icon: 'color-palette-outline', emoji: '🎨', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
-          { name: 'Original / niche', icon: 'compass-outline', emoji: '🔮', gradient: ['#5A6880', '#3A4858'], subtitle: '' },
-          { name: 'Picnic date', icon: 'sunny-outline', emoji: '🧺', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
+          { name: 'Coffee lover', icon: 'cafe-outline', emoji: '☕', gradient: ['#6B5A70', '#4A3D55'] },
+          { name: 'Cool bars', icon: 'beer-outline', emoji: '🍻', gradient: ['#7B6840', '#5C4E28'] },
+          { name: 'Authentic Restaurant', icon: 'restaurant-outline', emoji: '🍽️', gradient: ['#8B6A50', '#5C4030'] },
+          { name: 'Cool Concept', icon: 'bulb-outline', emoji: '💡', gradient: ['#7B6088', '#4A3555'] },
+          { name: 'Wine lover', icon: 'wine-outline', emoji: '🍷', gradient: ['#7B4A4A', '#553030'] },
+          { name: 'Niche / Hidden gems', icon: 'compass-outline', emoji: '💎', gradient: ['#5A6880', '#3A4858'] },
+          { name: 'Original', icon: 'sparkles-outline', emoji: '✨', gradient: ['#8B7530', '#5C4E20'] },
+          { name: 'Loved by Proofers', icon: 'heart-outline', emoji: '❤️', gradient: ['#8B5070', '#5C3048'], hot: true },
+          { name: 'Bar to watch sports', icon: 'tv-outline', emoji: '📺', gradient: ['#4A6A50', '#2D4830'] },
         ],
       },
     ],
   },
+
+  // ── CULTURE & DISCOVERY ──
   {
-    key: 'everyone',
-    label: '4 Everyone',
-    emoji: '🌍',
+    key: 'culture-discovery',
+    label: 'Culture & Discovery',
+    emoji: '🎨',
     layout: 'grid',
     sections: [
-      {
-        title: 'FOOD & DRINK',
-        items: [
-          { name: 'Food-lover day', icon: 'restaurant-outline', emoji: '🍕', gradient: ['#8B6A50', '#5C4030'], subtitle: '' },
-          { name: 'Coffee-lover day', icon: 'cafe-outline', emoji: '☕', gradient: ['#6B5A70', '#4A3D55'], subtitle: '' },
-          { name: 'Brunch crawl', icon: 'sunny-outline', emoji: '🥞', gradient: ['#8B7530', '#5C4E20'], subtitle: '', hot: true },
-        ],
-      },
       {
         title: 'CULTURE & DISCOVERY',
         items: [
-          { name: 'Discover niche addresses', icon: 'location-outline', emoji: '📍', gradient: ['#7B5060', '#553040'], subtitle: '' },
-          { name: 'Vinyl dig', icon: 'musical-notes-outline', emoji: '🎵', gradient: ['#5A5048', '#3D352E'], subtitle: '' },
-          { name: 'Cinephile day', icon: 'film-outline', emoji: '🎬', gradient: ['#7B4A4A', '#553030'], subtitle: '' },
-          { name: 'Theatre lover day', icon: 'ticket-outline', emoji: '🎭', gradient: ['#6B5080', '#4A3560'], subtitle: '' },
-          { name: 'Gallery hopping', icon: 'images-outline', emoji: '🖼️', gradient: ['#6B5080', '#4A3560'], subtitle: '' },
-          { name: 'Bookshop crawl', icon: 'book-outline', emoji: '📚', gradient: ['#5A5048', '#3D352E'], subtitle: '' },
-        ],
-      },
-      {
-        title: 'ACTIVITIES',
-        items: [
-          { name: 'Shopping day', icon: 'bag-handle-outline', emoji: '🛍️', gradient: ['#8B5070', '#5C3048'], subtitle: 'Niche addresses' },
-          { name: 'Touristic day', icon: 'map-outline', emoji: '🗺️', gradient: ['#5A6878', '#3A4858'], subtitle: 'Cheap / medium / expensive' },
-          { name: 'Running day', icon: 'fitness-outline', emoji: '🏃', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
-          { name: 'Meet new people', icon: 'people-outline', emoji: '🤝', gradient: ['#7B6840', '#5C4E28'], subtitle: '' },
-          { name: 'Thrift & vintage', icon: 'shirt-outline', emoji: '👕', gradient: ['#7B6088', '#4A3555'], subtitle: 'Fripes & pépites' },
+          { name: 'Museum', icon: 'business-outline', emoji: '🏛️', gradient: ['#7B6088', '#4A3555'] },
+          { name: 'Aquarium / Zoo', icon: 'fish-outline', emoji: '🐠', gradient: ['#4A7068', '#2D4A44'] },
+          { name: 'Fashion', icon: 'shirt-outline', emoji: '👗', gradient: ['#8B5070', '#5C3048'] },
+          { name: 'Shopping', icon: 'bag-handle-outline', emoji: '🛍️', gradient: ['#8B6A50', '#5C4030'] },
+          { name: 'City Tour', icon: 'map-outline', emoji: '🗺️', gradient: ['#5A6878', '#3A4858'] },
+          { name: 'Nature', icon: 'leaf-outline', emoji: '🌿', gradient: ['#4A6A50', '#2D4830'] },
+          { name: 'Cool neighbourhood', icon: 'location-outline', emoji: '🏘️', gradient: ['#5A5048', '#3D352E'] },
+          { name: 'Niche / Hidden gems', icon: 'compass-outline', emoji: '💎', gradient: ['#5A6880', '#3A4858'] },
+          { name: 'Original', icon: 'sparkles-outline', emoji: '✨', gradient: ['#8B7530', '#5C4E20'] },
+          { name: 'Loved by Proofers', icon: 'heart-outline', emoji: '❤️', gradient: ['#8B5070', '#5C3048'], hot: true },
+          { name: 'Vinyl', icon: 'musical-notes-outline', emoji: '🎵', gradient: ['#5A5048', '#3D352E'] },
+          { name: 'Places for Music lovers', icon: 'headset-outline', emoji: '🎧', gradient: ['#6B5080', '#4A3560'] },
         ],
       },
     ],
   },
+
+  // ── SPORTS ──
   {
-    key: 'friends',
-    label: 'Friends',
-    emoji: '👯',
+    key: 'sports',
+    label: 'Sports',
+    emoji: '🏃',
     layout: 'grid',
     sections: [
       {
-        title: 'AVEC LA TEAM',
+        title: 'SPORTS',
         items: [
-          { name: 'Sports & chill day', icon: 'football-outline', emoji: '⚽', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
-          { name: 'Cool bars with the crew', icon: 'beer-outline', emoji: '🍻', gradient: ['#7B6840', '#5C4E28'], subtitle: '' },
-          { name: 'Girls day', icon: 'heart-outline', emoji: '💅', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
-          { name: 'Cheap & nice spot', icon: 'cash-outline', emoji: '💰', gradient: ['#8B6A50', '#5C4030'], subtitle: 'For the crew' },
-          { name: 'Rainy day with friends', icon: 'rainy-outline', emoji: '🌧️', gradient: ['#5A6880', '#3A4858'], subtitle: '' },
-          { name: 'Wine bar crawl', icon: 'wine-outline', emoji: '🍷', gradient: ['#7B4A4A', '#553030'], subtitle: '', hot: true },
-          { name: 'Padel & chill', icon: 'tennisball-outline', emoji: '🏓', gradient: ['#4A6A50', '#2D4830'], subtitle: '' },
+          { name: 'Les classiques urbains', icon: 'football-outline', emoji: '⚽', gradient: ['#4A6A50', '#2D4830'] },
+          { name: 'Sports de salle tendance', icon: 'barbell-outline', emoji: '🏋️', gradient: ['#7B6088', '#4A3555'] },
+          { name: 'Sports de raquette', icon: 'tennisball-outline', emoji: '🎾', gradient: ['#8B7530', '#5C4E20'] },
+          { name: 'Sports outdoor & lifestyle', icon: 'bicycle-outline', emoji: '🚴', gradient: ['#4A7068', '#2D4A44'] },
+          { name: 'Récupération & wellness', icon: 'water-outline', emoji: '🧖', gradient: ['#6B5A70', '#4A3D55'] },
+          { name: 'Sports sociaux & crew', icon: 'people-outline', emoji: '🤝', gradient: ['#7B6840', '#5C4E28'] },
+          { name: 'Niche & émergent', icon: 'flash-outline', emoji: '⚡', gradient: ['#5A6880', '#3A4858'] },
+          { name: 'Cool Places to watch', icon: 'tv-outline', emoji: '📺', gradient: ['#7B4A4A', '#553030'] },
+          { name: 'Niche / Hidden gems', icon: 'compass-outline', emoji: '💎', gradient: ['#5A6880', '#3A4858'] },
+          { name: 'Original', icon: 'sparkles-outline', emoji: '✨', gradient: ['#8B7530', '#5C4E20'] },
+          { name: 'Loved by Proofers', icon: 'heart-outline', emoji: '❤️', gradient: ['#8B5070', '#5C3048'], hot: true },
         ],
       },
     ],
   },
+
+  // ── OTHER ──
   {
-    key: 'alone',
-    label: 'Solo',
-    emoji: '🧘',
+    key: 'other',
+    label: 'Other',
+    emoji: '🔮',
     layout: 'grid',
     sections: [
       {
-        title: 'SOLO VIBES',
+        title: 'OTHER',
         items: [
-          { name: 'Shopping solo', icon: 'bag-outline', emoji: '🛍️', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
-          { name: 'Good restaurant solo', icon: 'restaurant-outline', emoji: '🍽️', gradient: ['#8B6A50', '#5C4030'], subtitle: '' },
-          { name: 'Places to relax', icon: 'leaf-outline', emoji: '🧘', gradient: ['#4A7068', '#2D4A44'], subtitle: 'On your own' },
-          { name: 'Meet new people', icon: 'people-outline', emoji: '🤝', gradient: ['#7B6840', '#5C4E28'], subtitle: '' },
-          { name: 'Sports day solo', icon: 'barbell-outline', emoji: '🏋️', gradient: ['#5A6878', '#3A4858'], subtitle: '' },
-          { name: 'Rainy day solo', icon: 'cloudy-outline', emoji: '🌧️', gradient: ['#5A5048', '#3D352E'], subtitle: '' },
-          { name: 'Wellness day', icon: 'water-outline', emoji: '🧖', gradient: ['#4A7068', '#2D4A44'], subtitle: '' },
+          { name: 'Tout le reste', icon: 'apps-outline', emoji: '🌀', gradient: ['#5A5048', '#3D352E'], subtitle: 'Ce qui ne rentre nulle part ailleurs' },
         ],
       },
     ],
   },
+
+  // ── MOOD (unchanged) ──
   {
     key: 'mood',
     label: 'Mood',
@@ -146,24 +161,8 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
       },
     ],
   },
-  {
-    key: 'occasion',
-    label: 'Occasion',
-    emoji: '🎉',
-    layout: 'grid',
-    sections: [
-      {
-        title: 'SPECIAL OCCASION',
-        items: [
-          { name: 'Last-minute plan', icon: 'alarm-outline', emoji: '⏰', gradient: ['#7B4A4A', '#553030'], subtitle: '' },
-          { name: 'After-work plan', icon: 'moon-outline', emoji: '🍸', gradient: ['#6B5080', '#4A3560'], subtitle: '' },
-          { name: 'Hangover recovery', icon: 'medical-outline', emoji: '🥴', gradient: ['#4A7068', '#2D4A44'], subtitle: '' },
-          { name: 'Birthday', icon: 'gift-outline', emoji: '🎂', gradient: ['#8B5070', '#5C3048'], subtitle: '' },
-          { name: 'Rooftop night', icon: 'business-outline', emoji: '🌃', gradient: ['#5A6880', '#3A4858'], subtitle: '', hot: true },
-        ],
-      },
-    ],
-  },
+
+  // ── TENDANCE (unchanged) ──
   {
     key: 'trending',
     label: 'Tendance',
