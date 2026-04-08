@@ -197,6 +197,7 @@ export interface DoItNowPlaceVisit {
   photoUrl?: string;
   rating?: number;
   reviewText?: string;
+  pricePaid?: number;
 }
 
 export interface DoItNowSession {
@@ -212,6 +213,9 @@ export interface DoItNowSession {
   totalDurationMinutes?: number;
   isPaused: boolean;
   status: 'active' | 'paused' | 'completed';
+  isOrganizeMode?: boolean;
+  organizeTitle?: string;
+  organizeTags?: CategoryTag[];
 }
 
 export interface PlanPhoto {

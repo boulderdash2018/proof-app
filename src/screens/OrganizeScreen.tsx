@@ -11,6 +11,7 @@ import {
   FlatList,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -18,9 +19,13 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES } from '../constants';
 import { useColors } from '../hooks/useColors';
-import { CategoryTag } from '../types';
+import { useAuthStore } from '../store/authStore';
+import { useDoItNowStore } from '../store/doItNowStore';
+import { CategoryTag, Place, Plan, DoItNowTransport } from '../types';
+import { TransportChooser } from '../components/TransportChooser';
 import {
   searchPlacesAutocomplete,
+  getPlaceDetails,
   getReadableType,
   GooglePlaceAutocomplete,
 } from '../services/googlePlacesService';
@@ -39,11 +44,15 @@ export const OrganizeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const C = useColors();
+  const user = useAuthStore((s) => s.user);
 
   // ── State ──
   const [title, setTitle] = useState('');
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showTransport, setShowTransport] = useState(false);
+  const [tempPlan, setTempPlan] = useState<Plan | null>(null);
 
   // Place picker
   const [showPlacePicker, setShowPlacePicker] = useState(false);
@@ -92,8 +101,76 @@ export const OrganizeScreen: React.FC = () => {
     setPlaces((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const handleLaunch = () => {
-    // TODO: will be implemented later
+  const handleLaunch = async () => {
+    if (!canLaunch || !user) return;
+    setIsLoading(true);
+
+    try {
+      // Fetch Google Place details (coordinates, photos) for all places
+      const detailedPlaces: Place[] = [];
+      for (const entry of places) {
+        const details = await getPlaceDetails(entry.googlePlaceId);
+        detailedPlaces.push({
+          id: entry.googlePlaceId,
+          googlePlaceId: entry.googlePlaceId,
+          name: entry.name,
+          type: entry.type,
+          address: entry.address,
+          rating: details?.rating || 0,
+          reviewCount: details?.reviewCount || 0,
+          ratingDistribution: [0, 0, 0, 0, 0],
+          reviews: [],
+          photoUrls: details?.photoUrls || [],
+          latitude: details?.latitude,
+          longitude: details?.longitude,
+          priceLevel: details?.priceLevel,
+        });
+      }
+
+      // Check all places have coordinates
+      const placesWithCoords = detailedPlaces.filter((p) => p.latitude && p.longitude);
+      if (placesWithCoords.length === 0) {
+        Alert.alert('Erreur', 'Impossible de localiser les lieux. Réessaie avec d\'autres lieux.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Build temporary plan
+      const plan: Plan = {
+        id: `organize-${Date.now()}`,
+        authorId: user.id,
+        author: user,
+        title,
+        gradient: 'terracotta',
+        tags: selectedTags,
+        places: detailedPlaces,
+        price: '0€',
+        duration: '0min',
+        transport: 'À pied',
+        likesCount: 0,
+        commentsCount: 0,
+        proofCount: 0,
+        declinedCount: 0,
+        xpReward: 20,
+        createdAt: new Date().toISOString(),
+        timeAgo: 'maintenant',
+      };
+
+      setTempPlan(plan);
+      setShowTransport(true);
+    } catch (err) {
+      console.error('Error preparing plan:', err);
+      Alert.alert('Erreur', 'Impossible de préparer le plan. Réessaie.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTransportSelect = (transport: DoItNowTransport) => {
+    if (!tempPlan || !user) return;
+    setShowTransport(false);
+    useDoItNowStore.getState().startOrganizeSession(tempPlan, transport, user.id, title, selectedTags);
+    navigation.navigate('DoItNow', { planId: tempPlan.id });
   };
 
   const canLaunch = title.trim().length >= 3 && selectedTags.length > 0 && places.length >= 1;
@@ -194,15 +271,28 @@ export const OrganizeScreen: React.FC = () => {
         {/* ── Bottom CTA ── */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: C.white, borderTopColor: C.borderLight }]}>
           <TouchableOpacity
-            style={[styles.launchBtn, { backgroundColor: canLaunch ? C.primary : C.gray300 }]}
+            style={[styles.launchBtn, { backgroundColor: canLaunch && !isLoading ? C.primary : C.gray300 }]}
             onPress={handleLaunch}
             activeOpacity={canLaunch ? 0.8 : 1}
-            disabled={!canLaunch}
+            disabled={!canLaunch || isLoading}
           >
-            <Ionicons name="rocket-outline" size={18} color={canLaunch ? '#FFF' : C.gray500} />
-            <Text style={[styles.launchBtnText, { color: canLaunch ? '#FFF' : C.gray500 }]}>Lancer le plan</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="rocket-outline" size={18} color={canLaunch ? '#FFF' : C.gray500} />
+                <Text style={[styles.launchBtnText, { color: canLaunch ? '#FFF' : C.gray500 }]}>Lancer le plan</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
+
+        {/* ── Transport Chooser ── */}
+        <TransportChooser
+          visible={showTransport}
+          onClose={() => setShowTransport(false)}
+          onSelect={handleTransportSelect}
+        />
 
         {/* ── Place Picker Modal ── */}
         <Modal visible={showPlacePicker} animationType="slide" presentationStyle="pageSheet">

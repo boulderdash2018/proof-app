@@ -56,6 +56,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   DoItNow: { planId: string };
   DoItNowComplete: undefined;
+  OrganizeComplete: undefined;
 };
 
 export type BottomTabParamList = {

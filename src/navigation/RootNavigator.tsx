@@ -16,6 +16,7 @@ import { PlaceDetailModal } from '../screens/PlaceDetailModal';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { DoItNowScreen } from '../screens/DoItNowScreen';
 import { DoItNowCompleteScreen } from '../screens/DoItNowCompleteScreen';
+import { OrganizeCompleteScreen } from '../screens/OrganizeCompleteScreen';
 import { AccountPromptModal } from '../components/AccountPromptModal';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -55,6 +56,7 @@ export const RootNavigator: React.FC = () => {
               </Stack.Group>
               <Stack.Screen name="DoItNow" component={DoItNowScreen} options={{ animation: 'slide_from_bottom' }} />
               <Stack.Screen name="DoItNowComplete" component={DoItNowCompleteScreen} options={{ animation: 'slide_from_right' }} />
+              <Stack.Screen name="OrganizeComplete" component={OrganizeCompleteScreen} options={{ animation: 'slide_from_right' }} />
             </>
           )
         ) : wantsAuth ? (

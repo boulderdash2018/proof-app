@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  TextInput as RNTextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -72,6 +73,7 @@ export const DoItNowScreen: React.FC = () => {
   const [timer, setTimer] = useState(0);
   const [loading, setLoading] = useState(true);
   const [arrivedMessage, setArrivedMessage] = useState<string | null>(null);
+  const [placePrice, setPlacePrice] = useState('');
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
   if (!session || !plan) return null;
@@ -152,13 +154,20 @@ export const DoItNowScreen: React.FC = () => {
 
   const handleNextStop = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Save price if in organize mode
+    if (session.isOrganizeMode && placePrice) {
+      useDoItNowStore.getState().setPriceForPlace(currentIndex, parseFloat(placePrice) || 0);
+    }
+
     setPlaceMode(null);
+    setPlacePrice('');
     setRoute(null);
     setRouteCoords([]);
 
     if (isLastPlace) {
       completeSession();
-      navigation.replace('DoItNowComplete');
+      navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {
       nextStop();
     }
@@ -329,6 +338,24 @@ export const DoItNowScreen: React.FC = () => {
             ))}
           </View>
 
+          {/* Price input — organize mode only */}
+          {session.isOrganizeMode && (
+            <View style={styles.priceSection}>
+              <Text style={[styles.priceLabel, { color: C.gray600 }]}>Prix payé</Text>
+              <View style={[styles.priceInputBox, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                <RNTextInput
+                  style={[styles.priceInput, { color: C.black }]}
+                  placeholder="0"
+                  placeholderTextColor={C.gray500}
+                  keyboardType="numeric"
+                  value={placePrice}
+                  onChangeText={setPlacePrice}
+                />
+                <Text style={[styles.priceUnit, { color: C.gray600 }]}>€</Text>
+              </View>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.nextBtn, { backgroundColor: C.primary }]}
             onPress={handleNextStop}
@@ -433,6 +460,11 @@ const styles = StyleSheet.create({
   timerLabel: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 4 },
   timerValue: { fontSize: 36, fontFamily: Fonts.serifBold },
   ratingRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  priceSection: { alignItems: 'center', marginTop: 12, gap: 6 },
+  priceLabel: { fontSize: 11, fontFamily: Fonts.serif },
+  priceInputBox: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 16, height: 44, minWidth: 120 },
+  priceInput: { flex: 1, fontSize: 18, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
+  priceUnit: { fontSize: 16, fontFamily: Fonts.serifBold, marginLeft: 4 },
   nextBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 16 },
   nextBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
 

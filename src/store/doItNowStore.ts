@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DoItNowSession, DoItNowPlaceVisit, DoItNowTransport, Plan } from '../types';
+import { DoItNowSession, DoItNowPlaceVisit, DoItNowTransport, Plan, CategoryTag } from '../types';
 
 interface DoItNowStore {
   session: DoItNowSession | null;
@@ -7,10 +7,12 @@ interface DoItNowStore {
   isFirstTime: boolean;
 
   startSession: (plan: Plan, transport: DoItNowTransport, userId: string) => void;
+  startOrganizeSession: (plan: Plan, transport: DoItNowTransport, userId: string, organizeTitle: string, organizeTags: CategoryTag[]) => void;
   arriveAtPlace: (placeIndex: number) => void;
   leavePlace: () => void;
   addPhoto: (placeIndex: number, photoUrl: string) => void;
   ratePlace: (placeIndex: number, rating: number, reviewText?: string) => void;
+  setPriceForPlace: (placeIndex: number, price: number) => void;
   nextStop: () => void;
   pauseSession: () => void;
   resumeSession: () => void;
@@ -36,6 +38,25 @@ export const useDoItNowStore = create<DoItNowStore>((set, get) => ({
       placesVisited: [],
       isPaused: false,
       status: 'active',
+    };
+    set({ session, plan });
+  },
+
+  startOrganizeSession: (plan, transport, userId, organizeTitle, organizeTags) => {
+    const session: DoItNowSession = {
+      id: `org-${Date.now()}`,
+      planId: plan.id,
+      planTitle: organizeTitle,
+      userId,
+      transport,
+      startedAt: new Date().toISOString(),
+      currentPlaceIndex: 0,
+      placesVisited: [],
+      isPaused: false,
+      status: 'active',
+      isOrganizeMode: true,
+      organizeTitle,
+      organizeTags,
     };
     set({ session, plan });
   },
@@ -93,6 +114,16 @@ export const useDoItNowStore = create<DoItNowStore>((set, get) => ({
     const visits = [...session.placesVisited];
     if (visits[placeIndex]) {
       visits[placeIndex] = { ...visits[placeIndex], rating, reviewText };
+    }
+    set({ session: { ...session, placesVisited: visits } });
+  },
+
+  setPriceForPlace: (placeIndex, price) => {
+    const { session } = get();
+    if (!session) return;
+    const visits = [...session.placesVisited];
+    if (visits[placeIndex]) {
+      visits[placeIndex] = { ...visits[placeIndex], pricePaid: price };
     }
     set({ session: { ...session, placesVisited: visits } });
   },
