@@ -13,6 +13,7 @@ interface DoItNowStore {
   addPhoto: (placeIndex: number, photoUrl: string) => void;
   ratePlace: (placeIndex: number, rating: number, reviewText?: string) => void;
   setPriceForPlace: (placeIndex: number, price: number) => void;
+  setTimeForPlace: (placeIndex: number, minutes: number) => void;
   nextStop: () => void;
   pauseSession: () => void;
   resumeSession: () => void;
@@ -124,6 +125,16 @@ export const useDoItNowStore = create<DoItNowStore>((set, get) => ({
     const visits = [...session.placesVisited];
     if (visits[placeIndex]) {
       visits[placeIndex] = { ...visits[placeIndex], pricePaid: price };
+    }
+    set({ session: { ...session, placesVisited: visits } });
+  },
+
+  setTimeForPlace: (placeIndex, minutes) => {
+    const { session } = get();
+    if (!session) return;
+    const visits = [...session.placesVisited];
+    if (visits[placeIndex]) {
+      visits[placeIndex] = { ...visits[placeIndex], timeSpentMinutes: minutes };
     }
     set({ session: { ...session, placesVisited: visits } });
   },

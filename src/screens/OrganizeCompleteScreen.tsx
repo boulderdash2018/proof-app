@@ -18,7 +18,8 @@ import { useAuthStore } from '../store/authStore';
 import { useFeedStore } from '../store/feedStore';
 import { useSavesStore } from '../store/savesStore';
 import { createPlan } from '../services/plansService';
-import { TransportMode, TravelSegment, DoItNowSession, Plan } from '../types';
+import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan } from '../types';
+import { getDirections } from '../services/directionsService';
 
 const mapTransport = (t: string): TransportMode => {
   switch (t) {
@@ -90,20 +91,27 @@ export const OrganizeCompleteScreen: React.FC = () => {
         return cleaned;
       });
 
-      // Build travel segments between places
+      // Build travel segments using Google Directions API for real travel times
       const travelSegments: TravelSegment[] = [];
       for (let i = 0; i < enrichedPlaces.length - 1; i++) {
-        const fromVisit = s.placesVisited.find((v) => v.placeId === enrichedPlaces[i].id);
-        const toVisit = s.placesVisited.find((v) => v.placeId === enrichedPlaces[i + 1].id);
-        let travelMinutes = 10; // default
-        if (fromVisit?.leftAt && toVisit?.arrivedAt) {
-          travelMinutes = Math.max(1, Math.round(
-            (new Date(toVisit.arrivedAt).getTime() - new Date(fromVisit.leftAt).getTime()) / 60000
-          ));
+        const from = enrichedPlaces[i];
+        const to = enrichedPlaces[i + 1];
+        let travelMinutes = 10; // fallback
+
+        if (from.latitude && from.longitude && to.latitude && to.longitude) {
+          const directions = await getDirections(
+            { lat: from.latitude, lng: from.longitude },
+            { lat: to.latitude, lng: to.longitude },
+            s.transport as DoItNowTransport
+          );
+          if (directions) {
+            travelMinutes = Math.max(1, Math.round(directions.durationSeconds / 60));
+          }
         }
+
         travelSegments.push({
-          fromPlaceId: enrichedPlaces[i].id,
-          toPlaceId: enrichedPlaces[i + 1].id,
+          fromPlaceId: from.id,
+          toPlaceId: to.id,
           transport: mapTransport(s.transport),
           duration: travelMinutes,
         });

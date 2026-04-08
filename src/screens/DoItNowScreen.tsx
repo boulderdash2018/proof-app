@@ -70,10 +70,11 @@ export const DoItNowScreen: React.FC = () => {
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   const [placeMode, setPlaceMode] = useState<PlaceModeState | null>(null);
-  const [timer, setTimer] = useState(0);
   const [loading, setLoading] = useState(true);
   const [arrivedMessage, setArrivedMessage] = useState<string | null>(null);
   const [placePrice, setPlacePrice] = useState('');
+  const [placeTime, setPlaceTime] = useState('');
+  const [timeMode, setTimeMode] = useState<'none' | 'manual' | 'auto'>('none');
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
   if (!session || !plan) return null;
@@ -137,19 +138,10 @@ export const DoItNowScreen: React.FC = () => {
     }
   }, [userLocation]);
 
-  // Timer for place mode
-  useEffect(() => {
-    if (!placeMode) { setTimer(0); return; }
-    const interval = setInterval(() => {
-      setTimer(Math.floor((Date.now() - placeMode.arrivedAt.getTime()) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [placeMode]);
-
-  const formatTimer = (seconds: number): string => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+  // Hidden timer helper — computes minutes since arrival (snapshot, not live)
+  const getHiddenTimerMinutes = (): number => {
+    if (!placeMode) return 0;
+    return Math.max(1, Math.round((Date.now() - placeMode.arrivedAt.getTime()) / 60000));
   };
 
   const handleNextStop = () => {
@@ -159,9 +151,15 @@ export const DoItNowScreen: React.FC = () => {
     if (session.isOrganizeMode && placePrice) {
       useDoItNowStore.getState().setPriceForPlace(currentIndex, parseFloat(placePrice) || 0);
     }
+    // Save time spent
+    if (placeTime) {
+      useDoItNowStore.getState().setTimeForPlace(currentIndex, parseInt(placeTime, 10) || 0);
+    }
 
     setPlaceMode(null);
     setPlacePrice('');
+    setPlaceTime('');
+    setTimeMode('none');
     setRoute(null);
     setRouteCoords([]);
 
@@ -314,9 +312,49 @@ export const DoItNowScreen: React.FC = () => {
           <Text style={[styles.placeModeName, { color: C.black }]}>{currentPlace.name}</Text>
           <Text style={[styles.placeModeType, { color: C.gray600 }]}>{currentPlace.type}</Text>
 
-          <View style={[styles.timerBox, { borderColor: C.borderLight }]}>
-            <Text style={[styles.timerLabel, { color: C.gray600 }]}>Temps sur place</Text>
-            <Text style={[styles.timerValue, { color: C.primary }]}>{formatTimer(timer)}</Text>
+          {/* Time spent section */}
+          <View style={styles.timeSection}>
+            <Text style={[styles.timeLabel, { color: C.gray600 }]}>Temps sur place</Text>
+            {timeMode === 'none' ? (
+              <View style={styles.timeBtnRow}>
+                <TouchableOpacity
+                  style={[styles.timeBtn, { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+                  onPress={() => setTimeMode('manual')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="pencil-outline" size={16} color={C.gray700} />
+                  <Text style={[styles.timeBtnText, { color: C.gray800 }]}>Remplir</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.timeBtn, { backgroundColor: C.primary + '15', borderColor: C.primary + '30' }]}
+                  onPress={() => {
+                    const mins = getHiddenTimerMinutes();
+                    setPlaceTime(String(mins));
+                    setTimeMode('auto');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="timer-outline" size={16} color={C.primary} />
+                  <Text style={[styles.timeBtnText, { color: C.primary }]}>Calculer</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={[styles.timeInputBox, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                <RNTextInput
+                  style={[styles.timeInput, { color: C.black }]}
+                  placeholder="0"
+                  placeholderTextColor={C.gray500}
+                  keyboardType="numeric"
+                  value={placeTime}
+                  onChangeText={setPlaceTime}
+                  autoFocus={timeMode === 'manual'}
+                />
+                <Text style={[styles.timeUnit, { color: C.gray600 }]}>min</Text>
+                <TouchableOpacity onPress={() => { setTimeMode('none'); setPlaceTime(''); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={18} color={C.gray500} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Rating */}
@@ -456,9 +494,14 @@ const styles = StyleSheet.create({
   placeModeIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   placeModeName: { fontSize: 22, fontFamily: Fonts.serifBold, textAlign: 'center' },
   placeModeType: { fontSize: 14, fontFamily: Fonts.serif },
-  timerBox: { borderWidth: 1, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 30, alignItems: 'center', marginTop: 8 },
-  timerLabel: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 4 },
-  timerValue: { fontSize: 36, fontFamily: Fonts.serifBold },
+  timeSection: { width: '100%', marginTop: 8 },
+  timeLabel: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 8, textAlign: 'center' },
+  timeBtnRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 14, borderWidth: 1.5 },
+  timeBtnText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  timeInputBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 46 },
+  timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
+  timeUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   ratingRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   priceSection: { alignItems: 'center', marginTop: 12, gap: 6 },
   priceLabel: { fontSize: 11, fontFamily: Fonts.serif },
