@@ -18,7 +18,7 @@ import { useAuthStore } from '../store/authStore';
 import { useFeedStore } from '../store/feedStore';
 import { useSavesStore } from '../store/savesStore';
 import { createPlan } from '../services/plansService';
-import { TransportMode, DoItNowSession, Plan } from '../types';
+import { TransportMode, TravelSegment, DoItNowSession, Plan } from '../types';
 
 const mapTransport = (t: string): TransportMode => {
   switch (t) {
@@ -75,28 +75,59 @@ export const OrganizeCompleteScreen: React.FC = () => {
 
     try {
       // Build places with prices and durations from session
+      // Strip undefined values (Firestore rejects them)
       const enrichedPlaces = p.places.map((place) => {
         const visit = s.placesVisited.find((v) => v.placeId === place.id);
-        return {
-          ...place,
-          placePrice: visit?.pricePaid || 0,
-          placeDuration: visit?.timeSpentMinutes || 0,
-        };
+        const cleaned: Record<string, any> = {};
+        for (const [k, v] of Object.entries(place)) {
+          if (v !== undefined) cleaned[k] = v;
+        }
+        cleaned.placePrice = visit?.pricePaid || 0;
+        cleaned.placeDuration = visit?.timeSpentMinutes || 0;
+        // Ensure reviews is always an array
+        if (!cleaned.reviews) cleaned.reviews = [];
+        if (!cleaned.ratingDistribution) cleaned.ratingDistribution = [0, 0, 0, 0, 0];
+        return cleaned;
       });
+
+      // Build travel segments between places
+      const travelSegments: TravelSegment[] = [];
+      for (let i = 0; i < enrichedPlaces.length - 1; i++) {
+        const fromVisit = s.placesVisited.find((v) => v.placeId === enrichedPlaces[i].id);
+        const toVisit = s.placesVisited.find((v) => v.placeId === enrichedPlaces[i + 1].id);
+        let travelMinutes = 10; // default
+        if (fromVisit?.leftAt && toVisit?.arrivedAt) {
+          travelMinutes = Math.max(1, Math.round(
+            (new Date(toVisit.arrivedAt).getTime() - new Date(fromVisit.leftAt).getTime()) / 60000
+          ));
+        }
+        travelSegments.push({
+          fromPlaceId: enrichedPlaces[i].id,
+          toPlaceId: enrichedPlaces[i + 1].id,
+          transport: mapTransport(s.transport),
+          duration: travelMinutes,
+        });
+      }
 
       // Collect cover photos from places
       const coverPhotos = enrichedPlaces
-        .flatMap((pl) => pl.photoUrls || [])
+        .flatMap((pl: any) => pl.photoUrls || [])
         .slice(0, 5);
+
+      // Compute real duration: sum of place times + travel times
+      const placeTime = enrichedPlaces.reduce((sum: number, pl: any) => sum + (pl.placeDuration || 0), 0);
+      const travelTime = travelSegments.reduce((sum, seg) => sum + seg.duration, 0);
+      const realDuration = totalMinutes > 0 ? totalMinutes : placeTime + travelTime;
 
       const createdPlan = await createPlan(
         {
           title: s.organizeTitle || s.planTitle,
           tags: s.organizeTags || [],
-          places: enrichedPlaces,
+          places: enrichedPlaces as any,
           price: `${totalPrice}€`,
-          duration: formatDuration(totalMinutes),
+          duration: formatDuration(realDuration),
           transport: mapTransport(s.transport),
+          travelSegments,
           coverPhotos,
         },
         currentUser
@@ -108,9 +139,9 @@ export const OrganizeCompleteScreen: React.FC = () => {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setPublished(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Publish error:', err);
-      setPublishError('Impossible de publier le plan. Réessaie.');
+      setPublishError(`Erreur: ${err?.message || 'Impossible de publier le plan.'}`);
     } finally {
       setIsPublishing(false);
     }
