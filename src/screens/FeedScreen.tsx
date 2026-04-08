@@ -93,11 +93,12 @@ export const FeedScreen: React.FC = () => {
     toggleSave(planId);
   };
 
-  const renderItem = ({ item }: { item: Plan }) => (
+  const renderItem = ({ item, index }: { item: Plan; index: number }) => (
     <PlanCard
       plan={item}
       isLiked={likedPlanIds.has(item.id)}
       isSaved={savedPlanIds.has(item.id)}
+      index={index}
       onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
       onLike={() => handleLike(item.id)}
       onSave={() => handleSave(item.id)}

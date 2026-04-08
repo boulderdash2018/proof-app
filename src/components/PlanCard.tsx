@@ -12,6 +12,7 @@ import {
   NativeScrollEvent,
   GestureResponderEvent,
 } from 'react-native';
+import ReAnimated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Plan, TransportMode } from '../types';
@@ -44,6 +45,7 @@ interface PlanCardProps {
   plan: Plan;
   isLiked: boolean;
   isSaved: boolean;
+  index?: number;
   onPress: () => void;
   onLike: () => void;
   onSave: () => void;
@@ -55,6 +57,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   plan,
   isLiked,
   isSaved,
+  index = 0,
   onPress,
   onLike,
   onSave,
@@ -92,17 +95,27 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
   const likeScale = useRef(new Animated.Value(1)).current;
   const saveScale = useRef(new Animated.Value(1)).current;
+  const cardScale = useRef(new Animated.Value(1)).current;
   const doubleTapHeartScale = useRef(new Animated.Value(0)).current;
   const doubleTapHeartOpacity = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef<number>(0);
   const [heartPos, setHeartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Emil: snappy spring — fast attack (high tension), quick settle (high friction)
   const animateBounce = (scale: Animated.Value) => {
     Animated.sequence([
-      Animated.spring(scale, { toValue: 1.35, useNativeDriver: true, friction: 3, tension: 200 }),
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 4, tension: 120 }),
+      Animated.spring(scale, { toValue: 1.25, useNativeDriver: true, friction: 4, tension: 300 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 200 }),
     ]).start();
+  };
+
+  // Emil: scale(0.98) on press — instant feedback, card feels alive
+  const onCardPressIn = () => {
+    Animated.timing(cardScale, { toValue: 0.98, duration: 120, useNativeDriver: true }).start();
+  };
+  const onCardPressOut = () => {
+    Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 200 }).start();
   };
 
   const handleBannerPressIn = (e: GestureResponderEvent) => {
@@ -139,8 +152,9 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   };
 
   return (
-    <View
-      style={[styles.card, { backgroundColor: C.gray200, borderColor: C.border }]}
+    <ReAnimated.View entering={index < 6 ? FadeInUp.delay(index * 60).duration(400) : undefined}>
+    <Animated.View
+      style={[styles.card, { backgroundColor: C.gray200, borderColor: C.border, transform: [{ scale: cardScale }] }]}
     >
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
         <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
@@ -214,7 +228,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </Animated.View>
       </TouchableOpacity>
 
-      <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
+      <TouchableOpacity activeOpacity={0.92} onPress={onPress} onPressIn={onCardPressIn} onPressOut={onCardPressOut}>
         {plan.tags.length > 0 && (
           <View style={styles.tagsRow}>
             {plan.tags.map((tag, index) => (
@@ -284,7 +298,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         )}
       </View>
-    </View>
+    </Animated.View>
+    </ReAnimated.View>
   );
 };
 
