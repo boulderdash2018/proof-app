@@ -6,9 +6,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Layout } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useDoItNowStore } from '../store/doItNowStore';
-import { getDirections, decodePolyline, RouteResult } from '../services/directionsService';
+import { RouteResult } from '../services/directionsService';
 
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
+
+// Map transport mode to Google Maps JS API TravelMode
+function getTravelMode(mode: string): string {
+  switch (mode) {
+    case 'driving': return 'DRIVING';
+    case 'transit': return 'TRANSIT';
+    case 'bicycling': return 'BICYCLING';
+    default: return 'WALKING';
+  }
+}
+
+// Map transport mode for Google Maps URL
+function getUrlTravelMode(mode: string): string {
+  switch (mode) {
+    case 'driving': return 'driving';
+    case 'transit': return 'transit';
+    case 'bicycling': return 'bicycling';
+    default: return 'walking';
+  }
+}
 
 const MAP_STYLE = [
   {"featureType":"all","elementType":"geometry","stylers":[{"color":"#E8DDD0"}]},
@@ -57,7 +77,8 @@ export const DoItNowScreen: React.FC = () => {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapObjRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
-  const routeLineRef = useRef<any>(null);
+  const directionsServiceRef = useRef<any>(null);
+  const directionsRendererRef = useRef<any>(null);
   const watchIdRef = useRef<number | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -102,6 +123,19 @@ export const DoItNowScreen: React.FC = () => {
         });
       });
 
+      // Initialize DirectionsService & DirectionsRenderer for route display
+      directionsServiceRef.current = new gm.DirectionsService();
+      directionsRendererRef.current = new gm.DirectionsRenderer({
+        map,
+        suppressMarkers: true, // We use our own numbered markers
+        polylineOptions: {
+          strokeColor: '#D4845A',
+          strokeOpacity: 0.9,
+          strokeWeight: 5,
+        },
+        preserveViewport: true,
+      });
+
       setLoading(false);
     });
   }, []);
@@ -142,29 +176,48 @@ export const DoItNowScreen: React.FC = () => {
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, []);
 
-  // Fetch route
+  // Fetch route using Google Maps JS API DirectionsService (avoids CORS issues)
   useEffect(() => {
     if (!userLoc || !currentPlace?.latitude || !currentPlace?.longitude || placeMode) return;
-    getDirections(userLoc, { lat: currentPlace.latitude, lng: currentPlace.longitude }, session.transport).then((r) => {
-      setRoute(r);
-      if (r && mapObjRef.current) {
-        const gm = (window as any).google.maps;
-        if (routeLineRef.current) routeLineRef.current.setMap(null);
-        const coords = decodePolyline(r.overviewPolyline).map((c) => ({ lat: c.latitude, lng: c.longitude }));
-        routeLineRef.current = new gm.Polyline({
-          path: coords,
-          strokeColor: '#D4845A',
-          strokeOpacity: 0.85,
-          strokeWeight: 4,
-          map: mapObjRef.current,
-        });
+    if (!directionsServiceRef.current || !directionsRendererRef.current) return;
 
-        const bounds = new gm.LatLngBounds();
-        bounds.extend(userLoc);
-        bounds.extend({ lat: currentPlace.latitude, lng: currentPlace.longitude });
-        mapObjRef.current.fitBounds(bounds, { top: 80, right: 60, bottom: 200, left: 60 });
+    const gm = (window as any).google?.maps;
+    if (!gm) return;
+
+    directionsServiceRef.current.route(
+      {
+        origin: userLoc,
+        destination: { lat: currentPlace.latitude, lng: currentPlace.longitude },
+        travelMode: gm.TravelMode[getTravelMode(session.transport)],
+      },
+      (result: any, status: any) => {
+        if (status === 'OK' && result) {
+          directionsRendererRef.current.setDirections(result);
+          const leg = result.routes[0].legs[0];
+          setRoute({
+            distanceText: leg.distance.text,
+            durationText: leg.duration.text,
+            distanceMeters: leg.distance.value,
+            durationSeconds: leg.duration.value,
+            overviewPolyline: '',
+            steps: leg.steps.map((s: any) => ({
+              startLocation: { lat: s.start_location.lat(), lng: s.start_location.lng() },
+              endLocation: { lat: s.end_location.lat(), lng: s.end_location.lng() },
+              polyline: '',
+              distance: s.distance.text,
+              duration: s.duration.text,
+              instruction: s.instructions?.replace(/<[^>]+>/g, '') || '',
+            })),
+          });
+
+          // Fit bounds to show user + destination
+          const bounds = new gm.LatLngBounds();
+          bounds.extend(userLoc);
+          bounds.extend({ lat: currentPlace.latitude, lng: currentPlace.longitude });
+          mapObjRef.current?.fitBounds(bounds, { top: 80, right: 60, bottom: 250, left: 60 });
+        }
       }
-    });
+    );
   }, [userLoc?.lat, currentIndex, placeMode]);
 
   // Arrival detection
@@ -188,10 +241,18 @@ export const DoItNowScreen: React.FC = () => {
 
   const formatTimer = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
+  // Open Google Maps with turn-by-turn navigation
+  const openGoogleMapsNav = () => {
+    if (!userLoc || !currentPlace?.latitude || !currentPlace?.longitude) return;
+    const mode = getUrlTravelMode(session.transport);
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${currentPlace.latitude},${currentPlace.longitude}&travelmode=${mode}`;
+    window.open(url, '_blank');
+  };
+
   const handleNext = () => {
     setPlaceMode(null);
     setRoute(null);
-    if (routeLineRef.current) { routeLineRef.current.setMap(null); routeLineRef.current = null; }
+    if (directionsRendererRef.current) directionsRendererRef.current.setDirections({ routes: [] });
     if (isLastPlace) {
       completeSession();
       navigation.replace('DoItNowComplete');
@@ -276,14 +337,39 @@ export const DoItNowScreen: React.FC = () => {
             </View>
           </View>
           {route && (
-            <View style={styles.routeInfo}>
-              <Ionicons name="navigate-outline" size={14} color={C.primary} />
-              <Text style={[styles.routeText, { color: C.gray700 }]}>{route.distanceText} · {route.durationText}</Text>
+            <View style={styles.routeSection}>
+              <View style={styles.routeInfo}>
+                <Ionicons name="navigate-outline" size={14} color={C.primary} />
+                <Text style={[styles.routeText, { color: C.gray700 }]}>{route.distanceText} · {route.durationText}</Text>
+              </View>
+              {route.steps.length > 0 && (
+                <View style={[styles.nextStepBox, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                  <Ionicons name="arrow-forward-circle" size={16} color={C.primary} />
+                  <Text style={[styles.nextStepText, { color: C.gray800 }]} numberOfLines={2}>
+                    {route.steps[0].instruction}
+                  </Text>
+                  <Text style={[styles.nextStepDist, { color: C.gray600 }]}>{route.steps[0].distance}</Text>
+                </View>
+              )}
             </View>
           )}
-          <TouchableOpacity style={[styles.arrivedBtn, { backgroundColor: C.primary + '15', borderColor: C.primary }]} onPress={handleManualArrive}>
-            <Text style={[styles.arrivedBtnText, { color: C.primary }]}>Je suis arrivé(e)</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.navBtn, { backgroundColor: C.primary }]}
+              onPress={openGoogleMapsNav}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="navigate" size={16} color="#FFF" />
+              <Text style={styles.navBtnText}>Itinéraire</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.arrivedBtn, { backgroundColor: C.primary + '15', borderColor: C.primary }]}
+              onPress={handleManualArrive}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.arrivedBtnText, { color: C.primary }]}>Je suis arrivé(e)</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.quote, { color: C.gray500 }]}>proof. — discover your city</Text>
         </View>
       )}
@@ -319,9 +405,16 @@ const styles = StyleSheet.create({
   bottomIndexText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
   bottomName: { fontSize: 16, fontFamily: Fonts.serifBold },
   bottomType: { fontSize: 12, fontFamily: Fonts.serif },
-  routeInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  routeSection: { marginBottom: 12, gap: 8 },
+  routeInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   routeText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
-  arrivedBtn: { paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', marginBottom: 8 },
+  nextStepBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
+  nextStepText: { flex: 1, fontSize: 12, fontFamily: Fonts.serif },
+  nextStepDist: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12 },
+  navBtnText: { color: '#FFF', fontSize: 14, fontFamily: Fonts.serifBold },
+  arrivedBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
   arrivedBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
   quote: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center', fontStyle: 'italic' },
 });

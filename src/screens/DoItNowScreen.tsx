@@ -7,6 +7,7 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -174,6 +175,29 @@ export const DoItNowScreen: React.FC = () => {
     navigation.goBack();
   };
 
+  // Open Google Maps / Apple Maps with turn-by-turn directions
+  const openMapsNavigation = () => {
+    if (!userLocation || !currentPlace?.latitude || !currentPlace?.longitude) return;
+    const mode = session.transport === 'driving' ? 'driving' : session.transport === 'transit' ? 'transit' : session.transport === 'bicycling' ? 'bicycling' : 'walking';
+
+    if (Platform.OS === 'ios') {
+      // Try Google Maps first, fallback to Apple Maps
+      const gmUrl = `comgooglemaps://?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${currentPlace.latitude},${currentPlace.longitude}&directionsmode=${mode}`;
+      Linking.canOpenURL(gmUrl).then((supported) => {
+        if (supported) {
+          Linking.openURL(gmUrl);
+        } else {
+          const amMode = mode === 'driving' ? 'd' : mode === 'transit' ? 'r' : 'w';
+          Linking.openURL(`maps://?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${currentPlace.latitude},${currentPlace.longitude}&dirflg=${amMode}`);
+        }
+      });
+    } else {
+      // Android: use Google Maps navigation intent
+      const navMode = mode === 'walking' ? 'w' : mode === 'bicycling' ? 'b' : mode === 'transit' ? 'r' : 'd';
+      Linking.openURL(`google.navigation:q=${currentPlace.latitude},${currentPlace.longitude}&mode=${navMode}`);
+    }
+  };
+
   // Fit map to show user + destination
   useEffect(() => {
     if (!userLocation || !currentPlace?.latitude || placeMode) return;
@@ -331,21 +355,42 @@ export const DoItNowScreen: React.FC = () => {
           </View>
 
           {route && (
-            <View style={styles.bottomCardRoute}>
-              <Ionicons name="navigate-outline" size={14} color={C.primary} />
-              <Text style={[styles.bottomCardRouteText, { color: C.gray700 }]}>
-                {route.distanceText} · {route.durationText}
-              </Text>
+            <View style={styles.routeSection}>
+              <View style={styles.bottomCardRoute}>
+                <Ionicons name="navigate-outline" size={14} color={C.primary} />
+                <Text style={[styles.bottomCardRouteText, { color: C.gray700 }]}>
+                  {route.distanceText} · {route.durationText}
+                </Text>
+              </View>
+              {route.steps.length > 0 && (
+                <View style={[styles.nextStepBox, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                  <Ionicons name="arrow-forward-circle" size={16} color={C.primary} />
+                  <Text style={[styles.nextStepText, { color: C.gray800 }]} numberOfLines={2}>
+                    {route.steps[0].instruction}
+                  </Text>
+                  <Text style={[styles.nextStepDist, { color: C.gray600 }]}>{route.steps[0].distance}</Text>
+                </View>
+              )}
             </View>
           )}
 
-          <TouchableOpacity
-            style={[styles.arrivedBtn, { backgroundColor: C.primary + '15', borderColor: C.primary }]}
-            onPress={handleManualArrive}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.arrivedBtnText, { color: C.primary }]}>Je suis arrivé(e)</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.navBtn, { backgroundColor: C.primary }]}
+              onPress={openMapsNavigation}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="navigate" size={16} color="#FFF" />
+              <Text style={styles.navBtnText}>Itinéraire</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.arrivedBtn, { backgroundColor: C.primary + '15', borderColor: C.primary }]}
+              onPress={handleManualArrive}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.arrivedBtnText, { color: C.primary }]}>Je suis arrivé(e)</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={[styles.quoteText, { color: C.gray500 }]}>proof. — discover your city</Text>
         </View>
@@ -399,9 +444,16 @@ const styles = StyleSheet.create({
   bottomCardInfo: { flex: 1 },
   bottomCardName: { fontSize: 16, fontFamily: Fonts.serifBold },
   bottomCardType: { fontSize: 12, fontFamily: Fonts.serif },
-  bottomCardRoute: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  routeSection: { marginBottom: 12, gap: 8 },
+  bottomCardRoute: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   bottomCardRouteText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
-  arrivedBtn: { paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', marginBottom: 8 },
+  nextStepBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
+  nextStepText: { flex: 1, fontSize: 12, fontFamily: Fonts.serif },
+  nextStepDist: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12 },
+  navBtnText: { color: '#FFF', fontSize: 14, fontFamily: Fonts.serifBold },
+  arrivedBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
   arrivedBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
   quoteText: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center', fontStyle: 'italic' },
 });
