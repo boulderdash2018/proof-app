@@ -60,13 +60,18 @@ export const ExploreScreen: React.FC = () => {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Advanced filters
+  // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [maxBudget, setMaxBudget] = useState('');
-  const [maxDuration, setMaxDuration] = useState('');
-  const [minLikes, setMinLikes] = useState('');
-  const [minProofs, setMinProofs] = useState('');
-  const hasAdvancedFilters = maxBudget !== '' || maxDuration !== '' || minLikes !== '' || minProofs !== '';
+  const [maxBudget, setMaxBudget] = useState<number | null>(null);
+  const [maxDuration, setMaxDuration] = useState<number | null>(null);
+  const [minLikes, setMinLikes] = useState<number | null>(null);
+  const [minProofs, setMinProofs] = useState<number | null>(null);
+  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minLikes !== null || minProofs !== null;
+
+  const BUDGET_STEPS = [20, 50, 100, 200, 500];
+  const DURATION_STEPS = [30, 60, 120, 180, 360];
+  const LIKES_STEPS = [1, 5, 10, 25, 50];
+  const PROOFS_STEPS = [1, 3, 5, 10, 25];
 
   const activeGroup = EXPLORE_GROUPS.find((g) => g.key === selectedTheme) || EXPLORE_GROUPS[0];
 
@@ -142,10 +147,10 @@ export const ExploreScreen: React.FC = () => {
   const applyAdvancedFilters = (plans: Plan[]): Plan[] => {
     if (!hasAdvancedFilters) return plans;
     return plans.filter((p) => {
-      if (maxBudget !== '' && parsePrice(p.price) > parseInt(maxBudget, 10)) return false;
-      if (maxDuration !== '' && parseDuration(p.duration) > parseInt(maxDuration, 10)) return false;
-      if (minLikes !== '' && p.likesCount < parseInt(minLikes, 10)) return false;
-      if (minProofs !== '' && p.proofCount < parseInt(minProofs, 10)) return false;
+      if (maxBudget !== null && parsePrice(p.price) > maxBudget) return false;
+      if (maxDuration !== null && parseDuration(p.duration) > maxDuration) return false;
+      if (minLikes !== null && p.likesCount < minLikes) return false;
+      if (minProofs !== null && p.proofCount < minProofs) return false;
       return true;
     });
   };
@@ -153,11 +158,48 @@ export const ExploreScreen: React.FC = () => {
   const displayedPlans = applyAdvancedFilters(filteredPlans);
 
   const clearAdvancedFilters = () => {
-    setMaxBudget('');
-    setMaxDuration('');
-    setMinLikes('');
-    setMinProofs('');
+    setMaxBudget(null);
+    setMaxDuration(null);
+    setMinLikes(null);
+    setMinProofs(null);
   };
+
+  const formatDuration = (mins: number): string =>
+    mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? (mins % 60 < 10 ? '0' : '') + (mins % 60) : ''}` : `${mins}min`;
+
+  const renderStepRow = (
+    label: string,
+    icon: string,
+    steps: number[],
+    value: number | null,
+    setter: (v: number | null) => void,
+    formatLabel: (n: number, isLast: boolean) => string,
+  ) => (
+    <View style={styles.filterField}>
+      <View style={styles.filterFieldHeader}>
+        <Ionicons name={icon as any} size={16} color={C.gray600} />
+        <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>{label}</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stepsRow}>
+        {steps.map((step, i) => {
+          const isLast = i === steps.length - 1;
+          const isActive = value === step;
+          return (
+            <TouchableOpacity
+              key={step}
+              style={[styles.stepChip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+              onPress={() => setter(isActive ? null : step)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.stepChipText, { color: isActive ? '#FFF' : C.gray800 }]}>
+                {formatLabel(step, isLast)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
 
   const showCategories = searchQuery.length < 2;
 
@@ -466,71 +508,14 @@ export const ExploreScreen: React.FC = () => {
             </View>
 
             <ScrollView style={styles.filtersBody} showsVerticalScrollIndicator={false}>
-              {/* Budget max */}
-              <View style={styles.filterField}>
-                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Budget maximum</Text>
-                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
-                  <Ionicons name="cash-outline" size={16} color={C.gray600} />
-                  <RNTextInput
-                    style={[styles.filterInput, { color: C.black }]}
-                    placeholder="Ex: 50"
-                    placeholderTextColor={C.gray500}
-                    value={maxBudget}
-                    onChangeText={setMaxBudget}
-                    keyboardType="numeric"
-                  />
-                  <Text style={[styles.filterUnit, { color: C.gray600 }]}>€</Text>
-                </View>
-              </View>
-
-              {/* Duration max */}
-              <View style={styles.filterField}>
-                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Temps maximum</Text>
-                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
-                  <Ionicons name="time-outline" size={16} color={C.gray600} />
-                  <RNTextInput
-                    style={[styles.filterInput, { color: C.black }]}
-                    placeholder="Ex: 120"
-                    placeholderTextColor={C.gray500}
-                    value={maxDuration}
-                    onChangeText={setMaxDuration}
-                    keyboardType="numeric"
-                  />
-                  <Text style={[styles.filterUnit, { color: C.gray600 }]}>min</Text>
-                </View>
-              </View>
-
-              {/* Min likes */}
-              <View style={styles.filterField}>
-                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Likes minimum</Text>
-                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
-                  <Ionicons name="heart-outline" size={16} color={C.gray600} />
-                  <RNTextInput
-                    style={[styles.filterInput, { color: C.black }]}
-                    placeholder="Ex: 5"
-                    placeholderTextColor={C.gray500}
-                    value={minLikes}
-                    onChangeText={setMinLikes}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              {/* Min proofs */}
-              <View style={styles.filterField}>
-                <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Proof it minimum</Text>
-                <View style={[styles.filterInputWrap, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
-                  <Ionicons name="checkmark-circle-outline" size={16} color={C.gray600} />
-                  <RNTextInput
-                    style={[styles.filterInput, { color: C.black }]}
-                    placeholder="Ex: 3"
-                    placeholderTextColor={C.gray500}
-                    value={minProofs}
-                    onChangeText={setMinProofs}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
+              {renderStepRow('Budget maximum', 'cash-outline', BUDGET_STEPS, maxBudget, setMaxBudget,
+                (n, isLast) => isLast ? `${n}€+` : `${n}€`)}
+              {renderStepRow('Temps maximum', 'time-outline', DURATION_STEPS, maxDuration, setMaxDuration,
+                (n, isLast) => isLast ? `${formatDuration(n)}+` : formatDuration(n))}
+              {renderStepRow('Likes minimum', 'heart-outline', LIKES_STEPS, minLikes, setMinLikes,
+                (n, isLast) => isLast ? `${n}+` : `${n}`)}
+              {renderStepRow('Proof it minimum', 'checkmark-circle-outline', PROOFS_STEPS, minProofs, setMinProofs,
+                (n, isLast) => isLast ? `${n}+` : `${n}`)}
             </ScrollView>
 
             <View style={[styles.filtersFooter, { borderTopColor: C.borderLight }]}>
@@ -645,12 +630,13 @@ const styles = StyleSheet.create({
   filtersModal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },
   filtersHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
   filtersTitle: { fontSize: 18, fontFamily: Fonts.serifBold },
-  filtersBody: { padding: 20 },
-  filterField: { marginBottom: 20 },
-  filterFieldLabel: { fontSize: 13, fontFamily: Fonts.serifBold, marginBottom: 8 },
-  filterInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 46 },
-  filterInput: { flex: 1, fontSize: 15, fontFamily: Fonts.serif, paddingVertical: 0 },
-  filterUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  filtersBody: { paddingVertical: 16, paddingLeft: 20 },
+  filterField: { marginBottom: 18 },
+  filterFieldHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  filterFieldLabel: { fontSize: 13, fontFamily: Fonts.serifBold },
+  stepsRow: { gap: 8, paddingRight: 20 },
+  stepChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5 },
+  stepChipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   filtersFooter: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1 },
   filtersClearBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
   filtersClearText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
