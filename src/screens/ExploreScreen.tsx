@@ -23,7 +23,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { searchUsers } from '../services/friendsService';
 import { useAuthStore } from '../store';
-import { fetchPublicPlansByTag, searchPublicPlans } from '../services/plansService';
+import { fetchPublicPlansByTags, searchPublicPlans } from '../services/plansService';
 import {
   searchPlacesNearby,
   getReadableType,
@@ -48,16 +48,38 @@ export const ExploreScreen: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const [selectedTheme, setSelectedTheme] = useState(EXPLORE_GROUPS[0].key);
   const [showSubcategories, setShowSubcategories] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [searchUsers_, setSearchUsers_] = useState<any[]>([]);
   const [googlePlaces, setGooglePlaces] = useState<GooglePlaceDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeGroup = EXPLORE_GROUPS.find((g) => g.key === selectedTheme) || EXPLORE_GROUPS[0];
+
+  const toggleFilter = useCallback((label: string) => {
+    setSelectedFilters((prev) => {
+      const next = prev.includes(label) ? prev.filter((f) => f !== label) : [...prev, label];
+      // Debounced fetch
+      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+      if (next.length > 0) {
+        setIsFilterLoading(true);
+        filterTimerRef.current = setTimeout(async () => {
+          const plans = await fetchPublicPlansByTags(next);
+          setFilteredPlans(plans);
+          setIsFilterLoading(false);
+        }, 300);
+      } else {
+        setFilteredPlans([]);
+        setIsFilterLoading(false);
+      }
+      return next;
+    });
+  }, []);
 
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
@@ -94,36 +116,20 @@ export const ExploreScreen: React.FC = () => {
     setGooglePlaces([]);
   };
 
-  const handleCategoryPress = useCallback(async (categoryName: string) => {
-    setSearchQuery(categoryName);
-    setIsSearching(true);
-    const [plans, places] = await Promise.all([
-      fetchPublicPlansByTag(categoryName),
-      searchPlacesNearby(categoryName + ' Paris', { lat: 48.8566, lng: 2.3522 }),
-    ]);
-    setFilteredPlans(plans);
-    setGooglePlaces(places);
-    setSearchUsers_([]);
-    setIsSearching(false);
-  }, []);
-
   const showCategories = searchQuery.length < 2;
 
-  // ── Row 1: Person filters ──
+  // ── Row 1: Person filters (multi-select) ──
   const renderPersonRow = () => (
     <View style={styles.filterSection}>
       <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par personne</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
         {PERSON_FILTERS.map((p) => {
-          const isActive = p.key === selectedPerson;
+          const isActive = selectedFilters.includes(p.label);
           return (
             <TouchableOpacity
               key={p.key}
               style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border }]}
-              onPress={() => {
-                setSelectedPerson(isActive ? null : p.key);
-                if (!isActive) handleCategoryPress(p.label);
-              }}
+              onPress={() => toggleFilter(p.label)}
               activeOpacity={0.8}
             >
               <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray800 }]}>{p.emoji} {p.label}</Text>
@@ -165,58 +171,74 @@ export const ExploreScreen: React.FC = () => {
   );
 
   // ── Renderers ──
-  const renderCategoryCard = (item: ExploreCategoryItem, index: number, rowLength: number) => (
-    <TouchableOpacity
-      key={item.name}
-      style={[styles.catCard, { marginRight: index % 2 === 0 && rowLength > 1 ? CARD_GAP : 0 }]}
-      activeOpacity={0.85}
-      onPress={() => handleCategoryPress(item.name)}
-    >
-      <LinearGradient colors={item.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.catCardGradient}>
-        <View style={styles.catIconWrap}>
-          <Ionicons name={(item.icon || 'ellipse-outline') as any} size={26} color={Colors.gold} />
-        </View>
-        <View style={styles.catCardContent}>
-          <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
-          {item.subtitle ? <Text style={styles.catSubtitle}>{item.subtitle}</Text> : null}
-          {item.hot ? <View style={styles.catHotDot} /> : null}
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+  const renderCategoryCard = (item: ExploreCategoryItem, index: number, rowLength: number) => {
+    const isSelected = selectedFilters.includes(item.name);
+    return (
+      <TouchableOpacity
+        key={item.name}
+        style={[styles.catCard, { marginRight: index % 2 === 0 && rowLength > 1 ? CARD_GAP : 0 }]}
+        activeOpacity={0.85}
+        onPress={() => toggleFilter(item.name)}
+      >
+        <LinearGradient colors={item.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.catCardGradient, isSelected && { borderColor: Colors.primary, borderWidth: 2.5 }]}>
+          {isSelected && (
+            <View style={styles.catCheckMark}>
+              <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+            </View>
+          )}
+          <View style={styles.catIconWrap}>
+            <Ionicons name={(item.icon || 'ellipse-outline') as any} size={26} color={Colors.gold} />
+          </View>
+          <View style={styles.catCardContent}>
+            <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
+            {item.subtitle ? <Text style={styles.catSubtitle}>{item.subtitle}</Text> : null}
+            {item.hot ? <View style={styles.catHotDot} /> : null}
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
-  const renderMoodItem = (item: ExploreCategoryItem) => (
-    <TouchableOpacity key={item.name} style={[styles.moodCard, { backgroundColor: C.gray200, borderColor: C.border }]} activeOpacity={0.7} onPress={() => handleCategoryPress(item.name)}>
-      <Text style={styles.moodEmoji}>{item.emoji}</Text>
-      <View style={styles.moodTextCol}>
-        <Text style={[styles.moodName, { color: C.black }]}>{item.name}</Text>
-        {item.subtitle ? <Text style={[styles.moodSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={C.gray500} />
-    </TouchableOpacity>
-  );
+  const renderMoodItem = (item: ExploreCategoryItem) => {
+    const isSelected = selectedFilters.includes(item.name);
+    return (
+      <TouchableOpacity key={item.name} style={[styles.moodCard, { backgroundColor: C.gray200, borderColor: isSelected ? Colors.primary : C.border, borderWidth: isSelected ? 2 : 1 }]} activeOpacity={0.7} onPress={() => toggleFilter(item.name)}>
+        <Text style={styles.moodEmoji}>{item.emoji}</Text>
+        <View style={styles.moodTextCol}>
+          <Text style={[styles.moodName, { color: C.black }]}>{item.name}</Text>
+          {item.subtitle ? <Text style={[styles.moodSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+        </View>
+        {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : <Ionicons name="chevron-forward" size={18} color={C.gray500} />}
+      </TouchableOpacity>
+    );
+  };
 
-  const renderRankedItem = (item: ExploreCategoryItem, rank: number) => (
-    <TouchableOpacity key={item.name} style={[styles.rankedRow, { borderBottomColor: C.border }]} activeOpacity={0.7} onPress={() => handleCategoryPress(item.name)}>
-      <Text style={[styles.rankNumber, { color: C.primary }]}>{rank}</Text>
-      <View style={[styles.rankEmojiCircle, { backgroundColor: C.gray200 }]}>
-        <Text style={styles.rankEmoji}>{item.emoji}</Text>
-      </View>
-      <View style={styles.rankTextCol}>
-        <Text style={[styles.rankName, { color: C.black }]}>{item.name}</Text>
-        {item.subtitle ? <Text style={[styles.rankSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
-      </View>
-      {item.hot ? (
-        <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
-          <Text style={[styles.hotBadgeText, { color: C.primary }]}>chaud</Text>
+  const renderRankedItem = (item: ExploreCategoryItem, rank: number) => {
+    const isSelected = selectedFilters.includes(item.name);
+    return (
+      <TouchableOpacity key={item.name} style={[styles.rankedRow, { borderBottomColor: C.border, backgroundColor: isSelected ? Colors.primary + '10' : 'transparent' }]} activeOpacity={0.7} onPress={() => toggleFilter(item.name)}>
+        <Text style={[styles.rankNumber, { color: C.primary }]}>{rank}</Text>
+        <View style={[styles.rankEmojiCircle, { backgroundColor: C.gray200 }]}>
+          <Text style={styles.rankEmoji}>{item.emoji}</Text>
         </View>
-      ) : item.planCount ? (
-        <View style={[styles.planCountBadge, { backgroundColor: C.gray200 }]}>
-          <Text style={[styles.planCountText, { color: C.gray700 }]}>{item.planCount} plans</Text>
+        <View style={styles.rankTextCol}>
+          <Text style={[styles.rankName, { color: C.black }]}>{item.name}</Text>
+          {item.subtitle ? <Text style={[styles.rankSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
         </View>
-      ) : null}
-    </TouchableOpacity>
-  );
+        {isSelected ? (
+          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+        ) : item.hot ? (
+          <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
+            <Text style={[styles.hotBadgeText, { color: C.primary }]}>chaud</Text>
+          </View>
+        ) : item.planCount ? (
+          <View style={[styles.planCountBadge, { backgroundColor: C.gray200 }]}>
+            <Text style={[styles.planCountText, { color: C.gray700 }]}>{item.planCount} plans</Text>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
 
   const renderSection = (section: ExploreSection, idx: number, layout: ExploreLayout) => (
     <View key={`${section.title}-${idx}`} style={styles.section}>
@@ -290,6 +312,37 @@ export const ExploreScreen: React.FC = () => {
             {showSubcategories ? (
               activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))
             ) : null}
+
+            {/* Selected filters pills */}
+            {selectedFilters.length > 0 && (
+              <View style={styles.activeFiltersWrap}>
+                <View style={styles.activeFiltersRow}>
+                  {selectedFilters.map((f) => (
+                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
+                      <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
+                      <Ionicons name="close" size={13} color={Colors.primary} />
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
+                    <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Filter results */}
+                {isFilterLoading ? (
+                  <ActivityIndicator color={C.primary} style={{ marginTop: 16 }} />
+                ) : filteredPlans.length > 0 ? (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({filteredPlans.length})</Text>
+                    {filteredPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                  </View>
+                ) : (
+                  <View style={{ alignItems: 'center', paddingTop: 20 }}>
+                    <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
+                  </View>
+                )}
+              </View>
+            )}
             <View style={{ height: 30 }} />
           </ScrollView>
         </>
@@ -365,6 +418,7 @@ const styles = StyleSheet.create({
   catCardContent: {},
   catName: { color: '#FFFFFF', fontSize: 14, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   catSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '500', marginTop: 2 },
+  catCheckMark: { position: 'absolute', top: 10, left: 10, zIndex: 1 },
   catHotDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.error },
 
   // Results
@@ -420,4 +474,12 @@ const styles = StyleSheet.create({
   googlePlaceRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
   googlePlaceReviewCount: { fontSize: 11 },
   googlePlaceAddress: { fontSize: 11 },
+
+  // Active filters
+  activeFiltersWrap: { marginTop: 14 },
+  activeFiltersRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  activeFilterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
+  activeFilterText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  clearFiltersText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, marginLeft: 4 },
+  noResultText: { fontSize: 13, fontFamily: Fonts.serif },
 });

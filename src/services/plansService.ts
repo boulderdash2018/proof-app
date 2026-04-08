@@ -320,6 +320,34 @@ export const fetchPublicPlansByTag = async (tag: string): Promise<Plan[]> => {
   }
 };
 
+/** Fetch public plans matching ANY of the given tags (max 30 via batched array-contains-any) */
+export const fetchPublicPlansByTags = async (tags: string[]): Promise<Plan[]> => {
+  if (tags.length === 0) return [];
+  try {
+    // Firestore array-contains-any supports max 30 values
+    const batches: string[][] = [];
+    for (let i = 0; i < tags.length; i += 30) batches.push(tags.slice(i, i + 30));
+
+    const allPlans = new Map<string, Plan>();
+    for (const batch of batches) {
+      const q = query(collection(db, PLANS), where('tags', 'array-contains-any', batch));
+      const snap = await getDocs(q);
+      snap.docs.forEach((d) => {
+        if (!allPlans.has(d.id)) {
+          const data = d.data() as Plan;
+          allPlans.set(d.id, { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) });
+        }
+      });
+    }
+    const plans = Array.from(allPlans.values()).filter((p) => p.author?.isPrivate === false);
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchPublicPlansByTags error:', err);
+    return [];
+  }
+};
+
 /** Fetch public plans that contain a given place (by googlePlaceId or placeId) */
 export const fetchPublicPlansWithPlace = async (placeId: string, googlePlaceId?: string): Promise<Plan[]> => {
   try {
