@@ -449,6 +449,29 @@ export const PlanDetailModal: React.FC = () => {
                   <Ionicons name="chevron-forward" size={18} color={C.gray600} />
                 </TouchableOpacity>
 
+                {/* Hinge-style customization cards */}
+                {(place.customPhoto || place.comment || place.questionAnswer) && (
+                  <View style={styles.hingeCards}>
+                    {place.customPhoto && (
+                      <View style={[styles.hingeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+                        <Image source={{ uri: place.customPhoto }} style={styles.hingeCardPhoto} />
+                      </View>
+                    )}
+                    {place.comment && (
+                      <View style={[styles.hingeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+                        <Text style={[styles.hingeCardLabel, { color: C.gray600 }]}>Mon avis</Text>
+                        <Text style={[styles.hingeCardText, { color: C.black }]}>{place.comment}</Text>
+                      </View>
+                    )}
+                    {place.questionAnswer && place.question && (
+                      <View style={[styles.hingeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+                        <Text style={[styles.hingeCardLabel, { color: C.gray600 }]}>{place.question}</Text>
+                        <Text style={[styles.hingeCardText, { color: C.black }]}>{place.questionAnswer}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
                 {/* Dashed line + travel segment between places */}
                 {!isLast && (
                   <View style={styles.travelSegment}>
@@ -669,6 +692,13 @@ const styles = StyleSheet.create({
   placeMetaTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   placeMetaText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
   placeChevron: { fontSize: 18, marginLeft: 8, marginTop: 6 },
+
+  // Hinge-style customization cards
+  hingeCards: { paddingHorizontal: 18, paddingBottom: 6, gap: 10, marginTop: 2 },
+  hingeCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  hingeCardPhoto: { width: '100%', height: 200, resizeMode: 'cover' },
+  hingeCardLabel: { fontSize: 12, fontFamily: Fonts.serif, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+  hingeCardText: { fontSize: 20, fontFamily: Fonts.serifBold, paddingHorizontal: 16, paddingBottom: 16, lineHeight: 28 },
 
   // Travel segment between places
   travelSegment: { flexDirection: 'row', paddingHorizontal: 18, paddingVertical: 2 },

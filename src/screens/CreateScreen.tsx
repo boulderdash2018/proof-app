@@ -482,6 +482,11 @@ export const CreateScreen: React.FC = () => {
               }
             } catch {}
           }
+          // Upload custom photo to Firebase Storage if present
+          let customPhotoUrl: string | undefined;
+          if (p.customPhoto) {
+            try { customPhotoUrl = await uploadPhoto(p.customPhoto); } catch {}
+          }
           return {
             id: p.id,
             googlePlaceId: p.googlePlaceId,
@@ -497,6 +502,10 @@ export const CreateScreen: React.FC = () => {
             longitude: details?.longitude || undefined,
             placePrice: parseInt(p.price, 10) || 0,
             placeDuration: parseInt(p.duration, 10) || 0,
+            ...(customPhotoUrl && { customPhoto: customPhotoUrl }),
+            ...(p.comment && { comment: p.comment }),
+            ...(p.question && { question: p.question }),
+            ...(p.questionAnswer && { questionAnswer: p.questionAnswer }),
           };
         })
       );

@@ -76,6 +76,10 @@ export interface Place {
   priceLevel?: number;       // 0-4 Google price level
   placePrice?: number;       // price in € for this place
   placeDuration?: number;    // time spent in minutes
+  customPhoto?: string;      // user's own photo URI/URL
+  comment?: string;          // user's personal comment
+  question?: string;         // the question that was shown
+  questionAnswer?: string;   // answer to the question
 }
 
 export interface TravelSegment {
