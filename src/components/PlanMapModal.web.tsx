@@ -78,8 +78,8 @@ const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
       const map = new gm.Map(mapDivRef.current, {
         styles: PROOF_MAP_STYLE,
         disableDefaultUI: true,
-        zoomControl: false,
-        gestureHandling: 'none',
+        zoomControl: true,
+        gestureHandling: 'greedy',
         backgroundColor: '#E8DDD0',
       });
 

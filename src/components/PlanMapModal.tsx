@@ -84,15 +84,15 @@ export const PlanMapModal: React.FC<Props> = ({ visible, onClose, places, title 
           style={styles.map}
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           customMapStyle={MAP_STYLE}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          rotateEnabled={false}
+          scrollEnabled={true}
+          zoomEnabled={true}
+          rotateEnabled={true}
           pitchEnabled={false}
           toolbarEnabled={false}
           showsUserLocation={false}
           showsMyLocationButton={false}
-          showsCompass={false}
-          showsScale={false}
+          showsCompass={true}
+          showsScale={true}
           showsPointsOfInterest={false}
           initialRegion={{
             latitude: places[0].latitude,
