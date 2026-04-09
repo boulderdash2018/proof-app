@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
   Animated, ActivityIndicator,
@@ -12,6 +12,7 @@ import { Avatar, EmptyState } from '../components';
 import { useNotifStore, useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { Notification, NotificationType } from '../types';
+import { getUserById } from '../services/friendsService';
 
 // ========== HELPERS ==========
 
@@ -94,6 +95,34 @@ export const NotificationsScreen: React.FC = () => {
     }
   }, [user?.id]);
 
+  // Fetch sender avatarUrl live from Firestore (works for old + new notifs)
+  const [senderAvatars, setSenderAvatars] = useState<Record<string, string | null>>({});
+  const fetchedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const ids = [...new Set(notifications.map((n) => n.senderId))].filter(
+      (id) => id && !fetchedIdsRef.current.has(id),
+    );
+    if (ids.length === 0) return;
+    ids.forEach((id) => fetchedIdsRef.current.add(id));
+    Promise.all(
+      ids.map(async (id) => {
+        try {
+          const u = await getUserById(id);
+          return { id, url: u?.avatarUrl || null };
+        } catch {
+          return { id, url: null };
+        }
+      }),
+    ).then((results) => {
+      setSenderAvatars((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => { next[r.id] = r.url; });
+        return next;
+      });
+    });
+  }, [notifications]);
+
   // Ensure anim values exist for each notification
   notifications.forEach((n) => {
     if (!fadeAnims[n.id]) fadeAnims[n.id] = new Animated.Value(1);
@@ -170,7 +199,7 @@ export const NotificationsScreen: React.FC = () => {
             bg={notif.senderAvatar}
             color={notif.senderAvatarColor}
             size="M"
-            avatarUrl={notif.senderAvatarUrl ?? undefined}
+            avatarUrl={senderAvatars[notif.senderId] ?? notif.senderAvatarUrl ?? undefined}
           />
         ) : (
           <View style={[styles.iconCircle, { backgroundColor: icon.color + '20' }]}>
