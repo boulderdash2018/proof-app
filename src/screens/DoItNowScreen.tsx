@@ -177,10 +177,7 @@ export const DoItNowScreen: React.FC = () => {
     setPlaceMode({ active: true, placeIndex: currentIndex, arrivedAt: new Date(), rating: 0 });
   };
 
-  const handlePause = () => {
-    useDoItNowStore.getState().pauseSession();
-    navigation.goBack();
-  };
+
 
   // Open Google Maps / Apple Maps with turn-by-turn directions
   const openMapsNavigation = () => {
@@ -230,9 +227,6 @@ export const DoItNowScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: C.white }]}>
       {/* Progress bar */}
       <View style={[styles.progressBar, { paddingTop: insets.top + 6 }]}>
-        <TouchableOpacity onPress={handlePause} style={styles.pauseBtn}>
-          <Ionicons name="pause" size={18} color={C.gray600} />
-        </TouchableOpacity>
         <View style={styles.progressInfo}>
           <Text style={[styles.progressText, { color: C.primary }]}>
             Lieu {currentIndex + 1} / {totalPlaces}
@@ -471,7 +465,6 @@ const styles = StyleSheet.create({
 
   // Progress bar
   progressBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 10, gap: 10, backgroundColor: 'rgba(28,25,23,0.85)' },
-  pauseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   progressInfo: { flex: 1, gap: 4 },
   progressText: { fontSize: 13, fontFamily: Fonts.serifBold, textAlign: 'center' },

@@ -281,9 +281,6 @@ export const DoItNowScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: C.white }]}>
       {/* Progress */}
       <View style={[styles.progressBar, { paddingTop: insets.top + 6 }]}>
-        <TouchableOpacity onPress={() => { useDoItNowStore.getState().pauseSession(); navigation.goBack(); }} style={styles.iconBtn}>
-          <Ionicons name="pause" size={18} color={C.gray600} />
-        </TouchableOpacity>
         <View style={styles.progressInfo}>
           <Text style={[styles.progressText, { color: C.primary }]}>Lieu {currentIndex + 1} / {plan.places.length}</Text>
           <View style={[styles.progressTrack, { backgroundColor: C.gray300 }]}>
