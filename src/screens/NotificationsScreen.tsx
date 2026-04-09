@@ -222,7 +222,7 @@ export const NotificationsScreen: React.FC = () => {
         )}
       </TouchableOpacity>
     );
-  }, [C, handlePress]);
+  }, [C, handlePress, senderAvatars]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -242,6 +242,7 @@ export const NotificationsScreen: React.FC = () => {
         data={flatData}
         renderItem={renderItem}
         keyExtractor={(item) => item.key}
+        extraData={senderAvatars}
         contentContainerStyle={styles.list}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.3}
