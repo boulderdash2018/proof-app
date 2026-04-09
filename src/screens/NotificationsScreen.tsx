@@ -116,11 +116,11 @@ export const NotificationsScreen: React.FC = () => {
 
   const handlePress = useCallback((notif: Notification) => {
     markRead(notif.id);
-    // Navigate to context
-    if (notif.type === 'new_follower') {
-      navigation.navigate('OtherProfile', { userId: notif.senderId });
-    } else if (notif.planId) {
+    // Plan notifs → PlanDetail, follower notifs → OtherProfile
+    if (notif.planId) {
       navigation.navigate('PlanDetail', { planId: notif.planId });
+    } else if (notif.type === 'new_follower') {
+      navigation.navigate('OtherProfile', { userId: notif.senderId });
     }
   }, []);
 
@@ -170,6 +170,7 @@ export const NotificationsScreen: React.FC = () => {
             bg={notif.senderAvatar}
             color={notif.senderAvatarColor}
             size="M"
+            avatarUrl={notif.senderAvatarUrl ?? undefined}
           />
         ) : (
           <View style={[styles.iconCircle, { backgroundColor: icon.color + '20' }]}>

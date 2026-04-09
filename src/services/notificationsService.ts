@@ -111,6 +111,7 @@ export const createNotification = async (params: CreateNotifParams): Promise<voi
       senderId: params.sender.id,
       senderUsername: params.sender.username || params.sender.displayName || 'User',
       senderAvatar: params.sender.avatarBg || '#D4845A',
+      senderAvatarUrl: params.sender.avatarUrl || null,
       senderInitials: params.sender.initials || '?',
       senderAvatarColor: params.sender.avatarColor || '#FFF',
       type: params.type,

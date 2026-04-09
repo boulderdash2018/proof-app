@@ -135,7 +135,8 @@ export interface Notification {
   recipientId: string;
   senderId: string;
   senderUsername: string;
-  senderAvatar: string;          // avatarBg color or URL
+  senderAvatar: string;          // avatarBg color
+  senderAvatarUrl: string | null; // profile photo URL
   senderInitials: string;
   senderAvatarColor: string;
   type: NotificationType;
