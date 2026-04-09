@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Image,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -441,30 +442,73 @@ export const CreateScreen: React.FC = () => {
     return Math.min(score, 100);
   }, [title, selectedTags, places, travels, coverPhotos]);
 
-  const barWidth = useRef(new Animated.Value(0)).current;
-  const barPulse = useRef(new Animated.Value(1)).current;
-  const labelOpacity = useRef(new Animated.Value(1)).current;
+  const barAnim = useRef(new Animated.Value(0)).current;
+  const barScale = useRef(new Animated.Value(1)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const labelFade = useRef(new Animated.Value(1)).current;
+  const labelSlide = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0)).current;
   const [hasReached100, setHasReached100] = useState(false);
+  const [showPublishSheet, setShowPublishSheet] = useState(false);
+  const sheetSlide = useRef(new Animated.Value(300)).current;
+  const prevLabelRef = useRef('');
+  const screenWidth = Dimensions.get('window').width - Layout.screenPadding * 2;
+
+  const qualityLabel = qualityScore >= 100 ? 'Perfect plan' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
+  const labelColor = qualityScore >= 100 ? '#C8571A' : qualityScore >= 80 ? '#A04010' : qualityScore >= 56 ? '#C8571A' : qualityScore >= 31 ? '#D4784A' : '#8A8078';
+  const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2;
 
   useEffect(() => {
-    Animated.timing(barWidth, { toValue: qualityScore, duration: 400, useNativeDriver: false }).start();
-    // 100% celebration — once only
+    // Spring fill
+    Animated.spring(barAnim, { toValue: qualityScore, friction: 8, tension: 40, useNativeDriver: false }).start();
+    // Label fade+slide on text change
+    if (prevLabelRef.current !== qualityLabel) {
+      prevLabelRef.current = qualityLabel;
+      Animated.parallel([
+        Animated.timing(labelFade, { toValue: 0, duration: 100, useNativeDriver: true }),
+        Animated.timing(labelSlide, { toValue: 6, duration: 100, useNativeDriver: true }),
+      ]).start(() => {
+        labelSlide.setValue(-6);
+        Animated.parallel([
+          Animated.timing(labelFade, { toValue: 1, duration: 250, useNativeDriver: true }),
+          Animated.spring(labelSlide, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
+        ]).start();
+      });
+    }
+    // 100% celebration
     if (qualityScore >= 100 && !hasReached100) {
       setHasReached100(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Pulse
       Animated.sequence([
-        Animated.timing(barPulse, { toValue: 1.04, duration: 200, useNativeDriver: true }),
-        Animated.timing(barPulse, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(barScale, { toValue: 1.04, duration: 200, useNativeDriver: true }),
+        Animated.timing(barScale, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
-      Animated.sequence([
-        Animated.timing(labelOpacity, { toValue: 0, duration: 100, useNativeDriver: true }),
-        Animated.timing(labelOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]).start();
+      // Shimmer sweep
+      shimmerAnim.setValue(0);
+      Animated.timing(shimmerAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+      // Check pop
+      Animated.spring(checkScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
     }
   }, [qualityScore]);
 
-  const qualityLabel = qualityScore >= 100 ? 'Perfect plan \u2713' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
-  const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2;
+  // Missing criteria for bottom sheet
+  const missingCriteria = useMemo(() => {
+    const list: { icon: string; text: string; pts: number }[] = [];
+    if (coverPhotos.length === 0) list.push({ icon: '\uD83D\uDCF8', text: 'Une photo de couverture', pts: 10 });
+    if (!places.some((p) => p.customPhoto || p.comment || p.questionAnswer)) list.push({ icon: '\uD83D\uDCA1', text: 'Personnaliser un lieu', pts: 20 });
+    if (!places.some((p) => p.price && parseInt(p.price, 10) > 0)) list.push({ icon: '\uD83D\uDCB0', text: 'Le budget', pts: 10 });
+    if (!places.some((p) => p.duration && parseInt(p.duration, 10) > 0)) list.push({ icon: '\u23F1', text: 'La durée', pts: 10 });
+    return list.filter((c) => c.pts >= 5).slice(0, 3);
+  }, [coverPhotos, places]);
+
+  const openPublishSheet = () => {
+    setShowPublishSheet(true);
+    Animated.spring(sheetSlide, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }).start();
+  };
+  const closePublishSheet = () => {
+    Animated.timing(sheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setShowPublishSheet(false));
+  };
 
   const removePlace = (id: string) => {
     const index = places.findIndex((p) => p.id === id);
@@ -797,13 +841,23 @@ export const CreateScreen: React.FC = () => {
         </View>
 
         {/* Quality progress bar */}
-        <Animated.View style={[styles.qualityBarWrap, { transform: [{ scaleX: barPulse }] }]}>
-          <View style={[styles.qualityBarBg, { backgroundColor: C.gray200 }]}>
-            <Animated.View style={[styles.qualityBarFill, { backgroundColor: '#C8571A', width: barWidth.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }) }]} />
+        <Animated.View style={[styles.qualityBarWrap, { transform: [{ scaleY: barScale }] }]}>
+          <View style={styles.qualityBarBg}>
+            <Animated.View style={[styles.qualityBarFill, { width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }) }]}>
+              <LinearGradient colors={['#F5C4A0', '#D4784A', '#C8571A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              {/* Shimmer overlay at 100% */}
+              <Animated.View style={[styles.qualityShimmer, { transform: [{ translateX: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-screenWidth, screenWidth] }) }], opacity: shimmerAnim.interpolate({ inputRange: [0, 0.3, 0.7, 1], outputRange: [0, 0.6, 0.6, 0] }) }]} />
+            </Animated.View>
           </View>
-          <Animated.Text style={[styles.qualityLabel, { color: qualityScore >= 80 ? '#C8571A' : C.gray600, opacity: labelOpacity }]}>
-            {qualityLabel}
-          </Animated.Text>
+          {/* Tracking label */}
+          <Animated.View style={[styles.qualityLabelWrap, { left: barAnim.interpolate({ inputRange: [0, 75, 100], outputRange: ['0%', '55%', '55%'], extrapolate: 'clamp' }), opacity: labelFade, transform: [{ translateY: labelSlide }] }]}>
+            <Text style={[styles.qualityLabel, { color: labelColor }]}>
+              {qualityLabel}
+            </Text>
+            {qualityScore >= 100 && (
+              <Animated.Text style={[styles.qualityCheck, { color: '#C8571A', transform: [{ scale: checkScale }] }]}> ✓</Animated.Text>
+            )}
+          </Animated.View>
         </Animated.View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -1013,21 +1067,29 @@ export const CreateScreen: React.FC = () => {
                 canPublish && qualityScore < 80 && { backgroundColor: 'transparent', borderColor: '#C8571A' },
                 canPublish && qualityScore >= 80 && { backgroundColor: '#C8571A', borderColor: '#C8571A' },
               ]}
-              onPress={handlePublish}
+              onPress={() => {
+                if (canPublish && qualityScore < 100 && missingCriteria.length > 0) {
+                  openPublishSheet();
+                } else {
+                  handlePublish();
+                }
+              }}
               disabled={!canPublish || isPublishing}
               activeOpacity={0.8}
             >
               {isPublishing ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <Text style={[
-                  styles.publishBtnText,
-                  !canPublish && { color: '#FFF' },
-                  canPublish && qualityScore < 80 && { color: '#C8571A' },
-                  canPublish && qualityScore >= 80 && { color: '#FFF' },
-                ]}>
-                  {qualityScore >= 100 ? 'Publier le plan \u2726' : t.create_publish}
-                </Text>
+                <View style={styles.publishBtnInner}>
+                  <Text style={[
+                    styles.publishBtnText,
+                    !canPublish && { color: '#FFF' },
+                    canPublish && qualityScore < 80 && { color: '#C8571A' },
+                    canPublish && qualityScore >= 80 && { color: '#FFF' },
+                  ]}>
+                    {qualityScore >= 100 ? 'Publier le plan \u2726' : t.create_publish}
+                  </Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -1282,6 +1344,33 @@ export const CreateScreen: React.FC = () => {
             </View>
           </View>
         </Modal>
+
+        {/* ========== PUBLISH BOTTOM SHEET ========== */}
+        {showPublishSheet && (
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={closePublishSheet}>
+            <Animated.View style={[styles.sheetContainer, { backgroundColor: C.white, transform: [{ translateY: sheetSlide }] }]}>
+              <TouchableOpacity activeOpacity={1}>
+                <View style={[styles.sheetHandle, { backgroundColor: C.gray400 }]} />
+                <Text style={[styles.sheetTitle, { color: C.black }]}>Almost a perfect plan ✦</Text>
+                <Text style={[styles.sheetSubtitle, { color: C.gray600 }]}>Ton plan serait encore mieux avec :</Text>
+                {missingCriteria.map((c, i) => (
+                  <View key={i} style={[styles.sheetCriterion, { borderBottomColor: C.borderLight }]}>
+                    <Text style={styles.sheetCriterionIcon}>{c.icon}</Text>
+                    <Text style={[styles.sheetCriterionText, { color: C.black }]}>{c.text}</Text>
+                  </View>
+                ))}
+                <View style={styles.sheetButtons}>
+                  <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: '#C8571A' }]} onPress={closePublishSheet} activeOpacity={0.7}>
+                    <Text style={[styles.sheetBtnOutlineText, { color: '#C8571A' }]}>Continuer</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={() => { closePublishSheet(); handlePublish(); }} activeOpacity={0.7}>
+                    <Text style={styles.sheetBtnFillText}>Publier quand même</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -1348,16 +1437,35 @@ const styles = StyleSheet.create({
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
   publishSection: { marginTop: 20, marginBottom: 10 },
-  publishBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  publishBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
+  publishBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   publishBtnText: { fontSize: 15, fontFamily: Fonts.serifBold },
   publishHint: { fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: Fonts.serif },
   costNote: { fontSize: 12, textAlign: 'center', marginTop: 10 },
 
   // Quality progress bar
-  qualityBarWrap: { paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 4 },
-  qualityBarBg: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  qualityBarFill: { height: 4, borderRadius: 2 },
-  qualityLabel: { fontSize: 11, fontFamily: Fonts.serifSemiBold, marginTop: 4 },
+  qualityBarWrap: { paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 2 },
+  qualityBarBg: { height: 10, borderRadius: 20, backgroundColor: '#EDE8E0', overflow: 'hidden' },
+  qualityBarFill: { height: 10, borderRadius: 20, overflow: 'hidden' },
+  qualityShimmer: { position: 'absolute', top: 0, bottom: 0, width: 60, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 20 },
+  qualityLabelWrap: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+  qualityLabel: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.serifSemiBold },
+  qualityCheck: { fontSize: 13, fontWeight: '800', fontFamily: Fonts.serifBold },
+
+  // Publish bottom sheet
+  sheetOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end', zIndex: 999 },
+  sheetContainer: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 34 },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 16 },
+  sheetTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.serifBold, marginBottom: 4 },
+  sheetSubtitle: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 14 },
+  sheetCriterion: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
+  sheetCriterionIcon: { fontSize: 16, marginRight: 10 },
+  sheetCriterionText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  sheetButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  sheetBtnOutline: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
+  sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  sheetBtnFill: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   successEmoji: { fontSize: 56, marginBottom: 16 },
   successTitle: { fontSize: 20, fontWeight: '800', marginBottom: 8 },
