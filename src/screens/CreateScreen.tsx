@@ -213,6 +213,21 @@ export const CreateScreen: React.FC = () => {
     'Qu\'est-ce qui rend cet endroit unique ?',
     'À quel moment de la journée y aller ?',
     'Un souvenir marquant ici ?',
+    'Tu y vas plutôt solo ou accompagné ?',
+    'Le spot parfait pour quel mood ?',
+    'Combien de temps tu resterais ici ?',
+    'Qu\'est-ce que tu commanderais les yeux fermés ?',
+    'C\'est quoi l\'ambiance en un mot ?',
+    'Le truc que personne ne sait sur cet endroit ?',
+    'Première chose qui t\'a marqué en arrivant ?',
+    'Tu conseillerais pour un premier date ?',
+    'C\'est mieux en été ou en hiver ?',
+    'Le meilleur moment pour éviter la foule ?',
+    'Ça vaut le détour depuis l\'autre bout de Paris ?',
+    'Un endroit similaire que tu recommandes aussi ?',
+    'Si tu devais y emmener un touriste, pourquoi ?',
+    'Le rapport qualité-prix en toute honnêteté ?',
+    'Une anecdote ou fun fact sur ce lieu ?',
   ];
 
   type BlockType = 'photo' | 'comment' | 'question';
