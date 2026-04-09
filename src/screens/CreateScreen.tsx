@@ -427,25 +427,17 @@ export const CreateScreen: React.FC = () => {
   // ========== QUALITY SCORE (0–100) ==========
   const qualityScore = useMemo(() => {
     let score = 0;
-    // Obligatoires (45 pts)
-    if (title.trim().length > 0) score += 15;
-    if (selectedTags.length > 0) score += 10;
-    if (places.length >= 2) score += 20;
-    // Enrichissements (55 pts)
-    if (places.length >= 3) score += 8;
-    if (places.length >= 4) score += 5;
-    const allBudget = places.length > 0 && places.every((p) => p.price && parseInt(p.price, 10) > 0);
-    if (allBudget) score += 7;
-    const allDuration = places.length > 0 && places.every((p) => p.duration && parseInt(p.duration, 10) > 0);
-    if (allDuration) score += 7;
-    if (travels.length > 0) score += 5;
-    if (coverPhotos.length > 0) score += 5;
-    if (coverPhotos.length >= 3) score += 5;
-    if (selectedTags.length >= 2) score += 5;
-    if (selectedTags.length >= 3) score += 3;
-    const widgetCount = places.filter((p) => p.customPhoto || p.comment || p.questionAnswer).length;
-    if (widgetCount >= 1) score += 3;
-    if (widgetCount >= 2) score += 2;
+    if (title.trim().length > 0) score += 15;           // titre
+    if (selectedTags.length > 0) score += 10;            // 1 catégorie
+    if (places.length >= 1) score += 10;                 // 1er lieu
+    if (places.length >= 2) score += 15;                 // 2e lieu
+    if (coverPhotos.length > 0) score += 10;             // 1 photo de couverture
+    const hasBudget = places.some((p) => p.price && parseInt(p.price, 10) > 0);
+    if (hasBudget) score += 10;                          // prix renseigné
+    const hasDuration = places.some((p) => p.duration && parseInt(p.duration, 10) > 0);
+    if (hasDuration) score += 10;                        // durée renseignée
+    const hasWidget = places.some((p) => p.customPhoto || p.comment || p.questionAnswer);
+    if (hasWidget) score += 20;                          // 1 widget perso sur 1 lieu
     return Math.min(score, 100);
   }, [title, selectedTags, places, travels, coverPhotos]);
 
