@@ -123,14 +123,28 @@ export interface Badge {
   isUnlocked: boolean;
 }
 
+export type NotificationType =
+  | 'new_follower' | 'new_like' | 'new_comment' | 'new_proof_it'
+  | 'plan_recreated' | 'plan_saved' | 'mention'
+  | 'rank_up' | 'badge_unlocked' | 'xp_milestone'
+  | 'plan_trending' | 'plan_milestone' | 'first_in_city'
+  | 'friend_posted' | 'friend_completed';
+
 export interface Notification {
   id: string;
-  type: 'like' | 'follow' | 'comment' | 'xp_gained' | 'badge_unlocked';
-  fromUser?: User;
-  planTitle?: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
+  recipientId: string;
+  senderId: string;
+  senderUsername: string;
+  senderAvatar: string;          // avatarBg color or URL
+  senderInitials: string;
+  senderAvatarColor: string;
+  type: NotificationType;
+  content: string;
+  planId: string | null;
+  planTitle: string | null;
+  planCover: string | null;
+  read: boolean;
+  createdAt: string;             // ISO string
 }
 
 export interface PlaceReview {

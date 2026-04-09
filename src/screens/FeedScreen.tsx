@@ -45,16 +45,30 @@ export const FeedScreen: React.FC = () => {
     fetchFriendsFeed, refreshFriendsFeed,
     toggleLike, toggleSave,
   } = useFeedStore();
-  const { unreadCount, fetchNotifications } = useNotifStore();
+  const { unreadCount, subscribe: subscribeNotifs } = useNotifStore();
 
   const [activeTab, setActiveTab] = useState<FeedTab>('reco');
   const indicatorX = useRef(new Animated.Value(0)).current;
+  const bellPulse = useRef(new Animated.Value(1)).current;
+  const prevUnreadRef = useRef(unreadCount);
   const [friendsFetched, setFriendsFetched] = useState(false);
 
   useEffect(() => {
     fetchFeed(user?.id, isGuest ? guestInterests : undefined);
-    if (!isGuest) fetchNotifications();
+    if (!isGuest && user?.id) subscribeNotifs(user.id);
   }, [user?.id, isGuest]);
+
+  // Pulse bell when new unread arrives
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Animated.sequence([
+        Animated.timing(bellPulse, { toValue: 1.25, duration: 150, useNativeDriver: true }),
+        Animated.timing(bellPulse, { toValue: 1, duration: 150, useNativeDriver: true }),
+      ]).start();
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
 
   const switchTab = (tab: FeedTab) => {
     if (tab === 'friends' && isGuest) {
@@ -137,8 +151,14 @@ export const FeedScreen: React.FC = () => {
               style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
               onPress={() => navigation.navigate('Notifications')}
             >
-              <Ionicons name="notifications-outline" size={18} color={C.gray800} />
-              {unreadCount > 0 && <View style={styles.bellBadge} />}
+              <Animated.View style={{ transform: [{ scale: bellPulse }] }}>
+                <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={18} color={unreadCount > 0 ? C.primary : C.gray800} />
+              </Animated.View>
+              {unreadCount > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -228,7 +248,8 @@ const styles = StyleSheet.create({
   logo: { fontSize: 28, fontFamily: Fonts.serifBold, letterSpacing: -1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   bellBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  bellBadge: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.error },
+  bellBadge: { position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#E85D5D', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 
   // Tabs
   tabBar: {

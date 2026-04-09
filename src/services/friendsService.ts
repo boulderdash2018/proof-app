@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { User, FriendRequest } from '../types';
+import { notifyFollow } from './notificationsService';
 
 const USERS = 'users';
 const FRIEND_REQUESTS = 'friendRequests';
@@ -251,7 +252,7 @@ export const getPendingRequestId = async (
 // ==================== FOLLOWS ====================
 
 /** Follow a user (instant for public accounts, called after accept for private) */
-export const followUser = async (followerId: string, followingId: string): Promise<void> => {
+export const followUser = async (followerId: string, followingId: string, sender?: User): Promise<void> => {
   const q = query(collection(db, FOLLOWS), where('followerId', '==', followerId), where('followingId', '==', followingId));
   const snap = await getDocs(q);
   if (!snap.empty) return;
@@ -260,6 +261,7 @@ export const followUser = async (followerId: string, followingId: string): Promi
     followingId,
     createdAt: new Date().toISOString(),
   });
+  if (sender) notifyFollow(sender, followingId).catch(() => {});
 };
 
 /** Unfollow a user */

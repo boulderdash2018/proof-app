@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode, TravelSegment } from '../types';
+import { notifyLike, notifyComment, notifySave, notifyProofIt } from './notificationsService';
 
 const PLANS = 'plans';
 const SAVED_PLANS = 'savedPlans';
@@ -179,7 +180,7 @@ export const fetchLikedPlanIds = async (userId: string): Promise<Set<string>> =>
 };
 
 /** Toggle like on a plan */
-export const toggleLikePlan = async (userId: string, planId: string, isLiked: boolean): Promise<void> => {
+export const toggleLikePlan = async (userId: string, planId: string, isLiked: boolean, sender?: User, plan?: Plan): Promise<void> => {
   const ref = doc(db, `users/${userId}/${LIKED_PLANS}`, planId);
   if (isLiked) {
     await deleteDoc(ref);
@@ -199,6 +200,8 @@ export const toggleLikePlan = async (userId: string, planId: string, isLiked: bo
       const current = (planSnap.data() as Plan).likesCount || 0;
       await updateDoc(planRef, { likesCount: current + 1 });
     }
+    // Notify plan author
+    if (sender && plan) notifyLike(sender, plan).catch(() => {});
   }
 };
 
@@ -235,11 +238,12 @@ export const fetchSavedPlanIds = async (userId: string): Promise<Set<string>> =>
 };
 
 /** Save a plan (to do) */
-export const savePlan = async (userId: string, planId: string): Promise<void> => {
+export const savePlan = async (userId: string, planId: string, sender?: User, plan?: Plan): Promise<void> => {
   await setDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), {
     isDone: false,
     savedAt: new Date().toISOString(),
   });
+  if (sender && plan) notifySave(sender, plan).catch(() => {});
 };
 
 /** Save a created plan (already done) */
@@ -418,7 +422,7 @@ export const fetchComments = async (planId: string): Promise<Comment[]> => {
 };
 
 /** Add a comment to a plan */
-export const addComment = async (planId: string, author: User, text: string): Promise<Comment> => {
+export const addComment = async (planId: string, author: User, text: string, plan?: Plan): Promise<Comment> => {
   const now = new Date().toISOString();
   const commentData = {
     planId,
@@ -444,6 +448,9 @@ export const addComment = async (planId: string, author: User, text: string): Pr
   } catch (err) {
     console.error('[plansService] update commentsCount error:', err);
   }
+
+  // Notify plan author
+  if (plan) notifyComment(author, plan, text).catch(() => {});
 
   return { ...commentData, id: ref.id };
 };
