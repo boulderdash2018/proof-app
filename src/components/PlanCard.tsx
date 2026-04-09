@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Plan, TransportMode } from '../types';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
 import { useColors } from '../hooks/useColors';
+import { useTrendingStore } from '../store/trendingStore';
 import { Avatar } from './Avatar';
 import { RankBadge } from './RankBadge';
 import { FounderBadge } from './FounderBadge';
@@ -66,6 +67,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   onAuthorPress,
 }) => {
   const C = useColors();
+  const topTrendingTags = useTrendingStore((s) => s.topTags);
+  const isTrending = plan.tags.some((t) => topTrendingTags.includes(t));
   const gradientColors = parseGradient(plan.gradient);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
@@ -261,6 +264,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       <TouchableOpacity activeOpacity={0.92} onPress={onPress} onPressIn={onCardPressIn} onPressOut={onCardPressOut}>
         {plan.tags.length > 0 && (
           <View style={styles.tagsRow}>
+            {isTrending && (
+              <View style={styles.trendingBadge}>
+                <Text style={styles.trendingBadgeText}>🔥 Trending</Text>
+              </View>
+            )}
             {plan.tags.map((tag, index) => (
               <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
             ))}
@@ -368,6 +376,8 @@ const styles = StyleSheet.create({
   photoTitleWrap: { position: 'absolute', bottom: 14, left: 16, right: 16 },
   photoDots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 },
   photoDot: { width: 6, height: 6, borderRadius: 3 },
+  trendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B3520', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 6, marginBottom: 4 },
+  trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12 },
   placesList: { paddingHorizontal: 16, paddingTop: 12 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },

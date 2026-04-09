@@ -6,6 +6,7 @@ export interface ExploreCategoryItem {
   subtitle?: string;
   planCount?: number;
   hot?: boolean;
+  badgeLabel?: string;   // e.g. "🔥 Cette semaine", "📈 En hausse"
 }
 
 export interface ExploreSection {

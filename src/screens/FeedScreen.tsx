@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
-import { useAuthStore, useFeedStore, useNotifStore } from '../store';
+import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -56,6 +56,8 @@ export const FeedScreen: React.FC = () => {
   useEffect(() => {
     fetchFeed(user?.id, isGuest ? guestInterests : undefined);
     if (!isGuest && user?.id) subscribeNotifs(user.id);
+    // Pre-fetch trending tags so PlanCard badges appear
+    useTrendingStore.getState().fetchTrending();
   }, [user?.id, isGuest]);
 
   // Pulse bell when new unread arrives

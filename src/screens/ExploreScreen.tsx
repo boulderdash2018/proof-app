@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { searchUsers } from '../services/friendsService';
-import { useAuthStore } from '../store';
+import { useAuthStore, useTrendingStore } from '../store';
 import { fetchPublicPlansByTags, searchPublicPlans } from '../services/plansService';
 import {
   searchPlacesNearby,
@@ -47,6 +47,12 @@ export const ExploreScreen: React.FC = () => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
+  const trendingCategories = useTrendingStore((s) => s.categories);
+  const trendingLoading = useTrendingStore((s) => s.isLoading);
+  const fetchTrending = useTrendingStore((s) => s.fetchTrending);
+
+  // Fetch trending on mount (5-min cache in store)
+  useEffect(() => { fetchTrending(); }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTheme, setSelectedTheme] = useState(EXPLORE_GROUPS[0].key);
@@ -322,9 +328,13 @@ export const ExploreScreen: React.FC = () => {
         </View>
         {isSelected ? (
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+        ) : item.badgeLabel ? (
+          <View style={[styles.hotBadge, { backgroundColor: item.hot ? C.primary + '18' : '#22C55E18' }]}>
+            <Text style={[styles.hotBadgeText, { color: item.hot ? C.primary : '#22C55E' }]}>{item.badgeLabel}</Text>
+          </View>
         ) : item.hot ? (
           <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
-            <Text style={[styles.hotBadgeText, { color: C.primary }]}>chaud</Text>
+            <Text style={[styles.hotBadgeText, { color: C.primary }]}>🔥 Cette semaine</Text>
           </View>
         ) : item.planCount ? (
           <View style={[styles.planCountBadge, { backgroundColor: C.gray200 }]}>
@@ -415,7 +425,21 @@ export const ExploreScreen: React.FC = () => {
           {renderThemeRow()}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {showSubcategories ? (
-              activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))
+              (activeGroup.key === 'trending' && trendingCategories.length > 0
+                ? [{
+                    title: 'EN CE MOMENT',
+                    items: trendingCategories.map((c) => ({
+                      name: c.name,
+                      emoji: c.emoji,
+                      gradient: c.gradient,
+                      subtitle: c.subtitle,
+                      planCount: c.planCount,
+                      hot: c.hot,
+                      badgeLabel: c.badgeLabel ?? undefined,
+                    } as ExploreCategoryItem)),
+                  }]
+                : activeGroup.sections
+              ).map((section, idx) => renderSection(section, idx, activeGroup.layout))
             ) : null}
 
             {/* Selected filters pills */}
