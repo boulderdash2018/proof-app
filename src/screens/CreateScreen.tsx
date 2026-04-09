@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
   Image,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -423,6 +424,53 @@ export const CreateScreen: React.FC = () => {
     return result;
   }, [travels]);
 
+  // ========== QUALITY SCORE (0–100) ==========
+  const qualityScore = useMemo(() => {
+    let score = 0;
+    // Obligatoires
+    if (title.trim().length > 0) score += 15;
+    if (selectedTags.length > 0) score += 10;
+    if (places.length >= 2) score += 20;
+    // Enrichissements
+    if (places.length >= 3) score += 8;
+    if (places.length >= 4) score += 5;
+    const hasBudget = places.some((p) => p.price && parseInt(p.price, 10) > 0);
+    if (hasBudget) score += 7;
+    const hasDuration = places.some((p) => p.duration && parseInt(p.duration, 10) > 0);
+    if (hasDuration) score += 5;
+    if (travels.length > 0) score += 5; // transport chosen
+    if (coverPhotos.length > 0) score += 10;
+    if (selectedTags.length >= 2) score += 5; // sous-catégorie supplémentaire
+    const hasWidget = places.some((p) => p.customPhoto || p.comment || p.questionAnswer);
+    if (hasWidget) score += 3;
+    // Remaining points: creator's tip, moment, vibe, réservation — not yet implemented fields
+    return Math.min(score, 100);
+  }, [title, selectedTags, places, travels, coverPhotos]);
+
+  const barWidth = useRef(new Animated.Value(0)).current;
+  const barPulse = useRef(new Animated.Value(1)).current;
+  const labelOpacity = useRef(new Animated.Value(1)).current;
+  const [hasReached100, setHasReached100] = useState(false);
+
+  useEffect(() => {
+    Animated.timing(barWidth, { toValue: qualityScore, duration: 400, useNativeDriver: false }).start();
+    // 100% celebration — once only
+    if (qualityScore >= 100 && !hasReached100) {
+      setHasReached100(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Animated.sequence([
+        Animated.timing(barPulse, { toValue: 1.04, duration: 200, useNativeDriver: true }),
+        Animated.timing(barPulse, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+      Animated.sequence([
+        Animated.timing(labelOpacity, { toValue: 0, duration: 100, useNativeDriver: true }),
+        Animated.timing(labelOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [qualityScore]);
+
+  const qualityLabel = qualityScore >= 100 ? 'Perfect plan \u2713' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
+  const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2;
 
   const removePlace = (id: string) => {
     const index = places.findIndex((p) => p.id === id);
@@ -754,6 +802,16 @@ export const CreateScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Quality progress bar */}
+        <Animated.View style={[styles.qualityBarWrap, { transform: [{ scaleX: barPulse }] }]}>
+          <View style={[styles.qualityBarBg, { backgroundColor: C.gray200 }]}>
+            <Animated.View style={[styles.qualityBarFill, { backgroundColor: '#C8571A', width: barWidth.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }) }]} />
+          </View>
+          <Animated.Text style={[styles.qualityLabel, { color: qualityScore >= 80 ? '#C8571A' : C.gray600, opacity: labelOpacity }]}>
+            {qualityLabel}
+          </Animated.Text>
+        </Animated.View>
+
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
 
@@ -948,7 +1006,36 @@ export const CreateScreen: React.FC = () => {
           )}
 
           <View style={styles.publishSection}>
-            <PrimaryButton label={t.create_publish} onPress={handlePublish} loading={isPublishing} />
+            {!canPublish && (
+              <Text style={[styles.publishHint, { color: C.gray500 }]}>Ajoute un titre et au moins 2 lieux pour publier</Text>
+            )}
+            {canPublish && qualityScore < 80 && (
+              <Text style={[styles.publishHint, { color: C.gray500 }]}>Ajoute des détails pour améliorer ton plan</Text>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.publishBtn,
+                !canPublish && { backgroundColor: C.gray400, borderColor: C.gray400 },
+                canPublish && qualityScore < 80 && { backgroundColor: 'transparent', borderColor: '#C8571A' },
+                canPublish && qualityScore >= 80 && { backgroundColor: '#C8571A', borderColor: '#C8571A' },
+              ]}
+              onPress={handlePublish}
+              disabled={!canPublish || isPublishing}
+              activeOpacity={0.8}
+            >
+              {isPublishing ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={[
+                  styles.publishBtnText,
+                  !canPublish && { color: '#FFF' },
+                  canPublish && qualityScore < 80 && { color: '#C8571A' },
+                  canPublish && qualityScore >= 80 && { color: '#FFF' },
+                ]}>
+                  {qualityScore >= 100 ? 'Publier le plan \u2726' : t.create_publish}
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -1266,8 +1353,17 @@ const styles = StyleSheet.create({
 
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
-  publishSection: { marginTop: 20 },
+  publishSection: { marginTop: 20, marginBottom: 10 },
+  publishBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  publishBtnText: { fontSize: 15, fontFamily: Fonts.serifBold },
+  publishHint: { fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: Fonts.serif },
   costNote: { fontSize: 12, textAlign: 'center', marginTop: 10 },
+
+  // Quality progress bar
+  qualityBarWrap: { paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 4 },
+  qualityBarBg: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  qualityBarFill: { height: 4, borderRadius: 2 },
+  qualityLabel: { fontSize: 11, fontFamily: Fonts.serifSemiBold, marginTop: 4 },
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   successEmoji: { fontSize: 56, marginBottom: 16 },
   successTitle: { fontSize: 20, fontWeight: '800', marginBottom: 8 },
