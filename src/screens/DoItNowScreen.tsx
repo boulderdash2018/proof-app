@@ -24,17 +24,34 @@ import { Plan, DoItNowTransport } from '../types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Map style matching Proof branding
+// halilibrahimbayındır 3 — warm vintage map style
 const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#E8DDD0' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8C7A6B' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#F2EBE2' }, { weight: 3 }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#DED2C3' }] },
-  { featureType: 'water', elementType: 'geometry.fill', stylers: [{ color: '#B8CAC0' }] },
-  { featureType: 'park', elementType: 'geometry.fill', stylers: [{ color: '#C8D4AB' }] },
+  {"featureType":"all","elementType":"all","stylers":[{"lightness":"69"},{"saturation":"100"},{"weight":"1.17"},{"gamma":"2.04"}]},
+  {"featureType":"all","elementType":"geometry.stroke","stylers":[{"visibility":"on"},{"color":"#000000"}]},
+  {"featureType":"all","elementType":"labels","stylers":[{"lightness":"66"},{"saturation":"100"},{"visibility":"on"}]},
+  {"featureType":"all","elementType":"labels.text","stylers":[{"visibility":"off"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"gamma":0.01},{"lightness":20},{"color":"#98290e"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"weight":2},{"visibility":"on"},{"color":"#d4b78f"}]},
+  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.province","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"visibility":"on"},{"color":"#98290e"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"color":"#d4b78f"}]},
+  {"featureType":"administrative.locality","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"on"}]},
+  {"featureType":"administrative.neighborhood","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"landscape","elementType":"all","stylers":[{"weight":"2.45"},{"visibility":"on"},{"color":"#d4b78f"}]},
+  {"featureType":"landscape","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"poi.park","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#908d5c"}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#684e2a"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"visibility":"on"},{"color":"#684e2a"}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"visibility":"on"},{"color":"#684e2a"}]},
+  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#967f5e"}]},
+  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"visibility":"on"},{"color":"#967f5e"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"visibility":"on"},{"color":"#807676"}]},
+  {"featureType":"transit","elementType":"geometry.stroke","stylers":[{"visibility":"off"}]},
+  {"featureType":"transit","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"water","elementType":"all","stylers":[{"lightness":-20},{"color":"#a8ac91"}]},
 ];
 
 const ARRIVAL_THRESHOLD = 50; // meters

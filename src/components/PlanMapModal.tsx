@@ -26,20 +26,34 @@ interface Props {
   title: string;
 }
 
-// Proof-branded map style: muted tones, clean look
+// halilibrahimbayındır 3 — warm vintage map style
 const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#F5F0EB' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#6B6560' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#F5F0EB' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#E8E0D8' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#DDD5CC' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#DDD5CC' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C5D5DC' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#8AA4B0' }] },
-  { featureType: 'park', elementType: 'geometry', stylers: [{ color: '#D5DCC5' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#DDD5CC' }] },
+  {"featureType":"all","elementType":"all","stylers":[{"lightness":"69"},{"saturation":"100"},{"weight":"1.17"},{"gamma":"2.04"}]},
+  {"featureType":"all","elementType":"geometry.stroke","stylers":[{"visibility":"on"},{"color":"#000000"}]},
+  {"featureType":"all","elementType":"labels","stylers":[{"lightness":"66"},{"saturation":"100"},{"visibility":"on"}]},
+  {"featureType":"all","elementType":"labels.text","stylers":[{"visibility":"off"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"gamma":0.01},{"lightness":20},{"color":"#98290e"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"weight":2},{"visibility":"on"},{"color":"#d4b78f"}]},
+  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.province","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"visibility":"on"},{"color":"#98290e"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"color":"#d4b78f"}]},
+  {"featureType":"administrative.locality","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"on"}]},
+  {"featureType":"administrative.neighborhood","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"landscape","elementType":"all","stylers":[{"weight":"2.45"},{"visibility":"on"},{"color":"#d4b78f"}]},
+  {"featureType":"landscape","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"poi.park","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#908d5c"}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#684e2a"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"visibility":"on"},{"color":"#684e2a"}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"visibility":"on"},{"color":"#684e2a"}]},
+  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"visibility":"on"},{"color":"#967f5e"}]},
+  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"visibility":"on"},{"color":"#967f5e"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"visibility":"on"},{"color":"#807676"}]},
+  {"featureType":"transit","elementType":"geometry.stroke","stylers":[{"visibility":"off"}]},
+  {"featureType":"transit","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"water","elementType":"all","stylers":[{"lightness":-20},{"color":"#a8ac91"}]},
 ];
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
