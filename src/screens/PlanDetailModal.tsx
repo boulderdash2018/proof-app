@@ -634,6 +634,12 @@ export const PlanDetailModal: React.FC = () => {
               setShowTransportChooser(false);
               useDoItNowStore.getState().startSession(plan, transport, currentUser!.id);
               navigation.navigate('DoItNow', { planId: plan.id });
+              // Notify plan author
+              if (currentUser && plan) {
+                import('../services/notificationsService').then(({ notifyDoItNow }) => {
+                  notifyDoItNow(currentUser, plan).catch((e) => console.error('[notif trigger]', e));
+                });
+              }
             }}
           />
         </>

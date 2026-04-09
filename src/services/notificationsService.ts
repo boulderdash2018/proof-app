@@ -193,3 +193,26 @@ export const notifyProofIt = async (sender: User, plan: Plan): Promise<void> => 
     planCover: plan.coverPhotos?.[0] ?? null,
   });
 };
+
+/** Call when a user starts "Do It Now" on a plan */
+export const notifyDoItNow = async (sender: User, plan: Plan): Promise<void> => {
+  await createNotification({
+    recipientId: plan.author.id,
+    sender,
+    type: 'friend_completed',
+    content: `${sender.username} just started your plan ${plan.title}`,
+    planId: plan.id,
+    planTitle: plan.title,
+    planCover: plan.coverPhotos?.[0] ?? null,
+  });
+};
+
+/** Call when a friend request is accepted */
+export const notifyFriendAccepted = async (sender: User, recipientId: string): Promise<void> => {
+  await createNotification({
+    recipientId,
+    sender,
+    type: 'new_follower',
+    content: `${sender.username} accepted your friend request`,
+  });
+};

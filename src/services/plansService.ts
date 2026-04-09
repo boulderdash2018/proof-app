@@ -260,7 +260,7 @@ export const unsavePlan = async (userId: string, planId: string): Promise<void> 
 };
 
 /** Mark a saved plan as done with optional proof status (unique vote per user) */
-export const markPlanAsDone = async (userId: string, planId: string, proofStatus?: 'validated' | 'declined'): Promise<void> => {
+export const markPlanAsDone = async (userId: string, planId: string, proofStatus?: 'validated' | 'declined', sender?: User, plan?: Plan): Promise<void> => {
   const data: Record<string, any> = { isDone: true };
   if (proofStatus) data.proofStatus = proofStatus;
   await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data);
@@ -297,6 +297,10 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
       }
       // Save/update the vote record
       await setDoc(voteRef, { status: proofStatus, votedAt: new Date().toISOString() });
+      // Notify plan author on validated proof
+      if (proofStatus === 'validated' && sender && plan) {
+        notifyProofIt(sender, plan).catch((e) => console.error('[notif trigger]', e));
+      }
     } catch (err) {
       console.error('[plansService] update proof vote error:', err);
     }

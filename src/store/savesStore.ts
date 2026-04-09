@@ -40,12 +40,14 @@ export const useSavesStore = create<SavesStore>((set, get) => ({
 
   markAsDone: (planId: string, proofStatus?: ProofStatus) => {
     const uid = getCurrentUserId();
+    const sender = useAuthStore.getState().user || undefined;
     const { savedPlans } = get();
+    const plan = savedPlans.find((sp) => sp.planId === planId)?.plan || undefined;
     const updated = savedPlans.map((sp) =>
       sp.planId === planId ? { ...sp, isDone: true, proofStatus } : sp
     );
     set({ savedPlans: updated });
-    if (uid) markPlanAsDone(uid, planId, proofStatus).catch(console.error);
+    if (uid) markPlanAsDone(uid, planId, proofStatus, sender, plan).catch(console.error);
   },
 
   addCreatedPlan: (plan: Plan) => {

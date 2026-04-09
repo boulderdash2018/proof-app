@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { FriendRequest } from '../types';
 import * as friendsService from '../services/friendsService';
+import { useAuthStore } from './authStore';
 
 interface FriendsStore {
   incomingRequests: FriendRequest[];
@@ -60,7 +61,8 @@ export const useFriendsStore = create<FriendsStore>((set, get) => ({
   },
 
   acceptRequest: async (requestId: string, userId: string) => {
-    await friendsService.acceptFriendRequest(requestId);
+    const acceptingUser = useAuthStore.getState().user || undefined;
+    await friendsService.acceptFriendRequest(requestId, acceptingUser);
     await Promise.all([
       get().fetchIncomingRequests(userId),
       get().fetchFollowCounts(userId),

@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { User, FriendRequest } from '../types';
-import { notifyFollow } from './notificationsService';
+import { notifyFollow, notifyFriendAccepted } from './notificationsService';
 
 const USERS = 'users';
 const FRIEND_REQUESTS = 'friendRequests';
@@ -107,13 +107,17 @@ export const sendFriendRequest = async (fromUserId: string, toUserId: string): P
 };
 
 // Accept a follow request (creates a follow relationship)
-export const acceptFriendRequest = async (requestId: string): Promise<void> => {
+export const acceptFriendRequest = async (requestId: string, acceptingUser?: User): Promise<void> => {
   const reqDoc = await getDoc(doc(db, FRIEND_REQUESTS, requestId));
   await updateDoc(doc(db, FRIEND_REQUESTS, requestId), { status: 'accepted' });
   // Create follow: requester → target
   if (reqDoc.exists()) {
     const data = reqDoc.data();
     await followUser(data.fromUserId, data.toUserId);
+    // Notify the requester that their request was accepted
+    if (acceptingUser) {
+      notifyFriendAccepted(acceptingUser, data.fromUserId).catch((e) => console.error('[notif trigger]', e));
+    }
   }
 };
 

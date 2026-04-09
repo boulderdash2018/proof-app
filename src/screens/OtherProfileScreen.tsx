@@ -89,7 +89,7 @@ export const OtherProfileScreen: React.FC = () => {
         await sendFollowRequest(currentUser.id, userId);
         setFollowStatus('requested');
       } else {
-        await followUser(currentUser.id, userId);
+        await followUser(currentUser.id, userId, currentUser);
         setFollowStatus('following');
         refreshCounts();
       }
