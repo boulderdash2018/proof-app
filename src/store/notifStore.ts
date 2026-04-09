@@ -6,7 +6,7 @@ import {
   markAllNotificationsRead as markAllService,
 } from '../services/notificationsService';
 import {
-  collection, query, where, orderBy, limit, onSnapshot,
+  collection, query, where, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 
@@ -40,21 +40,21 @@ export const useNotifStore = create<NotifStore>((set, get) => ({
     get().unsubscribe();
 
     try {
+      // Simple query — no orderBy to avoid needing composite index
       const q = query(
         collection(db, 'notifications'),
         where('recipientId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(30)
       );
       const unsub = onSnapshot(q, (snap) => {
         const notifications: Notification[] = snap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         } as Notification));
+        // Sort client-side (newest first)
+        notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         const unreadCount = notifications.filter((n) => !n.read).length;
         set({ notifications, unreadCount });
       }, (err) => {
-        // Silently handle — likely missing index
         console.warn('[notifStore] onSnapshot error:', err.message);
       });
       set({ _unsub: unsub, _userId: userId });

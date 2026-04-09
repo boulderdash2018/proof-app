@@ -261,7 +261,7 @@ export const followUser = async (followerId: string, followingId: string, sender
     followingId,
     createdAt: new Date().toISOString(),
   });
-  if (sender) notifyFollow(sender, followingId).catch(() => {});
+  if (sender) notifyFollow(sender, followingId).catch((e) => console.error('[notif trigger]', e));
 };
 
 /** Unfollow a user */

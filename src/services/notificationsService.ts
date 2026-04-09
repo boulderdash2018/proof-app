@@ -1,7 +1,7 @@
 import {
-  collection, query, where, orderBy, limit, startAfter,
-  getDocs, addDoc, updateDoc, doc, writeBatch, onSnapshot,
-  Timestamp, QueryDocumentSnapshot,
+  collection, query, where,
+  getDocs, addDoc, updateDoc, doc, writeBatch,
+  QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Notification, NotificationType, User, Plan } from '../types';
@@ -11,24 +11,22 @@ const PAGE_SIZE = 20;
 
 // ==================== READ ====================
 
-/** Fetch paginated notifications for a user */
+/** Fetch notifications for a user (no composite index needed) */
 export const fetchNotifications = async (
   userId: string,
-  lastDoc?: QueryDocumentSnapshot | null
+  _lastDoc?: QueryDocumentSnapshot | null
 ): Promise<{ notifications: Notification[]; lastVisible: QueryDocumentSnapshot | null }> => {
-  let q = query(
+  const q = query(
     collection(db, NOTIFICATIONS),
     where('recipientId', '==', userId),
-    orderBy('createdAt', 'desc'),
-    limit(PAGE_SIZE)
   );
-  if (lastDoc) q = query(q, startAfter(lastDoc));
-
   const snap = await getDocs(q);
   const notifications: Notification[] = snap.docs.map((d) => ({
     id: d.id,
     ...d.data(),
   } as Notification));
+  // Sort client-side
+  notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const lastVisible = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
   return { notifications, lastVisible };
@@ -90,27 +88,6 @@ export const markAllNotificationsRead = async (userId: string): Promise<void> =>
   await batch.commit();
 };
 
-// ==================== ANTI-SPAM CHECK ====================
-
-const recentNotifExists = async (
-  recipientId: string,
-  senderId: string,
-  type: NotificationType,
-  planId: string | null
-): Promise<boolean> => {
-  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
-  let q = query(
-    collection(db, NOTIFICATIONS),
-    where('recipientId', '==', recipientId),
-    where('senderId', '==', senderId),
-    where('type', '==', type),
-    where('createdAt', '>=', oneHourAgo),
-    limit(1)
-  );
-  const snap = await getDocs(q);
-  return !snap.empty;
-};
-
 // ==================== CREATE NOTIFICATION ====================
 
 interface CreateNotifParams {
@@ -124,29 +101,32 @@ interface CreateNotifParams {
 }
 
 export const createNotification = async (params: CreateNotifParams): Promise<void> => {
-  // Never notify yourself
-  if (params.recipientId === params.sender.id) return;
-  // Anti-spam: same type + sender + recipient within 1 hour
-  const exists = await recentNotifExists(
-    params.recipientId, params.sender.id, params.type, params.planId ?? null
-  );
-  if (exists) return;
+  try {
+    // Never notify yourself
+    if (params.recipientId === params.sender.id) return;
+    if (!params.recipientId || !params.sender.id) return;
 
-  await addDoc(collection(db, NOTIFICATIONS), {
-    recipientId: params.recipientId,
-    senderId: params.sender.id,
-    senderUsername: params.sender.username,
-    senderAvatar: params.sender.avatarBg,
-    senderInitials: params.sender.initials,
-    senderAvatarColor: params.sender.avatarColor,
-    type: params.type,
-    content: params.content,
-    planId: params.planId ?? null,
-    planTitle: params.planTitle ?? null,
-    planCover: params.planCover ?? null,
-    read: false,
-    createdAt: new Date().toISOString(),
-  });
+    const data = {
+      recipientId: params.recipientId,
+      senderId: params.sender.id,
+      senderUsername: params.sender.username || params.sender.displayName || 'User',
+      senderAvatar: params.sender.avatarBg || '#D4845A',
+      senderInitials: params.sender.initials || '?',
+      senderAvatarColor: params.sender.avatarColor || '#FFF',
+      type: params.type,
+      content: params.content,
+      planId: params.planId ?? null,
+      planTitle: params.planTitle ?? null,
+      planCover: params.planCover ?? null,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    console.log('[notif] creating:', params.type, 'for', params.recipientId);
+    await addDoc(collection(db, NOTIFICATIONS), data);
+    console.log('[notif] created successfully');
+  } catch (err: any) {
+    console.error('[notif] createNotification error:', err?.message || err);
+  }
 };
 
 // ==================== TRIGGER HELPERS ====================

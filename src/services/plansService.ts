@@ -201,7 +201,7 @@ export const toggleLikePlan = async (userId: string, planId: string, isLiked: bo
       await updateDoc(planRef, { likesCount: current + 1 });
     }
     // Notify plan author
-    if (sender && plan) notifyLike(sender, plan).catch(() => {});
+    if (sender && plan) notifyLike(sender, plan).catch((e) => console.error('[notif trigger]', e));
   }
 };
 
@@ -243,7 +243,7 @@ export const savePlan = async (userId: string, planId: string, sender?: User, pl
     isDone: false,
     savedAt: new Date().toISOString(),
   });
-  if (sender && plan) notifySave(sender, plan).catch(() => {});
+  if (sender && plan) notifySave(sender, plan).catch((e) => console.error('[notif trigger]', e));
 };
 
 /** Save a created plan (already done) */
@@ -450,7 +450,7 @@ export const addComment = async (planId: string, author: User, text: string, pla
   }
 
   // Notify plan author
-  if (plan) notifyComment(author, plan, text).catch(() => {});
+  if (plan) notifyComment(author, plan, text).catch((e) => console.error('[notif trigger]', e));
 
   return { ...commentData, id: ref.id };
 };
