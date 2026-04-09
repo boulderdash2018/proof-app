@@ -206,6 +206,7 @@ export const CreateScreen: React.FC = () => {
   const [customComment, setCustomComment] = useState('');
   const [customAnswer, setCustomAnswer] = useState('');
   const [customQuestion, setCustomQuestion] = useState('');
+  const [showQuestionPicker, setShowQuestionPicker] = useState(false);
 
   const PLACE_QUESTIONS = [
     'Quel est ton plat / drink préféré ici ?',
@@ -1099,9 +1100,37 @@ export const CreateScreen: React.FC = () => {
 
                     {!isReordering && type === 'question' && (
                       <>
-                        <Text style={[styles.customizeQuestion, { color: C.gray700 }]}>{customQuestion}</Text>
+                        <TouchableOpacity
+                          style={[styles.questionPicker, { backgroundColor: C.white, borderColor: C.borderLight }]}
+                          onPress={() => setShowQuestionPicker(!showQuestionPicker)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.questionPickerText, { color: C.gray700 }]} numberOfLines={1}>{customQuestion}</Text>
+                          <Ionicons name={showQuestionPicker ? 'chevron-up' : 'chevron-down'} size={16} color={C.gray500} />
+                        </TouchableOpacity>
+                        {showQuestionPicker && (
+                          <View style={[styles.questionDropdown, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+                            <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                              {PLACE_QUESTIONS.map((q) => (
+                                <TouchableOpacity
+                                  key={q}
+                                  style={[
+                                    styles.questionOption,
+                                    { borderBottomColor: C.borderLight },
+                                    q === customQuestion && { backgroundColor: C.primary + '12' },
+                                  ]}
+                                  onPress={() => { setCustomQuestion(q); setShowQuestionPicker(false); }}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={[styles.questionOptionText, { color: q === customQuestion ? C.primary : C.black }]}>{q}</Text>
+                                  {q === customQuestion && <Ionicons name="checkmark" size={16} color={C.primary} />}
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          </View>
+                        )}
                         <RNTextInput
-                          style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
+                          style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight, marginTop: 8 }]}
                           placeholder="Ta réponse..."
                           placeholderTextColor={C.gray500}
                           value={customAnswer}
@@ -1276,6 +1305,11 @@ const styles = StyleSheet.create({
   customizePhotoPreview: { width: '100%', height: 140, borderRadius: 10, resizeMode: 'cover', marginTop: 4 },
   customizeInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontFamily: Fonts.serif, minHeight: 60, textAlignVertical: 'top' },
   customizeQuestion: { fontSize: 13, fontStyle: 'italic', fontFamily: Fonts.serif, marginBottom: 8 },
+  questionPicker: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  questionPickerText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, flex: 1, marginRight: 8 },
+  questionDropdown: { borderRadius: 10, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  questionOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1 },
+  questionOptionText: { fontSize: 13, fontFamily: Fonts.serif, flex: 1, marginRight: 8 },
   customizeFooter: { borderTopWidth: 1, paddingHorizontal: Layout.screenPadding, paddingVertical: 14 },
   customizeConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
   customizeConfirmText: { fontSize: 15, fontFamily: Fonts.serifBold, color: '#FFF' },
