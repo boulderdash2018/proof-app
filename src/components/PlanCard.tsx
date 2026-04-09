@@ -281,24 +281,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                     <Text style={[styles.placeType, { color: C.gray600 }]}>{place.type}</Text>
                   </View>
                 </View>
-                {/* Hinge-style cards per place */}
-                {place.customPhoto && (
-                  <View style={[styles.hingeCard, { borderColor: C.borderLight }]}>
-                    <Image source={{ uri: place.customPhoto }} style={styles.hingeCardImg} />
-                  </View>
-                )}
-                {place.comment && (
-                  <View style={[styles.hingeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
-                    <Text style={[styles.hingeLabel, { color: C.gray600 }]}>Mon avis</Text>
-                    <Text style={[styles.hingeText, { color: C.black }]}>{place.comment}</Text>
-                  </View>
-                )}
-                {place.questionAnswer && place.question && (
-                  <View style={[styles.hingeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
-                    <Text style={[styles.hingeLabel, { color: C.gray600 }]}>{place.question}</Text>
-                    <Text style={[styles.hingeText, { color: C.black }]}>{place.questionAnswer}</Text>
-                  </View>
-                )}
               </React.Fragment>
             ))}
           </View>
@@ -395,12 +377,6 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 1 },
-  // Hinge-style cards
-  hingeCard: { marginTop: 10, marginLeft: 36, marginRight: 4, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  hingeCardImg: { width: '100%', height: 160, resizeMode: 'cover' },
-  hingeLabel: { fontSize: 11, fontFamily: Fonts.serif, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 2 },
-  hingeText: { fontSize: 17, fontFamily: Fonts.serifBold, paddingHorizontal: 14, paddingBottom: 14, lineHeight: 23 },
-
   metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
   metaPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
