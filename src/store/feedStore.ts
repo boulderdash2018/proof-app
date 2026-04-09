@@ -181,8 +181,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       plans: plans.map(updateLikes),
       friendsPlans: friendsPlans.map(updateLikes),
     });
-    // Persist to Firestore in background
-    toggleLikePlan(uid, planId, isLiked).catch(console.error);
+    // Persist to Firestore in background + notify
+    const sender = useAuthStore.getState().user || undefined;
+    toggleLikePlan(uid, planId, isLiked, sender, plan || undefined).catch(console.error);
   },
 
   toggleSave: (planId: string) => {
@@ -211,8 +212,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         // Add to saves store as "to do"
         const entry: SavedPlan = { planId: plan.id, plan, isDone: false, savedAt: new Date().toISOString() };
         useSavesStore.setState((state) => ({ savedPlans: [entry, ...state.savedPlans] }));
-        // Persist to Firestore
-        savePlanFS(uid, planId).catch(console.error);
+        // Persist to Firestore + notify
+        const sender = useAuthStore.getState().user || undefined;
+        savePlanFS(uid, planId, sender, plan).catch(console.error);
       }
     }
 

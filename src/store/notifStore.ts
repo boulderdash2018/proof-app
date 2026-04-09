@@ -2,21 +2,21 @@ import { create } from 'zustand';
 import { Notification } from '../types';
 import {
   fetchNotifications as fetchNotifs,
-  subscribeToUnreadCount,
-  subscribeToNotifications,
   markNotificationRead as markReadService,
   markAllNotificationsRead as markAllService,
 } from '../services/notificationsService';
-import { QueryDocumentSnapshot } from 'firebase/firestore';
+import {
+  collection, query, where, orderBy, limit, onSnapshot,
+} from 'firebase/firestore';
+import { db } from '../services/firebaseConfig';
 
 interface NotifStore {
   notifications: Notification[];
   unreadCount: number;
   isLoading: boolean;
   hasMore: boolean;
-  lastDoc: QueryDocumentSnapshot | null;
-  _unsubUnread: (() => void) | null;
-  _unsubNotifs: (() => void) | null;
+  _unsub: (() => void) | null;
+  _userId: string | null;
 
   subscribe: (userId: string) => void;
   unsubscribe: () => void;
@@ -24,7 +24,6 @@ interface NotifStore {
   loadMore: (userId: string) => Promise<void>;
   markAllRead: (userId: string) => void;
   markRead: (id: string) => void;
-  setUnreadCount: (count: number) => void;
 }
 
 export const useNotifStore = create<NotifStore>((set, get) => ({
@@ -32,50 +31,63 @@ export const useNotifStore = create<NotifStore>((set, get) => ({
   unreadCount: 0,
   isLoading: false,
   hasMore: true,
-  lastDoc: null,
-  _unsubUnread: null,
-  _unsubNotifs: null,
+  _unsub: null,
+  _userId: null,
 
   subscribe: (userId: string) => {
-    // Unsubscribe existing listeners
+    // Don't re-subscribe if already listening to this user
+    if (get()._userId === userId && get()._unsub) return;
     get().unsubscribe();
-    // Real-time unread count badge
-    const unsubUnread = subscribeToUnreadCount(userId, (count) => {
-      set({ unreadCount: count });
-    });
-    // Real-time notification list
-    const unsubNotifs = subscribeToNotifications(userId, (notifications) => {
-      set({ notifications });
-    });
-    set({ _unsubUnread: unsubUnread, _unsubNotifs: unsubNotifs });
+
+    try {
+      const q = query(
+        collection(db, 'notifications'),
+        where('recipientId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(30)
+      );
+      const unsub = onSnapshot(q, (snap) => {
+        const notifications: Notification[] = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        } as Notification));
+        const unreadCount = notifications.filter((n) => !n.read).length;
+        set({ notifications, unreadCount });
+      }, (err) => {
+        // Silently handle — likely missing index
+        console.warn('[notifStore] onSnapshot error:', err.message);
+      });
+      set({ _unsub: unsub, _userId: userId });
+    } catch (err) {
+      console.warn('[notifStore] subscribe error:', err);
+    }
   },
 
   unsubscribe: () => {
-    const { _unsubUnread, _unsubNotifs } = get();
-    _unsubUnread?.();
-    _unsubNotifs?.();
-    set({ _unsubUnread: null, _unsubNotifs: null });
+    const { _unsub } = get();
+    _unsub?.();
+    set({ _unsub: null, _userId: null });
   },
 
   fetchNotifications: async (userId: string) => {
     set({ isLoading: true });
     try {
       const { notifications, lastVisible } = await fetchNotifs(userId);
-      set({ notifications, lastDoc: lastVisible, hasMore: notifications.length >= 20, isLoading: false });
+      const unreadCount = notifications.filter((n) => !n.read).length;
+      set({ notifications, unreadCount, hasMore: notifications.length >= 20, isLoading: false });
     } catch {
       set({ isLoading: false });
     }
   },
 
   loadMore: async (userId: string) => {
-    const { lastDoc, hasMore, isLoading } = get();
-    if (!hasMore || isLoading) return;
+    const { hasMore, isLoading, notifications } = get();
+    if (!hasMore || isLoading || notifications.length === 0) return;
     set({ isLoading: true });
     try {
-      const { notifications: more, lastVisible } = await fetchNotifs(userId, lastDoc);
+      const { notifications: more } = await fetchNotifs(userId);
       set((state) => ({
         notifications: [...state.notifications, ...more],
-        lastDoc: lastVisible,
         hasMore: more.length >= 20,
         isLoading: false,
       }));
@@ -98,6 +110,4 @@ export const useNotifStore = create<NotifStore>((set, get) => ({
     set({ notifications: updated, unreadCount });
     markReadService(id).catch(() => {});
   },
-
-  setUnreadCount: (count: number) => set({ unreadCount: count }),
 }));

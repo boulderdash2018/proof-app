@@ -219,7 +219,7 @@ export const NotificationsScreen: React.FC = () => {
           isLoading ? (
             <View style={styles.loadingWrap}><ActivityIndicator color={C.primary} /></View>
           ) : (
-            <EmptyState icon="\uD83D\uDD14" title="Nothing yet" subtitle="Go post a plan and see what happens \uD83D\uDC40" />
+            <EmptyState icon="🔔" title="Nothing yet" subtitle="Go post a plan and see what happens 👀" />
           )
         }
         ListFooterComponent={

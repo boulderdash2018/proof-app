@@ -223,7 +223,7 @@ export const PlanDetailModal: React.FC = () => {
     if (!commentText.trim() || !currentUser || isSending) return;
     setIsSending(true);
     try {
-      const newComment = await addComment(planId, currentUser, commentText.trim());
+      const newComment = await addComment(planId, currentUser, commentText.trim(), plan || undefined);
       setComments((prev) => [newComment, ...prev]);
       setLocalCommentsCount((prev) => prev + 1);
       // Also update feed store plan
