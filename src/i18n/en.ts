@@ -291,7 +291,9 @@ export const en: Record<TranslationKeys, string> = {
   settings_logout_confirm_short: 'Are you sure?',
   settings_delete_confirm: 'This action is irreversible. Are you sure?',
   settings_delete_confirm_title: 'Delete my account',
-  settings_delete_confirm_body: 'This action is irreversible.',
+  settings_delete_confirm_body: 'All your data (plans, comments, friends, saves) will be permanently deleted. This action is irreversible.',
+  settings_delete_loading: 'Deleting account...',
+  settings_delete_reauth: 'For security reasons, please log in again and retry.',
   settings_lang_french: '🇫🇷 Français',
   settings_lang_english: '🇬🇧 English',
 

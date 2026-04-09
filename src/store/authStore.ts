@@ -12,6 +12,7 @@ interface AuthStore {
   loginWithGoogle: () => Promise<void>;
   signup: (data: SignupData) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   loadSession: () => Promise<void>;
   setUser: (user: User) => void;
@@ -75,6 +76,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     await firebaseAuthService.logout();
     set({ user: null, isAuthenticated: false });
     trackEvent('user_logout');
+    resetUser();
+  },
+
+  deleteAccount: async () => {
+    const userId = get().user?.id;
+    await firebaseAuthService.deleteAccount();
+    set({ user: null, isAuthenticated: false });
+    trackEvent('account_deleted', { userId });
     resetUser();
   },
 

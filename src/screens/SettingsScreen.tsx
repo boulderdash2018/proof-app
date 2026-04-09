@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Layout, Fonts } from '../constants';
@@ -11,10 +11,11 @@ import type { Language } from '../store';
 export const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const logout = useAuthStore((s) => s.logout);
+  const { logout, deleteAccount } = useAuthStore();
   const { language, setLanguage } = useLanguageStore();
   const C = useColors();
   const { t } = useTranslation();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -30,16 +31,34 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  const performDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteAccount();
+    } catch (error: any) {
+      setIsDeleting(false);
+      const msg = error?.code === 'auth/requires-recent-login'
+        ? (t.settings_delete_reauth || 'Reconnecte-toi puis réessaie.')
+        : (error?.message || t.error);
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        const { Alert } = require('react-native');
+        Alert.alert(t.error, msg);
+      }
+    }
+  };
+
   const handleDeleteAccount = () => {
     if (Platform.OS === 'web') {
       if (window.confirm(t.settings_delete_confirm)) {
-        logout();
+        performDelete();
       }
     } else {
       const { Alert } = require('react-native');
       Alert.alert(t.settings_delete_confirm_title, t.settings_delete_confirm_body, [
         { text: t.cancel, style: 'cancel' },
-        { text: t.delete, style: 'destructive', onPress: () => logout() },
+        { text: t.delete, style: 'destructive', onPress: performDelete },
       ]);
     }
   };
@@ -110,6 +129,12 @@ export const SettingsScreen: React.FC = () => {
         <SettingsRow label={t.settings_logout} onPress={handleLogout} danger />
         <SettingsRow label={t.settings_delete_account} onPress={handleDeleteAccount} danger />
       </ScrollView>
+      {isDeleting && (
+        <View style={styles.deletingOverlay}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={[styles.deletingText, { color: C.white }]}>{t.settings_delete_loading || 'Suppression en cours...'}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -126,4 +151,6 @@ const styles = StyleSheet.create({
   rowChevron: { fontSize: 18 },
   themeBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
   themeBadgeText: { fontSize: 12, fontWeight: '600' },
+  deletingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+  deletingText: { marginTop: 16, fontSize: 15, fontFamily: Fonts.serifSemiBold },
 });

@@ -4,12 +4,16 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
+  deleteUser,
   setPersistence,
   browserLocalPersistence,
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  doc, getDoc, setDoc, updateDoc, deleteDoc,
+  collection, query, where, getDocs, writeBatch,
+} from 'firebase/firestore';
 import { auth, db } from './firebaseConfig';
 import { User, SignupData } from '../types';
 
@@ -76,6 +80,54 @@ const loadUserProfile = async (fbUser: FirebaseUser): Promise<User> => {
 export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<void> => {
   const { id, ...fields } = data as any;
   await updateDoc(doc(db, 'users', userId), fields);
+};
+
+// Delete all Firestore data for a user (RGPD)
+const deleteAllUserData = async (userId: string): Promise<void> => {
+  // Helper: delete all docs from a query
+  const deleteQuery = async (q: ReturnType<typeof query>) => {
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    if (snap.size > 0) await batch.commit();
+  };
+
+  // Helper: delete all docs in a subcollection
+  const deleteSub = async (path: string) => {
+    const snap = await getDocs(collection(db, path));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    if (snap.size > 0) await batch.commit();
+  };
+
+  // 1. User subcollections
+  await deleteSub(`users/${userId}/savedPlans`);
+  await deleteSub(`users/${userId}/likedPlans`);
+
+  // 2. Plans authored by user + their proofVotes subcollections
+  const plansQ = query(collection(db, 'plans'), where('authorId', '==', userId));
+  const plansSnap = await getDocs(plansQ);
+  for (const planDoc of plansSnap.docs) {
+    await deleteSub(`plans/${planDoc.id}/proofVotes`);
+    await deleteDoc(planDoc.ref);
+  }
+
+  // 3. Comments by user
+  await deleteQuery(query(collection(db, 'comments'), where('authorId', '==', userId)));
+
+  // 4. Friend requests (sent & received)
+  await deleteQuery(query(collection(db, 'friendRequests'), where('fromUserId', '==', userId)));
+  await deleteQuery(query(collection(db, 'friendRequests'), where('toUserId', '==', userId)));
+
+  // 5. Follows (follower & following)
+  await deleteQuery(query(collection(db, 'follows'), where('followerId', '==', userId)));
+  await deleteQuery(query(collection(db, 'follows'), where('followingId', '==', userId)));
+
+  // 6. Place reviews
+  await deleteQuery(query(collection(db, 'placeReviews'), where('authorId', '==', userId)));
+
+  // 7. User document itself
+  await deleteDoc(doc(db, 'users', userId));
 };
 
 // Set persistence to local (keep user logged in)
@@ -152,6 +204,14 @@ export const firebaseAuthService = {
       }
       throw new Error(error.message || 'Erreur lors de la connexion Google');
     }
+  },
+
+  deleteAccount: async (): Promise<void> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) throw new Error('Aucun utilisateur connecté');
+    // Delete all Firestore data first, then the Auth user
+    await deleteAllUserData(fbUser.uid);
+    await deleteUser(fbUser);
   },
 
   onAuthStateChange: (callback: (user: User | null) => void) => {

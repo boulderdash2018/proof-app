@@ -289,7 +289,9 @@ export const fr = {
   settings_logout_confirm_short: 'Tu es sûr ?',
   settings_delete_confirm: 'Cette action est irréversible. Tu es sûr ?',
   settings_delete_confirm_title: 'Supprimer mon compte',
-  settings_delete_confirm_body: 'Cette action est irréversible.',
+  settings_delete_confirm_body: 'Toutes tes données (plans, commentaires, amis, sauvegardes) seront supprimées définitivement. Cette action est irréversible.',
+  settings_delete_loading: 'Suppression en cours...',
+  settings_delete_reauth: 'Pour des raisons de sécurité, reconnecte-toi puis réessaie.',
   settings_lang_french: '🇫🇷 Français',
   settings_lang_english: '🇬🇧 English',
 
