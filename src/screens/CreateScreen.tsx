@@ -60,6 +60,10 @@ interface PlaceEntry {
   address?: string;
   price: string;      // user input (numbers only)
   duration: string;   // user input in minutes (numbers only)
+  customPhoto?: string;     // user's own photo URI
+  comment?: string;         // user's personal comment
+  questionAnswer?: string;  // answer to a random question
+  question?: string;        // the question that was shown
 }
 
 interface TravelEntry {
@@ -194,6 +198,23 @@ export const CreateScreen: React.FC = () => {
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Place customization state
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [pendingPlace, setPendingPlace] = useState<PlaceEntry | null>(null);
+  const [pendingPlacePhoto, setPendingPlacePhoto] = useState<string | null>(null);
+  const [customPhoto, setCustomPhoto] = useState('');
+  const [customComment, setCustomComment] = useState('');
+  const [customAnswer, setCustomAnswer] = useState('');
+  const [customQuestion, setCustomQuestion] = useState('');
+
+  const PLACE_QUESTIONS = [
+    'Quel est ton plat / drink préféré ici ?',
+    'Un conseil pour ceux qui y vont ?',
+    'Qu\'est-ce qui rend cet endroit unique ?',
+    'À quel moment de la journée y aller ?',
+    'Un souvenir marquant ici ?',
+  ];
+
   const handlePlaceSearch = useCallback((query: string) => {
     setPlaceSearch(query);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -218,7 +239,38 @@ export const CreateScreen: React.FC = () => {
       price: '',
       duration: '',
     };
-    const newPlaces = [...places, newPlace];
+
+    // Close search, open customization screen
+    setShowPlacePicker(false);
+    setPlaceSearch('');
+    setPlaceResults([]);
+
+    // Fetch place photo for the customization screen
+    setPendingPlace(newPlace);
+    setPendingPlacePhoto(null);
+    setCustomPhoto('');
+    setCustomComment('');
+    setCustomAnswer('');
+    setCustomQuestion(PLACE_QUESTIONS[Math.floor(Math.random() * PLACE_QUESTIONS.length)]);
+    setShowCustomize(true);
+
+    // Fetch photo in background
+    try {
+      const details = await getPlaceDetails(item.placeId);
+      if (details?.photoUrls?.[0]) setPendingPlacePhoto(details.photoUrls[0]);
+    } catch {}
+  }, []);
+
+  const confirmPlace = useCallback(() => {
+    if (!pendingPlace) return;
+    const placeWithCustom: PlaceEntry = {
+      ...pendingPlace,
+      customPhoto: customPhoto || undefined,
+      comment: customComment || undefined,
+      questionAnswer: customAnswer || undefined,
+      question: customAnswer ? customQuestion : undefined,
+    };
+    const newPlaces = [...places, placeWithCustom];
     setPlaces(newPlaces);
 
     if (places.length > 0) {
@@ -226,26 +278,36 @@ export const CreateScreen: React.FC = () => {
       const defaultTransport: TransportMode = 'À pied';
       setTravels((prev) => [
         ...prev,
-        { fromId: prevPlace.id, toId: item.placeId, duration: '...', transport: defaultTransport },
+        { fromId: prevPlace.id, toId: pendingPlace.id, duration: '...', transport: defaultTransport },
       ]);
-      // Auto-compute travel duration
-      computeTravelDuration(prevPlace.id, item.placeId, defaultTransport).then((mins) => {
+      computeTravelDuration(prevPlace.id, pendingPlace.id, defaultTransport).then((mins) => {
         if (mins !== null) {
           setTravels((prev) => prev.map((t) =>
-            t.fromId === prevPlace.id && t.toId === item.placeId ? { ...t, duration: String(mins) } : t
+            t.fromId === prevPlace.id && t.toId === pendingPlace.id ? { ...t, duration: String(mins) } : t
           ));
         } else {
           setTravels((prev) => prev.map((t) =>
-            t.fromId === prevPlace.id && t.toId === item.placeId && t.duration === '...' ? { ...t, duration: '' } : t
+            t.fromId === prevPlace.id && t.toId === pendingPlace.id && t.duration === '...' ? { ...t, duration: '' } : t
           ));
         }
       });
     }
 
-    setShowPlacePicker(false);
-    setPlaceSearch('');
-    setPlaceResults([]);
-  }, [places]);
+    setShowCustomize(false);
+    setPendingPlace(null);
+  }, [pendingPlace, places, customPhoto, customComment, customAnswer, customQuestion]);
+
+  const pickCustomPhoto = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+    if (!result.canceled && result.assets[0]) {
+      setCustomPhoto(result.assets[0].uri);
+    }
+  }, []);
 
   const toggleTag = (tag: CategoryTag) => {
     setSelectedTags((prev) =>
@@ -877,6 +939,117 @@ export const CreateScreen: React.FC = () => {
             />
           </View>
         </Modal>
+
+        {/* ========== PLACE CUSTOMIZATION MODAL ========== */}
+        <Modal visible={showCustomize} animationType="slide" presentationStyle="pageSheet">
+          <View style={[styles.customizeContainer, { backgroundColor: C.white }]}>
+            <View style={[styles.customizeHeader, { borderBottomColor: C.border }]}>
+              <TouchableOpacity onPress={() => { setShowCustomize(false); setPendingPlace(null); }}>
+                <Ionicons name="arrow-back" size={22} color={C.black} />
+              </TouchableOpacity>
+              <Text style={[styles.customizeTitle, { color: C.black }]}>{pendingPlace?.name}</Text>
+              <View style={{ width: 22 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={styles.customizeScroll} showsVerticalScrollIndicator={false}>
+              {/* Place photo banner */}
+              <View style={styles.customizeBanner}>
+                {pendingPlacePhoto ? (
+                  <Image source={{ uri: pendingPlacePhoto }} style={styles.customizeBannerImg} />
+                ) : (
+                  <View style={[styles.customizeBannerPlaceholder, { backgroundColor: C.gray200 }]}>
+                    <Ionicons name="location" size={40} color={C.gray500} />
+                  </View>
+                )}
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.customizeBannerOverlay} />
+                <View style={styles.customizeBannerInfo}>
+                  <Text style={styles.customizeBannerName}>{pendingPlace?.name}</Text>
+                  <Text style={styles.customizeBannerType}>{pendingPlace?.type} • {pendingPlace?.address}</Text>
+                </View>
+              </View>
+
+              {/* Customization blocks */}
+              <Text style={[styles.customizeSectionTitle, { color: C.gray600 }]}>
+                Optionnel : personnaliser ce lieu
+              </Text>
+
+              {/* 1 — Photo */}
+              <TouchableOpacity
+                style={[styles.customizeBlock, { backgroundColor: C.gray100, borderColor: customPhoto ? C.primary : C.borderLight }]}
+                onPress={pickCustomPhoto}
+                activeOpacity={0.7}
+              >
+                <View style={styles.customizeBlockHeader}>
+                  <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
+                    <Ionicons name="camera-outline" size={20} color={C.primary} />
+                  </View>
+                  <Text style={[styles.customizeBlockTitle, { color: C.black }]}>Ajouter une photo</Text>
+                  {customPhoto ? <Ionicons name="checkmark-circle" size={20} color={C.primary} /> : null}
+                </View>
+                {customPhoto ? (
+                  <Image source={{ uri: customPhoto }} style={styles.customizePhotoPreview} />
+                ) : (
+                  <Text style={[styles.customizeBlockHint, { color: C.gray500 }]}>
+                    Ta propre photo de ce lieu
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* 2 — Comment */}
+              <View style={[styles.customizeBlock, { backgroundColor: C.gray100, borderColor: customComment ? C.primary : C.borderLight }]}>
+                <View style={styles.customizeBlockHeader}>
+                  <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
+                    <Ionicons name="chatbubble-outline" size={20} color={C.primary} />
+                  </View>
+                  <Text style={[styles.customizeBlockTitle, { color: C.black }]}>Commenter</Text>
+                  {customComment ? <Ionicons name="checkmark-circle" size={20} color={C.primary} /> : null}
+                </View>
+                <RNTextInput
+                  style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
+                  placeholder="Ton avis, un conseil, une anecdote..."
+                  placeholderTextColor={C.gray500}
+                  value={customComment}
+                  onChangeText={setCustomComment}
+                  multiline
+                  maxLength={280}
+                />
+              </View>
+
+              {/* 3 — Question */}
+              <View style={[styles.customizeBlock, { backgroundColor: C.gray100, borderColor: customAnswer ? C.primary : C.borderLight }]}>
+                <View style={styles.customizeBlockHeader}>
+                  <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
+                    <Ionicons name="help-circle-outline" size={20} color={C.primary} />
+                  </View>
+                  <Text style={[styles.customizeBlockTitle, { color: C.black }]}>Répondre à une question</Text>
+                  {customAnswer ? <Ionicons name="checkmark-circle" size={20} color={C.primary} /> : null}
+                </View>
+                <Text style={[styles.customizeQuestion, { color: C.gray700 }]}>{customQuestion}</Text>
+                <RNTextInput
+                  style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
+                  placeholder="Ta réponse..."
+                  placeholderTextColor={C.gray500}
+                  value={customAnswer}
+                  onChangeText={setCustomAnswer}
+                  multiline
+                  maxLength={200}
+                />
+              </View>
+            </ScrollView>
+
+            {/* Confirm button */}
+            <View style={[styles.customizeFooter, { borderTopColor: C.border }]}>
+              <TouchableOpacity
+                style={[styles.customizeConfirmBtn, { backgroundColor: C.primary }]}
+                onPress={confirmPlace}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.customizeConfirmText}>Ajouter ce lieu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -1002,4 +1175,29 @@ const styles = StyleSheet.create({
   selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },
   selectedTagChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
   selectedTagText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+
+  // ========== PLACE CUSTOMIZATION MODAL ==========
+  customizeContainer: { flex: 1 },
+  customizeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 14, borderBottomWidth: 1 },
+  customizeTitle: { fontSize: 16, fontFamily: Fonts.serifBold, flex: 1, textAlign: 'center' },
+  customizeScroll: { paddingBottom: 40 },
+  customizeBanner: { height: 200, position: 'relative' },
+  customizeBannerImg: { width: '100%', height: '100%', resizeMode: 'cover' },
+  customizeBannerPlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  customizeBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
+  customizeBannerInfo: { position: 'absolute', bottom: 16, left: 16, right: 16 },
+  customizeBannerName: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  customizeBannerType: { fontSize: 12, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  customizeSectionTitle: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: Layout.screenPadding, paddingTop: 20, paddingBottom: 12 },
+  customizeBlock: { marginHorizontal: Layout.screenPadding, marginBottom: 14, borderRadius: 14, borderWidth: 1, padding: 14 },
+  customizeBlockHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  customizeBlockIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  customizeBlockTitle: { fontSize: 14, fontFamily: Fonts.serifSemiBold, flex: 1 },
+  customizeBlockHint: { fontSize: 13, fontStyle: 'italic', fontFamily: Fonts.serif },
+  customizePhotoPreview: { width: '100%', height: 140, borderRadius: 10, resizeMode: 'cover', marginTop: 4 },
+  customizeInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontFamily: Fonts.serif, minHeight: 60, textAlignVertical: 'top' },
+  customizeQuestion: { fontSize: 13, fontStyle: 'italic', fontFamily: Fonts.serif, marginBottom: 8 },
+  customizeFooter: { borderTopWidth: 1, paddingHorizontal: Layout.screenPadding, paddingVertical: 14 },
+  customizeConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
+  customizeConfirmText: { fontSize: 15, fontFamily: Fonts.serifBold, color: '#FFF' },
 });
