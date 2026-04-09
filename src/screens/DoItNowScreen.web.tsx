@@ -30,26 +30,25 @@ function getUrlTravelMode(mode: string): string {
   }
 }
 
-// Vintage Brown by Magdalena — monochrome brown, dark water
+// Enegry by Schloesser David — dark mode, gold labels
 const MAP_STYLE = [
-  {"featureType":"administrative","elementType":"labels.text.fill","stylers":[{"color":"#444444"}]},
-  {"featureType":"administrative.country","elementType":"all","stylers":[{"visibility":"on"}]},
-  {"featureType":"administrative.country","elementType":"labels.text","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative.province","elementType":"labels.text","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative.locality","elementType":"labels.text","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"all","stylers":[{"color":"#f2f2f2"}]},
-  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#b5997c"}]},
-  {"featureType":"landscape","elementType":"labels.text","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape.man_made","elementType":"all","stylers":[{"visibility":"on"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#ffa600"},{"lightness":40}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"lightness":16},{"hue":"#ff0000"}]},
+  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":20}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":17},{"weight":1.2}]},
+  {"featureType":"administrative.locality","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":20}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":21}]},
   {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"road","elementType":"all","stylers":[{"saturation":-100},{"lightness":45},{"visibility":"off"}]},
-  {"featureType":"road.highway","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"road.arterial","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"transit","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"all","stylers":[{"color":"#ff9100"},{"visibility":"on"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#a06249"}]},
-  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#a06249"}]},
-  {"featureType":"water","elementType":"labels","stylers":[{"visibility":"off"}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":17}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":29},{"weight":0.2}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":18}]},
+  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":16}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":19}]},
+  {"featureType":"transit.line","elementType":"all","stylers":[{"visibility":"off"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":17}]},
 ];
 
 let gmLoaded = false;
