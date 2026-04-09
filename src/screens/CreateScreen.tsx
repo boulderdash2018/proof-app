@@ -215,6 +215,28 @@ export const CreateScreen: React.FC = () => {
     'Un souvenir marquant ici ?',
   ];
 
+  type BlockType = 'photo' | 'comment' | 'question';
+  const [blockOrder, setBlockOrder] = useState<BlockType[]>(['photo', 'comment', 'question']);
+  const [isReordering, setIsReordering] = useState(false);
+
+  const moveBlock = (index: number, dir: 'up' | 'down') => {
+    const target = dir === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= blockOrder.length) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBlockOrder((prev) => {
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const clearBlock = (type: BlockType) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (type === 'photo') setCustomPhoto('');
+    if (type === 'comment') setCustomComment('');
+    if (type === 'question') setCustomAnswer('');
+  };
+
   const handlePlaceSearch = useCallback((query: string) => {
     setPlaceSearch(query);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -969,72 +991,105 @@ export const CreateScreen: React.FC = () => {
               </View>
 
               {/* Customization blocks */}
-              <Text style={[styles.customizeSectionTitle, { color: C.gray600 }]}>
-                Optionnel : personnaliser ce lieu
-              </Text>
-
-              {/* 1 — Photo */}
-              <TouchableOpacity
-                style={[styles.customizeBlock, { backgroundColor: C.gray100, borderColor: customPhoto ? C.primary : C.borderLight }]}
-                onPress={pickCustomPhoto}
-                activeOpacity={0.7}
-              >
-                <View style={styles.customizeBlockHeader}>
-                  <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
-                    <Ionicons name="camera-outline" size={20} color={C.primary} />
-                  </View>
-                  <Text style={[styles.customizeBlockTitle, { color: C.black }]}>Ajouter une photo</Text>
-                  {customPhoto ? <Ionicons name="checkmark-circle" size={20} color={C.primary} /> : null}
-                </View>
-                {customPhoto ? (
-                  <Image source={{ uri: customPhoto }} style={styles.customizePhotoPreview} />
-                ) : (
-                  <Text style={[styles.customizeBlockHint, { color: C.gray500 }]}>
-                    Ta propre photo de ce lieu
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              {/* 2 — Comment */}
-              <View style={[styles.customizeBlock, { backgroundColor: C.gray100, borderColor: customComment ? C.primary : C.borderLight }]}>
-                <View style={styles.customizeBlockHeader}>
-                  <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
-                    <Ionicons name="chatbubble-outline" size={20} color={C.primary} />
-                  </View>
-                  <Text style={[styles.customizeBlockTitle, { color: C.black }]}>Commenter</Text>
-                  {customComment ? <Ionicons name="checkmark-circle" size={20} color={C.primary} /> : null}
-                </View>
-                <RNTextInput
-                  style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
-                  placeholder="Ton avis, un conseil, une anecdote..."
-                  placeholderTextColor={C.gray500}
-                  value={customComment}
-                  onChangeText={setCustomComment}
-                  multiline
-                  maxLength={280}
-                />
+              <View style={styles.customizeSectionRow}>
+                <Text style={[styles.customizeSectionTitle, { color: C.gray600 }]}>
+                  Optionnel : personnaliser ce lieu
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setIsReordering(!isReordering)}
+                  style={[styles.reorderToggle, { backgroundColor: isReordering ? C.primary : C.gray200 }]}
+                >
+                  <Ionicons name={isReordering ? 'checkmark' : 'reorder-three'} size={16} color={isReordering ? '#FFF' : C.gray700} />
+                </TouchableOpacity>
               </View>
 
-              {/* 3 — Question */}
-              <View style={[styles.customizeBlock, { backgroundColor: C.gray100, borderColor: customAnswer ? C.primary : C.borderLight }]}>
-                <View style={styles.customizeBlockHeader}>
-                  <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
-                    <Ionicons name="help-circle-outline" size={20} color={C.primary} />
-                  </View>
-                  <Text style={[styles.customizeBlockTitle, { color: C.black }]}>Répondre à une question</Text>
-                  {customAnswer ? <Ionicons name="checkmark-circle" size={20} color={C.primary} /> : null}
-                </View>
-                <Text style={[styles.customizeQuestion, { color: C.gray700 }]}>{customQuestion}</Text>
-                <RNTextInput
-                  style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
-                  placeholder="Ta réponse..."
-                  placeholderTextColor={C.gray500}
-                  value={customAnswer}
-                  onChangeText={setCustomAnswer}
-                  multiline
-                  maxLength={200}
-                />
-              </View>
+              {blockOrder.map((type, idx) => {
+                const isFilled = type === 'photo' ? !!customPhoto : type === 'comment' ? !!customComment : !!customAnswer;
+
+                return (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.customizeBlock,
+                      { backgroundColor: C.gray100, borderColor: isFilled ? C.primary : C.borderLight },
+                      isReordering && styles.customizeBlockReorder,
+                    ]}
+                    onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setIsReordering(true); }}
+                    onPress={type === 'photo' && !isReordering ? pickCustomPhoto : undefined}
+                    activeOpacity={isReordering ? 1 : 0.7}
+                    delayLongPress={300}
+                  >
+                    <View style={styles.customizeBlockHeader}>
+                      {/* Grip handle (reorder mode) */}
+                      {isReordering && (
+                        <View style={styles.reorderArrows}>
+                          <TouchableOpacity onPress={() => moveBlock(idx, 'up')} disabled={idx === 0} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="chevron-up" size={18} color={idx === 0 ? C.gray400 : C.black} />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => moveBlock(idx, 'down')} disabled={idx === blockOrder.length - 1} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="chevron-down" size={18} color={idx === blockOrder.length - 1 ? C.gray400 : C.black} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      <View style={[styles.customizeBlockIcon, { backgroundColor: C.primary + '15' }]}>
+                        <Ionicons
+                          name={type === 'photo' ? 'camera-outline' : type === 'comment' ? 'chatbubble-outline' : 'help-circle-outline'}
+                          size={20}
+                          color={C.primary}
+                        />
+                      </View>
+                      <Text style={[styles.customizeBlockTitle, { color: C.black }]}>
+                        {type === 'photo' ? 'Ajouter une photo' : type === 'comment' ? 'Commenter' : 'Répondre à une question'}
+                      </Text>
+
+                      {/* Clear button */}
+                      {isFilled && (
+                        <TouchableOpacity onPress={() => clearBlock(type)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.clearBtn}>
+                          <Ionicons name="close-circle" size={20} color={C.gray500} />
+                        </TouchableOpacity>
+                      )}
+                      {!isFilled && !isReordering && <Ionicons name="chevron-forward" size={16} color={C.gray400} />}
+                    </View>
+
+                    {/* Block content */}
+                    {!isReordering && type === 'photo' && (
+                      customPhoto ? (
+                        <Image source={{ uri: customPhoto }} style={styles.customizePhotoPreview} />
+                      ) : (
+                        <Text style={[styles.customizeBlockHint, { color: C.gray500 }]}>Ta propre photo de ce lieu</Text>
+                      )
+                    )}
+
+                    {!isReordering && type === 'comment' && (
+                      <RNTextInput
+                        style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
+                        placeholder="Ton avis, un conseil, une anecdote..."
+                        placeholderTextColor={C.gray500}
+                        value={customComment}
+                        onChangeText={setCustomComment}
+                        multiline
+                        maxLength={280}
+                      />
+                    )}
+
+                    {!isReordering && type === 'question' && (
+                      <>
+                        <Text style={[styles.customizeQuestion, { color: C.gray700 }]}>{customQuestion}</Text>
+                        <RNTextInput
+                          style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight }]}
+                          placeholder="Ta réponse..."
+                          placeholderTextColor={C.gray500}
+                          value={customAnswer}
+                          onChangeText={setCustomAnswer}
+                          multiline
+                          maxLength={200}
+                        />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
             {/* Confirm button */}
@@ -1200,4 +1255,10 @@ const styles = StyleSheet.create({
   customizeFooter: { borderTopWidth: 1, paddingHorizontal: Layout.screenPadding, paddingVertical: 14 },
   customizeConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
   customizeConfirmText: { fontSize: 15, fontFamily: Fonts.serifBold, color: '#FFF' },
+
+  // Reorder UI
+  customizeSectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: Layout.screenPadding },
+  reorderToggle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  customizeBlockReorder: { opacity: 0.92, borderStyle: 'dashed' },
+  reorderArrows: { flexDirection: 'column', alignItems: 'center', marginRight: 4 },
 });
