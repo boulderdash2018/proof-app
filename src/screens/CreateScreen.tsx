@@ -207,6 +207,7 @@ export const CreateScreen: React.FC = () => {
   const [customAnswer, setCustomAnswer] = useState('');
   const [customQuestion, setCustomQuestion] = useState('');
   const [showQuestionPicker, setShowQuestionPicker] = useState(false);
+  const [editingPlaceIndex, setEditingPlaceIndex] = useState<number | null>(null);
 
   const PLACE_QUESTIONS = [
     'Quel est ton plat / drink préféré ici ?',
@@ -299,6 +300,28 @@ export const CreateScreen: React.FC = () => {
     } catch {}
   }, []);
 
+  const editPlaceCustomization = useCallback(async (index: number) => {
+    const place = places[index];
+    setEditingPlaceIndex(index);
+    setPendingPlace(place);
+    setCustomPhoto(place.customPhoto || '');
+    setCustomComment(place.comment || '');
+    setCustomAnswer(place.questionAnswer || '');
+    setCustomQuestion(place.question || PLACE_QUESTIONS[Math.floor(Math.random() * PLACE_QUESTIONS.length)]);
+    setBlockOrder(['photo', 'comment', 'question']);
+    setIsReordering(false);
+    setShowQuestionPicker(false);
+    setPendingPlacePhoto(null);
+    setShowCustomize(true);
+    // Fetch photo in background
+    if (place.googlePlaceId) {
+      try {
+        const details = await getPlaceDetails(place.googlePlaceId);
+        if (details?.photoUrls?.[0]) setPendingPlacePhoto(details.photoUrls[0]);
+      } catch {}
+    }
+  }, [places]);
+
   const confirmPlace = useCallback(() => {
     if (!pendingPlace) return;
     const placeWithCustom: PlaceEntry = {
@@ -308,32 +331,40 @@ export const CreateScreen: React.FC = () => {
       questionAnswer: customAnswer || undefined,
       question: customAnswer ? customQuestion : undefined,
     };
-    const newPlaces = [...places, placeWithCustom];
-    setPlaces(newPlaces);
 
-    if (places.length > 0) {
-      const prevPlace = places[places.length - 1];
-      const defaultTransport: TransportMode = 'À pied';
-      setTravels((prev) => [
-        ...prev,
-        { fromId: prevPlace.id, toId: pendingPlace.id, duration: '...', transport: defaultTransport },
-      ]);
-      computeTravelDuration(prevPlace.id, pendingPlace.id, defaultTransport).then((mins) => {
-        if (mins !== null) {
-          setTravels((prev) => prev.map((t) =>
-            t.fromId === prevPlace.id && t.toId === pendingPlace.id ? { ...t, duration: String(mins) } : t
-          ));
-        } else {
-          setTravels((prev) => prev.map((t) =>
-            t.fromId === prevPlace.id && t.toId === pendingPlace.id && t.duration === '...' ? { ...t, duration: '' } : t
-          ));
-        }
-      });
+    if (editingPlaceIndex !== null) {
+      // Editing existing place — update in-place
+      setPlaces((prev) => prev.map((p, i) => i === editingPlaceIndex ? { ...p, ...placeWithCustom } : p));
+    } else {
+      // Adding new place
+      const newPlaces = [...places, placeWithCustom];
+      setPlaces(newPlaces);
+
+      if (places.length > 0) {
+        const prevPlace = places[places.length - 1];
+        const defaultTransport: TransportMode = 'À pied';
+        setTravels((prev) => [
+          ...prev,
+          { fromId: prevPlace.id, toId: pendingPlace.id, duration: '...', transport: defaultTransport },
+        ]);
+        computeTravelDuration(prevPlace.id, pendingPlace.id, defaultTransport).then((mins) => {
+          if (mins !== null) {
+            setTravels((prev) => prev.map((t) =>
+              t.fromId === prevPlace.id && t.toId === pendingPlace.id ? { ...t, duration: String(mins) } : t
+            ));
+          } else {
+            setTravels((prev) => prev.map((t) =>
+              t.fromId === prevPlace.id && t.toId === pendingPlace.id && t.duration === '...' ? { ...t, duration: '' } : t
+            ));
+          }
+        });
+      }
     }
 
     setShowCustomize(false);
     setPendingPlace(null);
-  }, [pendingPlace, places, customPhoto, customComment, customAnswer, customQuestion]);
+    setEditingPlaceIndex(null);
+  }, [pendingPlace, places, customPhoto, customComment, customAnswer, customQuestion, editingPlaceIndex]);
 
   const pickCustomPhoto = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -631,6 +662,18 @@ export const CreateScreen: React.FC = () => {
               )}
             </View>
           </View>
+
+          {/* Customize / Edit button */}
+          <TouchableOpacity
+            style={[styles.customizeBtn, { borderColor: C.primary + '40' }]}
+            onPress={() => editPlaceCustomization(index)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name={place.customPhoto || place.comment || place.questionAnswer ? 'create-outline' : 'sparkles-outline'} size={14} color={C.primary} />
+            <Text style={[styles.customizeBtnText, { color: C.primary }]}>
+              {place.customPhoto || place.comment || place.questionAnswer ? 'Modifier la personnalisation' : 'Personnaliser ce lieu'}
+            </Text>
+          </TouchableOpacity>
         </View>
       );
 
@@ -1152,8 +1195,8 @@ export const CreateScreen: React.FC = () => {
                 onPress={confirmPlace}
                 activeOpacity={0.8}
               >
-                <Ionicons name="add" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.customizeConfirmText}>Ajouter ce lieu</Text>
+                <Ionicons name={editingPlaceIndex !== null ? 'checkmark' : 'add'} size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.customizeConfirmText}>{editingPlaceIndex !== null ? 'Enregistrer' : 'Ajouter ce lieu'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1185,6 +1228,8 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 13, fontWeight: '700' },
   placeType: { fontSize: 11, marginTop: 1 },
   placeRemove: { fontSize: 14, paddingHorizontal: 6 },
+  customizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  customizeBtnText: { fontSize: 12, fontWeight: '600' },
   placeInputsRow: { flexDirection: 'row' },
   placeInputGroup: { flex: 1 },
   placeInputLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
