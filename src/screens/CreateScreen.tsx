@@ -1363,7 +1363,7 @@ export const CreateScreen: React.FC = () => {
                   <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: '#C8571A' }]} onPress={closePublishSheet} activeOpacity={0.7}>
                     <Text style={[styles.sheetBtnOutlineText, { color: '#C8571A' }]}>Continuer</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={() => { closePublishSheet(); handlePublish(); }} activeOpacity={0.7}>
+                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={() => { setShowPublishSheet(false); handlePublish(); }} activeOpacity={0.7}>
                     <Text style={styles.sheetBtnFillText}>Publier quand même</Text>
                   </TouchableOpacity>
                 </View>
