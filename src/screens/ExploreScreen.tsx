@@ -41,6 +41,23 @@ const parseGradientColors = (gradient: string): string[] => {
   return matches && matches.length >= 2 ? matches : ['#8B6A50', '#5C4030'];
 };
 
+// Theme bar: hide mood & trending (moved to "Manque d'inspi")
+const THEME_GROUPS = EXPLORE_GROUPS.filter(g => g.key !== 'mood' && g.key !== 'trending');
+// Person bar: hide "Around You" (moved to "Manque d'inspi")
+const FILTERED_PERSONS = PERSON_FILTERS.filter(p => p.key !== 'around-you');
+// For intersection logic
+const PERSON_LABELS = new Set(PERSON_FILTERS.map(p => p.label));
+// Keep mood & trending data accessible for inspi section
+const MOOD_GROUP = EXPLORE_GROUPS.find(g => g.key === 'mood');
+const TRENDING_GROUP = EXPLORE_GROUPS.find(g => g.key === 'trending');
+
+type InspiKey = 'trending' | 'mood' | 'nearby';
+const INSPI_OPTIONS: { key: InspiKey; emoji: string; label: string }[] = [
+  { key: 'trending', emoji: '🔥', label: 'Tendance' },
+  { key: 'mood', emoji: '💭', label: 'Mood' },
+  { key: 'nearby', emoji: '📍', label: 'Around you' },
+];
+
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -66,6 +83,23 @@ export const ExploreScreen: React.FC = () => {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Inspi section
+  const [inspiSection, setInspiSection] = useState<InspiKey | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<GooglePlaceDetails[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const nearbyFetchedRef = useRef(false);
+
+  // Fetch nearby places on first open
+  useEffect(() => {
+    if (inspiSection === 'nearby' && !nearbyFetchedRef.current) {
+      nearbyFetchedRef.current = true;
+      setNearbyLoading(true);
+      searchPlacesNearby('restaurants bars cafés', { lat: 48.8566, lng: 2.3522 })
+        .then((places) => { setNearbyPlaces(places); setNearbyLoading(false); })
+        .catch(() => setNearbyLoading(false));
+    }
+  }, [inspiSection]);
+
   // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [maxBudget, setMaxBudget] = useState<number | null>(null);
@@ -79,18 +113,27 @@ export const ExploreScreen: React.FC = () => {
   const LIKES_STEPS = [1, 5, 10, 25, 50];
   const PROOFS_STEPS = [1, 3, 5, 10, 25];
 
-  const activeGroup = EXPLORE_GROUPS.find((g) => g.key === selectedTheme) || EXPLORE_GROUPS[0];
+  const activeGroup = THEME_GROUPS.find((g) => g.key === selectedTheme) || THEME_GROUPS[0];
 
   const toggleFilter = useCallback((label: string) => {
     setSelectedFilters((prev) => {
       const next = prev.includes(label) ? prev.filter((f) => f !== label) : [...prev, label];
-      // Debounced fetch
+      // Debounced fetch with intersection logic
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       if (next.length > 0) {
         setIsFilterLoading(true);
         filterTimerRef.current = setTimeout(async () => {
           const plans = await fetchPublicPlansByTags(next);
-          setFilteredPlans(plans);
+          // Split into person vs theme filters
+          const persons = next.filter((f) => PERSON_LABELS.has(f));
+          const themes = next.filter((f) => !PERSON_LABELS.has(f));
+          // Intersection: plan must match ≥1 from each non-empty group
+          const filtered = plans.filter((plan) => {
+            const okPerson = persons.length === 0 || persons.some((p) => plan.tags.includes(p));
+            const okTheme = themes.length === 0 || themes.some((t) => plan.tags.includes(t));
+            return okPerson && okTheme;
+          });
+          setFilteredPlans(filtered);
           setIsFilterLoading(false);
         }, 300);
       } else {
@@ -214,7 +257,7 @@ export const ExploreScreen: React.FC = () => {
     <View style={styles.filterSection}>
       <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par personne</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-        {PERSON_FILTERS.map((p) => {
+        {FILTERED_PERSONS.map((p) => {
           const isActive = selectedFilters.includes(p.label);
           return (
             <TouchableOpacity
@@ -238,7 +281,7 @@ export const ExploreScreen: React.FC = () => {
     <View style={styles.filterSection}>
       <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par thème</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-        {EXPLORE_GROUPS.map((group) => {
+        {THEME_GROUPS.map((group) => {
           const isActive = showSubcategories
             ? group.key === selectedTheme
             : selectedFilters.includes(group.label);
@@ -424,23 +467,101 @@ export const ExploreScreen: React.FC = () => {
           {renderPersonRow()}
           {renderThemeRow()}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {showSubcategories ? (
-              (activeGroup.key === 'trending' && trendingCategories.length > 0
-                ? [{
-                    title: 'EN CE MOMENT',
-                    items: trendingCategories.map((c) => ({
-                      name: c.name,
-                      emoji: c.emoji,
-                      gradient: c.gradient,
-                      subtitle: c.subtitle,
-                      planCount: c.planCount,
-                      hot: c.hot,
-                      badgeLabel: c.badgeLabel ?? undefined,
-                    } as ExploreCategoryItem)),
-                  }]
-                : activeGroup.sections
-              ).map((section, idx) => renderSection(section, idx, activeGroup.layout))
-            ) : null}
+            {showSubcategories
+              ? activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))
+              : null}
+
+            {/* ── Manque d'inspi ? ── */}
+            <View style={styles.inspiSection}>
+              <Text style={[styles.inspiTitle, { color: C.black }]}>Manque d'inspi ?</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inspiRow}>
+                {INSPI_OPTIONS.map((opt) => {
+                  const isActive = inspiSection === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.inspiCard,
+                        {
+                          backgroundColor: isActive ? Colors.primary + '15' : C.gray200,
+                          borderColor: isActive ? Colors.primary : C.border,
+                        },
+                      ]}
+                      onPress={() => setInspiSection(isActive ? null : opt.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.inspiEmoji}>{opt.emoji}</Text>
+                      <Text style={[styles.inspiLabel, { color: isActive ? Colors.primary : C.black }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* ── Inspi content ── */}
+            {inspiSection === 'trending' && (
+              <View style={styles.inspiContent}>
+                <Text style={[styles.sectionTitle, { color: C.gray600 }]}>EN CE MOMENT</Text>
+                {trendingCategories.length > 0
+                  ? trendingCategories.map((c, i) =>
+                      renderRankedItem(
+                        { name: c.name, emoji: c.emoji, gradient: c.gradient, subtitle: c.subtitle, planCount: c.planCount, hot: c.hot, badgeLabel: c.badgeLabel ?? undefined },
+                        i + 1,
+                      ),
+                    )
+                  : TRENDING_GROUP?.sections[0]?.items.map((item, i) => renderRankedItem(item, i + 1))}
+              </View>
+            )}
+
+            {inspiSection === 'mood' && MOOD_GROUP && (
+              <View style={styles.inspiContent}>
+                <Text style={[styles.sectionTitle, { color: C.gray600 }]}>COMMENT TU TE SENS ?</Text>
+                <View style={styles.moodList}>
+                  {MOOD_GROUP.sections[0].items.map((item) => renderMoodItem(item))}
+                </View>
+              </View>
+            )}
+
+            {inspiSection === 'nearby' && (
+              <View style={styles.inspiContent}>
+                <Text style={[styles.sectionTitle, { color: C.gray600 }]}>À CÔTÉ DE CHEZ TOI</Text>
+                {nearbyLoading ? (
+                  <LoadingSkeleton variant="list" />
+                ) : nearbyPlaces.length > 0 ? (
+                  nearbyPlaces.map((place) => (
+                    <TouchableOpacity
+                      key={place.placeId}
+                      style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]}
+                      activeOpacity={0.7}
+                      onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}
+                    >
+                      {place.photoUrls.length > 0 ? (
+                        <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} />
+                      ) : (
+                        <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' } as any]}>
+                          <Ionicons name="location" size={24} color={C.gray600} />
+                        </View>
+                      )}
+                      <View style={styles.googlePlaceInfo}>
+                        <Text style={[styles.googlePlaceName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+                        <Text style={[styles.googlePlaceType, { color: C.gray700 }]} numberOfLines={1}>
+                          {getReadableType(place.types)}{place.priceLevel !== undefined ? ' · ' + priceLevelToSymbol(place.priceLevel) : ''}
+                        </Text>
+                        {place.rating > 0 && (
+                          <View style={styles.googlePlaceRating}>
+                            <Ionicons name="star" size={12} color={C.primary} />
+                            <Text style={[styles.googlePlaceRatingText, { color: C.black }]}>{place.rating.toFixed(1)}</Text>
+                            <Text style={[styles.googlePlaceReviewCount, { color: C.gray600 }]}>({place.reviewCount})</Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun lieu trouvé à proximité</Text>
+                )}
+              </View>
+            )}
 
             {/* Selected filters pills */}
             {selectedFilters.length > 0 && (
@@ -572,6 +693,15 @@ const styles = StyleSheet.create({
   chipsContainer: { paddingRight: Layout.screenPadding, gap: 8, paddingBottom: 4 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+
+  // Inspi section
+  inspiSection: { marginTop: 14, paddingLeft: Layout.screenPadding },
+  inspiTitle: { fontSize: 16, fontFamily: Fonts.serifBold, marginBottom: 10 },
+  inspiRow: { gap: 10, paddingRight: Layout.screenPadding },
+  inspiCard: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, borderWidth: 1.5 },
+  inspiEmoji: { fontSize: 18 },
+  inspiLabel: { fontSize: 13, fontFamily: Fonts.serifBold },
+  inspiContent: { marginTop: 16 },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
