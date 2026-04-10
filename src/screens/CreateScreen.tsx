@@ -410,6 +410,7 @@ export const CreateScreen: React.FC = () => {
       allowsMultipleSelection: true,
       selectionLimit: 7 - coverPhotos.length,
       quality: 0.7,
+      base64: true,
     });
     if (result.canceled || !result.assets) return;
 
@@ -417,7 +418,14 @@ export const CreateScreen: React.FC = () => {
     try {
       const urls: string[] = [];
       for (const asset of result.assets) {
-        const dataUrl = await readFileAsDataUrl(await (await fetch(asset.uri)).blob());
+        // Use base64 directly when available (native), fallback to fetch for web URIs
+        let dataUrl: string;
+        if (asset.base64) {
+          const mime = asset.mimeType || 'image/jpeg';
+          dataUrl = `data:${mime};base64,${asset.base64}`;
+        } else {
+          dataUrl = await readFileAsDataUrl(await (await fetch(asset.uri)).blob());
+        }
         urls.push(await uploadPhoto(dataUrl));
       }
       setCoverPhotos((prev) => [...prev, ...urls].slice(0, 7));
@@ -618,7 +626,7 @@ export const CreateScreen: React.FC = () => {
 
   const pickCustomPhoto = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.7,
       allowsEditing: true,
       aspect: [4, 3],
