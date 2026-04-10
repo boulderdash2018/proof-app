@@ -8,6 +8,8 @@ interface DraftPlace {
   name: string;
   type: string;
   address?: string;
+  priceRangeIndex: number;
+  exactPrice: string;
   price: string;
   duration: string;
   customPhoto?: string;

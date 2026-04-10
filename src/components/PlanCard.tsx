@@ -295,10 +295,16 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         )}
 
         <View style={[styles.metaRow, { borderTopColor: C.border }]}>
-          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-            <Ionicons name="cash-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
-            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
-          </View>
+          {plan.price.includes('Free') ? (
+            <View style={[styles.metaPill, { backgroundColor: '#16a34a18' }]}>
+              <Text style={[styles.metaItem, { color: '#16a34a', fontWeight: '700' }]}>Free ✦</Text>
+            </View>
+          ) : (
+            <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+              <Ionicons name="cash-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+              <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
+            </View>
+          )}
           <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
             <Ionicons name="hourglass-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
             <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.duration}</Text>

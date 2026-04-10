@@ -53,6 +53,37 @@ const TRANSPORT_EMOJIS: Record<TransportMode, string> = {
 
 // City center set dynamically in component via useCity hook
 
+// ========== PRICE RANGES ==========
+interface PriceRange {
+  label: string;
+  min: number;
+  max: number;  // Infinity for open-ended
+}
+
+const PRICE_RANGES: PriceRange[] = [
+  { label: 'Gratuit', min: 0, max: 0 },
+  { label: '< 15', min: 1, max: 15 },
+  { label: '15–30', min: 15, max: 30 },
+  { label: '30–60', min: 30, max: 60 },
+  { label: '60–100', min: 60, max: 100 },
+  { label: '100+', min: 100, max: Infinity },
+];
+
+const BUDGET_LEVELS = [
+  { max: 20, icon: 'leaf-outline' },
+  { max: 50, icon: 'cafe-outline' },
+  { max: 100, icon: 'diamond-outline' },
+  { max: Infinity, icon: 'trophy-outline' },
+] as const;
+
+const getBudgetLevel = (amount: number): number => {
+  if (amount <= 0) return 0;
+  if (amount < 20) return 1;
+  if (amount <= 50) return 2;
+  if (amount <= 100) return 3;
+  return 4;
+};
+
 // ========== TYPES ==========
 interface PlaceEntry {
   id: string;
@@ -60,8 +91,10 @@ interface PlaceEntry {
   name: string;
   type: string;
   address?: string;
-  price: string;      // user input (numbers only)
-  duration: string;   // user input in minutes (numbers only)
+  priceRangeIndex: number;  // index into PRICE_RANGES (-1 = not set)
+  exactPrice: string;       // optional exact price (digits only)
+  price: string;            // kept for compat: derived from range or exact
+  duration: string;         // user input in minutes (numbers only)
   customPhoto?: string;     // user's own photo URI
   comment?: string;         // user's personal comment
   questionAnswer?: string;  // answer to a random question
@@ -292,7 +325,7 @@ export const CreateScreen: React.FC = () => {
     setTitle(draft.title);
     setCoverPhotos(draft.coverPhotos);
     setSelectedTags(draft.selectedTags as CategoryTag[]);
-    setPlaces(draft.places as PlaceEntry[]);
+    setPlaces((draft.places as any[]).map((p) => ({ ...p, priceRangeIndex: p.priceRangeIndex ?? -1, exactPrice: p.exactPrice ?? '' })) as PlaceEntry[]);
     setTravels(draft.travels as TravelEntry[]);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -483,6 +516,8 @@ export const CreateScreen: React.FC = () => {
       name: item.name,
       type,
       address: item.address,
+      priceRangeIndex: -1,
+      exactPrice: '',
       price: '',
       duration: '',
     };
@@ -597,12 +632,45 @@ export const CreateScreen: React.FC = () => {
   };
 
   // ========== AUTO-CALCULATED TOTALS ==========
-  const totalPrice = useMemo(() => {
-    return places.reduce((sum, p) => {
-      const val = parseInt(p.price, 10);
-      return sum + (isNaN(val) ? 0 : val);
-    }, 0);
+  const { totalPriceMin, totalPriceMax, totalPriceExact } = useMemo(() => {
+    let tMin = 0, tMax = 0, tExact = 0;
+    let hasExact = false;
+    for (const p of places) {
+      const exact = parseInt(p.exactPrice, 10);
+      if (!isNaN(exact) && exact > 0) {
+        tMin += exact; tMax += exact; tExact += exact; hasExact = true;
+      } else if (p.priceRangeIndex >= 0) {
+        const range = PRICE_RANGES[p.priceRangeIndex];
+        tMin += range.min;
+        tMax += range.max === Infinity ? range.min * 2 : range.max;
+        tExact += Math.round((range.min + (range.max === Infinity ? range.min * 2 : range.max)) / 2);
+      }
+    }
+    return { totalPriceMin: tMin, totalPriceMax: tMax, totalPriceExact: hasExact ? tExact : tExact };
   }, [places]);
+
+  const totalPrice = totalPriceExact; // backward compat for preview/publish
+
+  const formatPriceRange = useCallback((cur: string) => {
+    if (totalPriceMin === 0 && totalPriceMax === 0) return `Free ✦`;
+    if (totalPriceMin === totalPriceMax) return `~${totalPriceMin}${cur}`;
+    return `${totalPriceMin}–${totalPriceMax}${cur}`;
+  }, [totalPriceMin, totalPriceMax]);
+
+  // Animated budget level
+  const budgetLevelAnim = useRef(new Animated.Value(0)).current;
+  const prevBudgetLevel = useRef(0);
+  const currentBudgetLevel = getBudgetLevel(totalPriceExact);
+
+  useEffect(() => {
+    if (currentBudgetLevel !== prevBudgetLevel.current) {
+      prevBudgetLevel.current = currentBudgetLevel;
+      Animated.sequence([
+        Animated.timing(budgetLevelAnim, { toValue: 1.15, duration: 150, useNativeDriver: true }),
+        Animated.timing(budgetLevelAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [currentBudgetLevel]);
 
   const totalDuration = useMemo(() => {
     const placeTime = places.reduce((sum, p) => {
@@ -670,7 +738,7 @@ export const CreateScreen: React.FC = () => {
       tags: selectedTags,
       places: previewPlaces,
       travelSegments: travelSegs,
-      price: `${totalPrice}${cityConfig.currency}`,
+      price: formatPriceRange(cityConfig.currency),
       duration: formatDuration(totalDuration),
       transport: mainTransport,
       coverPhotos,
@@ -683,7 +751,7 @@ export const CreateScreen: React.FC = () => {
       createdAt: new Date().toISOString(),
       timeAgo: 'À l\'instant',
     };
-  }, [title, selectedTags, places, travels, coverPhotos, totalPrice, totalDuration, mainTransport, user, cityConfig.name]);
+  }, [title, selectedTags, places, travels, coverPhotos, totalPrice, totalDuration, mainTransport, user, cityConfig.name, formatPriceRange]);
 
   // ========== QUALITY SCORE (0–100) ==========
   const qualityScore = useMemo(() => {
@@ -693,7 +761,7 @@ export const CreateScreen: React.FC = () => {
     if (places.length >= 1) score += 10;                 // 1er lieu
     if (places.length >= 2) score += 15;                 // 2e lieu
     if (coverPhotos.length > 0) score += 10;             // 1 photo de couverture
-    const hasBudget = places.some((p) => p.price && parseInt(p.price, 10) > 0);
+    const hasBudget = places.some((p) => p.priceRangeIndex >= 0);
     if (hasBudget) score += 10;                          // prix renseigné
     const hasDuration = places.some((p) => p.duration && parseInt(p.duration, 10) > 0);
     if (hasDuration) score += 10;                        // durée renseignée
@@ -801,11 +869,22 @@ export const CreateScreen: React.FC = () => {
   };
 
   // ========== UPDATE HANDLERS ==========
-  const updatePlacePrice = (id: string, value: string) => {
-    // Only allow digits
-    const cleaned = value.replace(/[^0-9]/g, '');
-    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, price: cleaned } : p));
+  const updatePlacePriceRange = (id: string, rangeIndex: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPlaces((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const range = PRICE_RANGES[rangeIndex];
+      const mid = range.max === Infinity ? range.min : Math.round((range.min + range.max) / 2);
+      return { ...p, priceRangeIndex: rangeIndex, exactPrice: '', price: String(mid) };
+    }));
   };
+
+  const updatePlaceExactPrice = (id: string, value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, exactPrice: cleaned, price: cleaned || String(PRICE_RANGES[p.priceRangeIndex]?.min || 0) } : p));
+  };
+
+  const [showExactPrice, setShowExactPrice] = useState<Record<string, boolean>>({});
 
   const DURATION_PRESETS = ['15', '30', '45', '60', '90', '120', '180'];
   const formatDurationLabel = (min: string) => {
@@ -847,9 +926,9 @@ export const CreateScreen: React.FC = () => {
     if (selectedTags.length === 0) e.tags = t.create_error_tags;
     if (places.length < 2) e.places = t.create_error_places;
 
-    // Check each place has valid numbers
+    // Check each place has valid price range + duration
     places.forEach((p, i) => {
-      if (!p.price || isNaN(parseInt(p.price, 10))) e[`place_price_${i}`] = t.create_error_numbers_only;
+      if (p.priceRangeIndex < 0) e[`place_price_${i}`] = t.create_error_numbers_only;
       if (!p.duration || isNaN(parseInt(p.duration, 10))) e[`place_duration_${i}`] = t.create_error_numbers_only;
     });
 
@@ -919,7 +998,7 @@ export const CreateScreen: React.FC = () => {
           title,
           tags: selectedTags,
           places: placesWithPhotos,
-          price: `${totalPrice}${cityConfig.currency}`,
+          price: formatPriceRange(cityConfig.currency),
           duration: formatDuration(totalDuration),
           transport: mainTransport,
           travelSegments,
@@ -1010,26 +1089,53 @@ export const CreateScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Per-place price input */}
-          <View style={styles.placeInputsRow}>
-            <View style={styles.placeInputGroup}>
-              <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_price}</Text>
-              <View style={[styles.placeInputWrap, { backgroundColor: C.gray200, borderColor: errors[`place_price_${index}`] ? Colors.error : 'transparent' }]}>
+          {/* Per-place price range chips */}
+          <View style={{ marginTop: 4 }}>
+            <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_price}</Text>
+            <View style={styles.durationChipsRow}>
+              {PRICE_RANGES.map((range, ri) => {
+                const isSelected = place.priceRangeIndex === ri;
+                const label = range.max === 0 ? range.label : range.max === Infinity ? `${range.min}${cityConfig.currency}+` : `${range.label}${cityConfig.currency}`;
+                return (
+                  <TouchableOpacity
+                    key={ri}
+                    style={[styles.durationChip, { backgroundColor: isSelected ? C.primary : C.gray200 }]}
+                    onPress={() => updatePlacePriceRange(place.id, ri)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {place.priceRangeIndex >= 0 && !showExactPrice[place.id] && (
+              <TouchableOpacity
+                onPress={() => setShowExactPrice((prev) => ({ ...prev, [place.id]: true }))}
+                style={{ marginTop: 6 }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 11, color: C.primary, fontWeight: '600' }}>Préciser le montant</Text>
+              </TouchableOpacity>
+            )}
+            {showExactPrice[place.id] && (
+              <View style={[styles.placeInputWrap, { backgroundColor: C.gray200, borderColor: 'transparent', marginTop: 6, maxWidth: 140 }]}>
                 <RNTextInput
                   style={[styles.placeInput, { color: C.black }]}
-                  placeholder={t.create_place_price_placeholder}
+                  placeholder="ex: 25"
                   placeholderTextColor={C.gray500}
-                  value={place.price}
-                  onChangeText={(v) => updatePlacePrice(place.id, v)}
+                  value={place.exactPrice}
+                  onChangeText={(v) => updatePlaceExactPrice(place.id, v)}
                   keyboardType="numeric"
                   maxLength={5}
                 />
                 <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>{cityConfig.currency}</Text>
               </View>
-              {errors[`place_price_${index}`] && (
-                <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
-              )}
-            </View>
+            )}
+            {errors[`place_price_${index}`] && (
+              <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
+            )}
           </View>
 
           {/* Per-place duration chips */}
@@ -1352,7 +1458,7 @@ export const CreateScreen: React.FC = () => {
                 <View style={styles.totalItem}>
                   <Text style={styles.totalEmoji}>💰</Text>
                   <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_total_price}</Text>
-                  <Text style={[styles.totalValue, { color: C.black }]}>{totalPrice}{cityConfig.currency}</Text>
+                  <Text style={[styles.totalValue, { color: C.black }]}>{formatPriceRange(cityConfig.currency)}</Text>
                 </View>
                 <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
                 <View style={styles.totalItem}>
@@ -1373,6 +1479,17 @@ export const CreateScreen: React.FC = () => {
                   </View>
                 </View>
               </View>
+              {/* Budget level indicator */}
+              <Animated.View style={[styles.budgetLevelRow, { transform: [{ scale: budgetLevelAnim }] }]}>
+                {BUDGET_LEVELS.map((lvl, i) => {
+                  const active = i < currentBudgetLevel;
+                  return (
+                    <View key={i} style={[styles.budgetLevelDot, { backgroundColor: active ? C.primary + '15' : C.gray200 }]}>
+                      <Ionicons name={lvl.icon as any} size={16} color={active ? C.primary : C.gray500} />
+                    </View>
+                  );
+                })}
+              </Animated.View>
             </View>
           )}
 
@@ -1815,6 +1932,8 @@ const styles = StyleSheet.create({
   transportTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   transportTagEmoji: { fontSize: 11, marginRight: 3 },
   transportTagText: { fontSize: 11, fontWeight: '700' },
+  budgetLevelRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(201,69,32,0.1)' },
+  budgetLevelDot: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
