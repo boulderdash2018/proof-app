@@ -190,7 +190,14 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.completionBarBg}>
               <Animated.View style={[styles.completionBarFill, {
                 width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-              }]} />
+              }]}>
+                <LinearGradient
+                  colors={['#FF9A60', '#C8571A', '#8B3A10']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </Animated.View>
             </View>
 
             {/* Label */}
@@ -355,7 +362,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   completionSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 16, paddingBottom: 4 },
   completionBarBg: { height: 5, borderRadius: 3, backgroundColor: '#EDE8E0', overflow: 'hidden' },
-  completionBarFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.primary },
+  completionBarFill: { height: '100%', borderRadius: 3, overflow: 'hidden' },
   completionLabel: { fontSize: 11, fontWeight: '600', marginTop: 8, marginBottom: 8, letterSpacing: 0.3 },
   checkItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
   checkText: { flex: 1, fontSize: 13, fontWeight: '500' },
