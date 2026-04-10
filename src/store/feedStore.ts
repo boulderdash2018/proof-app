@@ -27,10 +27,10 @@ interface FeedStore {
   isFriendsRefreshing: boolean;
   likedPlanIds: Set<string>;
   savedPlanIds: Set<string>;
-  fetchFeed: (userId?: string, guestInterests?: string[]) => Promise<void>;
-  refreshFeed: (guestInterests?: string[]) => Promise<void>;
-  fetchFriendsFeed: () => Promise<void>;
-  refreshFriendsFeed: () => Promise<void>;
+  fetchFeed: (userId?: string, guestInterests?: string[], city?: string) => Promise<void>;
+  refreshFeed: (guestInterests?: string[], city?: string) => Promise<void>;
+  fetchFriendsFeed: (city?: string) => Promise<void>;
+  refreshFriendsFeed: (city?: string) => Promise<void>;
   addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
   toggleSave: (planId: string) => void;
@@ -46,11 +46,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   likedPlanIds: new Set<string>(),
   savedPlanIds: new Set<string>(),
 
-  fetchFeed: async (userId?: string, guestInterests?: string[]) => {
+  fetchFeed: async (userId?: string, guestInterests?: string[], city?: string) => {
     const uid = userId || getCurrentUserId();
     set({ isLoading: true });
     try {
-      let plans = await fetchFeedPlans();
+      let plans = await fetchFeedPlans(city);
 
       if (uid) {
         const [likedIds, savedIds, friendIds, followingIds] = await Promise.all([
@@ -83,11 +83,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
-  refreshFeed: async (guestInterests?: string[]) => {
+  refreshFeed: async (guestInterests?: string[], city?: string) => {
     const uid = getCurrentUserId();
     set({ isRefreshing: true });
     try {
-      let plans = await fetchFeedPlans();
+      let plans = await fetchFeedPlans(city);
 
       if (uid) {
         const [likedIds, savedIds, friendIds, followingIds] = await Promise.all([
@@ -116,13 +116,13 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
-  fetchFriendsFeed: async () => {
+  fetchFriendsFeed: async (city?: string) => {
     const uid = getCurrentUserId();
     if (!uid) return;
     set({ isFriendsLoading: true });
     try {
       const [allPlans, mutualIds] = await Promise.all([
-        fetchFeedPlans(),
+        fetchFeedPlans(city),
         getMutualFollowIds(uid),
       ]);
       const mutualSet = new Set(mutualIds);
@@ -134,13 +134,13 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     }
   },
 
-  refreshFriendsFeed: async () => {
+  refreshFriendsFeed: async (city?: string) => {
     const uid = getCurrentUserId();
     if (!uid) return;
     set({ isFriendsRefreshing: true });
     try {
       const [allPlans, mutualIds] = await Promise.all([
-        fetchFeedPlans(),
+        fetchFeedPlans(city),
         getMutualFollowIds(uid),
       ]);
       const mutualSet = new Set(mutualIds);

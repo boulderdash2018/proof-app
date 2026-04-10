@@ -57,7 +57,7 @@ interface TagAccumulator {
  * Returns top 8 categories sorted by score.
  * Returns [] when not enough data → caller should use editorial fallback.
  */
-export const computeTrendingCategories = async (): Promise<TrendingCategory[]> => {
+export const computeTrendingCategories = async (city?: string): Promise<TrendingCategory[]> => {
   try {
     const snap = await getDocs(collection(db, 'plans'));
     const now = Date.now();
@@ -68,6 +68,11 @@ export const computeTrendingCategories = async (): Promise<TrendingCategory[]> =
       const plan = d.data() as Plan;
       // Only public plans
       if (plan.author?.isPrivate !== false) continue;
+      // City filter: legacy plans without city field are treated as Paris
+      if (city) {
+        const planCity = (plan as any).city || 'Paris';
+        if (planCity !== city) continue;
+      }
 
       const tags = plan.tags || [];
       if (tags.length === 0) continue;

@@ -655,6 +655,7 @@ export const CreateScreen: React.FC = () => {
           transport: mainTransport,
           travelSegments,
           coverPhotos,
+          city: cityConfig.name,
         },
         user
       );

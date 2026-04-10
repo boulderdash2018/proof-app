@@ -71,7 +71,7 @@ export const ExploreScreen: React.FC = () => {
   const cityConfig = useCity();
 
   // Fetch trending on mount (5-min cache in store)
-  useEffect(() => { fetchTrending(); }, []);
+  useEffect(() => { fetchTrending(cityConfig.name); }, [cityConfig.name]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTheme, setSelectedTheme] = useState(EXPLORE_GROUPS[0].key);
@@ -125,7 +125,7 @@ export const ExploreScreen: React.FC = () => {
       if (next.length > 0) {
         setIsFilterLoading(true);
         filterTimerRef.current = setTimeout(async () => {
-          const plans = await fetchPublicPlansByTags(next);
+          const plans = await fetchPublicPlansByTags(next, cityConfig.name);
           // Split into person vs theme filters
           const persons = next.filter((f) => PERSON_LABELS.has(f));
           const themes = next.filter((f) => !PERSON_LABELS.has(f));
@@ -144,7 +144,7 @@ export const ExploreScreen: React.FC = () => {
       }
       return next;
     });
-  }, []);
+  }, [cityConfig.name]);
 
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
@@ -163,7 +163,7 @@ export const ExploreScreen: React.FC = () => {
       setGooglePlaces([]);
       setIsSearching(false);
     } else {
-      const plans = await searchPublicPlans(query);
+      const plans = await searchPublicPlans(query, cityConfig.name);
       setFilteredPlans(plans);
       setSearchUsers_([]);
       searchTimerRef.current = setTimeout(async () => {
@@ -172,7 +172,7 @@ export const ExploreScreen: React.FC = () => {
         setIsSearching(false);
       }, 400);
     }
-  }, [currentUser]);
+  }, [currentUser, cityConfig.name]);
 
   const handleClear = () => {
     setSearchQuery('');

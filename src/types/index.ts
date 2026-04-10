@@ -102,6 +102,7 @@ export interface Plan {
   transport: TransportMode;
   travelSegments?: TravelSegment[];
   coverPhotos?: string[];
+  city?: string;
   likesCount: number;
   commentsCount: number;
   proofCount: number;

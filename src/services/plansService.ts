@@ -43,6 +43,15 @@ const getTimeAgo = (dateStr: string): string => {
   return `${Math.floor(days / 30)}m`;
 };
 
+// ==================== CITY FILTER HELPER ====================
+
+/** Check if a plan belongs to a given city. Legacy plans without city field are treated as Paris. */
+const planMatchesCity = (plan: Plan, city?: string): boolean => {
+  if (!city) return true;
+  const planCity = (plan as any).city || 'Paris';
+  return planCity === city;
+};
+
 // ==================== PLANS CRUD ====================
 
 /** Create a plan in Firestore */
@@ -56,6 +65,7 @@ export const createPlan = async (
     transport: TransportMode;
     travelSegments?: TravelSegment[];
     coverPhotos?: string[];
+    city?: string;
   },
   author: User
 ): Promise<Plan> => {
@@ -76,6 +86,7 @@ export const createPlan = async (
     transport: planData.transport,
     travelSegments: planData.travelSegments || [],
     coverPhotos: planData.coverPhotos || [],
+    city: planData.city || 'Paris',
     likesCount: 0,
     commentsCount: 0,
     proofCount: 0,
@@ -89,15 +100,15 @@ export const createPlan = async (
   return plan;
 };
 
-/** Fetch all plans for the feed (ordered by date) */
-export const fetchFeedPlans = async (): Promise<Plan[]> => {
+/** Fetch all plans for the feed (ordered by date), optionally filtered by city */
+export const fetchFeedPlans = async (city?: string): Promise<Plan[]> => {
   try {
     const snap = await getDocs(collection(db, PLANS));
     console.log(`[plansService] fetchFeedPlans: ${snap.docs.length} plans found`);
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
       return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
-    }).filter((p) => !(p as any).archived);
+    }).filter((p) => !(p as any).archived && planMatchesCity(p, city));
     // Sort client-side (avoids Firestore index requirement)
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
@@ -309,8 +320,8 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
 
 // ==================== PUBLIC PLAN QUERIES ====================
 
-/** Fetch public plans that have a specific tag (category) */
-export const fetchPublicPlansByTag = async (tag: string): Promise<Plan[]> => {
+/** Fetch public plans that have a specific tag (category), optionally filtered by city */
+export const fetchPublicPlansByTag = async (tag: string, city?: string): Promise<Plan[]> => {
   try {
     const q = query(collection(db, PLANS), where('tags', 'array-contains', tag));
     const snap = await getDocs(q);
@@ -319,7 +330,7 @@ export const fetchPublicPlansByTag = async (tag: string): Promise<Plan[]> => {
         const data = d.data() as Plan;
         return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
       })
-      .filter((p) => p.author?.isPrivate === false);
+      .filter((p) => p.author?.isPrivate === false && planMatchesCity(p, city));
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
   } catch (err) {
@@ -328,8 +339,8 @@ export const fetchPublicPlansByTag = async (tag: string): Promise<Plan[]> => {
   }
 };
 
-/** Fetch public plans matching ANY of the given tags (max 30 via batched array-contains-any) */
-export const fetchPublicPlansByTags = async (tags: string[]): Promise<Plan[]> => {
+/** Fetch public plans matching ANY of the given tags (max 30 via batched array-contains-any), optionally filtered by city */
+export const fetchPublicPlansByTags = async (tags: string[], city?: string): Promise<Plan[]> => {
   if (tags.length === 0) return [];
   try {
     // Firestore array-contains-any supports max 30 values
@@ -347,7 +358,7 @@ export const fetchPublicPlansByTags = async (tags: string[]): Promise<Plan[]> =>
         }
       });
     }
-    const plans = Array.from(allPlans.values()).filter((p) => p.author?.isPrivate === false);
+    const plans = Array.from(allPlans.values()).filter((p) => p.author?.isPrivate === false && planMatchesCity(p, city));
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
   } catch (err) {
@@ -381,8 +392,8 @@ export const fetchPublicPlansWithPlace = async (placeId: string, googlePlaceId?:
   }
 };
 
-/** Search public plans by query (title, place names, tags) */
-export const searchPublicPlans = async (queryStr: string): Promise<Plan[]> => {
+/** Search public plans by query (title, place names, tags), optionally filtered by city */
+export const searchPublicPlans = async (queryStr: string, city?: string): Promise<Plan[]> => {
   try {
     const snap = await getDocs(collection(db, PLANS));
     const q = queryStr.toLowerCase();
@@ -393,6 +404,7 @@ export const searchPublicPlans = async (queryStr: string): Promise<Plan[]> => {
       })
       .filter((p) => {
         if (p.author?.isPrivate !== false) return false;
+        if (!planMatchesCity(p, city)) return false;
         return (
           p.title.toLowerCase().includes(q) ||
           p.places.some((pl) => pl.name.toLowerCase().includes(q)) ||

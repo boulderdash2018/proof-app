@@ -18,6 +18,7 @@ import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
 import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
+import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
 
@@ -34,6 +35,7 @@ export const FeedScreen: React.FC = () => {
   const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
   const isGuest = !isAuthenticated;
   const C = useColors();
+  const cityConfig = useCity();
   const { t } = useTranslation();
 
   const {
@@ -54,11 +56,11 @@ export const FeedScreen: React.FC = () => {
   const [friendsFetched, setFriendsFetched] = useState(false);
 
   useEffect(() => {
-    fetchFeed(user?.id, isGuest ? guestInterests : undefined);
+    fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name);
     if (!isGuest && user?.id) subscribeNotifs(user.id);
     // Pre-fetch trending tags so PlanCard badges appear
-    useTrendingStore.getState().fetchTrending();
-  }, [user?.id, isGuest]);
+    useTrendingStore.getState().fetchTrending(cityConfig.name);
+  }, [user?.id, isGuest, cityConfig.name]);
 
   // Pulse bell when new unread arrives
   useEffect(() => {
@@ -87,7 +89,7 @@ export const FeedScreen: React.FC = () => {
 
     // Lazy-load friends feed on first switch
     if (tab === 'friends' && !friendsFetched) {
-      fetchFriendsFeed();
+      fetchFriendsFeed(cityConfig.name);
       setFriendsFetched(true);
     }
   };
@@ -201,9 +203,9 @@ export const FeedScreen: React.FC = () => {
               refreshing={currentRefreshing}
               onRefresh={() => {
                 if (activeTab === 'reco') {
-                  refreshFeed(isGuest ? guestInterests : undefined);
+                  refreshFeed(isGuest ? guestInterests : undefined, cityConfig.name);
                 } else {
-                  refreshFriendsFeed();
+                  refreshFriendsFeed(cityConfig.name);
                 }
               }}
               tintColor={C.primary}
