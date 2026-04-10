@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Layout } from '../constants';
 import { useColors } from '../hooks/useColors';
+import { useCity } from '../hooks/useCity';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { RouteResult } from '../services/directionsService';
 
@@ -81,6 +82,7 @@ export const DoItNowScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const C = useColors();
+  const cityConfig = useCity();
 
   const { session, plan, arriveAtPlace, nextStop, completeSession } = useDoItNowStore();
   const mapDivRef = useRef<HTMLDivElement>(null);
@@ -116,7 +118,7 @@ export const DoItNowScreen: React.FC = () => {
         zoomControl: true,
         gestureHandling: 'greedy',
         backgroundColor: '#E8DDD0',
-        center: { lat: 48.8566, lng: 2.3522 },
+        center: { lat: cityConfig.coordinates.lat, lng: cityConfig.coordinates.lng },
         zoom: 13,
       });
       mapObjRef.current = map;

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Layout, Fonts } from '../constants';
-import { useAuthStore, useLanguageStore } from '../store';
+import { Layout, Fonts, CITIES } from '../constants';
+import { useAuthStore, useLanguageStore, useSettingsStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import type { Language } from '../store';
@@ -13,6 +13,7 @@ export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { logout, deleteAccount } = useAuthStore();
   const { language, setLanguage } = useLanguageStore();
+  const { city, setCity } = useSettingsStore();
   const C = useColors();
   const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -63,6 +64,28 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  const handleCity = () => {
+    const available = CITIES.filter((c) => c.available);
+    if (Platform.OS === 'web') {
+      const choice = window.prompt(
+        `Choisis ta ville:\n${available.map((c, i) => `${i + 1}. ${c.emoji} ${c.name}`).join('\n')}`,
+        city,
+      );
+      const match = available.find((c) => c.name.toLowerCase() === (choice || '').toLowerCase());
+      if (match) setCity(match.name);
+    } else {
+      const { Alert } = require('react-native');
+      Alert.alert(
+        'Ville',
+        'Choisis ta ville',
+        [
+          ...available.map((c) => ({ text: `${c.emoji} ${c.name}`, onPress: () => setCity(c.name) })),
+          { text: t.cancel, style: 'cancel' as const },
+        ],
+      );
+    }
+  };
+
   const handleLanguage = () => {
     if (Platform.OS === 'web') {
       const next: Language = language === 'fr' ? 'en' : 'fr';
@@ -107,6 +130,17 @@ export const SettingsScreen: React.FC = () => {
         <SettingsRow label={t.settings_notif} onPress={() => navigation.navigate('NotificationsSettings')} />
 
         <Text style={[styles.sectionTitle, { color: C.gray700 }]}>{t.settings_app}</Text>
+        <SettingsRow
+          label="Ville"
+          onPress={handleCity}
+          right={
+            <View style={[styles.themeBadge, { backgroundColor: C.gray300 }]}>
+              <Text style={[styles.themeBadgeText, { color: C.gray800 }]}>
+                {CITIES.find((c) => c.name === city)?.emoji || '🗼'} {city}
+              </Text>
+            </View>
+          }
+        />
         <SettingsRow
           label={t.settings_language}
           onPress={handleLanguage}

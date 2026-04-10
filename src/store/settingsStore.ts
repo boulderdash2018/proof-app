@@ -3,6 +3,9 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SettingsStore {
+  // City
+  city: string;
+  setCity: (city: string) => void;
   // Notification preferences
   notifLikes: boolean;
   notifFollowers: boolean;
@@ -17,6 +20,9 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
+      // City default
+      city: 'Paris',
+      setCity: (city) => set({ city }),
       // Notification defaults
       notifLikes: true,
       notifFollowers: true,

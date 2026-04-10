@@ -23,11 +23,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
+import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore } from '../store';
 import { useColors } from '../hooks/useColors';
+import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, TravelSegment } from '../types';
 import { createPlan } from '../services/plansService';
@@ -50,8 +51,7 @@ const TRANSPORT_EMOJIS: Record<TransportMode, string> = {
   'Trottinette': '🛴',
 };
 
-// Paris center for location bias
-const PARIS_CENTER = { lat: 48.8566, lng: 2.3522 };
+// City center set dynamically in component via useCity hook
 
 // ========== TYPES ==========
 interface PlaceEntry {
@@ -91,6 +91,8 @@ export const CreateScreen: React.FC = () => {
   const addCreatedPlan = useSavesStore((s) => s.addCreatedPlan);
   const C = useColors();
   const { t } = useTranslation();
+  const cityConfig = useCity();
+  const CITY_CENTER = cityConfig.coordinates;
 
   const getTransportLabel = (mode: TransportMode): string => {
     const map: Record<TransportMode, string> = {
@@ -262,7 +264,7 @@ export const CreateScreen: React.FC = () => {
     if (query.length < 2) { setPlaceResults([]); return; }
     setIsSearchingPlaces(true);
     searchTimerRef.current = setTimeout(async () => {
-      const results = await searchPlacesAutocomplete(query, PARIS_CENTER);
+      const results = await searchPlacesAutocomplete(query, CITY_CENTER);
       setPlaceResults(results);
       setIsSearchingPlaces(false);
     }, 350);

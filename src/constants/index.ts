@@ -10,3 +10,5 @@ export { RANKS, getRankForProofs, getNextRank, getRankProgress } from './ranks';
 export type { RankDef, RankId } from './ranks';
 export { ACHIEVEMENTS, TOTAL_ACHIEVEMENTS, ACHIEVEMENTS_BY_CATEGORY } from './achievements';
 export type { AchievementDef, AchievementId, AchievementCategory } from './achievements';
+export { CITIES, DEFAULT_CITY, getCityConfig, getCityCoordinates } from './cities';
+export type { CityConfig } from './cities';

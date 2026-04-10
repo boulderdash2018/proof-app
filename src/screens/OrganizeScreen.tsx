@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '../hooks/useColors';
+import { useCity } from '../hooks/useCity';
 import { useAuthStore } from '../store/authStore';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { CategoryTag, Place, Plan, DoItNowTransport } from '../types';
@@ -30,8 +31,6 @@ import {
   getReadableType,
   GooglePlaceAutocomplete,
 } from '../services/googlePlacesService';
-
-const PARIS_CENTER = { lat: 48.8566, lng: 2.3522 };
 
 interface PlaceEntry {
   id: string;
@@ -45,6 +44,8 @@ export const OrganizeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const C = useColors();
+  const cityConfig = useCity();
+  const CITY_CENTER = cityConfig.coordinates;
   const user = useAuthStore((s) => s.user);
 
   // ── State ──
@@ -78,7 +79,7 @@ export const OrganizeScreen: React.FC = () => {
     if (query.length < 2) { setPlaceResults([]); return; }
     setIsSearchingPlaces(true);
     searchTimerRef.current = setTimeout(async () => {
-      const results = await searchPlacesAutocomplete(query, PARIS_CENTER);
+      const results = await searchPlacesAutocomplete(query, CITY_CENTER);
       setPlaceResults(results);
       setIsSearchingPlaces(false);
     }, 350);

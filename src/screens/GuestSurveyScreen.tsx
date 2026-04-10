@@ -9,19 +9,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts } from '../constants';
+import { Colors, Layout, Fonts, CITIES } from '../constants';
 import { CATEGORIES } from '../constants/categories';
 import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
 
 const { width } = Dimensions.get('window');
-
-const CITIES = [
-  { name: 'Paris', emoji: '🗼', available: true },
-  { name: 'Lyon', emoji: '🦁', available: false },
-  { name: 'Marseille', emoji: '🌊', available: false },
-  { name: 'Bordeaux', emoji: '🍷', available: false },
-];
 
 export const GuestSurveyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();

@@ -21,6 +21,7 @@ import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants
 import { EmptyState, LoadingSkeleton } from '../components';
 import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
+import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { searchUsers } from '../services/friendsService';
 import { useAuthStore, useTrendingStore } from '../store';
@@ -67,6 +68,7 @@ export const ExploreScreen: React.FC = () => {
   const trendingCategories = useTrendingStore((s) => s.categories);
   const trendingLoading = useTrendingStore((s) => s.isLoading);
   const fetchTrending = useTrendingStore((s) => s.fetchTrending);
+  const cityConfig = useCity();
 
   // Fetch trending on mount (5-min cache in store)
   useEffect(() => { fetchTrending(); }, []);
@@ -94,7 +96,7 @@ export const ExploreScreen: React.FC = () => {
     if (inspiSection === 'nearby' && !nearbyFetchedRef.current) {
       nearbyFetchedRef.current = true;
       setNearbyLoading(true);
-      searchPlacesNearby('restaurants bars cafés', { lat: 48.8566, lng: 2.3522 })
+      searchPlacesNearby('restaurants bars cafés', cityConfig.coordinates)
         .then((places) => { setNearbyPlaces(places); setNearbyLoading(false); })
         .catch(() => setNearbyLoading(false));
     }
@@ -165,7 +167,7 @@ export const ExploreScreen: React.FC = () => {
       setFilteredPlans(plans);
       setSearchUsers_([]);
       searchTimerRef.current = setTimeout(async () => {
-        const places = await searchPlacesNearby(query + ' Paris', { lat: 48.8566, lng: 2.3522 });
+        const places = await searchPlacesNearby(query + ' ' + cityConfig.name, cityConfig.coordinates);
         setGooglePlaces(places);
         setIsSearching(false);
       }, 400);
