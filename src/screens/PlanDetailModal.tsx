@@ -15,8 +15,6 @@ import {
   Dimensions,
   Animated,
   Modal,
-  LayoutAnimation,
-  UIManager,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -39,10 +37,6 @@ import { MiniStampIcon } from '../components/MiniStampIcon';
 import { PlanMapModal } from '../components/PlanMapModal';
 import { TransportChooser } from '../components/TransportChooser';
 import { useDoItNowStore } from '../store/doItNowStore';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const HERO_H = SCREEN_H * 0.46;
@@ -106,7 +100,6 @@ export const PlanDetailModal: React.FC = () => {
   const [showTransportChooser, setShowTransportChooser] = useState(false);
 
   // Redesign state
-  const [expandedPlaceIdx, setExpandedPlaceIdx] = useState<number | null>(null);
   const [showCommentSheet, setShowCommentSheet] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -253,11 +246,6 @@ export const PlanDetailModal: React.FC = () => {
     }
   };
 
-  const handleTogglePlace = useCallback((idx: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedPlaceIdx((prev) => (prev === idx ? null : idx));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
 
   // ==================== DERIVED DATA ====================
 
@@ -496,8 +484,8 @@ export const PlanDetailModal: React.FC = () => {
               (ts) => ts.fromPlaceId === place.id
             ) || (plan.travelSegments && plan.travelSegments[index]);
             const isLast = index === plan.places.length - 1;
-            const isExpanded = expandedPlaceIdx === index;
             const placePhoto = place.customPhoto || place.photoUrls?.[0];
+            const hasExtras = !!(place.address || place.comment || (place.questionAnswer && place.question) || place.customPhoto);
 
             return (
               <View key={place.id}>
@@ -513,7 +501,7 @@ export const PlanDetailModal: React.FC = () => {
 
                   <TouchableOpacity
                     style={[st.placeCard, { backgroundColor: C.gray200, borderColor: C.border }]}
-                    onPress={() => handleTogglePlace(index)}
+                    onPress={() => navigation.navigate('PlaceDetail', { placeId: place.id, planId: plan.id })}
                     activeOpacity={0.7}
                   >
                     {placePhoto && <Image source={{ uri: placePhoto }} style={st.placeCardImg} />}
@@ -523,7 +511,7 @@ export const PlanDetailModal: React.FC = () => {
                           <Text style={[st.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
                           <Text style={[st.placeType, { color: C.gray600 }]}>{place.type}</Text>
                         </View>
-                        <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.gray500} />
+                        <Ionicons name="chevron-forward" size={16} color={C.gray500} />
                       </View>
                       <View style={st.ratingRow}>
                         <Ionicons name="star" size={12} color="#F5A623" style={{ marginRight: 3 }} />
@@ -544,48 +532,30 @@ export const PlanDetailModal: React.FC = () => {
                           )}
                         </View>
                       )}
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Expanded detail */}
-                {isExpanded && (
-                  <View style={st.expandRow}>
-                    <View style={st.tlCol}>
-                      <View style={[st.tlLineFull, isLast && !travelToNext && { backgroundColor: 'transparent' }]} />
-                    </View>
-                    <View style={[st.expandBody, { backgroundColor: C.gray100, borderColor: C.border }]}>
+                      {/* Inline widgets */}
                       {place.address ? (
-                        <View style={st.expandAddr}>
-                          <Ionicons name="location-outline" size={14} color={C.gray600} />
-                          <Text style={[st.expandAddrText, { color: C.gray700 }]}>{place.address}</Text>
+                        <View style={st.inlineAddr}>
+                          <Ionicons name="location-outline" size={13} color={C.gray600} />
+                          <Text style={[st.inlineAddrText, { color: C.gray700 }]} numberOfLines={1}>{place.address.split(',')[0]}</Text>
                         </View>
                       ) : null}
                       {place.comment ? (
-                        <View style={[st.expandQuote, { borderLeftColor: C.primary }]}>
-                          <Text style={[st.expandQuoteText, { color: C.gray800 }]}>"{place.comment}"</Text>
+                        <View style={[st.inlineQuote, { borderLeftColor: C.primary }]}>
+                          <Text style={[st.inlineQuoteText, { color: C.gray800 }]} numberOfLines={2}>"{place.comment}"</Text>
                         </View>
                       ) : null}
                       {place.questionAnswer && place.question ? (
-                        <View style={st.expandQa}>
-                          <Text style={[st.expandQaLabel, { color: C.gray600 }]}>{place.question}</Text>
-                          <Text style={[st.expandQaAnswer, { color: C.black }]}>{place.questionAnswer}</Text>
+                        <View style={[st.inlineQa, { backgroundColor: C.gray300 }]}>
+                          <Text style={[st.inlineQaLabel, { color: C.gray600 }]}>{place.question}</Text>
+                          <Text style={[st.inlineQaAnswer, { color: C.black }]} numberOfLines={2}>{place.questionAnswer}</Text>
                         </View>
                       ) : null}
-                      {place.customPhoto ? (
-                        <Image source={{ uri: place.customPhoto }} style={st.expandPhoto} />
-                      ) : null}
-                      <TouchableOpacity
-                        style={[st.viewPlaceBtn, { borderColor: C.primary }]}
-                        onPress={() => navigation.navigate('PlaceDetail', { placeId: place.id, planId: plan.id })}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[st.viewPlaceBtnText, { color: C.primary }]}>Voir les détails</Text>
-                        <Ionicons name="arrow-forward" size={14} color={C.primary} />
-                      </TouchableOpacity>
                     </View>
-                  </View>
-                )}
+                    {place.customPhoto && !placePhoto ? (
+                      <Image source={{ uri: place.customPhoto }} style={st.placeCardImg} />
+                    ) : null}
+                  </TouchableOpacity>
+                </View>
 
                 {/* Travel segment */}
                 {!isLast && (
@@ -885,19 +855,14 @@ const st = StyleSheet.create({
   placeMetaPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   placeMetaText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
 
-  // Expanded
-  expandRow: { flexDirection: 'row' },
-  expandBody: { flex: 1, marginLeft: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 4, gap: 10 },
-  expandAddr: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  expandAddrText: { fontSize: 12, fontFamily: Fonts.serif, flex: 1, lineHeight: 17 },
-  expandQuote: { borderLeftWidth: 3, paddingLeft: 10, paddingVertical: 4 },
-  expandQuoteText: { fontSize: 13, fontFamily: Fonts.serif, fontStyle: 'italic', lineHeight: 19 },
-  expandQa: { gap: 2 },
-  expandQaLabel: { fontSize: 11, fontFamily: Fonts.serif },
-  expandQaAnswer: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
-  expandPhoto: { width: '100%', height: 160, borderRadius: 10, resizeMode: 'cover' },
-  viewPlaceBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5 },
-  viewPlaceBtnText: { fontSize: 12, fontFamily: Fonts.serifBold },
+  // Inline widgets inside place card
+  inlineAddr: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  inlineAddrText: { fontSize: 11, fontFamily: Fonts.serif, flex: 1 },
+  inlineQuote: { borderLeftWidth: 3, paddingLeft: 8, marginTop: 8 },
+  inlineQuoteText: { fontSize: 12, fontFamily: Fonts.serif, fontStyle: 'italic', lineHeight: 17 },
+  inlineQa: { marginTop: 8, borderRadius: 8, padding: 8 },
+  inlineQaLabel: { fontSize: 10, fontFamily: Fonts.serif, marginBottom: 2 },
+  inlineQaAnswer: { fontSize: 12, fontFamily: Fonts.serifSemiBold, lineHeight: 17 },
 
   // Travel
   travelRow: { flexDirection: 'row', paddingVertical: 2 },
