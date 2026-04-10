@@ -25,7 +25,7 @@ import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PrimaryButton, Chip, TextInput } from '../components';
+import { PrimaryButton, Chip, TextInput, PlanCard } from '../components';
 import { useAuthStore, useFeedStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
@@ -149,6 +149,9 @@ export const CreateScreen: React.FC = () => {
     setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
     draft.clearDraft();
   };
+
+  // ========== PREVIEW ==========
+  const [showPreview, setShowPreview] = useState(false);
 
   // ========== PHOTO PICKER ==========
   const readFileAsDataUrl = (file: Blob): Promise<string> => {
@@ -1154,6 +1157,16 @@ export const CreateScreen: React.FC = () => {
           )}
 
           <View style={styles.publishSection}>
+            {canPublish && (
+              <TouchableOpacity
+                style={[styles.previewBtn, { borderColor: C.primary }]}
+                onPress={() => setShowPreview(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="eye-outline" size={16} color={C.primary} />
+                <Text style={[styles.previewBtnText, { color: C.primary }]}>Preview</Text>
+              </TouchableOpacity>
+            )}
             {!canPublish && (
               <Text style={[styles.publishHint, { color: C.gray500 }]}>Ajoute un titre et au moins 2 lieux pour publier</Text>
             )}
@@ -1446,6 +1459,65 @@ export const CreateScreen: React.FC = () => {
           </View>
         </Modal>
 
+        {/* ========== PREVIEW MODAL ========== */}
+        <Modal visible={showPreview} animationType="slide" presentationStyle="pageSheet">
+          <View style={[styles.previewModal, { backgroundColor: C.white, paddingTop: insets.top }]}>
+            <View style={[styles.previewHeader, { borderBottomColor: C.border }]}>
+              <Text style={[styles.previewTitle, { color: C.black }]}>Preview</Text>
+              <TouchableOpacity onPress={() => setShowPreview(false)}>
+                <Ionicons name="close" size={24} color={C.black} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.previewSubtitle, { color: C.gray600 }]}>
+              Voici comment ton plan apparaîtra dans le feed
+            </Text>
+            <ScrollView contentContainerStyle={styles.previewScroll} showsVerticalScrollIndicator={false}>
+              <PlanCard
+                plan={{
+                  id: 'preview',
+                  authorId: user?.id ?? '',
+                  author: user ?? { id: '', username: '', displayName: 'Toi', initials: '?', avatarBg: '#C8571A', avatarColor: '#FFF', badgeType: 'none' as any, isPrivate: false, xpPoints: 0, coins: 0, level: 1, xpForNextLevel: 100, rank: 'Explorateur', planCount: 0, followersCount: 0, followingCount: 0, likesReceived: 0, unlockedBadges: [], createdAt: new Date().toISOString() },
+                  title: title || 'Mon plan',
+                  gradient: 'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
+                  tags: selectedTags,
+                  places: places.map((p) => ({
+                    id: p.id,
+                    googlePlaceId: p.googlePlaceId,
+                    name: p.name,
+                    type: p.type,
+                    address: p.address || '',
+                    rating: 0,
+                    reviewCount: 0,
+                    ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
+                    reviews: [],
+                    placePrice: parseInt(p.price, 10) || 0,
+                    placeDuration: parseInt(p.duration, 10) || 0,
+                  })),
+                  price: `${totalPrice}€`,
+                  duration: formatDuration(totalDuration),
+                  transport: mainTransport,
+                  coverPhotos,
+                  city: cityConfig.name,
+                  likesCount: 0,
+                  commentsCount: 0,
+                  proofCount: 0,
+                  declinedCount: 0,
+                  xpReward: 0,
+                  createdAt: new Date().toISOString(),
+                  timeAgo: 'À l\'instant',
+                }}
+                isLiked={false}
+                isSaved={false}
+                onPress={() => {}}
+                onLike={() => {}}
+                onSave={() => {}}
+                onComment={() => {}}
+                onAuthorPress={() => {}}
+              />
+            </ScrollView>
+          </View>
+        </Modal>
+
         {/* ========== PUBLISH BOTTOM SHEET ========== */}
         {showPublishSheet && (
           <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={closePublishSheet}>
@@ -1544,6 +1616,13 @@ const styles = StyleSheet.create({
 
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, marginBottom: 10 },
+  previewBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  previewModal: { flex: 1 },
+  previewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
+  previewTitle: { fontSize: 20, fontFamily: Fonts.serifBold },
+  previewSubtitle: { fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 16, fontFamily: Fonts.serif },
+  previewScroll: { paddingBottom: 40 },
   publishSection: { marginTop: 20, marginBottom: 10 },
   publishBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
   publishBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
