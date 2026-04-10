@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Modal, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Layout, Fonts, CITIES } from '../constants';
 import { useAuthStore, useLanguageStore, useSettingsStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
+import { Ionicons } from '@expo/vector-icons';
 import type { Language } from '../store';
+
+const { width: SCREEN_W } = Dimensions.get('window');
 
 export const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -17,6 +20,8 @@ export const SettingsScreen: React.FC = () => {
   const C = useColors();
   const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [pendingCity, setPendingCity] = useState(city);
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -65,25 +70,13 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleCity = () => {
-    const available = CITIES.filter((c) => c.available);
-    if (Platform.OS === 'web') {
-      const choice = window.prompt(
-        `Choisis ta ville:\n${available.map((c, i) => `${i + 1}. ${c.emoji} ${c.name}`).join('\n')}`,
-        city,
-      );
-      const match = available.find((c) => c.name.toLowerCase() === (choice || '').toLowerCase());
-      if (match) setCity(match.name);
-    } else {
-      const { Alert } = require('react-native');
-      Alert.alert(
-        'Ville',
-        'Choisis ta ville',
-        [
-          ...available.map((c) => ({ text: `${c.emoji} ${c.name}`, onPress: () => setCity(c.name) })),
-          { text: t.cancel, style: 'cancel' as const },
-        ],
-      );
-    }
+    setPendingCity(city);
+    setShowCityModal(true);
+  };
+
+  const confirmCity = () => {
+    setCity(pendingCity);
+    setShowCityModal(false);
   };
 
   const handleLanguage = () => {
@@ -169,6 +162,56 @@ export const SettingsScreen: React.FC = () => {
           <Text style={[styles.deletingText, { color: C.white }]}>{t.settings_delete_loading || 'Suppression en cours...'}</Text>
         </View>
       )}
+
+      {/* ───── City Picker Modal ───── */}
+      <Modal visible={showCityModal} transparent animationType="slide" onRequestClose={() => setShowCityModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: C.white }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: C.black }]}>Choisis ta ville</Text>
+              <TouchableOpacity onPress={() => setShowCityModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={22} color={C.gray700} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.cityGrid}>
+              {CITIES.map((c) => {
+                const isSelected = pendingCity === c.name;
+                return (
+                  <TouchableOpacity
+                    key={c.name}
+                    style={[
+                      styles.cityCard,
+                      {
+                        backgroundColor: isSelected ? C.primary + '12' : C.gray200,
+                        borderColor: isSelected ? C.primary : C.border,
+                      },
+                    ]}
+                    onPress={() => setPendingCity(c.name)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cityEmoji}>{c.emoji}</Text>
+                    <Text style={[styles.cityName, { color: C.black }]}>{c.name}</Text>
+                    {isSelected && (
+                      <View style={[styles.cityCheck, { backgroundColor: C.primary }]}>
+                        <Ionicons name="checkmark" size={14} color="#FFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.confirmBtn, { backgroundColor: C.primary }]}
+              onPress={confirmCity}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.confirmBtnText}>Confirmer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -187,4 +230,16 @@ const styles = StyleSheet.create({
   themeBadgeText: { fontSize: 12, fontWeight: '600' },
   deletingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
   deletingText: { marginTop: 16, fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  // City picker modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: Layout.screenPadding, paddingTop: 20, paddingBottom: 36 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { fontSize: 20, fontFamily: Fonts.serifBold },
+  cityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 24 },
+  cityCard: { width: (SCREEN_W - Layout.screenPadding * 2 - 24) / 3, paddingVertical: 20, borderRadius: 16, alignItems: 'center', borderWidth: 1.5, position: 'relative' as const },
+  cityEmoji: { fontSize: 32, marginBottom: 8 },
+  cityName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  cityCheck: { position: 'absolute' as const, top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: 'center' as const, justifyContent: 'center' as const },
+  confirmBtn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center' as const },
+  confirmBtnText: { color: '#FFFFFF', fontSize: 16, fontFamily: Fonts.serifBold },
 });
