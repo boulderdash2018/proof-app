@@ -470,7 +470,7 @@ export const CreateScreen: React.FC = () => {
       setPlaceResults(results);
       setIsSearchingPlaces(false);
     }, 350);
-  }, []);
+  }, [CITY_CENTER]);
 
   const selectGooglePlace = useCallback(async (item: GooglePlaceAutocomplete) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
