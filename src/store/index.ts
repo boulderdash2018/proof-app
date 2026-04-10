@@ -9,3 +9,5 @@ export { useSettingsStore } from './settingsStore';
 export { useGuestStore } from './guestStore';
 export { useDoItNowStore } from './doItNowStore';
 export { useTrendingStore } from './trendingStore';
+export { useDraftStore } from './draftStore';
+export type { DraftState } from './draftStore';

@@ -26,7 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput } from '../components';
-import { useAuthStore, useFeedStore, useSavesStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
@@ -114,6 +114,41 @@ export const CreateScreen: React.FC = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ========== DRAFT ==========
+  const draft = useDraftStore();
+  const draftRestoredRef = useRef(false);
+
+  // Restore draft on mount
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    if (!draft.hasDraft()) return;
+    setTitle(draft.title);
+    setCoverPhotos(draft.coverPhotos);
+    setSelectedTags(draft.selectedTags as CategoryTag[]);
+    setPlaces(draft.places as PlaceEntry[]);
+    setTravels(draft.travels as TravelEntry[]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save draft when navigating away
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      if (isSuccess || isPublishing) return;
+      const hasContent = title.length > 0 || places.length > 0 || coverPhotos.length > 0;
+      if (hasContent) {
+        draft.saveDraft({ title, coverPhotos, selectedTags, places, travels });
+      } else {
+        draft.clearDraft();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, title, coverPhotos, selectedTags, places, travels, isSuccess, isPublishing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const discardDraft = () => {
+    setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
+    draft.clearDraft();
+  };
 
   // ========== PHOTO PICKER ==========
   const readFileAsDataUrl = (file: Blob): Promise<string> => {
@@ -674,6 +709,7 @@ export const CreateScreen: React.FC = () => {
       addCreatedPlan(newPlan);
       trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport: mainTransport });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      draft.clearDraft();
       setIsSuccess(true);
     } catch {
       // Reset animation on error so UI comes back
@@ -914,6 +950,17 @@ export const CreateScreen: React.FC = () => {
         </Animated.View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {draft.savedAt && (title.length > 0 || places.length > 0) && (
+            <View style={[styles.draftBanner, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
+              <View style={styles.draftBannerLeft}>
+                <Ionicons name="document-text-outline" size={16} color={C.gold} />
+                <Text style={[styles.draftBannerText, { color: C.gold }]}>Brouillon restauré</Text>
+              </View>
+              <TouchableOpacity onPress={discardDraft} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[styles.draftBannerDiscard, { color: C.gray600 }]}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
 
           {/* Cover Photos */}
@@ -1438,6 +1485,10 @@ const styles = StyleSheet.create({
   costText: { fontSize: 11, fontWeight: '700' },
   scroll: { flex: 1 },
   scrollContent: { padding: Layout.screenPadding, paddingBottom: 40 },
+  draftBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
+  draftBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  draftBannerText: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.serif },
+  draftBannerDiscard: { fontSize: 12, fontWeight: '600' },
   fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 6 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
   errorText: { fontSize: 11, color: Colors.error, marginTop: -6, marginBottom: 8, marginLeft: 2 },
