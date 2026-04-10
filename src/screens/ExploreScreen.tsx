@@ -424,7 +424,7 @@ export const ExploreScreen: React.FC = () => {
         </View>
         <View style={styles.compactMeta}>
           <View style={styles.compactMetaItem}><Ionicons name="cash-outline" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.price}</Text></View>
-          <View style={styles.compactMetaItem}><Ionicons name="time-outline" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.duration}</Text></View>
+          <View style={styles.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.duration}</Text></View>
           <View style={styles.compactMetaItem}><Ionicons name="heart" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.likesCount}</Text></View>
         </View>
       </TouchableOpacity>
@@ -657,7 +657,7 @@ export const ExploreScreen: React.FC = () => {
             <ScrollView style={styles.filtersBody} showsVerticalScrollIndicator={false}>
               {renderStepRow('Budget maximum', 'cash-outline', BUDGET_STEPS, maxBudget, setMaxBudget,
                 (n, isLast) => isLast ? `${n}€+` : `${n}€`)}
-              {renderStepRow('Temps maximum', 'time-outline', DURATION_STEPS, maxDuration, setMaxDuration,
+              {renderStepRow('Temps maximum', 'hourglass-outline', DURATION_STEPS, maxDuration, setMaxDuration,
                 (n, isLast) => isLast ? `${formatDuration(n)}+` : formatDuration(n))}
               {renderStepRow('Likes minimum', 'heart-outline', LIKES_STEPS, minLikes, setMinLikes,
                 (n, isLast) => isLast ? `${n}+` : `${n}`)}

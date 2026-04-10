@@ -221,7 +221,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
         {/* Stats */}
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: C.gray200 }]}>
-            <Ionicons name="time-outline" size={20} color={C.primary} />
+            <Ionicons name="hourglass-outline" size={20} color={C.primary} />
             <Text style={[styles.statValue, { color: C.black }]}>{timeString}</Text>
             <Text style={[styles.statLabel, { color: C.gray600 }]}>Durée</Text>
           </View>

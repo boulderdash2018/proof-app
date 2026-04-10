@@ -381,7 +381,7 @@ export const PlanDetailModal: React.FC = () => {
             <View style={styles.metaRow}>
               <View style={styles.metaItem}><Ionicons name="cash-outline" size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.price}</Text></View>
               <View style={[styles.metaDot, { backgroundColor: C.gray500 }]} />
-              <View style={styles.metaItem}><Ionicons name="time-outline" size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.duration}</Text></View>
+              <View style={styles.metaItem}><Ionicons name="hourglass-outline" size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.duration}</Text></View>
               <View style={[styles.metaDot, { backgroundColor: C.gray500 }]} />
               <View style={styles.metaItem}><Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={14} color={C.gold} /><Text style={[styles.metaText, { color: C.gray800 }]}>{plan.transport}</Text></View>
               {plan.places.some((p) => p.latitude && p.longitude) && (
@@ -439,7 +439,7 @@ export const PlanDetailModal: React.FC = () => {
                         )}
                         {place.placeDuration != null && place.placeDuration > 0 && (
                           <View style={[styles.placeMetaTag, { backgroundColor: C.gray200 }]}>
-                            <Ionicons name="time-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
+                            <Ionicons name="hourglass-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
                             <Text style={[styles.placeMetaText, { color: C.gray800 }]}>{place.placeDuration}min</Text>
                           </View>
                         )}

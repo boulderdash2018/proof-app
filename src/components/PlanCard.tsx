@@ -300,7 +300,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
           </View>
           <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-            <Ionicons name="time-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+            <Ionicons name="hourglass-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
             <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.duration}</Text>
           </View>
           <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>

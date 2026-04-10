@@ -544,9 +544,17 @@ export const CreateScreen: React.FC = () => {
     setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, price: cleaned } : p));
   };
 
+  const DURATION_PRESETS = ['15', '30', '45', '60', '90', '120', '180'];
+  const formatDurationLabel = (min: string) => {
+    const n = parseInt(min, 10);
+    if (n < 60) return `${n}min`;
+    const h = Math.floor(n / 60);
+    const m = n % 60;
+    return m > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${h}h`;
+  };
+
   const updatePlaceDuration = (id: string, value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, '');
-    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, duration: cleaned } : p));
+    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, duration: p.duration === value ? '' : value } : p));
   };
 
   const updateTravelDuration = (index: number, value: string) => {
@@ -709,7 +717,7 @@ export const CreateScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Per-place price & duration inputs */}
+          {/* Per-place price input */}
           <View style={styles.placeInputsRow}>
             <View style={styles.placeInputGroup}>
               <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_price}</Text>
@@ -729,27 +737,34 @@ export const CreateScreen: React.FC = () => {
                 <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
               )}
             </View>
+          </View>
 
-            <View style={{ width: 10 }} />
-
-            <View style={styles.placeInputGroup}>
-              <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_duration}</Text>
-              <View style={[styles.placeInputWrap, { backgroundColor: C.gray200, borderColor: errors[`place_duration_${index}`] ? Colors.error : 'transparent' }]}>
-                <RNTextInput
-                  style={[styles.placeInput, { color: C.black }]}
-                  placeholder={t.create_place_duration_placeholder}
-                  placeholderTextColor={C.gray500}
-                  value={place.duration}
-                  onChangeText={(v) => updatePlaceDuration(place.id, v)}
-                  keyboardType="numeric"
-                  maxLength={4}
-                />
-                <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>min</Text>
-              </View>
-              {errors[`place_duration_${index}`] && (
-                <Text style={styles.miniError}>{errors[`place_duration_${index}`]}</Text>
-              )}
+          {/* Per-place duration chips */}
+          <View style={{ marginTop: 8 }}>
+            <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_duration}</Text>
+            <View style={styles.durationChipsRow}>
+              {DURATION_PRESETS.map((preset) => {
+                const isSelected = place.duration === preset;
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[
+                      styles.durationChip,
+                      { backgroundColor: isSelected ? C.primary : C.gray200 },
+                    ]}
+                    onPress={() => updatePlaceDuration(place.id, preset)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>
+                      {formatDurationLabel(preset)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+            {errors[`place_duration_${index}`] && (
+              <Text style={styles.miniError}>{errors[`place_duration_${index}`]}</Text>
+            )}
           </View>
 
           {/* Customize / Edit button */}
@@ -1410,6 +1425,9 @@ const styles = StyleSheet.create({
   placeInput: { flex: 1, fontSize: 14, fontWeight: '600', paddingVertical: 0 },
   placeInputUnit: { fontSize: 12, fontWeight: '600', marginLeft: 4 },
   miniError: { fontSize: 10, color: Colors.error, marginTop: 2 },
+  durationChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  durationChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  durationChipText: { fontSize: 12, fontWeight: '600' },
 
   // Travel card
   travelCard: { borderRadius: 12, padding: 10, marginVertical: 4 },

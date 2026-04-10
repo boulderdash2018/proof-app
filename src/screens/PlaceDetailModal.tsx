@@ -217,7 +217,7 @@ export const PlaceDetailModal: React.FC = () => {
                     <View style={styles.relatedMetaRow}>
                       <Ionicons name="heart" size={10} color="rgba(255,255,255,0.7)" />
                       <Text style={styles.relatedMetaText}>{plan.likesCount}</Text>
-                      <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 6 }} />
+                      <Ionicons name="hourglass-outline" size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 6 }} />
                       <Text style={styles.relatedMetaText}>{plan.duration}</Text>
                     </View>
                   </View>
