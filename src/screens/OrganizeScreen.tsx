@@ -79,11 +79,11 @@ export const OrganizeScreen: React.FC = () => {
     if (query.length < 2) { setPlaceResults([]); return; }
     setIsSearchingPlaces(true);
     searchTimerRef.current = setTimeout(async () => {
-      const results = await searchPlacesAutocomplete(query, CITY_CENTER);
+      const results = await searchPlacesAutocomplete(query, CITY_CENTER, cityConfig.countryCode);
       setPlaceResults(results);
       setIsSearchingPlaces(false);
     }, 350);
-  }, []);
+  }, [CITY_CENTER, cityConfig.countryCode]);
 
   const selectPlace = useCallback((item: GooglePlaceAutocomplete) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

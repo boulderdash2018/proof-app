@@ -82,13 +82,14 @@ function getPhotoUrl(photoName: string, maxWidth: number = 400): string {
 export async function searchPlacesAutocomplete(
   query: string,
   locationBias?: { lat: number; lng: number },
+  countryCode?: string,
 ): Promise<GooglePlaceAutocomplete[]> {
   if (!query || query.length < 2) return [];
 
   const body: any = {
     input: query,
     languageCode: 'fr',
-    includedRegionCodes: ['fr'],
+    includedRegionCodes: [countryCode || 'fr'],
   };
 
   if (locationBias) {
