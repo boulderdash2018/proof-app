@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
+  Animated,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -92,6 +94,41 @@ export const ProfileScreen: React.FC = () => {
   const realPlanCount = userPlans.length;
   const realLikesReceived = userPlans.reduce((sum: number, p: any) => sum + (p.likesCount || 0), 0);
 
+  // ========== PROFILE COMPLETION ==========
+  const hasAvatar = !!(user?.avatarUrl);
+  const hasPublished = realPlanCount > 0;
+  const placesRated = user?.places_rated_count ?? 0;
+  const hasRated3 = placesRated >= 3;
+
+  const completionPct = (hasAvatar ? 30 : 0) + (hasPublished ? 40 : 0) + (hasRated3 ? 30 : 0);
+  const isProfileComplete = completionPct >= 100;
+
+  const [profileDismissed, setProfileDismissed] = useState(false);
+  const barAnim = useRef(new Animated.Value(0)).current;
+  const checklistOpacity = useRef(new Animated.Value(1)).current;
+  const completeOpacity = useRef(new Animated.Value(0)).current;
+  const prevPctRef = useRef(0);
+
+  useEffect(() => {
+    const target = completionPct / 100;
+    if (completionPct > prevPctRef.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    prevPctRef.current = completionPct;
+    Animated.timing(barAnim, { toValue: target, duration: 500, useNativeDriver: false }).start();
+
+    if (isProfileComplete && !profileDismissed) {
+      Animated.sequence([
+        Animated.timing(completeOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.delay(1500),
+        Animated.parallel([
+          Animated.timing(checklistOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+          Animated.timing(completeOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        ]),
+      ]).start(() => setProfileDismissed(true));
+    }
+  }, [completionPct, isProfileComplete]);
+
   if (!user) return null;
 
   const formatCount = (n: number): string => {
@@ -145,6 +182,63 @@ export const ProfileScreen: React.FC = () => {
             <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_likes_received}</Text>
           </View>
         </View>
+
+        {/* Profile Completion */}
+        {!profileDismissed && !isProfileComplete && (
+          <View style={styles.completionSection}>
+            {/* Progress bar */}
+            <View style={styles.completionBarBg}>
+              <Animated.View style={[styles.completionBarFill, {
+                width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              }]} />
+            </View>
+
+            {/* Label */}
+            {isProfileComplete ? (
+              <Animated.Text style={[styles.completionLabel, { color: Colors.primary, opacity: completeOpacity }]}>
+                Profile complete ✦
+              </Animated.Text>
+            ) : (
+              <Text style={[styles.completionLabel, { color: C.gray700 }]}>Complete your profile</Text>
+            )}
+
+            {/* Checklist */}
+            <Animated.View style={{ opacity: checklistOpacity }}>
+              {/* Avatar */}
+              <TouchableOpacity
+                style={styles.checkItem}
+                onPress={() => !hasAvatar && navigation.navigate('EditProfile')}
+                activeOpacity={hasAvatar ? 1 : 0.7}
+              >
+                <Ionicons name={hasAvatar ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasAvatar ? Colors.primary : C.gray600} />
+                <Text style={[styles.checkText, hasAvatar && styles.checkTextDone, { color: hasAvatar ? C.gray600 : C.black }]}>Add a profile photo</Text>
+                {!hasAvatar && <Ionicons name="chevron-forward" size={14} color={C.gray600} />}
+              </TouchableOpacity>
+
+              {/* First plan */}
+              <TouchableOpacity
+                style={styles.checkItem}
+                onPress={() => !hasPublished && navigation.navigate('CreateTab', { screen: 'Create' })}
+                activeOpacity={hasPublished ? 1 : 0.7}
+              >
+                <Ionicons name={hasPublished ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasPublished ? Colors.primary : C.gray600} />
+                <Text style={[styles.checkText, hasPublished && styles.checkTextDone, { color: hasPublished ? C.gray600 : C.black }]}>Post your first plan</Text>
+                {!hasPublished && <Ionicons name="chevron-forward" size={14} color={C.gray600} />}
+              </TouchableOpacity>
+
+              {/* Rate 3 places */}
+              <TouchableOpacity
+                style={styles.checkItem}
+                onPress={() => !hasRated3 && navigation.navigate('ExploreTab', { screen: 'Explore' })}
+                activeOpacity={hasRated3 ? 1 : 0.7}
+              >
+                <Ionicons name={hasRated3 ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasRated3 ? Colors.primary : C.gray600} />
+                <Text style={[styles.checkText, hasRated3 && styles.checkTextDone, { color: hasRated3 ? C.gray600 : C.black }]}>Rate 3 places ({Math.min(placesRated, 3)}/3)</Text>
+                {!hasRated3 && <Ionicons name="chevron-forward" size={14} color={C.gray600} />}
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        )}
 
         {/* Rank Progress */}
         <View style={styles.section}>
@@ -259,6 +353,13 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 28 },
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
   sectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
+  completionSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 16, paddingBottom: 4 },
+  completionBarBg: { height: 5, borderRadius: 3, backgroundColor: '#EDE8E0', overflow: 'hidden' },
+  completionBarFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.primary },
+  completionLabel: { fontSize: 11, fontWeight: '600', marginTop: 8, marginBottom: 8, letterSpacing: 0.3 },
+  checkItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
+  checkText: { flex: 1, fontSize: 13, fontWeight: '500' },
+  checkTextDone: { textDecorationLine: 'line-through', opacity: 0.6 },
   plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end', overflow: 'hidden' },
   miniCardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
