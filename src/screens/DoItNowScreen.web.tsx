@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput as RNTextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Layout } from '../constants';
 import { useColors } from '../hooks/useColors';
@@ -345,18 +346,25 @@ export const DoItNowScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={[styles.timeInputBox, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
-                <RNTextInput
-                  style={[styles.timeInput, { color: C.black }]}
-                  placeholder="0"
-                  placeholderTextColor={C.gray500}
-                  keyboardType="numeric"
-                  value={placeTime}
-                  onChangeText={setPlaceTime}
-                  autoFocus={timeMode === 'manual'}
-                />
-                <Text style={[styles.timeUnit, { color: C.gray600 }]}>min</Text>
-                <TouchableOpacity onPress={() => { setTimeMode('none'); setPlaceTime(''); }}>
+              <View>
+                <View style={styles.durationChipsRow}>
+                  {['15', '30', '45', '60', '90', '120', '180'].map((preset) => {
+                    const isSelected = placeTime === preset;
+                    const n = parseInt(preset, 10);
+                    const label = n < 60 ? `${n}min` : n % 60 === 0 ? `${n / 60}h` : `${Math.floor(n / 60)}h${(n % 60).toString().padStart(2, '0')}`;
+                    return (
+                      <TouchableOpacity
+                        key={preset}
+                        style={[styles.durationChip, { backgroundColor: isSelected ? C.primary : C.gray200 }]}
+                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlaceTime(preset); setTimeMode('manual'); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TouchableOpacity onPress={() => { setTimeMode('none'); setPlaceTime(''); }} style={{ alignSelf: 'flex-end', marginTop: 4 }}>
                   <Ionicons name="close-circle" size={18} color={C.gray500} />
                 </TouchableOpacity>
               </View>
@@ -375,16 +383,27 @@ export const DoItNowScreen: React.FC = () => {
           {session.isOrganizeMode && (
             <View style={styles.priceSection}>
               <Text style={[styles.priceLabel, { color: C.gray600 }]}>Prix payé</Text>
-              <View style={[styles.priceInputBox, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
-                <RNTextInput
-                  style={[styles.priceInput, { color: C.black }]}
-                  placeholder="0"
-                  placeholderTextColor={C.gray500}
-                  keyboardType="numeric"
-                  value={placePrice}
-                  onChangeText={setPlacePrice}
-                />
-                <Text style={[styles.priceUnit, { color: C.gray600 }]}>{cityConfig.currency}</Text>
+              <View style={styles.durationChipsRow}>
+                {[
+                  { label: 'Gratuit', value: '0' },
+                  { label: `< 15${cityConfig.currency}`, value: '10' },
+                  { label: `15–30${cityConfig.currency}`, value: '22' },
+                  { label: `30–60${cityConfig.currency}`, value: '45' },
+                  { label: `60–100${cityConfig.currency}`, value: '80' },
+                  { label: `100${cityConfig.currency}+`, value: '120' },
+                ].map((chip) => {
+                  const isSelected = placePrice === chip.value;
+                  return (
+                    <TouchableOpacity
+                      key={chip.value}
+                      style={[styles.durationChip, { backgroundColor: isSelected ? C.primary : C.gray200 }]}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlacePrice(chip.value); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{chip.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -477,11 +496,11 @@ const styles = StyleSheet.create({
   timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
   timeUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   ratingRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  priceSection: { alignItems: 'center', marginTop: 12, gap: 6 },
-  priceLabel: { fontSize: 11, fontFamily: Fonts.serif },
-  priceInputBox: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 16, height: 44, minWidth: 120 },
-  priceInput: { flex: 1, fontSize: 18, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
-  priceUnit: { fontSize: 16, fontFamily: Fonts.serifBold, marginLeft: 4 },
+  durationChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
+  durationChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  durationChipText: { fontSize: 12, fontWeight: '600' },
+  priceSection: { width: '100%', marginTop: 12, gap: 6 },
+  priceLabel: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center' },
   nextBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 16 },
   nextBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
   bottomCard: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, borderTopWidth: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
