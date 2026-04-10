@@ -66,6 +66,7 @@ interface PlaceEntry {
   comment?: string;         // user's personal comment
   questionAnswer?: string;  // answer to a random question
   question?: string;        // the question that was shown
+  previewPhotoUrl?: string; // Google photo fetched at selection for preview
 }
 
 interface TravelEntry {
@@ -502,7 +503,10 @@ export const CreateScreen: React.FC = () => {
     // Fetch photo in background
     try {
       const details = await getPlaceDetails(item.placeId);
-      if (details?.photoUrls?.[0]) setPendingPlacePhoto(details.photoUrls[0]);
+      if (details?.photoUrls?.[0]) {
+        setPendingPlacePhoto(details.photoUrls[0]);
+        setPendingPlace((prev) => prev ? { ...prev, previewPhotoUrl: details.photoUrls[0] } : prev);
+      }
     } catch {}
   }, []);
 
@@ -536,6 +540,7 @@ export const CreateScreen: React.FC = () => {
       comment: customComment || undefined,
       questionAnswer: customAnswer || undefined,
       question: customAnswer ? customQuestion : undefined,
+      previewPhotoUrl: pendingPlace.previewPhotoUrl || pendingPlacePhoto || undefined,
     };
 
     if (editingPlaceIndex !== null) {
@@ -641,7 +646,7 @@ export const CreateScreen: React.FC = () => {
       reviewCount: 0,
       ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
       reviews: [] as any[],
-      photoUrls: p.customPhoto ? [p.customPhoto] : [],
+      photoUrls: [p.customPhoto, p.previewPhotoUrl].filter(Boolean) as string[],
       placePrice: parseInt(p.price, 10) || 0,
       placeDuration: parseInt(p.duration, 10) || 0,
       customPhoto: p.customPhoto,
