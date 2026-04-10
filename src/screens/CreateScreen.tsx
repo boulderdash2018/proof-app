@@ -453,6 +453,11 @@ export const CreateScreen: React.FC = () => {
   const [hasReached100, setHasReached100] = useState(false);
   const [showPublishSheet, setShowPublishSheet] = useState(false);
   const sheetSlide = useRef(new Animated.Value(300)).current;
+  // Publish fly-away animation
+  const publishTranslateY = useRef(new Animated.Value(0)).current;
+  const publishScale = useRef(new Animated.Value(1)).current;
+  const publishOpacity = useRef(new Animated.Value(1)).current;
+  const [isFlying, setIsFlying] = useState(false);
   const prevLabelRef = useRef('');
   const screenWidth = Dimensions.get('window').width - Layout.screenPadding * 2;
 
@@ -601,9 +606,7 @@ export const CreateScreen: React.FC = () => {
     return Object.keys(e).length === 0;
   };
 
-  const handlePublish = async () => {
-    if (!validate() || !user) return;
-    setIsPublishing(true);
+  const doPublish = async () => {
     try {
       const travelSegments: TravelSegment[] = travels.map((tr) => ({
         fromPlaceId: tr.fromId,
@@ -673,10 +676,40 @@ export const CreateScreen: React.FC = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSuccess(true);
     } catch {
+      // Reset animation on error so UI comes back
+      publishTranslateY.setValue(0);
+      publishScale.setValue(1);
+      publishOpacity.setValue(1);
+      setIsFlying(false);
       Alert.alert(t.error, t.create_error_publish);
     } finally {
       setIsPublishing(false);
     }
+  };
+
+  const handlePublish = async () => {
+    if (!validate() || !user) return;
+    setIsPublishing(true);
+    setIsFlying(true);
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const screenH = Dimensions.get('window').height;
+
+    // Phase 1: slight scale down + lift
+    Animated.parallel([
+      Animated.timing(publishScale, { toValue: 0.92, duration: 200, useNativeDriver: true }),
+      Animated.timing(publishTranslateY, { toValue: -10, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      // Phase 2: fly up and fade out
+      Animated.parallel([
+        Animated.timing(publishTranslateY, { toValue: -screenH, duration: 450, useNativeDriver: true }),
+        Animated.timing(publishScale, { toValue: 0.7, duration: 450, useNativeDriver: true }),
+        Animated.timing(publishOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]).start(() => {
+        doPublish();
+      });
+    });
   };
 
   // ========== SUCCESS SCREEN ==========
@@ -689,6 +722,7 @@ export const CreateScreen: React.FC = () => {
           <Text style={[styles.successDesc, { color: C.gray700 }]}>{t.create_success_desc}</Text>
           <PrimaryButton label={t.create_success_back} onPress={() => {
             setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setTravels([]);
+            publishTranslateY.setValue(0); publishScale.setValue(1); publishOpacity.setValue(1); setIsFlying(false);
             navigation.navigate('FeedTab');
           }} />
         </View>
@@ -858,6 +892,7 @@ export const CreateScreen: React.FC = () => {
           </View>
         </View>
 
+        <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
         {/* Quality progress bar */}
         <Animated.View style={[styles.qualityBarWrap, { transform: [{ scaleY: barScale }] }]}>
           <View style={styles.qualityBarBg}>
@@ -1112,6 +1147,7 @@ export const CreateScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        </Animated.View>
 
         {/* ========== PLACE PICKER MODAL ========== */}
         <Modal visible={showPlacePicker} animationType="slide" presentationStyle="pageSheet">
