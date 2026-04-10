@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput, PlanCard } from '../components';
+import { PhotoEditorSheet } from '../components/PhotoEditorSheet';
 import { useAuthStore, useFeedStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
@@ -431,6 +432,8 @@ export const CreateScreen: React.FC = () => {
   const removePhoto = (index: number) => {
     setCoverPhotos((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const [editingPhotoIdx, setEditingPhotoIdx] = useState<number | null>(null);
 
   // Place picker state
   const [showPlacePicker, setShowPlacePicker] = useState(false);
@@ -1301,6 +1304,9 @@ export const CreateScreen: React.FC = () => {
                 <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(i)}>
                   <Ionicons name="close-circle" size={22} color="#FFF" />
                 </TouchableOpacity>
+                <TouchableOpacity style={styles.photoEditBtn} onPress={() => setEditingPhotoIdx(i)} activeOpacity={0.7}>
+                  <Ionicons name="options-outline" size={13} color="#FFF" />
+                </TouchableOpacity>
               </View>
             ))}
             {coverPhotos.length < 7 && (
@@ -1863,6 +1869,18 @@ export const CreateScreen: React.FC = () => {
             </Animated.View>
           </TouchableOpacity>
         )}
+        {/* Photo Editor */}
+        <PhotoEditorSheet
+          visible={editingPhotoIdx !== null}
+          photoUri={editingPhotoIdx !== null ? coverPhotos[editingPhotoIdx] : ''}
+          onApply={(newUri) => {
+            if (editingPhotoIdx !== null) {
+              setCoverPhotos((prev) => prev.map((u, i) => i === editingPhotoIdx ? newUri : u));
+            }
+            setEditingPhotoIdx(null);
+          }}
+          onClose={() => setEditingPhotoIdx(null)}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -2006,6 +2024,7 @@ const styles = StyleSheet.create({
   photoThumbWrap: { position: 'relative' },
   photoThumb: { width: 90, height: 90, borderRadius: 12 },
   photoRemoveBtn: { position: 'absolute', top: -6, right: -6 },
+  photoEditBtn: { position: 'absolute', bottom: 4, right: 4, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   photoAddBtn: { width: 90, height: 90, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   photoAddText: { fontSize: 10, fontFamily: Fonts.serifSemiBold, marginTop: 4 },
   photoHint: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 12 },
