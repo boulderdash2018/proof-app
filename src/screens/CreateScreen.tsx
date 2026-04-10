@@ -30,7 +30,7 @@ import { useAuthStore, useFeedStore, useSavesStore, useDraftStore } from '../sto
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
-import { CategoryTag, TransportMode, TravelSegment } from '../types';
+import { CategoryTag, TransportMode, TravelSegment, Plan } from '../types';
 import { createPlan } from '../services/plansService';
 import { trackEvent } from '../services/posthogConfig';
 import {
@@ -81,6 +81,169 @@ const formatDuration = (totalMinutes: number): string => {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return m > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${h}h`;
+};
+
+const PREVIEW_TRANSPORT_ICONS: Record<TransportMode, string> = {
+  'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
+};
+const PREVIEW_TRANSPORT_EMOJIS: Record<TransportMode, string> = {
+  'Métro': '🚇', 'Vélo': '🚲', 'À pied': '🚶', 'Voiture': '🚗', 'Trottinette': '🛴',
+};
+
+const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t }) => {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const bannerW = Dimensions.get('window').width;
+
+  const allPhotos: string[] = (() => {
+    if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos;
+    const pp: string[] = [];
+    for (const place of plan.places) {
+      if (place.photoUrls) for (const u of place.photoUrls) { pp.push(u); if (pp.length >= 7) break; }
+      if (pp.length >= 7) break;
+    }
+    return pp;
+  })();
+
+  const gradientColors = (() => {
+    const m = plan.gradient.match(/#[0-9A-Fa-f]{6}/g);
+    return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
+  })();
+
+  return (
+    <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      {/* Banner */}
+      {allPhotos.length > 0 ? (
+        <View style={{ borderRadius: 0, overflow: 'hidden', position: 'relative' }}>
+          <FlatList
+            data={allPhotos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => setActiveIdx(Math.round(e.nativeEvent.contentOffset.x / bannerW))}
+            scrollEventThrottle={16}
+            keyExtractor={(_, i) => String(i)}
+            style={{ height: 220 }}
+            renderItem={({ item }) => (
+              <View style={{ width: bannerW, height: 220 }}>
+                <Image source={{ uri: item }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 }} />
+              </View>
+            )}
+          />
+          <View style={{ position: 'absolute', bottom: 16, left: 18, right: 18 }} pointerEvents="none">
+            <Text style={{ fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>{plan.title}</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontFamily: Fonts.serif, marginTop: 2 }}>par {plan.author.displayName}</Text>
+          </View>
+          {allPhotos.length > 1 && (
+            <View style={{ position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 }} pointerEvents="none">
+              {allPhotos.map((_, i) => (
+                <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === activeIdx ? '#FFF' : 'rgba(255,255,255,0.4)' }} />
+              ))}
+            </View>
+          )}
+        </View>
+      ) : (
+        <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: 220, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 16 }}>
+          <Text style={{ fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFF' }}>{plan.title}</Text>
+          <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontFamily: Fonts.serif, marginTop: 2 }}>par {plan.author.displayName}</Text>
+        </LinearGradient>
+      )}
+
+      {/* Tags + meta */}
+      <View style={{ paddingHorizontal: Layout.screenPadding, paddingTop: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {plan.tags.map((tag) => (<Chip key={tag} label={tag} small />))}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name="cash-outline" size={14} color={C.gold} /><Text style={{ color: C.gray800, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>{plan.price}</Text></View>
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.gray500 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name="hourglass-outline" size={14} color={C.gold} /><Text style={{ color: C.gray800, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>{plan.duration}</Text></View>
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.gray500 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}><Ionicons name={(PREVIEW_TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={14} color={C.gold} /><Text style={{ color: C.gray800, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>{plan.transport}</Text></View>
+        </View>
+      </View>
+
+      {/* Itinerary */}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: C.gray700, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: Layout.screenPadding, marginTop: 16, marginBottom: 10 }}>
+        {t.plan_full}
+      </Text>
+
+      {plan.places.map((place, index) => {
+        const isLast = index === plan.places.length - 1;
+        const travelToNext = plan.travelSegments?.find((ts) => ts.fromPlaceId === place.id) || (plan.travelSegments && plan.travelSegments[index]);
+
+        return (
+          <View key={place.id}>
+            <View style={{ flexDirection: 'row', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, ...(!isLast && !travelToNext ? { borderBottomWidth: 1, borderBottomColor: C.borderLight } : {}) }}>
+              <View style={{ width: 30, alignItems: 'center', marginRight: 12 }}>
+                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFF' }}>{index + 1}</Text>
+                </View>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: C.black }}>{place.name}</Text>
+                <Text style={{ fontSize: 12, color: C.gray700, marginTop: 2 }}>{place.type}{place.address ? ` · ${place.address.split(',')[0]}` : ''}</Text>
+                {(place.placePrice != null && place.placePrice > 0 || place.placeDuration != null && place.placeDuration > 0) && (
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+                    {place.placePrice != null && place.placePrice > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.gray200, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                        <Ionicons name="cash-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.gray800 }}>{place.placePrice}€</Text>
+                      </View>
+                    )}
+                    {place.placeDuration != null && place.placeDuration > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.gray200, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                        <Ionicons name="hourglass-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.gray800 }}>{place.placeDuration}min</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Hinge cards */}
+            {(place.customPhoto || place.comment || place.questionAnswer) && (
+              <View style={{ paddingLeft: Layout.screenPadding + 42, paddingRight: Layout.screenPadding, gap: 8, marginBottom: 8 }}>
+                {place.customPhoto && (
+                  <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.borderLight }}>
+                    <Image source={{ uri: place.customPhoto }} style={{ width: '100%', height: 160, resizeMode: 'cover' }} />
+                  </View>
+                )}
+                {place.comment && (
+                  <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.borderLight }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: C.gray600, textTransform: 'uppercase', marginBottom: 4 }}>Mon avis</Text>
+                    <Text style={{ fontSize: 13, color: C.black, lineHeight: 18 }}>{place.comment}</Text>
+                  </View>
+                )}
+                {place.questionAnswer && place.question && (
+                  <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.borderLight }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: C.gray600, textTransform: 'uppercase', marginBottom: 4 }}>{place.question}</Text>
+                    <Text style={{ fontSize: 13, color: C.black, lineHeight: 18 }}>{place.questionAnswer}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Travel segment */}
+            {!isLast && travelToNext && (
+              <View style={{ flexDirection: 'row', paddingHorizontal: Layout.screenPadding, marginVertical: 2 }}>
+                <View style={{ width: 30, alignItems: 'center', marginRight: 12 }}>
+                  <View style={{ height: 30, borderLeftWidth: 2, borderLeftColor: C.primary + '50', borderStyle: 'dashed' }} />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.gray200 + '80', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, gap: 4 }}>
+                  <Ionicons name={(PREVIEW_TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any} size={13} color={C.gold} />
+                  <Text style={{ fontSize: 12, color: C.gray700 }}>{travelToNext.transport}</Text>
+                  <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: C.gray500 }} />
+                  <Text style={{ fontSize: 12, color: C.gray700 }}>{travelToNext.duration}min</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
 };
 
 export const CreateScreen: React.FC = () => {
@@ -152,6 +315,7 @@ export const CreateScreen: React.FC = () => {
 
   // ========== PREVIEW ==========
   const [showPreview, setShowPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'card' | 'detail'>('card');
 
   // ========== PHOTO PICKER ==========
   const readFileAsDataUrl = (file: Blob): Promise<string> => {
@@ -464,6 +628,56 @@ export const CreateScreen: React.FC = () => {
     });
     return result;
   }, [travels]);
+
+  // ========== BUILD PREVIEW PLAN ==========
+  const buildPreviewPlan = useCallback((): Plan => {
+    const previewPlaces = places.map((p) => ({
+      id: p.id,
+      googlePlaceId: p.googlePlaceId,
+      name: p.name,
+      type: p.type,
+      address: p.address || '',
+      rating: 0,
+      reviewCount: 0,
+      ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
+      reviews: [] as any[],
+      photoUrls: p.customPhoto ? [p.customPhoto] : [],
+      placePrice: parseInt(p.price, 10) || 0,
+      placeDuration: parseInt(p.duration, 10) || 0,
+      customPhoto: p.customPhoto,
+      comment: p.comment,
+      question: p.question,
+      questionAnswer: p.questionAnswer,
+    }));
+    const travelSegs = travels.map((tr) => ({
+      fromPlaceId: tr.fromId,
+      toPlaceId: tr.toId,
+      duration: parseInt(tr.duration, 10) || 0,
+      transport: tr.transport,
+    }));
+    return {
+      id: 'preview',
+      authorId: user?.id ?? '',
+      author: user ?? { id: '', username: '', displayName: 'Toi', initials: '?', avatarBg: '#C8571A', avatarColor: '#FFF', badgeType: 'none' as any, isPrivate: false, xpPoints: 0, coins: 0, level: 1, xpForNextLevel: 100, rank: 'Explorateur', planCount: 0, followersCount: 0, followingCount: 0, likesReceived: 0, unlockedBadges: [], createdAt: new Date().toISOString() },
+      title: title || 'Mon plan',
+      gradient: 'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
+      tags: selectedTags,
+      places: previewPlaces,
+      travelSegments: travelSegs,
+      price: `${totalPrice}€`,
+      duration: formatDuration(totalDuration),
+      transport: mainTransport,
+      coverPhotos,
+      city: cityConfig.name,
+      likesCount: 0,
+      commentsCount: 0,
+      proofCount: 0,
+      declinedCount: 0,
+      xpReward: 0,
+      createdAt: new Date().toISOString(),
+      timeAgo: 'À l\'instant',
+    };
+  }, [title, selectedTags, places, travels, coverPhotos, totalPrice, totalDuration, mainTransport, user, cityConfig.name]);
 
   // ========== QUALITY SCORE (0–100) ==========
   const qualityScore = useMemo(() => {
@@ -1463,58 +1677,40 @@ export const CreateScreen: React.FC = () => {
         <Modal visible={showPreview} animationType="slide" presentationStyle="pageSheet">
           <View style={[styles.previewModal, { backgroundColor: C.white, paddingTop: insets.top }]}>
             <View style={[styles.previewHeader, { borderBottomColor: C.border }]}>
-              <Text style={[styles.previewTitle, { color: C.black }]}>Preview</Text>
-              <TouchableOpacity onPress={() => setShowPreview(false)}>
+              {previewMode === 'detail' ? (
+                <TouchableOpacity onPress={() => setPreviewMode('card')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="chevron-back" size={22} color={C.primary} />
+                  <Text style={[styles.previewBackText, { color: C.primary }]}>Feed</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={[styles.previewTitle, { color: C.black }]}>Preview</Text>
+              )}
+              <TouchableOpacity onPress={() => { setShowPreview(false); setPreviewMode('card'); }}>
                 <Ionicons name="close" size={24} color={C.black} />
               </TouchableOpacity>
             </View>
-            <Text style={[styles.previewSubtitle, { color: C.gray600 }]}>
-              Voici comment ton plan apparaîtra dans le feed
-            </Text>
-            <ScrollView contentContainerStyle={styles.previewScroll} showsVerticalScrollIndicator={false}>
-              <PlanCard
-                plan={{
-                  id: 'preview',
-                  authorId: user?.id ?? '',
-                  author: user ?? { id: '', username: '', displayName: 'Toi', initials: '?', avatarBg: '#C8571A', avatarColor: '#FFF', badgeType: 'none' as any, isPrivate: false, xpPoints: 0, coins: 0, level: 1, xpForNextLevel: 100, rank: 'Explorateur', planCount: 0, followersCount: 0, followingCount: 0, likesReceived: 0, unlockedBadges: [], createdAt: new Date().toISOString() },
-                  title: title || 'Mon plan',
-                  gradient: 'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
-                  tags: selectedTags,
-                  places: places.map((p) => ({
-                    id: p.id,
-                    googlePlaceId: p.googlePlaceId,
-                    name: p.name,
-                    type: p.type,
-                    address: p.address || '',
-                    rating: 0,
-                    reviewCount: 0,
-                    ratingDistribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
-                    reviews: [],
-                    placePrice: parseInt(p.price, 10) || 0,
-                    placeDuration: parseInt(p.duration, 10) || 0,
-                  })),
-                  price: `${totalPrice}€`,
-                  duration: formatDuration(totalDuration),
-                  transport: mainTransport,
-                  coverPhotos,
-                  city: cityConfig.name,
-                  likesCount: 0,
-                  commentsCount: 0,
-                  proofCount: 0,
-                  declinedCount: 0,
-                  xpReward: 0,
-                  createdAt: new Date().toISOString(),
-                  timeAgo: 'À l\'instant',
-                }}
-                isLiked={false}
-                isSaved={false}
-                onPress={() => {}}
-                onLike={() => {}}
-                onSave={() => {}}
-                onComment={() => {}}
-                onAuthorPress={() => {}}
-              />
-            </ScrollView>
+
+            {previewMode === 'card' ? (
+              <>
+                <Text style={[styles.previewSubtitle, { color: C.gray600 }]}>
+                  Voici comment ton plan apparaîtra dans le feed
+                </Text>
+                <ScrollView contentContainerStyle={styles.previewScroll} showsVerticalScrollIndicator={false}>
+                  <PlanCard
+                    plan={buildPreviewPlan()}
+                    isLiked={false}
+                    isSaved={false}
+                    onPress={() => setPreviewMode('detail')}
+                    onLike={() => {}}
+                    onSave={() => {}}
+                    onComment={() => {}}
+                    onAuthorPress={() => {}}
+                  />
+                </ScrollView>
+              </>
+            ) : (
+              <PreviewDetail plan={buildPreviewPlan()} C={C} t={t} />
+            )}
           </View>
         </Modal>
 
@@ -1621,6 +1817,7 @@ const styles = StyleSheet.create({
   previewModal: { flex: 1 },
   previewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
   previewTitle: { fontSize: 20, fontFamily: Fonts.serifBold },
+  previewBackText: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
   previewSubtitle: { fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 16, fontFamily: Fonts.serif },
   previewScroll: { paddingBottom: 40 },
   publishSection: { marginTop: 20, marginBottom: 10 },
