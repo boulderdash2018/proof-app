@@ -19,6 +19,7 @@ import { useAuthStore } from '../store/authStore';
 import { useFeedStore } from '../store/feedStore';
 import { useSavesStore } from '../store/savesStore';
 import { createPlan } from '../services/plansService';
+import { useCity } from '../hooks/useCity';
 import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan } from '../types';
 import { getDirections } from '../services/directionsService';
 
@@ -42,6 +43,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const C = useColors();
+  const cityConfig = useCity();
   const { session, plan, clearSession } = useDoItNowStore();
   const currentUser = useAuthStore((s) => s.user);
   const addPlan = useFeedStore((s) => s.addPlan);
@@ -158,7 +160,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
           title: s.organizeTitle || s.planTitle,
           tags: s.organizeTags || [],
           places: enrichedPlaces as any,
-          price: `${totalPrice}€`,
+          price: `${totalPrice}${cityConfig.currency}`,
           duration: formatDuration(realDuration),
           transport: mapTransport(s.transport),
           travelSegments,
@@ -232,7 +234,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
           </View>
           <View style={[styles.statCard, { backgroundColor: C.gray200 }]}>
             <Ionicons name="wallet-outline" size={20} color={Colors.gold} />
-            <Text style={[styles.statValue, { color: C.black }]}>{totalPrice}€</Text>
+            <Text style={[styles.statValue, { color: C.black }]}>{totalPrice}{cityConfig.currency}</Text>
             <Text style={[styles.statLabel, { color: C.gray600 }]}>Total</Text>
           </View>
         </View>
@@ -263,7 +265,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
               </View>
               {visit?.pricePaid !== undefined && visit.pricePaid > 0 ? (
                 <View style={[styles.priceBadge, { backgroundColor: C.primary + '15' }]}>
-                  <Text style={[styles.priceBadgeText, { color: C.primary }]}>{visit.pricePaid}€</Text>
+                  <Text style={[styles.priceBadgeText, { color: C.primary }]}>{visit.pricePaid}{cityConfig.currency}</Text>
                 </View>
               ) : (
                 <Text style={[styles.freeText, { color: Colors.success }]}>Gratuit</Text>

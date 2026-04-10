@@ -656,7 +656,7 @@ export const ExploreScreen: React.FC = () => {
 
             <ScrollView style={styles.filtersBody} showsVerticalScrollIndicator={false}>
               {renderStepRow('Budget maximum', 'cash-outline', BUDGET_STEPS, maxBudget, setMaxBudget,
-                (n, isLast) => isLast ? `${n}€+` : `${n}€`)}
+                (n, isLast) => isLast ? `${n}${cityConfig.currency}+` : `${n}${cityConfig.currency}`)}
               {renderStepRow('Temps maximum', 'hourglass-outline', DURATION_STEPS, maxDuration, setMaxDuration,
                 (n, isLast) => isLast ? `${formatDuration(n)}+` : formatDuration(n))}
               {renderStepRow('Likes minimum', 'heart-outline', LIKES_STEPS, minLikes, setMinLikes,

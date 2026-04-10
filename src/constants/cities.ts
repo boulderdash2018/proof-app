@@ -3,14 +3,15 @@ export interface CityConfig {
   emoji: string;
   country: string;
   countryCode: string;
+  currency: string;
   coordinates: { lat: number; lng: number };
   available: boolean;
 }
 
 export const CITIES: CityConfig[] = [
-  { name: 'Paris', emoji: '🗼', country: 'France', countryCode: 'fr', coordinates: { lat: 48.8566, lng: 2.3522 }, available: true },
-  { name: 'London', emoji: '🎡', country: 'England', countryCode: 'gb', coordinates: { lat: 51.5074, lng: -0.1278 }, available: true },
-  { name: 'Madrid', emoji: '💃', country: 'Spain', countryCode: 'es', coordinates: { lat: 40.4168, lng: -3.7038 }, available: true },
+  { name: 'Paris', emoji: '🗼', country: 'France', countryCode: 'fr', currency: '€', coordinates: { lat: 48.8566, lng: 2.3522 }, available: true },
+  { name: 'London', emoji: '🎡', country: 'England', countryCode: 'gb', currency: '£', coordinates: { lat: 51.5074, lng: -0.1278 }, available: true },
+  { name: 'Madrid', emoji: '💃', country: 'Spain', countryCode: 'es', currency: '€', coordinates: { lat: 40.4168, lng: -3.7038 }, available: true },
 ];
 
 export const DEFAULT_CITY = 'Paris';

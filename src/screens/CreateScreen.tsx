@@ -92,6 +92,7 @@ const PREVIEW_TRANSPORT_EMOJIS: Record<TransportMode, string> = {
 };
 
 const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t }) => {
+  const cityConfig = useCity();
   const [activeIdx, setActiveIdx] = useState(0);
   const bannerW = Dimensions.get('window').width;
 
@@ -189,7 +190,7 @@ const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t })
                     {place.placePrice != null && place.placePrice > 0 && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.gray200, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
                         <Ionicons name="cash-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.gray800 }}>{place.placePrice}€</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.gray800 }}>{place.placePrice}{cityConfig.currency}</Text>
                       </View>
                     )}
                     {place.placeDuration != null && place.placeDuration > 0 && (
@@ -669,7 +670,7 @@ export const CreateScreen: React.FC = () => {
       tags: selectedTags,
       places: previewPlaces,
       travelSegments: travelSegs,
-      price: `${totalPrice}€`,
+      price: `${totalPrice}${cityConfig.currency}`,
       duration: formatDuration(totalDuration),
       transport: mainTransport,
       coverPhotos,
@@ -918,7 +919,7 @@ export const CreateScreen: React.FC = () => {
           title,
           tags: selectedTags,
           places: placesWithPhotos,
-          price: `${totalPrice}€`,
+          price: `${totalPrice}${cityConfig.currency}`,
           duration: formatDuration(totalDuration),
           transport: mainTransport,
           travelSegments,
@@ -1023,7 +1024,7 @@ export const CreateScreen: React.FC = () => {
                   keyboardType="numeric"
                   maxLength={5}
                 />
-                <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>€</Text>
+                <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>{cityConfig.currency}</Text>
               </View>
               {errors[`place_price_${index}`] && (
                 <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
@@ -1351,7 +1352,7 @@ export const CreateScreen: React.FC = () => {
                 <View style={styles.totalItem}>
                   <Text style={styles.totalEmoji}>💰</Text>
                   <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_total_price}</Text>
-                  <Text style={[styles.totalValue, { color: C.black }]}>{totalPrice}€</Text>
+                  <Text style={[styles.totalValue, { color: C.black }]}>{totalPrice}{cityConfig.currency}</Text>
                 </View>
                 <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
                 <View style={styles.totalItem}>

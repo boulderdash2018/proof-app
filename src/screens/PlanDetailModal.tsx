@@ -28,6 +28,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment, deletePlan, archivePlan } from '../services/plansService';
 import { getPlaceDetails } from '../services/googlePlacesService';
+import { useCity } from '../hooks/useCity';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
 import { PlanMapModal } from '../components/PlanMapModal';
@@ -67,6 +68,7 @@ export const PlanDetailModal: React.FC = () => {
   const route = useRoute<any>();
   const { planId } = route.params as { planId: string };
   const C = useColors();
+  const cityConfig = useCity();
   const { t } = useTranslation();
 
   const currentUser = useAuthStore((s) => s.user);
@@ -434,7 +436,7 @@ export const PlanDetailModal: React.FC = () => {
                         {place.placePrice != null && place.placePrice > 0 && (
                           <View style={[styles.placeMetaTag, { backgroundColor: C.gray200 }]}>
                             <Ionicons name="cash-outline" size={11} color={C.gold} style={{ marginRight: 3 }} />
-                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>{place.placePrice}€</Text>
+                            <Text style={[styles.placeMetaText, { color: C.gray800 }]}>{place.placePrice}{cityConfig.currency}</Text>
                           </View>
                         )}
                         {place.placeDuration != null && place.placeDuration > 0 && (

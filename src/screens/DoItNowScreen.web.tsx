@@ -384,7 +384,7 @@ export const DoItNowScreen: React.FC = () => {
                   value={placePrice}
                   onChangeText={setPlacePrice}
                 />
-                <Text style={[styles.priceUnit, { color: C.gray600 }]}>€</Text>
+                <Text style={[styles.priceUnit, { color: C.gray600 }]}>{cityConfig.currency}</Text>
               </View>
             </View>
           )}

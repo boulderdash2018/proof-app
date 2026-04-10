@@ -21,6 +21,7 @@ import { useColors } from '../hooks/useColors';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { getDirections, decodePolyline, RouteResult } from '../services/directionsService';
 import { Plan, DoItNowTransport } from '../types';
+import { useCity } from '../hooks/useCity';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -70,6 +71,7 @@ export const DoItNowScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const C = useColors();
+  const cityConfig = useCity();
 
   const { session, plan, arriveAtPlace, nextStop, completeSession } = useDoItNowStore();
 
@@ -391,7 +393,7 @@ export const DoItNowScreen: React.FC = () => {
                   value={placePrice}
                   onChangeText={setPlacePrice}
                 />
-                <Text style={[styles.priceUnit, { color: C.gray600 }]}>€</Text>
+                <Text style={[styles.priceUnit, { color: C.gray600 }]}>{cityConfig.currency}</Text>
               </View>
             </View>
           )}

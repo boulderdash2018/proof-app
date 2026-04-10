@@ -148,7 +148,7 @@ export const OrganizeScreen: React.FC = () => {
         gradient: 'terracotta',
         tags: selectedTags,
         places: detailedPlaces,
-        price: '0€',
+        price: `0${cityConfig.currency}`,
         duration: '0min',
         transport: 'À pied',
         likesCount: 0,
