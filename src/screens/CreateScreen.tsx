@@ -1279,7 +1279,7 @@ export const CreateScreen: React.FC = () => {
             </Animated.View>
           </View>
           {/* Tracking label */}
-          <Animated.View style={[styles.qualityLabelWrap, { left: barAnim.interpolate({ inputRange: [0, 50, 100], outputRange: ['0%', '28%', '60%'], extrapolate: 'clamp' }), opacity: labelFade, transform: [{ translateY: labelSlide }] }]}>
+          <Animated.View style={[styles.qualityLabelWrap, { left: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '78%'], extrapolate: 'clamp' }), opacity: labelFade, transform: [{ translateY: labelSlide }] }]}>
             <Text style={[styles.qualityLabel, { color: labelColor }]}>
               {qualityLabel}
             </Text>
