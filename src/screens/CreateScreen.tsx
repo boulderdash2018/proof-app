@@ -17,7 +17,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
@@ -285,6 +285,7 @@ const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t })
 export const CreateScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const user = useAuthStore((s) => s.user);
   const addPlan = useFeedStore((s) => s.addPlan);
   const addCreatedPlan = useSavesStore((s) => s.addCreatedPlan);
@@ -315,38 +316,97 @@ export const CreateScreen: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // ========== DRAFT ==========
-  const draft = useDraftStore();
+  const draftIdRef = useRef<string>(route.params?.draftId || 'draft-' + Date.now());
   const draftRestoredRef = useRef(false);
+  const toastShownRef = useRef(false);
+  const [showDraftToast, setShowDraftToast] = useState(false);
+  const [showExitSheet, setShowExitSheet] = useState(false);
+  const pendingNavRef = useRef<any>(null);
+  const draftToastAnim = useRef(new Animated.Value(0)).current;
 
-  // Restore draft on mount
+  // Ref for current form state (read from interval without stale closures)
+  const formRef = useRef({ title: '', coverPhotos: [] as string[], selectedTags: [] as CategoryTag[], places: [] as PlaceEntry[], travels: [] as TravelEntry[] });
+  formRef.current = { title, coverPhotos, selectedTags, places, travels };
+
+  // Restore specific draft on mount (when navigating from Profile drafts)
   useEffect(() => {
     if (draftRestoredRef.current) return;
     draftRestoredRef.current = true;
-    if (!draft.hasDraft()) return;
-    setTitle(draft.title);
-    setCoverPhotos(draft.coverPhotos);
-    setSelectedTags(draft.selectedTags as CategoryTag[]);
-    setPlaces((draft.places as any[]).map((p) => ({ ...p, priceRangeIndex: p.priceRangeIndex ?? -1, exactPrice: p.exactPrice ?? '' })) as PlaceEntry[]);
-    setTravels(draft.travels as TravelEntry[]);
+    const id = route.params?.draftId;
+    if (!id) return;
+    const saved = useDraftStore.getState().getDraft(id);
+    if (!saved) return;
+    setTitle(saved.title);
+    setCoverPhotos(saved.coverPhotos);
+    setSelectedTags(saved.selectedTags as CategoryTag[]);
+    setPlaces((saved.places as any[]).map((p) => ({ ...p, priceRangeIndex: p.priceRangeIndex ?? -1, exactPrice: p.exactPrice ?? '' })) as PlaceEntry[]);
+    setTravels(saved.travels as TravelEntry[]);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-save draft when navigating away
+  // Auto-save every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
+      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
+      if (!hasContent) return;
+      useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
+      // Show toast once per session
+      if (!toastShownRef.current) {
+        toastShownRef.current = true;
+        setShowDraftToast(true);
+        Animated.timing(draftToastAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+        setTimeout(() => {
+          Animated.timing(draftToastAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => setShowDraftToast(false));
+        }, 2000);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Save on blur as safety net
   useEffect(() => {
     const unsubscribe = navigation.addListener('blur', () => {
       if (isSuccess || isPublishing) return;
-      const hasContent = title.length > 0 || places.length > 0 || coverPhotos.length > 0;
+      const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
+      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
       if (hasContent) {
-        draft.saveDraft({ title, coverPhotos, selectedTags, places, travels });
-      } else {
-        draft.clearDraft();
+        useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
       }
     });
     return unsubscribe;
-  }, [navigation, title, coverPhotos, selectedTags, places, travels, isSuccess, isPublishing]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigation, isSuccess, isPublishing]);
+
+  // Intercept back navigation to show exit sheet
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (isSuccess || isPublishing) return;
+      const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
+      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
+      if (!hasContent) return;
+      if (showExitSheet) return; // Already showing
+      e.preventDefault();
+      pendingNavRef.current = e.data.action;
+      setShowExitSheet(true);
+    });
+    return unsubscribe;
+  }, [navigation, isSuccess, isPublishing, showExitSheet]);
+
+  const handleExitSave = () => {
+    const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
+    useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
+    setShowExitSheet(false);
+    if (pendingNavRef.current) navigation.dispatch(pendingNavRef.current);
+  };
+
+  const handleExitDiscard = () => {
+    useDraftStore.getState().deleteDraft(draftIdRef.current);
+    setShowExitSheet(false);
+    if (pendingNavRef.current) navigation.dispatch(pendingNavRef.current);
+  };
 
   const discardDraft = () => {
     setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
-    draft.clearDraft();
+    useDraftStore.getState().deleteDraft(draftIdRef.current);
   };
 
   // ========== PREVIEW ==========
@@ -1022,7 +1082,7 @@ export const CreateScreen: React.FC = () => {
       addCreatedPlan(newPlan);
       trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport: mainTransport });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      draft.clearDraft();
+      useDraftStore.getState().deleteDraft(draftIdRef.current);
       setIsSuccess(true);
     } catch {
       // Reset animation on error so UI comes back
@@ -1292,17 +1352,6 @@ export const CreateScreen: React.FC = () => {
         </Animated.View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {draft.savedAt && (title.length > 0 || places.length > 0) && (
-            <View style={[styles.draftBanner, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
-              <View style={styles.draftBannerLeft}>
-                <Ionicons name="document-text-outline" size={16} color={C.gold} />
-                <Text style={[styles.draftBannerText, { color: C.gold }]}>Brouillon restauré</Text>
-              </View>
-              <TouchableOpacity onPress={discardDraft} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={[styles.draftBannerDiscard, { color: C.gray600 }]}>Supprimer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
           <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
 
           {/* Cover Photos */}
@@ -1891,6 +1940,32 @@ export const CreateScreen: React.FC = () => {
           }}
           onClose={() => setEditingPhotoIdx(null)}
         />
+
+        {/* Draft saved toast */}
+        {showDraftToast && (
+          <Animated.View style={[styles.draftToast, { opacity: draftToastAnim, transform: [{ translateY: draftToastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]} pointerEvents="none">
+            <Ionicons name="cloud-done-outline" size={14} color="#8B7B6B" />
+            <Text style={styles.draftToastText}>Draft saved ✦</Text>
+          </Animated.View>
+        )}
+
+        {/* Exit confirmation sheet */}
+        <Modal visible={showExitSheet} transparent animationType="fade">
+          <View style={styles.exitBackdrop}>
+            <View style={[styles.exitSheet, { backgroundColor: C.gray200, borderColor: C.border }]}>
+              <Text style={[styles.exitTitle, { color: C.black }]}>Save your draft?</Text>
+              <Text style={[styles.exitSub, { color: C.gray600 }]}>You can finish this plan later</Text>
+              <View style={styles.exitBtns}>
+                <TouchableOpacity style={[styles.exitBtn, styles.exitBtnDiscard, { borderColor: C.gray500 }]} onPress={handleExitDiscard} activeOpacity={0.7}>
+                  <Text style={[styles.exitBtnText, { color: C.gray700 }]}>Discard</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.exitBtn, styles.exitBtnSave]} onPress={handleExitSave} activeOpacity={0.7}>
+                  <Text style={[styles.exitBtnText, { color: '#FFF' }]}>Save draft</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -1904,10 +1979,19 @@ const styles = StyleSheet.create({
   costText: { fontSize: 11, fontWeight: '700' },
   scroll: { flex: 1 },
   scrollContent: { padding: Layout.screenPadding, paddingBottom: 40 },
-  draftBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
-  draftBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  draftBannerText: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.serif },
-  draftBannerDiscard: { fontSize: 12, fontWeight: '600' },
+  // Draft toast
+  draftToast: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EDE8E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
+  draftToastText: { fontSize: 11, fontWeight: '600', color: '#8B7B6B', letterSpacing: 0.3 },
+  // Exit sheet
+  exitBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
+  exitSheet: { width: '100%', borderRadius: 20, borderWidth: 1, padding: 24, alignItems: 'center' },
+  exitTitle: { fontSize: 18, fontFamily: Fonts.serifBold, marginBottom: 4 },
+  exitSub: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 20 },
+  exitBtns: { flexDirection: 'row', gap: 12, width: '100%' },
+  exitBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  exitBtnDiscard: { borderWidth: 1.5, backgroundColor: 'transparent' },
+  exitBtnSave: { backgroundColor: '#C8571A' },
+  exitBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
   fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 6 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
   errorText: { fontSize: 11, color: Colors.error, marginTop: -6, marginBottom: 8, marginLeft: 2 },

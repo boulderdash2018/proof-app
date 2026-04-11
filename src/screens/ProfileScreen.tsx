@@ -8,6 +8,8 @@ import {
   Dimensions,
   Image,
   Animated,
+  Platform,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
 import { Avatar, RankBadge, RankProgressBar, BadgeGrid, FounderBadge } from '../components';
-import { useAuthStore, useFriendsStore, useSavesStore } from '../store';
+import { useAuthStore, useFriendsStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { getFollowerIds, getFollowingIds, migrateToFollows } from '../services/friendsService';
@@ -46,6 +48,8 @@ export const ProfileScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
   const { savedPlans, fetchSaves } = useSavesStore();
+  const drafts = useDraftStore((s) => s.drafts);
+  const deleteDraft = useDraftStore((s) => s.deleteDraft);
   const C = useColors();
   const { t } = useTranslation();
   const [userPlans, setUserPlans] = useState<any[]>([]);
@@ -334,6 +338,69 @@ export const ProfileScreen: React.FC = () => {
             </View>
           </View>
         )}
+
+        {/* ===== DRAFTS ===== */}
+        {drafts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>DRAFTS</Text>
+            <View style={styles.plansGrid}>
+              {[...drafts].sort((a, b) => b.updatedAt - a.updatedAt).map((d) => {
+                const draftPhoto = d.coverPhotos?.[0];
+                const timeAgo = (() => {
+                  const mins = Math.floor((Date.now() - d.updatedAt) / 60000);
+                  if (mins < 1) return 'just now';
+                  if (mins < 60) return `${mins}min ago`;
+                  const hrs = Math.floor(mins / 60);
+                  if (hrs < 24) return `${hrs}h ago`;
+                  return `${Math.floor(hrs / 24)}d ago`;
+                })();
+                return (
+                  <TouchableOpacity
+                    key={d.id}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('CreateTab', { screen: 'Create', params: { draftId: d.id } })}
+                  >
+                    <View style={[styles.miniCard, styles.draftCard]}>
+                      {draftPhoto ? (
+                        <Image source={{ uri: draftPhoto }} style={styles.miniCardImage} />
+                      ) : (
+                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#EDE8E0' }]} />
+                      )}
+                      {!draftPhoto && (
+                        <Ionicons name="document-text-outline" size={18} color="#B5A998" style={styles.draftIcon} />
+                      )}
+                      {draftPhoto && <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />}
+                      <Text style={[styles.miniCardTitle, !draftPhoto && styles.draftCardTitle]} numberOfLines={1}>
+                        {d.title || 'Untitled plan'}
+                      </Text>
+                      <Text style={[styles.draftMeta, !draftPhoto && styles.draftMetaDark]}>
+                        {d.places.length} {d.places.length === 1 ? 'place' : 'places'} · {timeAgo}
+                      </Text>
+                      {/* Delete button */}
+                      <TouchableOpacity
+                        style={styles.draftDeleteBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          if (Platform.OS === 'web') {
+                            if (window.confirm('Delete draft?')) deleteDraft(d.id);
+                          } else {
+                            Alert.alert('Delete draft?', '', [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Delete', style: 'destructive', onPress: () => deleteDraft(d.id) },
+                            ]);
+                          }
+                        }}
+                      >
+                        <Ionicons name="close-circle" size={18} color="rgba(0,0,0,0.4)" />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -374,4 +441,11 @@ const styles = StyleSheet.create({
   miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  // Drafts
+  draftCard: { borderWidth: 1, borderColor: '#D6CEC4' },
+  draftIcon: { position: 'absolute', top: 8, right: 8 },
+  draftCardTitle: { color: '#6B5E50', textShadowColor: 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 0 },
+  draftMeta: { fontSize: 9, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  draftMetaDark: { color: '#9A8E80' },
+  draftDeleteBtn: { position: 'absolute', top: 4, right: 4 },
 });
