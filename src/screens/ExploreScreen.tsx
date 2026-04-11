@@ -476,7 +476,7 @@ export const ExploreScreen: React.FC = () => {
               {googlePlaces.length > 0 && (
                 <>
                   <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({Math.min(googlePlaces.length, 3)})</Text>
-                  {googlePlaces.slice(0, 3).map((place) => (
+                  {[...googlePlaces].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 3).map((place) => (
                     <TouchableOpacity key={place.placeId} style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]} activeOpacity={0.7} onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}>
                       {place.photoUrls.length > 0 ? <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} /> : <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}><Ionicons name="location" size={24} color={C.gray600} /></View>}
                       <View style={styles.googlePlaceInfo}>
