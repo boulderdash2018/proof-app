@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -31,6 +31,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguageStore, useAuthStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
+import { activeCreateSession } from '../store/draftStore';
 import { Colors, Fonts } from '../constants';
 import { fr, en } from '../i18n';
 
@@ -133,15 +134,62 @@ export const BottomTabNavigator: React.FC = () => {
   const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
   const isGuest = !isAuthenticated;
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDraftExit, setShowDraftExit] = useState(false);
+  const pendingTabRef = useRef<string | null>(null);
   const navigationRef = useNavigation<any>();
 
-  // Intercept tab press for guests on restricted tabs
-  const guestGuard = {
+  // Handle draft exit: save
+  const handleDraftSave = useCallback(() => {
+    activeCreateSession.saveForm?.();
+    setShowDraftExit(false);
+    if (pendingTabRef.current) {
+      navigationRef.navigate(pendingTabRef.current);
+      pendingTabRef.current = null;
+    }
+  }, [navigationRef]);
+
+  // Handle draft exit: discard
+  const handleDraftDiscard = useCallback(() => {
+    activeCreateSession.discardForm?.();
+    setShowDraftExit(false);
+    if (pendingTabRef.current) {
+      navigationRef.navigate(pendingTabRef.current);
+      pendingTabRef.current = null;
+    }
+  }, [navigationRef]);
+
+  // Combined tab guard: guest check + draft exit check
+  const tabGuard = (tabName: string) => ({
     listeners: () => ({
       tabPress: (e: any) => {
+        // Guest guard first
         if (isGuest) {
           e.preventDefault();
           setShowAccountPrompt(true);
+          return;
+        }
+        // Draft exit guard: check if we're leaving CreateTab with unsaved content
+        const state = navigationRef.getState?.();
+        const currentTab = state?.routes?.[state.index]?.name;
+        if (currentTab === 'CreateTab' && activeCreateSession.hasContent) {
+          e.preventDefault();
+          pendingTabRef.current = tabName;
+          setShowDraftExit(true);
+        }
+      },
+    }),
+  });
+
+  // Feed tab: no guest guard, but still needs draft exit check
+  const feedTabGuard = {
+    listeners: () => ({
+      tabPress: (e: any) => {
+        const state = navigationRef.getState?.();
+        const currentTab = state?.routes?.[state.index]?.name;
+        if (currentTab === 'CreateTab' && activeCreateSession.hasContent) {
+          e.preventDefault();
+          pendingTabRef.current = 'FeedTab';
+          setShowDraftExit(true);
         }
       },
     }),
@@ -162,6 +210,7 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="FeedTab" focused={focused} />,
         }}
+        {...feedTabGuard}
       />
       <Tab.Screen
         name="ExploreTab"
@@ -169,7 +218,7 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="ExploreTab" focused={focused} />,
         }}
-        {...(isGuest ? guestGuard : {})}
+        {...tabGuard('ExploreTab')}
       />
       <Tab.Screen
         name="CreateTab"
@@ -191,7 +240,7 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="SavesTab" focused={focused} />,
         }}
-        {...(isGuest ? guestGuard : {})}
+        {...tabGuard('SavesTab')}
       />
       <Tab.Screen
         name="ProfileTab"
@@ -199,9 +248,27 @@ export const BottomTabNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused }) => <TabIcon label="ProfileTab" focused={focused} />,
         }}
-        {...(isGuest ? guestGuard : {})}
+        {...tabGuard('ProfileTab')}
       />
     </Tab.Navigator>
+
+    {/* Draft exit confirmation sheet */}
+    <Modal visible={showDraftExit} transparent animationType="fade" onRequestClose={() => setShowDraftExit(false)}>
+      <View style={styles.draftExitBackdrop}>
+        <View style={styles.draftExitSheet}>
+          <Text style={styles.draftExitTitle}>Enregistrer le brouillon ?</Text>
+          <Text style={styles.draftExitSub}>Vous pourrez finir ce plan plus tard</Text>
+          <View style={styles.draftExitBtns}>
+            <TouchableOpacity style={[styles.draftExitBtn, styles.draftExitBtnDiscard]} onPress={handleDraftDiscard} activeOpacity={0.7}>
+              <Text style={[styles.draftExitBtnText, { color: Colors.gray600 }]}>Supprimer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.draftExitBtn, styles.draftExitBtnSave]} onPress={handleDraftSave} activeOpacity={0.7}>
+              <Text style={[styles.draftExitBtnText, { color: '#FFF' }]}>Enregistrer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
 
     {/* Create choice modal */}
     <Modal visible={showCreateModal} transparent animationType="fade" onRequestClose={() => setShowCreateModal(false)}>
@@ -346,5 +413,58 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.border,
     marginHorizontal: 16,
+  },
+  // Draft exit sheet
+  draftExitBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+  draftExitSheet: {
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+    padding: 24,
+    alignItems: 'center',
+  },
+  draftExitTitle: {
+    fontSize: 18,
+    fontFamily: Fonts.serifBold,
+    color: Colors.black,
+    marginBottom: 4,
+  },
+  draftExitSub: {
+    fontSize: 13,
+    fontFamily: Fonts.serif,
+    color: Colors.gray600,
+    marginBottom: 20,
+  },
+  draftExitBtns: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  draftExitBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  draftExitBtnDiscard: {
+    borderWidth: 1.5,
+    borderColor: Colors.gray600,
+    backgroundColor: 'transparent',
+  },
+  draftExitBtnSave: {
+    backgroundColor: '#C8571A',
+  },
+  draftExitBtnText: {
+    fontSize: 14,
+    fontFamily: Fonts.serifBold,
   },
 });

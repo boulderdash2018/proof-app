@@ -28,6 +28,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput, PlanCard } from '../components';
 import { PhotoEditorSheet } from '../components/PhotoEditorSheet';
 import { useAuthStore, useFeedStore, useSavesStore, useDraftStore } from '../store';
+import { activeCreateSession } from '../store/draftStore';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
@@ -320,8 +321,6 @@ export const CreateScreen: React.FC = () => {
   const draftRestoredRef = useRef(false);
   const toastShownRef = useRef(false);
   const [showDraftToast, setShowDraftToast] = useState(false);
-  const [showExitSheet, setShowExitSheet] = useState(false);
-  const pendingNavRef = useRef<any>(null);
   const draftToastAnim = useRef(new Animated.Value(0)).current;
 
   // Ref for current form state (read from interval without stale closures)
@@ -376,33 +375,33 @@ export const CreateScreen: React.FC = () => {
     return unsubscribe;
   }, [navigation, isSuccess, isPublishing]);
 
-  // Intercept back navigation to show exit sheet
+  // Track content on shared module-level object so BottomTabNavigator can check
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
-      if (isSuccess || isPublishing) return;
+    activeCreateSession.draftId = draftIdRef.current;
+    activeCreateSession.saveForm = () => {
       const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
-      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
-      if (!hasContent) return;
-      if (showExitSheet) return; // Already showing
-      e.preventDefault();
-      pendingNavRef.current = e.data.action;
-      setShowExitSheet(true);
-    });
-    return unsubscribe;
-  }, [navigation, isSuccess, isPublishing, showExitSheet]);
+      useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
+    };
+    activeCreateSession.discardForm = () => {
+      // Clear form fields + formRef so blur handler won't re-save
+      setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
+      formRef.current = { title: '', coverPhotos: [], selectedTags: [], places: [], travels: [] };
+      activeCreateSession.hasContent = false;
+      useDraftStore.getState().deleteDraft(draftIdRef.current);
+    };
+    return () => {
+      activeCreateSession.hasContent = false;
+      activeCreateSession.draftId = '';
+      activeCreateSession.saveForm = null;
+      activeCreateSession.discardForm = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleExitSave = () => {
-    const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
-    useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
-    setShowExitSheet(false);
-    if (pendingNavRef.current) navigation.dispatch(pendingNavRef.current);
-  };
-
-  const handleExitDiscard = () => {
-    useDraftStore.getState().deleteDraft(draftIdRef.current);
-    setShowExitSheet(false);
-    if (pendingNavRef.current) navigation.dispatch(pendingNavRef.current);
-  };
+  // Keep hasContent in sync on every render (cheap assignment)
+  useEffect(() => {
+    const has = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
+    activeCreateSession.hasContent = has && !isSuccess && !isPublishing;
+  });
 
   const discardDraft = () => {
     setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
@@ -1961,23 +1960,6 @@ export const CreateScreen: React.FC = () => {
           </Animated.View>
         )}
 
-        {/* Exit confirmation sheet */}
-        <Modal visible={showExitSheet} transparent animationType="fade">
-          <View style={styles.exitBackdrop}>
-            <View style={[styles.exitSheet, { backgroundColor: C.gray200, borderColor: C.border }]}>
-              <Text style={[styles.exitTitle, { color: C.black }]}>Enregistrer le brouillon ?</Text>
-              <Text style={[styles.exitSub, { color: C.gray600 }]}>Vous pourrez finir ce plan plus tard</Text>
-              <View style={styles.exitBtns}>
-                <TouchableOpacity style={[styles.exitBtn, styles.exitBtnDiscard, { borderColor: C.gray500 }]} onPress={handleExitDiscard} activeOpacity={0.7}>
-                  <Text style={[styles.exitBtnText, { color: C.gray700 }]}>Supprimer</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.exitBtn, styles.exitBtnSave]} onPress={handleExitSave} activeOpacity={0.7}>
-                  <Text style={[styles.exitBtnText, { color: '#FFF' }]}>Enregistrer</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -1999,16 +1981,6 @@ const styles = StyleSheet.create({
   // Draft toast
   draftToast: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EDE8E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
   draftToastText: { fontSize: 11, fontWeight: '600', color: '#8B7B6B', letterSpacing: 0.3 },
-  // Exit sheet
-  exitBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
-  exitSheet: { width: '100%', borderRadius: 20, borderWidth: 1, padding: 24, alignItems: 'center' },
-  exitTitle: { fontSize: 18, fontFamily: Fonts.serifBold, marginBottom: 4 },
-  exitSub: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 20 },
-  exitBtns: { flexDirection: 'row', gap: 12, width: '100%' },
-  exitBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  exitBtnDiscard: { borderWidth: 1.5, backgroundColor: 'transparent' },
-  exitBtnSave: { backgroundColor: '#C8571A' },
-  exitBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
   fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 6 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
   errorText: { fontSize: 11, color: Colors.error, marginTop: -6, marginBottom: 8, marginLeft: 2 },

@@ -95,3 +95,12 @@ export const useDraftStore = create<DraftStore>()(
 
 // Re-export for backward compat
 export type DraftState = DraftItem;
+
+// Module-level shared object for navigator ↔ CreateScreen communication
+// This avoids stale closures and works across components without re-renders
+export const activeCreateSession = {
+  hasContent: false,
+  draftId: '',
+  saveForm: null as (() => void) | null,
+  discardForm: null as (() => void) | null,
+};
