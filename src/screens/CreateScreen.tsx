@@ -1352,6 +1352,18 @@ export const CreateScreen: React.FC = () => {
         </Animated.View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Draft indicator with discard option */}
+          {(title.length > 0 || places.length > 0 || coverPhotos.length > 0) && useDraftStore.getState().getDraft(draftIdRef.current) && (
+            <View style={[styles.draftBanner, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
+              <View style={styles.draftBannerLeft}>
+                <Ionicons name="document-text-outline" size={16} color={C.gold} />
+                <Text style={[styles.draftBannerText, { color: C.gold }]}>Brouillon en cours</Text>
+              </View>
+              <TouchableOpacity onPress={discardDraft} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[styles.draftBannerDiscard, { color: C.gray600 }]}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
 
           {/* Cover Photos */}
@@ -1953,14 +1965,14 @@ export const CreateScreen: React.FC = () => {
         <Modal visible={showExitSheet} transparent animationType="fade">
           <View style={styles.exitBackdrop}>
             <View style={[styles.exitSheet, { backgroundColor: C.gray200, borderColor: C.border }]}>
-              <Text style={[styles.exitTitle, { color: C.black }]}>Save your draft?</Text>
-              <Text style={[styles.exitSub, { color: C.gray600 }]}>You can finish this plan later</Text>
+              <Text style={[styles.exitTitle, { color: C.black }]}>Enregistrer le brouillon ?</Text>
+              <Text style={[styles.exitSub, { color: C.gray600 }]}>Vous pourrez finir ce plan plus tard</Text>
               <View style={styles.exitBtns}>
                 <TouchableOpacity style={[styles.exitBtn, styles.exitBtnDiscard, { borderColor: C.gray500 }]} onPress={handleExitDiscard} activeOpacity={0.7}>
-                  <Text style={[styles.exitBtnText, { color: C.gray700 }]}>Discard</Text>
+                  <Text style={[styles.exitBtnText, { color: C.gray700 }]}>Supprimer</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.exitBtn, styles.exitBtnSave]} onPress={handleExitSave} activeOpacity={0.7}>
-                  <Text style={[styles.exitBtnText, { color: '#FFF' }]}>Save draft</Text>
+                  <Text style={[styles.exitBtnText, { color: '#FFF' }]}>Enregistrer</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1979,6 +1991,11 @@ const styles = StyleSheet.create({
   costText: { fontSize: 11, fontWeight: '700' },
   scroll: { flex: 1 },
   scrollContent: { padding: Layout.screenPadding, paddingBottom: 40 },
+  // Draft banner
+  draftBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
+  draftBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  draftBannerText: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.serif },
+  draftBannerDiscard: { fontSize: 12, fontWeight: '600' },
   // Draft toast
   draftToast: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EDE8E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
   draftToastText: { fontSize: 11, fontWeight: '600', color: '#8B7B6B', letterSpacing: 0.3 },
