@@ -1278,10 +1278,9 @@ export const CreateScreen: React.FC = () => {
               <Animated.View style={[styles.qualityShimmer, { transform: [{ translateX: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-screenWidth, screenWidth] }) }], opacity: shimmerAnim.interpolate({ inputRange: [0, 0.3, 0.7, 1], outputRange: [0, 0.6, 0.6, 0] }) }]} />
             </Animated.View>
           </View>
-          {/* Tracking label — aligned to end of bar fill */}
-          <View style={styles.qualityLabelRow}>
-            <Animated.View style={[styles.qualityLabelSpacer, { width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }) }]} />
-            <Animated.View style={[styles.qualityLabelWrap, { opacity: labelFade, transform: [{ translateY: labelSlide }] }]}>
+          {/* Tracking label — right-aligned inside a container matching bar fill width */}
+          <Animated.View style={[styles.qualityLabelTrack, { width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['10%', '100%'], extrapolate: 'clamp' }) }]}>
+            <Animated.View style={[styles.qualityLabelInner, { opacity: labelFade, transform: [{ translateY: labelSlide }] }]}>
               <Text style={[styles.qualityLabel, { color: labelColor }]}>
                 {qualityLabel}
               </Text>
@@ -1289,7 +1288,7 @@ export const CreateScreen: React.FC = () => {
                 <Animated.Text style={[styles.qualityCheck, { color: '#C8571A', transform: [{ scale: checkScale }] }]}> ✓</Animated.Text>
               )}
             </Animated.View>
-          </View>
+          </Animated.View>
         </Animated.View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -1986,9 +1985,8 @@ const styles = StyleSheet.create({
   qualityBarBg: { height: 10, borderRadius: 20, backgroundColor: '#EDE8E0', overflow: 'hidden' },
   qualityBarFill: { height: 10, borderRadius: 20, overflow: 'hidden' },
   qualityShimmer: { position: 'absolute', top: 0, bottom: 0, width: 60, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 20 },
-  qualityLabelRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
-  qualityLabelSpacer: { height: 1 },
-  qualityLabelWrap: { flexDirection: 'row', alignItems: 'center', marginLeft: -2 },
+  qualityLabelTrack: { marginTop: 5, alignItems: 'flex-end' },
+  qualityLabelInner: { flexDirection: 'row', alignItems: 'center' },
   qualityLabel: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.serifSemiBold },
   qualityCheck: { fontSize: 13, fontWeight: '800', fontFamily: Fonts.serifBold },
 
