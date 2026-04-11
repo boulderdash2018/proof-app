@@ -459,9 +459,9 @@ export const ExploreScreen: React.FC = () => {
         {searchQuery.length > 0 && <TouchableOpacity onPress={handleClear}><Ionicons name="close-circle" size={18} color={C.gray600} /></TouchableOpacity>}
       </View>
 
-      {/* Always visible filter rows */}
-      {renderPersonRow()}
-      {renderThemeRow()}
+      {/* Filter rows — hidden during active search */}
+      {showCategories && renderPersonRow()}
+      {showCategories && renderThemeRow()}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {!showCategories ? (
