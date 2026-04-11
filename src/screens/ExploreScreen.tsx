@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   ScrollView,
   TouchableOpacity,
   TextInput as RNTextInput,
   Dimensions,
-  ActivityIndicator,
   Image,
   Modal,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -42,22 +41,19 @@ const parseGradientColors = (gradient: string): string[] => {
   return matches && matches.length >= 2 ? matches : ['#8B6A50', '#5C4030'];
 };
 
-// Theme bar: hide mood & trending (moved to "Manque d'inspi")
 const THEME_GROUPS = EXPLORE_GROUPS.filter(g => g.key !== 'mood' && g.key !== 'trending');
-// Person bar: hide "Around You" (moved to "Manque d'inspi")
 const FILTERED_PERSONS = PERSON_FILTERS.filter(p => p.key !== 'around-you');
-// For intersection logic
 const PERSON_LABELS = new Set(PERSON_FILTERS.map(p => p.label));
-// Keep mood & trending data accessible for inspi section
-const MOOD_GROUP = EXPLORE_GROUPS.find(g => g.key === 'mood');
-const TRENDING_GROUP = EXPLORE_GROUPS.find(g => g.key === 'trending');
 
-type InspiKey = 'trending' | 'mood' | 'nearby';
-const INSPI_OPTIONS: { key: InspiKey; emoji: string; label: string }[] = [
-  { key: 'trending', emoji: '🔥', label: 'Tendance' },
-  { key: 'mood', emoji: '💭', label: 'Mood' },
-  { key: 'nearby', emoji: '📍', label: 'Around you' },
-];
+// Build name→icon lookup from all category items for trending grid
+const CATEGORY_ICON_MAP = new Map<string, string>();
+for (const group of EXPLORE_GROUPS) {
+  for (const section of group.sections) {
+    for (const item of section.items) {
+      if (item.icon) CATEGORY_ICON_MAP.set(item.name, item.icon);
+    }
+  }
+}
 
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -84,23 +80,6 @@ export const ExploreScreen: React.FC = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Inspi section
-  const [inspiSection, setInspiSection] = useState<InspiKey | null>(null);
-  const [nearbyPlaces, setNearbyPlaces] = useState<GooglePlaceDetails[]>([]);
-  const [nearbyLoading, setNearbyLoading] = useState(false);
-  const nearbyFetchedRef = useRef(false);
-
-  // Fetch nearby places on first open
-  useEffect(() => {
-    if (inspiSection === 'nearby' && !nearbyFetchedRef.current) {
-      nearbyFetchedRef.current = true;
-      setNearbyLoading(true);
-      searchPlacesNearby('restaurants bars cafés', cityConfig.coordinates)
-        .then((places) => { setNearbyPlaces(places); setNearbyLoading(false); })
-        .catch(() => setNearbyLoading(false));
-    }
-  }, [inspiSection]);
 
   // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -253,6 +232,22 @@ export const ExploreScreen: React.FC = () => {
   );
 
   const showCategories = searchQuery.length < 2;
+
+  // ── Trending section fade ──
+  const [showTrending, setShowTrending] = useState(true);
+  const trendingOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (showSubcategories) {
+      Animated.timing(trendingOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        setShowTrending(false);
+      });
+    } else {
+      setShowTrending(true);
+      trendingOpacity.setValue(0);
+      Animated.timing(trendingOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    }
+  }, [showSubcategories]);
 
   // ── Row 1: Person filters (multi-select) ──
   const renderPersonRow = () => (
@@ -464,160 +459,24 @@ export const ExploreScreen: React.FC = () => {
         {searchQuery.length > 0 && <TouchableOpacity onPress={handleClear}><Ionicons name="close-circle" size={18} color={C.gray600} /></TouchableOpacity>}
       </View>
 
-      {showCategories ? (
-        <>
-          {renderPersonRow()}
-          {renderThemeRow()}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {showSubcategories
-              ? activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))
-              : null}
+      {/* Always visible filter rows */}
+      {renderPersonRow()}
+      {renderThemeRow()}
 
-            {/* ── Manque d'inspi ? ── */}
-            <View style={styles.inspiSection}>
-              <Text style={[styles.inspiTitle, { color: C.black }]}>Manque d'inspi ?</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inspiRow}>
-                {INSPI_OPTIONS.map((opt) => {
-                  const isActive = inspiSection === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[
-                        styles.inspiCard,
-                        {
-                          backgroundColor: isActive ? Colors.primary + '15' : C.gray200,
-                          borderColor: isActive ? Colors.primary : C.border,
-                        },
-                      ]}
-                      onPress={() => setInspiSection(isActive ? null : opt.key)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.inspiEmoji}>{opt.emoji}</Text>
-                      <Text style={[styles.inspiLabel, { color: isActive ? Colors.primary : C.black }]}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* ── Inspi content ── */}
-            {inspiSection === 'trending' && (
-              <View style={styles.inspiContent}>
-                <Text style={[styles.sectionTitle, { color: C.gray600 }]}>EN CE MOMENT</Text>
-                {trendingCategories.length > 0
-                  ? trendingCategories.map((c, i) =>
-                      renderRankedItem(
-                        { name: c.name, emoji: c.emoji, gradient: c.gradient, subtitle: c.subtitle, planCount: c.planCount, hot: c.hot, badgeLabel: c.badgeLabel ?? undefined },
-                        i + 1,
-                      ),
-                    )
-                  : TRENDING_GROUP?.sections[0]?.items.map((item, i) => renderRankedItem(item, i + 1))}
-              </View>
-            )}
-
-            {inspiSection === 'mood' && MOOD_GROUP && (
-              <View style={styles.inspiContent}>
-                <Text style={[styles.sectionTitle, { color: C.gray600 }]}>COMMENT TU TE SENS ?</Text>
-                <View style={styles.moodList}>
-                  {MOOD_GROUP.sections[0].items.map((item) => renderMoodItem(item))}
-                </View>
-              </View>
-            )}
-
-            {inspiSection === 'nearby' && (
-              <View style={styles.inspiContent}>
-                <Text style={[styles.sectionTitle, { color: C.gray600 }]}>À CÔTÉ DE CHEZ TOI</Text>
-                {nearbyLoading ? (
-                  <LoadingSkeleton variant="list" />
-                ) : nearbyPlaces.length > 0 ? (
-                  nearbyPlaces.map((place) => (
-                    <TouchableOpacity
-                      key={place.placeId}
-                      style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]}
-                      activeOpacity={0.7}
-                      onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}
-                    >
-                      {place.photoUrls.length > 0 ? (
-                        <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} />
-                      ) : (
-                        <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' } as any]}>
-                          <Ionicons name="location" size={24} color={C.gray600} />
-                        </View>
-                      )}
-                      <View style={styles.googlePlaceInfo}>
-                        <Text style={[styles.googlePlaceName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
-                        <Text style={[styles.googlePlaceType, { color: C.gray700 }]} numberOfLines={1}>
-                          {getReadableType(place.types)}{place.priceLevel !== undefined ? ' · ' + priceLevelToSymbol(place.priceLevel) : ''}
-                        </Text>
-                        {place.rating > 0 && (
-                          <View style={styles.googlePlaceRating}>
-                            <Ionicons name="star" size={12} color={C.primary} />
-                            <Text style={[styles.googlePlaceRatingText, { color: C.black }]}>{place.rating.toFixed(1)}</Text>
-                            <Text style={[styles.googlePlaceReviewCount, { color: C.gray600 }]}>({place.reviewCount})</Text>
-                          </View>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun lieu trouvé à proximité</Text>
-                )}
-              </View>
-            )}
-
-            {/* Selected filters pills */}
-            {selectedFilters.length > 0 && (
-              <View style={styles.activeFiltersWrap}>
-                <View style={styles.activeFiltersRow}>
-                  {selectedFilters.map((f) => (
-                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
-                      <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
-                      <Ionicons name="close" size={13} color={Colors.primary} />
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
-                    <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Filter results */}
-                {isFilterLoading ? (
-                  <LoadingSkeleton variant="list" />
-                ) : displayedPlans.length > 0 ? (
-                  <View style={{ marginTop: 12 }}>
-                    <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({displayedPlans.length})</Text>
-                    {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
-                  </View>
-                ) : (
-                  <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                    <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
-                  </View>
-                )}
-              </View>
-            )}
-            <View style={{ height: 30 }} />
-          </ScrollView>
-        </>
-      ) : (
-        <>
-          <View style={styles.resultsHeader}>
-            <TouchableOpacity onPress={handleClear} style={styles.backLinkRow}>
-              <Ionicons name="arrow-back" size={16} color={C.primary} />
-              <Text style={[styles.backLink, { color: C.primary }]}>{t.explore_back_categories}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {searchUsers_.length > 0 ? (
-            <ScrollView contentContainerStyle={styles.resultsList}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {!showCategories ? (
+          /* ── Search results ── */
+          searchUsers_.length > 0 ? (
+            <>
               <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>{t.explore_users_count} ({searchUsers_.length})</Text>
               {searchUsers_.map(renderUserResult)}
-            </ScrollView>
+            </>
           ) : (
-            <ScrollView contentContainerStyle={styles.resultsList} showsVerticalScrollIndicator={false}>
+            <>
               {googlePlaces.length > 0 && (
                 <>
-                  <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({googlePlaces.length})</Text>
-                  {googlePlaces.map((place) => (
+                  <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({Math.min(googlePlaces.length, 3)})</Text>
+                  {googlePlaces.slice(0, 3).map((place) => (
                     <TouchableOpacity key={place.placeId} style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]} activeOpacity={0.7} onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}>
                       {place.photoUrls.length > 0 ? <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} /> : <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}><Ionicons name="location" size={24} color={C.gray600} /></View>}
                       <View style={styles.googlePlaceInfo}>
@@ -638,10 +497,66 @@ export const ExploreScreen: React.FC = () => {
               )}
               {isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <LoadingSkeleton variant="list" />}
               {!isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />}
-            </ScrollView>
-          )}
-        </>
-      )}
+            </>
+          )
+        ) : (
+          /* ── Default / category mode ── */
+          <>
+            {/* Subcategories when "Voir +" is open */}
+            {showSubcategories && activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))}
+
+            {/* Trending categories grid — fades in/out when Voir + toggles */}
+            {showTrending && (
+              <Animated.View style={{ opacity: trendingOpacity }}>
+                <Text style={[styles.trendingLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
+                {trendingLoading ? (
+                  <LoadingSkeleton variant="list" />
+                ) : (
+                  <View style={styles.catGrid}>
+                    {trendingCategories.map((cat, i) =>
+                      renderCategoryCard(
+                        { name: cat.name, emoji: cat.emoji, icon: CATEGORY_ICON_MAP.get(cat.name), gradient: cat.gradient, subtitle: cat.subtitle, planCount: cat.planCount, hot: cat.hot, badgeLabel: cat.badgeLabel ?? undefined },
+                        i,
+                        trendingCategories.length,
+                      )
+                    )}
+                  </View>
+                )}
+              </Animated.View>
+            )}
+
+            {/* Selected filter pills + results */}
+            {selectedFilters.length > 0 && (
+              <View style={styles.activeFiltersWrap}>
+                <View style={styles.activeFiltersRow}>
+                  {selectedFilters.map((f) => (
+                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
+                      <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
+                      <Ionicons name="close" size={13} color={Colors.primary} />
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
+                    <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
+                  </TouchableOpacity>
+                </View>
+                {isFilterLoading ? (
+                  <LoadingSkeleton variant="list" />
+                ) : displayedPlans.length > 0 ? (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({displayedPlans.length})</Text>
+                    {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                  </View>
+                ) : (
+                  <View style={{ alignItems: 'center', paddingTop: 20 }}>
+                    <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </>
+        )}
+        <View style={{ height: 30 }} />
+      </ScrollView>
 
       {/* ── Filters Modal ── */}
       <Modal visible={showFiltersModal} animationType="slide" transparent>
@@ -696,14 +611,8 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
 
-  // Inspi section
-  inspiSection: { marginTop: 14, paddingLeft: Layout.screenPadding },
-  inspiTitle: { fontSize: 16, fontFamily: Fonts.serifBold, marginBottom: 10 },
-  inspiRow: { gap: 10, paddingRight: Layout.screenPadding },
-  inspiCard: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, borderWidth: 1.5 },
-  inspiEmoji: { fontSize: 18 },
-  inspiLabel: { fontSize: 13, fontFamily: Fonts.serifBold },
-  inspiContent: { marginTop: 16 },
+  // Trending section label
+  trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, marginTop: 6 },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
@@ -720,11 +629,7 @@ const styles = StyleSheet.create({
   catHotDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.error },
 
   // Results
-  resultsHeader: { paddingHorizontal: Layout.screenPadding, marginBottom: 12 },
-  backLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  backLink: { fontSize: 13, fontWeight: '600' },
   resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
-  resultsList: { paddingHorizontal: Layout.screenPadding, paddingBottom: 20 },
   compactCard: { borderRadius: 18, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
   compactBanner: { height: 90, justifyContent: 'flex-end', padding: 12, overflow: 'hidden' },
   compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
