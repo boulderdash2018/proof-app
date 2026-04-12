@@ -290,7 +290,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                 {index > 0 && <View style={[styles.placeSeparator, { backgroundColor: C.border }]} />}
                 <View style={styles.placeRow}>
                   <View style={[styles.placeIndex, { backgroundColor: C.primary + '18' }]}>
-                    <Text style={[styles.placeIndexText, { color: C.primary }]}>{index + 1}</Text>
+                    <Text style={[styles.placeIndexText, { color: C.primary }]}>{index === 2 && plan.places.length > 3 ? '3+' : index + 1}</Text>
                   </View>
                   <View style={styles.placeInfo}>
                     <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
