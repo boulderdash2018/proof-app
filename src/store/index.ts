@@ -13,3 +13,4 @@ export { useDraftStore } from './draftStore';
 export type { DraftState, DraftItem } from './draftStore';
 export { useSavedPlacesStore } from './savedPlacesStore';
 export type { SavedPlace } from './savedPlacesStore';
+export { useRecentSearchesStore } from './recentSearchesStore';

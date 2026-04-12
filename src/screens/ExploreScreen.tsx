@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput as RNTextInput,
   Dimensions,
   Image,
   Modal,
@@ -17,20 +16,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
 import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
-import { EmptyState, LoadingSkeleton } from '../components';
+import { LoadingSkeleton } from '../components';
 import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
-import { searchUsers } from '../services/friendsService';
-import { useAuthStore, useTrendingStore, useSavedPlacesStore } from '../store';
-import { fetchPublicPlansByTags, searchPublicPlans } from '../services/plansService';
-import {
-  searchPlacesNearby,
-  getReadableType,
-  priceLevelToSymbol,
-  GooglePlaceDetails,
-} from '../services/googlePlacesService';
+import { useAuthStore, useTrendingStore } from '../store';
+import { fetchPublicPlansByTags } from '../services/plansService';
 
 const { width } = Dimensions.get('window');
 const CARD_GAP = 10;
@@ -65,21 +57,15 @@ export const ExploreScreen: React.FC = () => {
   const trendingLoading = useTrendingStore((s) => s.isLoading);
   const fetchTrending = useTrendingStore((s) => s.fetchTrending);
   const cityConfig = useCity();
-  const savedPlacesStore = useSavedPlacesStore();
 
   // Fetch trending on mount (5-min cache in store)
   useEffect(() => { fetchTrending(cityConfig.name); }, [cityConfig.name]);
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedTheme, setSelectedTheme] = useState(EXPLORE_GROUPS[0].key);
   const [showSubcategories, setShowSubcategories] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
-  const [searchUsers_, setSearchUsers_] = useState<any[]>([]);
-  const [googlePlaces, setGooglePlaces] = useState<GooglePlaceDetails[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Advanced filters (null = off, number = active threshold)
@@ -125,41 +111,6 @@ export const ExploreScreen: React.FC = () => {
       return next;
     });
   }, [cityConfig.name]);
-
-  const handleSearch = useCallback(async (query: string) => {
-    setSearchQuery(query);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (query.length < 2) {
-      setFilteredPlans([]);
-      setSearchUsers_([]);
-      setGooglePlaces([]);
-      return;
-    }
-    setIsSearching(true);
-    if (query.startsWith('@')) {
-      const users = await searchUsers(query.slice(1), currentUser?.id || '');
-      setSearchUsers_(users);
-      setFilteredPlans([]);
-      setGooglePlaces([]);
-      setIsSearching(false);
-    } else {
-      const plans = await searchPublicPlans(query, cityConfig.name);
-      setFilteredPlans(plans);
-      setSearchUsers_([]);
-      searchTimerRef.current = setTimeout(async () => {
-        const places = await searchPlacesNearby(query + ' ' + cityConfig.name, cityConfig.coordinates);
-        setGooglePlaces(places);
-        setIsSearching(false);
-      }, 400);
-    }
-  }, [currentUser, cityConfig.name]);
-
-  const handleClear = () => {
-    setSearchQuery('');
-    setFilteredPlans([]);
-    setSearchUsers_([]);
-    setGooglePlaces([]);
-  };
 
   // ── Parse helpers for plan fields ──
   const parsePrice = (p: string): number => {
@@ -231,8 +182,6 @@ export const ExploreScreen: React.FC = () => {
       </ScrollView>
     </View>
   );
-
-  const showCategories = searchQuery.length < 2;
 
   // ── Trending section fade ──
   const [showTrending, setShowTrending] = useState(true);
@@ -427,18 +376,6 @@ export const ExploreScreen: React.FC = () => {
     );
   };
 
-  const renderUserResult = (user: any) => (
-    <TouchableOpacity key={user.id} style={[styles.userRow, { borderBottomColor: C.borderLight }]} onPress={() => navigation.navigate('OtherProfile', { userId: user.id })} activeOpacity={0.7}>
-      <View style={[styles.userAvatar, { backgroundColor: user.avatarBg }]}>
-        <Text style={[styles.userInitials, { color: user.avatarColor }]}>{user.initials}</Text>
-      </View>
-      <View>
-        <Text style={[styles.userName, { color: C.black }]}>{user.displayName}</Text>
-        <Text style={[styles.userHandle, { color: C.gray600 }]}>@{user.username}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <View style={styles.headerRow}>
@@ -453,84 +390,22 @@ export const ExploreScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
-      <View style={[styles.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}>
+      {/* Search bar — tapping opens dedicated SearchScreen */}
+      <TouchableOpacity
+        style={[styles.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('ExploreSearch')}
+      >
         <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
-        <RNTextInput style={[styles.searchInput, { color: C.black }]} placeholder={t.explore_search_placeholder} placeholderTextColor={C.gray600} value={searchQuery} onChangeText={handleSearch} />
-        {searchQuery.length > 0 && <TouchableOpacity onPress={handleClear}><Ionicons name="close-circle" size={18} color={C.gray600} /></TouchableOpacity>}
-      </View>
+        <Text style={[styles.searchInput, { color: C.gray600 }]}>{t.explore_search_placeholder}</Text>
+      </TouchableOpacity>
 
-      {/* Filter rows — hidden during active search */}
-      {showCategories && renderPersonRow()}
-      {showCategories && renderThemeRow()}
+      {/* Filter rows */}
+      {renderPersonRow()}
+      {renderThemeRow()}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {!showCategories ? (
-          /* ── Search results ── */
-          searchUsers_.length > 0 ? (
-            <>
-              <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>{t.explore_users_count} ({searchUsers_.length})</Text>
-              {searchUsers_.map(renderUserResult)}
-            </>
-          ) : (
-            <>
-              {googlePlaces.length > 0 && (
-                <>
-                  <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({Math.min(googlePlaces.length, 3)})</Text>
-                  {[...googlePlaces].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 3).map((place) => {
-                    const isSaved = savedPlacesStore.isPlaceSaved(place.placeId);
-                    return (
-                    <TouchableOpacity key={place.placeId} style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]} activeOpacity={0.7} onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}>
-                      {place.photoUrls.length > 0 ? <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} /> : <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}><Ionicons name="location" size={24} color={C.gray600} /></View>}
-                      <View style={styles.googlePlaceInfo}>
-                        <Text style={[styles.googlePlaceName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
-                        <Text style={[styles.googlePlaceType, { color: C.gray700 }]} numberOfLines={1}>{getReadableType(place.types)} {place.priceLevel !== undefined ? '· ' + priceLevelToSymbol(place.priceLevel) : ''}</Text>
-                        {place.rating > 0 && <View style={styles.googlePlaceRating}><Ionicons name="star" size={12} color={C.primary} /><Text style={[styles.googlePlaceRatingText, { color: C.black }]}>{place.rating.toFixed(1)}</Text><Text style={[styles.googlePlaceReviewCount, { color: C.gray600 }]}>({place.reviewCount})</Text></View>}
-                        <Text style={[styles.googlePlaceAddress, { color: C.gray600 }]} numberOfLines={1}>{place.address}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.saveStarBtn}
-                        activeOpacity={0.6}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          if (isSaved) {
-                            savedPlacesStore.unsavePlace(place.placeId);
-                          } else {
-                            savedPlacesStore.savePlace({
-                              placeId: place.placeId,
-                              name: place.name,
-                              address: place.address,
-                              types: place.types,
-                              rating: place.rating,
-                              reviewCount: place.reviewCount,
-                              photoUrl: place.photoUrls.length > 0 ? place.photoUrls[0] : null,
-                              savedAt: Date.now(),
-                            });
-                          }
-                        }}
-                      >
-                        <Ionicons name={isSaved ? 'star' : 'star-outline'} size={20} color={isSaved ? Colors.gold : C.gray600} />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                    );
-                  })}
-                </>
-              )}
-              {displayedPlans.length > 0 && (
-                <>
-                  <Text style={[styles.resultsSectionLabel, { color: C.gray700, marginTop: googlePlaces.length > 0 ? 16 : 0 }]}>Plans ({displayedPlans.length})</Text>
-                  {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
-                </>
-              )}
-              {isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <LoadingSkeleton variant="list" />}
-              {!isSearching && googlePlaces.length === 0 && displayedPlans.length === 0 && <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />}
-            </>
-          )
-        ) : (
-          /* ── Default / category mode ── */
-          <>
-            {/* Subcategories when "Voir +" is open */}
+        {/* Subcategories when "Voir +" is open */}
             {showSubcategories && activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))}
 
             {/* Trending categories list — fades in/out when Voir + toggles */}
@@ -593,8 +468,6 @@ export const ExploreScreen: React.FC = () => {
                 )}
               </View>
             )}
-          </>
-        )}
         <View style={{ height: 30 }} />
       </ScrollView>
 
@@ -703,25 +576,6 @@ const styles = StyleSheet.create({
   hotBadgeText: { fontSize: 12, fontWeight: '600' },
   planCountBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 8 },
   planCountText: { fontSize: 12, fontWeight: '500' },
-
-  // User results
-  userRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
-  userAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  userInitials: { fontSize: 14, fontWeight: '600' },
-  userName: { fontSize: 14, fontWeight: '600' },
-  userHandle: { fontSize: 12, marginTop: 1 },
-
-  // Google Places
-  googlePlaceCard: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 10 },
-  googlePlacePhoto: { width: 90, height: 90 },
-  googlePlaceInfo: { flex: 1, padding: 10, justifyContent: 'center' },
-  googlePlaceName: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 2 },
-  googlePlaceType: { fontSize: 12, marginBottom: 3 },
-  googlePlaceRating: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 2 },
-  googlePlaceRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
-  googlePlaceReviewCount: { fontSize: 11 },
-  googlePlaceAddress: { fontSize: 11 },
-  saveStarBtn: { position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
 
   // Active filters
   activeFiltersWrap: { marginTop: 14 },

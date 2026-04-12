@@ -16,6 +16,7 @@ export type FeedStackParamList = {
 
 export type ExploreStackParamList = {
   Explore: undefined;
+  ExploreSearch: undefined;
   OtherProfile: { userId: string };
 };
 

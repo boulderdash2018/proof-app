@@ -13,6 +13,7 @@ import {
 
 import { FeedScreen } from '../screens/FeedScreen';
 import { ExploreScreen } from '../screens/ExploreScreen';
+import { SearchScreen } from '../screens/SearchScreen';
 import { CreateScreen } from '../screens/CreateScreen';
 import { OrganizeScreen } from '../screens/OrganizeScreen';
 import { SavesScreen } from '../screens/SavesScreen';
@@ -49,6 +50,7 @@ const ExploreStack = createNativeStackNavigator<ExploreStackParamList>();
 const ExploreStackNavigator: React.FC = () => (
   <ExploreStack.Navigator screenOptions={{ headerShown: false }}>
     <ExploreStack.Screen name="Explore" component={ExploreScreen} />
+    <ExploreStack.Screen name="ExploreSearch" component={SearchScreen} options={{ animation: 'slide_from_bottom' }} />
     <ExploreStack.Screen name="OtherProfile" component={OtherProfileScreen} />
   </ExploreStack.Navigator>
 );
