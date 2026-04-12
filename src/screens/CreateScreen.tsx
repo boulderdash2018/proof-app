@@ -315,25 +315,20 @@ export const CreateScreen: React.FC = () => {
   const toastShownRef = useRef(false);
   const [showDraftToast, setShowDraftToast] = useState(false);
   const draftToastAnim = useRef(new Animated.Value(0)).current;
+  const [showResumeSheet, setShowResumeSheet] = useState(false);
+  const resumeSheetSlide = useRef(new Animated.Value(300)).current;
 
   // Ref for current form state (read from interval without stale closures)
   const formRef = useRef({ title: '', coverPhotos: [] as string[], selectedTags: [] as CategoryTag[], places: [] as PlaceEntry[], travels: [] as TravelEntry[] });
   formRef.current = { title, coverPhotos, selectedTags, places, travels };
 
-  // Restore specific draft on mount (when navigating from Profile drafts)
-  useEffect(() => {
-    if (draftRestoredRef.current) return;
-    draftRestoredRef.current = true;
-    const id = route.params?.draftId;
-    if (!id) return;
-    const saved = useDraftStore.getState().getDraft(id);
-    if (!saved) return;
+  // Helper: load a draft into form state
+  const loadDraftIntoForm = useCallback((saved: ReturnType<typeof useDraftStore.getState>['drafts'][number]) => {
     setTitle(saved.title);
     setCoverPhotos(saved.coverPhotos);
     setSelectedTags(saved.selectedTags as CategoryTag[]);
     setPlaces((saved.places as any[]).map((p) => {
       let idx = p.priceRangeIndex ?? -1;
-      // Infer price range from price when editing (priceRangeIndex not stored in plan docs)
       if (idx < 0 && p.price) {
         const amount = parseInt(p.price, 10);
         if (!isNaN(amount)) {
@@ -344,6 +339,101 @@ export const CreateScreen: React.FC = () => {
       return { ...p, priceRangeIndex: idx, exactPrice: p.exactPrice ?? '' };
     }) as PlaceEntry[]);
     setTravels(saved.travels as TravelEntry[]);
+  }, []);
+
+  // Helper: reset form to blank
+  const resetForm = useCallback(() => {
+    setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
+    formRef.current = { title: '', coverPhotos: [], selectedTags: [], places: [], travels: [] };
+    setErrors({});
+  }, []);
+
+  // ── Detect route param changes (switching between plans) ──
+  useEffect(() => {
+    const newDraftId = route.params?.draftId;
+    const newEditPlanId = route.params?.editPlanId;
+    const resumeDraft = route.params?.resumeDraft;
+
+    // Skip if params haven't changed
+    if (newDraftId === draftIdRef.current && newEditPlanId === editPlanIdRef.current) {
+      // Still handle resume sheet on re-focus for same plan
+      if (resumeDraft && !draftRestoredRef.current) {
+        draftRestoredRef.current = true;
+        setShowResumeSheet(true);
+        Animated.spring(resumeSheetSlide, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }).start();
+      }
+      return;
+    }
+
+    // ── New plan being edited — clean up old edit draft if switching plans ──
+    const oldDraftId = draftIdRef.current;
+    if (oldDraftId && oldDraftId !== newDraftId && oldDraftId.startsWith('edit-') && !oldDraftId.endsWith('-fresh')) {
+      useDraftStore.getState().deleteDraft(oldDraftId);
+      useDraftStore.getState().deleteDraft(oldDraftId + '-fresh');
+    }
+
+    // Update refs
+    draftIdRef.current = newDraftId || 'draft-' + Date.now();
+    editPlanIdRef.current = newEditPlanId;
+    draftRestoredRef.current = true;
+    toastShownRef.current = false;
+
+    // Reset form before loading new draft
+    resetForm();
+
+    // Update activeCreateSession
+    activeCreateSession.draftId = draftIdRef.current;
+
+    if (resumeDraft) {
+      // Show bottom sheet — let user choose resume or discard
+      setShowResumeSheet(true);
+      Animated.spring(resumeSheetSlide, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }).start();
+    } else if (newDraftId) {
+      const saved = useDraftStore.getState().getDraft(newDraftId);
+      if (saved) loadDraftIntoForm(saved);
+    }
+  }, [route.params?.draftId, route.params?.editPlanId, route.params?.resumeDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resume sheet handlers
+  const handleResumeDraft = () => {
+    Animated.timing(resumeSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setShowResumeSheet(false));
+    const saved = useDraftStore.getState().getDraft(draftIdRef.current);
+    if (saved) loadDraftIntoForm(saved);
+  };
+
+  const handleDiscardResume = () => {
+    Animated.timing(resumeSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setShowResumeSheet(false));
+    // Load fresh copy saved by PlanDetailModal
+    const freshId = draftIdRef.current + '-fresh';
+    const fresh = useDraftStore.getState().getDraft(freshId);
+    if (fresh) {
+      loadDraftIntoForm(fresh);
+      // Replace the modified draft with fresh data
+      useDraftStore.getState().saveDraft(draftIdRef.current, {
+        title: fresh.title, coverPhotos: fresh.coverPhotos,
+        selectedTags: fresh.selectedTags, places: fresh.places, travels: fresh.travels,
+      });
+    }
+    useDraftStore.getState().deleteDraft(freshId);
+  };
+
+  // Restore specific draft on initial mount only
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    const id = route.params?.draftId;
+    if (!id) return;
+
+    if (route.params?.resumeDraft) {
+      // Show resume sheet instead of auto-loading
+      setShowResumeSheet(true);
+      Animated.spring(resumeSheetSlide, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }).start();
+      return;
+    }
+
+    const saved = useDraftStore.getState().getDraft(id);
+    if (!saved) return;
+    loadDraftIntoForm(saved);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save every 30s
@@ -387,11 +477,10 @@ export const CreateScreen: React.FC = () => {
       useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
     };
     activeCreateSession.discardForm = () => {
-      // Clear form fields + formRef so blur handler won't re-save
-      setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
-      formRef.current = { title: '', coverPhotos: [], selectedTags: [], places: [], travels: [] };
+      resetForm();
       activeCreateSession.hasContent = false;
       useDraftStore.getState().deleteDraft(draftIdRef.current);
+      useDraftStore.getState().deleteDraft(draftIdRef.current + '-fresh');
     };
     return () => {
       activeCreateSession.hasContent = false;
@@ -408,8 +497,9 @@ export const CreateScreen: React.FC = () => {
   });
 
   const discardDraft = () => {
-    setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
+    resetForm();
     useDraftStore.getState().deleteDraft(draftIdRef.current);
+    useDraftStore.getState().deleteDraft(draftIdRef.current + '-fresh');
   };
 
   // ========== PREVIEW ==========
@@ -1201,6 +1291,7 @@ export const CreateScreen: React.FC = () => {
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       useDraftStore.getState().deleteDraft(draftIdRef.current);
+      useDraftStore.getState().deleteDraft(draftIdRef.current + '-fresh');
       setIsSuccess(true);
     } catch {
       // Reset animation on error so UI comes back
@@ -2122,6 +2213,27 @@ export const CreateScreen: React.FC = () => {
             </Animated.View>
           </TouchableOpacity>
         )}
+        {/* ========== RESUME EDIT BOTTOM SHEET ========== */}
+        {showResumeSheet && (
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={handleDiscardResume}>
+            <Animated.View style={[styles.sheetContainer, { backgroundColor: C.white, transform: [{ translateY: resumeSheetSlide }] }]}>
+              <TouchableOpacity activeOpacity={1}>
+                <View style={[styles.sheetHandle, { backgroundColor: C.gray400 }]} />
+                <Text style={[styles.sheetTitle, { color: C.black }]}>Modification en cours</Text>
+                <Text style={[styles.sheetSubtitle, { color: C.gray600 }]}>Tu avais commencé à modifier ce plan — continuer ?</Text>
+                <View style={styles.sheetButtons}>
+                  <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: C.gray500 }]} onPress={handleDiscardResume} activeOpacity={0.7}>
+                    <Text style={[styles.sheetBtnOutlineText, { color: C.gray700 }]}>Annuler les modifications</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={handleResumeDraft} activeOpacity={0.7}>
+                    <Text style={styles.sheetBtnFillText}>Reprendre</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        )}
+
         {/* Photo Editor */}
         <PhotoEditorSheet
           visible={editingPhotoIdx !== null}

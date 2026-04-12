@@ -198,8 +198,10 @@ export const PlanDetailModal: React.FC = () => {
   const handleEditPlan = () => {
     if (!plan) return;
     setShowPlanMenu(false);
-    // Convert plan places to draft format
     const draftId = 'edit-' + plan.id;
+    const existingDraft = useDraftStore.getState().getDraft(draftId);
+
+    // Convert plan places to draft format (fresh copy from published plan)
     const draftPlaces = plan.places.map((p) => ({
       id: p.id,
       googlePlaceId: p.googlePlaceId,
@@ -223,16 +225,25 @@ export const PlanDetailModal: React.FC = () => {
       duration: String(ts.duration),
       transport: ts.transport,
     }));
-    useDraftStore.getState().saveDraft(draftId, {
+    const freshData = {
       title: plan.title,
       coverPhotos: plan.coverPhotos || [],
       selectedTags: plan.tags,
       places: draftPlaces,
       travels: draftTravels,
-    });
+    };
+
+    // Always save a fresh copy so "Annuler les modifications" can reset
+    useDraftStore.getState().saveDraft(draftId + '-fresh', freshData);
+
+    // Only save as main draft if no existing partial edit
+    if (!existingDraft) {
+      useDraftStore.getState().saveDraft(draftId, freshData);
+    }
+
     navigation.goBack();
     setTimeout(() => {
-      (navigation as any).navigate('CreateTab', { screen: 'Create', params: { draftId, editPlanId: plan.id } });
+      (navigation as any).navigate('CreateTab', { screen: 'Create', params: { draftId, editPlanId: plan.id, resumeDraft: !!existingDraft } });
     }, 100);
   };
 
