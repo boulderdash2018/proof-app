@@ -24,6 +24,7 @@ import { RankBadge } from './RankBadge';
 import { FounderBadge } from './FounderBadge';
 import { Chip } from './Chip';
 import { MiniStampIcon } from './MiniStampIcon';
+import { FriendActivity } from './FriendActivity';
 import * as Haptics from 'expo-haptics';
 
 export function parseGradient(gradient: string): string[] {
@@ -320,6 +321,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         </View>
       </TouchableOpacity>
+
+      <FriendActivity plan={plan} />
 
       <View style={[styles.actionBar, { borderTopColor: C.border }]}>
         <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>

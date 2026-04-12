@@ -112,6 +112,9 @@ export interface Plan {
   xpReward: number;
   createdAt: string;
   timeAgo: string;
+  likedByIds?: string[];
+  savedByIds?: string[];
+  recreatedByIds?: string[];
 }
 
 export type BadgeId =

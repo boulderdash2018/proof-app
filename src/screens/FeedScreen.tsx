@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
-import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore } from '../store';
+import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore, useSocialProofStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
@@ -57,7 +57,10 @@ export const FeedScreen: React.FC = () => {
 
   useEffect(() => {
     fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name);
-    if (!isGuest && user?.id) subscribeNotifs(user.id);
+    if (!isGuest && user?.id) {
+      subscribeNotifs(user.id);
+      useSocialProofStore.getState().init(user.id);
+    }
     // Pre-fetch trending tags so PlanCard badges appear
     useTrendingStore.getState().fetchTrending(cityConfig.name);
   }, [user?.id, isGuest, cityConfig.name]);

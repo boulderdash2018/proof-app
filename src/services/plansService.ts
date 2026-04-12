@@ -9,6 +9,8 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode, TravelSegment } from '../types';
@@ -229,7 +231,7 @@ export const toggleLikePlan = async (userId: string, planId: string, isLiked: bo
     const planSnap = await getDoc(planRef);
     if (planSnap.exists()) {
       const current = (planSnap.data() as Plan).likesCount || 0;
-      await updateDoc(planRef, { likesCount: Math.max(0, current - 1) });
+      await updateDoc(planRef, { likesCount: Math.max(0, current - 1), likedByIds: arrayRemove(userId) });
     }
   } else {
     await setDoc(ref, { likedAt: new Date().toISOString() });
@@ -238,7 +240,7 @@ export const toggleLikePlan = async (userId: string, planId: string, isLiked: bo
     const planSnap = await getDoc(planRef);
     if (planSnap.exists()) {
       const current = (planSnap.data() as Plan).likesCount || 0;
-      await updateDoc(planRef, { likesCount: current + 1 });
+      await updateDoc(planRef, { likesCount: current + 1, likedByIds: arrayUnion(userId) });
     }
     // Notify plan author
     if (sender && plan) notifyLike(sender, plan).catch((e) => console.error('[notif trigger]', e));
@@ -283,6 +285,7 @@ export const savePlan = async (userId: string, planId: string, sender?: User, pl
     isDone: false,
     savedAt: new Date().toISOString(),
   });
+  await updateDoc(doc(db, PLANS, planId), { savedByIds: arrayUnion(userId) }).catch(() => {});
   if (sender && plan) notifySave(sender, plan).catch((e) => console.error('[notif trigger]', e));
 };
 
@@ -297,6 +300,7 @@ export const saveCreatedPlan = async (userId: string, planId: string): Promise<v
 /** Unsave a plan */
 export const unsavePlan = async (userId: string, planId: string): Promise<void> => {
   await deleteDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId));
+  await updateDoc(doc(db, PLANS, planId), { savedByIds: arrayRemove(userId) }).catch(() => {});
 };
 
 /** Mark a saved plan as done with optional proof status (unique vote per user) */
@@ -337,6 +341,10 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
       }
       // Save/update the vote record
       await setDoc(voteRef, { status: proofStatus, votedAt: new Date().toISOString() });
+      // Track in recreatedByIds
+      if (proofStatus === 'validated') {
+        await updateDoc(planRef, { recreatedByIds: arrayUnion(userId) }).catch(() => {});
+      }
       // Notify plan author on validated proof
       if (proofStatus === 'validated' && sender && plan) {
         notifyProofIt(sender, plan).catch((e) => console.error('[notif trigger]', e));
