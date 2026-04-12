@@ -524,7 +524,10 @@ export const ExploreScreen: React.FC = () => {
                           onPress={() => toggleFilter(cat.name)}
                         >
                           <Text style={styles.trendingEmoji}>{cat.emoji}</Text>
-                          <Text style={[styles.trendingName, { color: C.black }]}>{cat.name}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.trendingName, { color: C.black }]}>{cat.name}</Text>
+                            <Text style={[styles.trendingCount, { color: C.gray600 }]}>{cat.planCount} plan{cat.planCount > 1 ? 's' : ''}</Text>
+                          </View>
                           {isSelected && <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />}
                         </TouchableOpacity>
                       );
@@ -624,7 +627,8 @@ const styles = StyleSheet.create({
   trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6 },
   trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
   trendingEmoji: { fontSize: 28 },
-  trendingName: { flex: 1, fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  trendingName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  trendingCount: { fontSize: 12, marginTop: 2 },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
