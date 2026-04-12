@@ -82,7 +82,7 @@ export const ExploreScreen: React.FC = () => {
   const [maxDuration, setMaxDuration] = useState<number | null>(null);
   const [minLikes, setMinLikes] = useState<number | null>(null);
   const [minProofs, setMinProofs] = useState<number | null>(null);
-  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minLikes !== null || minProofs !== null;
+  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minLikes !== null || minProofs !== null || contentMode === 'lieux';
 
   const BUDGET_STEPS = [20, 50, 100, 200, 500];
   const DURATION_STEPS = [30, 60, 120, 180, 360];
@@ -248,6 +248,7 @@ export const ExploreScreen: React.FC = () => {
     setMaxDuration(null);
     setMinLikes(null);
     setMinProofs(null);
+    setContentMode('plans');
   };
 
   const formatDuration = (mins: number): string =>
@@ -536,30 +537,11 @@ export const ExploreScreen: React.FC = () => {
       <TouchableOpacity
         style={[styles.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate('ExploreSearch')}
+        onPress={() => navigation.navigate('ExploreSearch', { contentMode })}
       >
         <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
         <Text style={[styles.searchInput, { color: C.gray600 }]}>{t.explore_search_placeholder}</Text>
       </TouchableOpacity>
-
-      {/* Content mode toggle */}
-      <View style={[styles.modeRow, { backgroundColor: C.gray200 }]}>
-        {(['plans', 'lieux'] as const).map((mode) => {
-          const active = contentMode === mode;
-          return (
-            <TouchableOpacity
-              key={mode}
-              style={[styles.modePill, active && { backgroundColor: C.white }]}
-              onPress={() => setContentMode(mode)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modePillText, { color: active ? C.black : C.gray600 }]}>
-                {mode === 'plans' ? 'Plans' : 'Lieux'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
 
       {/* Filter rows */}
       {renderPersonRow()}
@@ -685,6 +667,31 @@ export const ExploreScreen: React.FC = () => {
             </View>
 
             <ScrollView style={styles.filtersBody} showsVerticalScrollIndicator={false}>
+              {/* Content mode toggle */}
+              <View style={styles.filterField}>
+                <View style={styles.filterFieldHeader}>
+                  <Ionicons name="layers-outline" size={16} color={C.gray600} />
+                  <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Afficher</Text>
+                </View>
+                <View style={[styles.modeRow, { backgroundColor: C.gray200 }]}>
+                  {(['plans', 'lieux'] as const).map((mode) => {
+                    const active = contentMode === mode;
+                    return (
+                      <TouchableOpacity
+                        key={mode}
+                        style={[styles.modePill, active && { backgroundColor: C.white }]}
+                        onPress={() => setContentMode(mode)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.modePillText, { color: active ? C.black : C.gray600 }]}>
+                          {mode === 'plans' ? 'Plans' : 'Lieux'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               {renderStepRow('Budget maximum', 'cash-outline', BUDGET_STEPS, maxBudget, setMaxBudget,
                 (n, isLast) => isLast ? `${n}${cityConfig.currency}+` : `${n}${cityConfig.currency}`)}
               {renderStepRow('Temps maximum', 'hourglass-outline', DURATION_STEPS, maxDuration, setMaxDuration,
@@ -720,7 +727,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14 },
 
   // Content mode toggle
-  modeRow: { flexDirection: 'row', marginHorizontal: Layout.screenPadding, borderRadius: 10, padding: 3, marginBottom: 10 },
+  modeRow: { flexDirection: 'row', borderRadius: 10, padding: 3, marginRight: 20 },
   modePill: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
   modePillText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
 

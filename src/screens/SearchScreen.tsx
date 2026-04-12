@@ -10,7 +10,7 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
@@ -36,6 +36,8 @@ const parseGradientColors = (gradient: string): string[] => {
 export const SearchScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const searchMode: 'plans' | 'lieux' = route.params?.contentMode ?? 'plans';
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
@@ -286,8 +288,8 @@ export const SearchScreen: React.FC = () => {
       {isActive && (
         <Animated.View style={[s.resultsWrap, { opacity: resultsOpacity }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
-            {/* Google Places (max 3) */}
-            {sortedPlaces.length > 0 && (
+            {/* Google Places */}
+            {searchMode === 'lieux' && sortedPlaces.length > 0 && (
               <View style={s.section}>
                 <Text style={[s.sectionLabel, { color: C.gray600 }]}>LIEUX</Text>
                 {sortedPlaces.map(renderPlace)}
@@ -295,20 +297,22 @@ export const SearchScreen: React.FC = () => {
             )}
 
             {/* Plans */}
-            {plans.length > 0 && (
-              <View style={[s.section, sortedPlaces.length > 0 && { marginTop: 8 }]}>
+            {searchMode === 'plans' && plans.length > 0 && (
+              <View style={[s.section]}>
                 <Text style={[s.sectionLabel, { color: C.gray600 }]}>PLANS ({plans.length})</Text>
                 {plans.map(renderPlan)}
               </View>
             )}
 
             {/* Loading */}
-            {isSearching && sortedPlaces.length === 0 && plans.length === 0 && (
-              <LoadingSkeleton variant="list" />
+            {isSearching && (
+              (searchMode === 'plans' ? plans.length === 0 : sortedPlaces.length === 0) && (
+                <LoadingSkeleton variant="list" />
+              )
             )}
 
             {/* Empty */}
-            {!isSearching && sortedPlaces.length === 0 && plans.length === 0 && (
+            {!isSearching && (searchMode === 'plans' ? plans.length === 0 : sortedPlaces.length === 0) && (
               <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />
             )}
             <View style={{ height: 40 }} />
