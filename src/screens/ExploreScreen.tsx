@@ -85,17 +85,31 @@ export const ExploreScreen: React.FC = () => {
 
   const toggleFilter = useCallback((label: string) => {
     setSelectedFilters((prev) => {
-      // Single-select: deselect if same, otherwise replace
-      const next = prev.includes(label) ? [] : [label];
+      const isPerson = PERSON_LABELS.has(label);
+      const currentPerson = prev.find((f) => PERSON_LABELS.has(f));
+      const currentTheme = prev.find((f) => !PERSON_LABELS.has(f));
+
+      // Single-select per group: 1 person + 1 theme max
+      let newPerson = isPerson ? (currentPerson === label ? undefined : label) : currentPerson;
+      let newTheme = isPerson ? currentTheme : (currentTheme === label ? undefined : label);
+
+      const next: string[] = [];
+      if (newPerson) next.push(newPerson);
+      if (newTheme) next.push(newTheme);
+
+      // Hide subcategories when a theme is selected
+      if (!isPerson && newTheme) setShowSubcategories(false);
+
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
-      // Hide subcategories when a filter is selected
-      if (next.length > 0) setShowSubcategories(false);
       if (next.length > 0) {
         setIsFilterLoading(true);
-        // Fetch immediately — single filter, no debounce needed
         (async () => {
           const plans = await fetchPublicPlansByTags(next, cityConfig.name);
-          setFilteredPlans(plans);
+          // Intersect: plan must match ALL selected tags
+          const filtered = next.length > 1
+            ? plans.filter((plan) => next.every((tag) => plan.tags.includes(tag)))
+            : plans;
+          setFilteredPlans(filtered);
           setIsFilterLoading(false);
         })();
       } else {
@@ -445,14 +459,21 @@ export const ExploreScreen: React.FC = () => {
               </Animated.View>
             )}
 
-            {/* Selected filter pill + results */}
+            {/* Selected filter pills + results */}
             {hasActiveFilters && (
               <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
                 <View style={styles.activeFiltersRow}>
-                  <TouchableOpacity style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
-                    <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{selectedFilters[0]}</Text>
-                    <Ionicons name="close" size={13} color={Colors.primary} />
-                  </TouchableOpacity>
+                  {selectedFilters.map((f) => (
+                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
+                      <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
+                      <Ionicons name="close" size={13} color={Colors.primary} />
+                    </TouchableOpacity>
+                  ))}
+                  {selectedFilters.length > 1 && (
+                    <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
+                      <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 {isFilterLoading ? (
                   <LoadingSkeleton variant="list" />
