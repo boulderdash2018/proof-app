@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Plan } from '../types';
 import { useSocialProofStore, MinimalUser } from '../store';
-import { useColors } from '../hooks/useColors';
 import { Avatar } from './Avatar';
 
 interface Props {
@@ -12,7 +11,6 @@ interface Props {
 type ActivityLevel = 'recreated' | 'saved' | 'liked';
 
 export const FriendActivity: React.FC<Props> = ({ plan }) => {
-  const C = useColors();
   const followingIds = useSocialProofStore((s) => s.followingIds);
   const getUser = useSocialProofStore((s) => s.getUser);
   const loaded = useSocialProofStore((s) => s.loaded);
@@ -21,7 +19,6 @@ export const FriendActivity: React.FC<Props> = ({ plan }) => {
 
   const followingSet = new Set(followingIds);
 
-  // Compute friend intersections — prioritized
   const recreatedFriends = (plan.recreatedByIds || []).filter((id) => followingSet.has(id));
   const savedFriends = (plan.savedByIds || []).filter((id) => followingSet.has(id));
   const likedFriends = (plan.likedByIds || []).filter((id) => followingSet.has(id));
@@ -42,7 +39,6 @@ export const FriendActivity: React.FC<Props> = ({ plan }) => {
     return null;
   }
 
-  // Resolve profiles (only what's cached)
   const users: MinimalUser[] = friendIds
     .map((id) => getUser(id))
     .filter(Boolean) as MinimalUser[];
@@ -51,19 +47,17 @@ export const FriendActivity: React.FC<Props> = ({ plan }) => {
 
   const firstName = (u: MinimalUser) => u.displayName.split(' ')[0];
   const count = friendIds.length;
-  const maxAvatars = level === 'liked' ? 1 : 2;
-  const avatarUsers = users.slice(0, maxAvatars);
+  const avatarUsers = users.slice(0, 3);
 
-  // Build text parts
   const actionStyle =
     level === 'recreated'
-      ? { fontWeight: '700' as const, color: '#C8571A' }
+      ? { fontWeight: '600' as const, color: '#C8571A' }
       : level === 'saved'
       ? { fontWeight: '600' as const, color: '#6B6058' }
       : { fontWeight: '400' as const, color: '#8A8078' };
 
   const actionWord =
-    level === 'recreated' ? 'recreated this plan' : level === 'saved' ? 'saved this' : 'liked this';
+    level === 'recreated' ? 'recreated this' : level === 'saved' ? 'saved this' : 'liked this';
 
   let nameText: string;
   if (count === 1) {
@@ -75,11 +69,10 @@ export const FriendActivity: React.FC<Props> = ({ plan }) => {
   }
 
   return (
-    <View style={[s.container, { borderTopColor: '#EDE8E0' }]}>
-      {/* Overlapping avatars */}
+    <View style={s.container}>
       <View style={s.avatars}>
         {avatarUsers.map((u, i) => (
-          <View key={u.id} style={[s.avatarWrap, i > 0 && { marginLeft: -4 }]}>
+          <View key={u.id} style={i > 0 ? { marginLeft: -4 } : undefined}>
             <Avatar
               initials={u.initials}
               bg={u.avatarBg}
@@ -90,7 +83,6 @@ export const FriendActivity: React.FC<Props> = ({ plan }) => {
           </View>
         ))}
       </View>
-      {/* Text */}
       <Text style={s.text} numberOfLines={1}>
         <Text style={s.name}>{nameText}</Text>
         {' '}
@@ -104,13 +96,10 @@ const s = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 28,
-    borderTopWidth: 1,
-    gap: 8,
+    paddingTop: 4,
+    gap: 6,
   },
   avatars: { flexDirection: 'row', alignItems: 'center' },
-  avatarWrap: {},
   text: { flex: 1, fontSize: 11, fontWeight: '500', color: '#8A8078' },
   name: { fontWeight: '600', color: '#6B6058' },
 });

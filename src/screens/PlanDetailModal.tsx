@@ -25,7 +25,8 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, Chip, UserBadge } from '../components';
-import { useAuthStore, useFeedStore, useSavesStore, useGuestStore, useDraftStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore, useGuestStore, useDraftStore, useSocialProofStore } from '../store';
+import type { MinimalUser } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
@@ -98,6 +99,8 @@ export const PlanDetailModal: React.FC = () => {
   const [showMap, setShowMap] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
   const [showTransportChooser, setShowTransportChooser] = useState(false);
+  const [showLikersSheet, setShowLikersSheet] = useState(false);
+  const [likerUsers, setLikerUsers] = useState<MinimalUser[]>([]);
 
   // Auto-compute missing travel segments
   const [computedSegments, setComputedSegments] = useState<Record<string, TravelSegment>>({});
@@ -131,6 +134,17 @@ export const PlanDetailModal: React.FC = () => {
       }).catch(() => {});
     });
   }, [plan?.id]);
+
+  // Fetch liker profiles
+  useEffect(() => {
+    if (!plan || !plan.likedByIds || plan.likedByIds.length === 0) return;
+    useSocialProofStore.getState().ensureUsers(plan.likedByIds).then(() => {
+      const users = plan.likedByIds!
+        .map((id) => useSocialProofStore.getState().getUser(id))
+        .filter(Boolean) as MinimalUser[];
+      setLikerUsers(users);
+    });
+  }, [plan?.id, plan?.likedByIds?.length]);
 
   // Redesign state
   const [showCommentSheet, setShowCommentSheet] = useState(false);
@@ -507,6 +521,25 @@ export const PlanDetailModal: React.FC = () => {
           </View>
         </View>
 
+        {/* ===== LIKED BY ===== */}
+        {likerUsers.length > 0 && (
+          <TouchableOpacity style={st.likesRow} onPress={() => setShowLikersSheet(true)} activeOpacity={0.7}>
+            <View style={st.likesAvatars}>
+              {likerUsers.slice(0, 5).map((u, i) => (
+                <View key={u.id} style={[st.likerAvatarWrap, i > 0 && { marginLeft: -6 }]}>
+                  <Avatar initials={u.initials} bg={u.avatarBg} color={u.avatarColor} size="SS" avatarUrl={u.avatarUrl ?? undefined} borderColor={C.white} />
+                </View>
+              ))}
+            </View>
+            <Text style={[st.likesText, { color: C.gray800 }]} numberOfLines={1}>
+              Liked by <Text style={st.likesName}>{likerUsers[0].displayName.split(' ')[0]}</Text>
+              {(plan.likedByIds?.length ?? 0) > 1 && (
+                <Text> and <Text style={st.likesName}>{(plan.likedByIds!.length - 1)} other{(plan.likedByIds!.length - 1) > 1 ? 's' : ''}</Text></Text>
+              )}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* ===== EXTRA TAGS ===== */}
         {plan.tags.length > 1 && (
           <View style={st.tagsRow}>
@@ -819,6 +852,38 @@ export const PlanDetailModal: React.FC = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* ===== LIKERS SHEET ===== */}
+      <Modal visible={showLikersSheet} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={() => setShowLikersSheet(false)}>
+          <View style={st.sheetBackdrop}>
+            <TouchableWithoutFeedback>
+              <View style={[st.sheet, { backgroundColor: C.gray100, paddingBottom: insets.bottom + 8 }]}>
+                <View style={[st.sheetHandle, { backgroundColor: C.gray500 }]} />
+                <Text style={[st.sheetTitle, { color: C.black }]}>Likes</Text>
+                <ScrollView style={st.likersScroll}>
+                  {likerUsers.map((u) => (
+                    <TouchableOpacity
+                      key={u.id}
+                      style={st.likerRow}
+                      onPress={() => {
+                        setShowLikersSheet(false);
+                        if (u.id !== currentUser?.id) {
+                          navigation.navigate('OtherProfile', { userId: u.id });
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Avatar initials={u.initials} bg={u.avatarBg} color={u.avatarColor} size="S" avatarUrl={u.avatarUrl ?? undefined} />
+                      <Text style={[st.likerName, { color: C.black }]}>{u.displayName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {/* ===== EXISTING MODALS ===== */}
       {plan && (
         <>
@@ -999,4 +1064,16 @@ const st = StyleSheet.create({
   commentPlaceholder: { fontSize: 13, fontFamily: Fonts.serif },
   commentInput: { flex: 1, fontSize: 13, maxHeight: 60, paddingVertical: 0 },
   sendBtn: { marginLeft: 8, paddingHorizontal: 4 },
+
+  // Likes row (Instagram-style)
+  likesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, marginTop: 14 },
+  likesAvatars: { flexDirection: 'row', alignItems: 'center' },
+  likerAvatarWrap: { zIndex: 1 },
+  likesText: { flex: 1, fontSize: 12, fontFamily: Fonts.serif },
+  likesName: { fontFamily: Fonts.serifBold },
+
+  // Likers sheet
+  likersScroll: { maxHeight: SCREEN_H * 0.45 },
+  likerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4 },
+  likerName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
 });

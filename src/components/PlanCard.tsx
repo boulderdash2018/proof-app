@@ -322,41 +322,42 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </View>
       </TouchableOpacity>
 
-      <FriendActivity plan={plan} />
-
       <View style={[styles.actionBar, { borderTopColor: C.border }]}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>
-          <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? C.primary : C.gray600} />
-          </Animated.View>
-          <Text style={[styles.actionCount, { color: isLiked ? C.primary : C.gray700 }]}>{plan.likesCount}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={onComment} activeOpacity={0.7}>
-          <Ionicons name="chatbubble-outline" size={16} color={C.gray600} />
-          <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
-          <View style={styles.saveIconWrap}>
-            <Animated.View pointerEvents="none" style={[styles.saveFlash, { backgroundColor: C.primary, opacity: saveFlashOpacity }]} />
-            <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-              <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>
+            <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+              <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? C.primary : C.gray600} />
             </Animated.View>
-          </View>
-          {showSaveLabel && (
-            <Animated.Text style={[styles.saveLabel, { color: C.primary, opacity: saveLabelOpacity }]}>
-              Sauvegardé !
-            </Animated.Text>
+            <Text style={[styles.actionCount, { color: isLiked ? C.primary : C.gray700 }]}>{plan.likesCount}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={onComment} activeOpacity={0.7}>
+            <Ionicons name="chatbubble-outline" size={16} color={C.gray600} />
+            <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
+            <View style={styles.saveIconWrap}>
+              <Animated.View pointerEvents="none" style={[styles.saveFlash, { backgroundColor: C.primary, opacity: saveFlashOpacity }]} />
+              <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
+              </Animated.View>
+            </View>
+            {showSaveLabel && (
+              <Animated.Text style={[styles.saveLabel, { color: C.primary, opacity: saveLabelOpacity }]}>
+                Sauvegardé !
+              </Animated.Text>
+            )}
+          </TouchableOpacity>
+          <View style={styles.actionSpacer} />
+          {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
+            <View style={styles.proofStats}>
+              <MiniStampIcon type="proof" size={14} />
+              <Text style={styles.proofCountText}>{plan.proofCount ?? 0}</Text>
+              <MiniStampIcon type="declined" size={14} />
+              <Text style={styles.declinedCountText}>{plan.declinedCount ?? 0}</Text>
+            </View>
           )}
-        </TouchableOpacity>
-        <View style={styles.actionSpacer} />
-        {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
-          <View style={styles.proofStats}>
-            <MiniStampIcon type="proof" size={14} />
-            <Text style={styles.proofCountText}>{plan.proofCount ?? 0}</Text>
-            <MiniStampIcon type="declined" size={14} />
-            <Text style={styles.declinedCountText}>{plan.declinedCount ?? 0}</Text>
-          </View>
-        )}
+        </View>
+        <FriendActivity plan={plan} />
       </View>
     </Animated.View>
     </ReAnimated.View>
@@ -406,7 +407,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
   metaPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
-  actionBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
+  actionBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  actionRow: { flexDirection: 'row', alignItems: 'center' },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
   saveIconWrap: { position: 'relative', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   saveFlash: { position: 'absolute', width: 28, height: 28, borderRadius: 14 },
