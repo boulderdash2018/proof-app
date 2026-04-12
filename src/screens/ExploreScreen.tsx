@@ -380,7 +380,7 @@ export const ExploreScreen: React.FC = () => {
     const colors = parseGradientColors(item.gradient);
     const photo = getPlanPhoto(item);
     return (
-      <TouchableOpacity style={[styles.compactCard, { borderColor: C.cardBorder, backgroundColor: C.gray200 }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
+      <TouchableOpacity style={[styles.compactCard, { borderBottomColor: C.border }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
         <View style={styles.compactBanner}>
           {photo ? <Image source={{ uri: photo }} style={styles.compactBannerImage} /> : <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.compactBannerOverlay} />
@@ -478,8 +478,8 @@ export const ExploreScreen: React.FC = () => {
                 {isFilterLoading ? (
                   <LoadingSkeleton variant="list" />
                 ) : displayedPlans.length > 0 ? (
-                  <View style={{ marginTop: 12 }}>
-                    <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Plans ({displayedPlans.length})</Text>
+                  <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
+                    <Text style={[styles.resultsSectionLabel, { color: C.gray700, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
                     {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
                   </View>
                 ) : (
@@ -568,12 +568,12 @@ const styles = StyleSheet.create({
 
   // Results
   resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
-  compactCard: { height: 130, borderRadius: 18, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
-  compactBanner: { height: 90, justifyContent: 'flex-end', padding: 12, overflow: 'hidden' },
+  compactCard: { marginBottom: 0, borderBottomWidth: 1, overflow: 'hidden' },
+  compactBanner: { height: 180, justifyContent: 'flex-end', padding: 14, overflow: 'hidden' },
   compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
-  compactBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
-  compactTitle: { color: '#FFFFFF', fontSize: 15, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  compactMeta: { flexDirection: 'row', padding: 10, gap: 14 },
+  compactBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
+  compactTitle: { color: '#FFFFFF', fontSize: 16, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  compactMeta: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, gap: 14 },
   compactMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactMetaText: { fontSize: 12 },
 

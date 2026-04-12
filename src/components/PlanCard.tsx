@@ -44,7 +44,8 @@ function getTransportIcon(mode: TransportMode): string {
   return TRANSPORT_ICONS[mode] ?? 'walk-outline';
 }
 
-const CARD_HEIGHT = 520;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const BANNER_HEIGHT = Math.round(SCREEN_WIDTH * 0.95); // ~1:1 aspect like Instagram
 
 interface PlanCardProps {
   plan: Plan;
@@ -93,7 +94,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     return placePhotos;
   })();
 
-  const bannerWidth = Dimensions.get('window').width - Layout.screenPadding * 2 - 24; // card padding
+  const bannerWidth = SCREEN_WIDTH; // full-width edge-to-edge
 
   const handlePhotoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
@@ -123,13 +124,9 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     ]).start();
   };
 
-  // Emil: scale(0.98) on press — instant feedback, card feels alive
-  const onCardPressIn = () => {
-    Animated.timing(cardScale, { toValue: 0.98, duration: 120, useNativeDriver: true }).start();
-  };
-  const onCardPressOut = () => {
-    Animated.spring(cardScale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 200 }).start();
-  };
+  // No card scale — flat feed, no card feel
+  const onCardPressIn = () => {};
+  const onCardPressOut = () => {};
 
   const handleBannerPressIn = (e: GestureResponderEvent) => {
     tapPosRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
@@ -190,9 +187,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
   return (
     <ReAnimated.View entering={index < 6 ? FadeInUp.delay(index * 60).duration(400) : undefined}>
-    <Animated.View
-      style={[styles.card, { backgroundColor: C.gray200, borderColor: C.border, transform: [{ scale: cardScale }] }]}
-    >
+    <View style={[styles.card, { backgroundColor: C.white }]}>
+      <View style={[styles.postSeparator, { backgroundColor: C.border }]} />
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
         <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
         <View style={styles.userInfo}>
@@ -313,7 +309,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         )}
 
-        <View style={[styles.metaRow, { borderTopColor: C.border }]}>
+        <View style={styles.metaRow}>
           {plan.price.includes('Free') ? (
             <View style={[styles.metaPill, { backgroundColor: '#16a34a18' }]}>
               <Text style={[styles.metaItem, { color: '#16a34a', fontWeight: '700' }]}>Free ✦</Text>
@@ -335,7 +331,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </View>
       </TouchableOpacity>
 
-      <View style={[styles.actionBar, { borderTopColor: C.border }]}>
+      <View style={styles.actionBar}>
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>
             <Animated.View style={{ transform: [{ scale: likeScale }] }}>
@@ -372,49 +368,40 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </View>
         <FriendActivity plan={plan} />
       </View>
-    </Animated.View>
+    </View>
     </ReAnimated.View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    height: CARD_HEIGHT,
-    borderRadius: Layout.cardRadius,
-    marginHorizontal: Layout.screenPadding,
-    marginBottom: 16,
-    borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
   },
-  userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
+  postSeparator: { height: 1, marginTop: 4 },
+  userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10 },
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
   displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
-  contentArea: { flex: 1, overflow: 'hidden' },
-  bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden', position: 'relative' } as any,
+  contentArea: { overflow: 'hidden' },
+  bannerWrap: { overflow: 'hidden', position: 'relative' } as any,
   doubleTapHeart: { position: 'absolute', width: 70, height: 70, alignItems: 'center', justifyContent: 'center' },
-  banner: { height: 180, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
-  bannerTitle: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  photoBanner: { height: 180 },
-  photoSlide: { height: 180 },
+  banner: { height: BANNER_HEIGHT, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 18 },
+  bannerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
+  photoBanner: { height: BANNER_HEIGHT },
+  photoSlide: { height: BANNER_HEIGHT },
   photoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  photoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  photoTitleWrap: { position: 'absolute', bottom: 14, left: 16, right: 16 },
-  photoDots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 },
+  photoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
+  photoTitleWrap: { position: 'absolute', bottom: 16, left: 16, right: 16 },
+  photoDots: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', gap: 5 },
   photoDot: { width: 6, height: 6, borderRadius: 3 },
-  newBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  newBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   newBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FFF', letterSpacing: 0.5 },
   trendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B3520', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 6, marginBottom: 4 },
   trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
   bookAheadBadge: { backgroundColor: '#FFF0F0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginBottom: 4 },
   bookAheadText: { fontSize: 9, fontFamily: Fonts.serifSemiBold, color: '#C0392B' },
-  tagsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, overflow: 'hidden' },
-  placesList: { paddingHorizontal: 16, paddingTop: 12 },
+  tagsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, overflow: 'hidden' },
+  placesList: { paddingHorizontal: 14, paddingTop: 10 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },
   placeRow: { flexDirection: 'row', alignItems: 'center' },
   placeIndex: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
@@ -422,10 +409,10 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, gap: 8 },
   metaPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
-  actionBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  actionBar: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
   saveIconWrap: { position: 'relative', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },

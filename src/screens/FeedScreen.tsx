@@ -281,5 +281,5 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  list: { paddingTop: 10, paddingBottom: 20 },
+  list: { paddingBottom: 20 },
 });
