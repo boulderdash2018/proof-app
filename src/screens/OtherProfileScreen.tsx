@@ -18,6 +18,9 @@ type FollowStatus = 'none' | 'following' | 'requested';
 const { width } = Dimensions.get('window');
 const CARD_GAP = 8;
 const CARD_WIDTH = (width - Layout.screenPadding * 2 - CARD_GAP) / 2;
+const GRID_GAP = 2;
+const GRID_COLS = 3;
+const GRID_CELL = (width - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
@@ -235,48 +238,32 @@ export const OtherProfileScreen: React.FC = () => {
         {/* Content area */}
         {canSeeContent ? (
           <>
-            {/* Plans grid */}
+            {/* Plans grid — Instagram style */}
             {userPlans.length > 0 ? (
-              <View style={styles.plansSection}>
-                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.other_profile_plans_section}</Text>
-                <View style={styles.plansGrid}>
-                  {userPlans.map((plan) => {
-                    const colors = parseGradient(plan.gradient);
-                    const photo = getPlanPhoto(plan);
-                    return (
-                      <TouchableOpacity
-                        key={plan.id}
-                        activeOpacity={0.85}
-                        onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
-                      >
-                        <View style={styles.planCard}>
-                          {photo ? (
-                            <Image source={{ uri: photo }} style={styles.planCardImage} />
-                          ) : (
-                            <LinearGradient
-                              colors={colors as [string, string, ...string[]]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={StyleSheet.absoluteFill}
-                            />
-                          )}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.planCardOverlay} />
-                          <Text style={styles.planCardTitle} numberOfLines={2}>{plan.title}</Text>
-                          <View style={styles.planCardMeta}>
-                            <View style={styles.planCardMetaItem}>
-                              <Ionicons name="heart" size={11} color="rgba(255,255,255,0.85)" />
-                              <Text style={styles.planCardMetaText}>{plan.likesCount}</Text>
-                            </View>
-                            <View style={styles.planCardMetaItem}>
-                              <Ionicons name="cash-outline" size={11} color="rgba(255,255,255,0.85)" />
-                              <Text style={styles.planCardMetaText}>{plan.price}</Text>
-                            </View>
+              <View style={styles.instaGrid}>
+                {userPlans.map((plan) => {
+                  const colors = parseGradient(plan.gradient);
+                  const photo = getPlanPhoto(plan);
+                  return (
+                    <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                      <View style={styles.instaCell}>
+                        {photo ? (
+                          <Image source={{ uri: photo }} style={styles.instaCellImage} />
+                        ) : (
+                          <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                        )}
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <View style={styles.instaCellBottom}>
+                          <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
+                          <View style={styles.instaCellLikes}>
+                            <Ionicons name="heart" size={11} color="#FFF" />
+                            <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
                           </View>
                         </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             ) : (
               <View style={styles.emptyPlans}>
@@ -478,4 +465,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+  // Instagram-style grid
+  instaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  instaCell: { width: GRID_CELL, height: GRID_CELL, overflow: 'hidden' },
+  instaCellImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' } as any,
+  instaCellOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%' } as any,
+  instaCellBottom: { position: 'absolute', bottom: 8, left: 8, right: 8 },
+  instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 } as any,
+  instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.serifSemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 });

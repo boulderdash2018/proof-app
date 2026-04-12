@@ -27,6 +27,9 @@ import { checkAndUnlockBadges } from '../services/badgeService';
 import { useLanguageStore } from '../store/languageStore';
 
 const { width } = Dimensions.get('window');
+const GRID_GAP = 2;
+const GRID_COLS = 3;
+const GRID_CELL = (width - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 const MINI_CARD_W = (width - Layout.screenPadding * 2 - 8) / 2;
 
 const parseGradient = (g: string): string[] => {
@@ -270,83 +273,33 @@ export const ProfileScreen: React.FC = () => {
         {/* ═══ Tab content ═══ */}
         {profileTab === 'plans' && (
           <>
-            {userPlans.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_recent_plans}</Text>
-                <View style={styles.plansGrid}>
-                  {userPlans.map((plan) => {
-                    const colors = parseGradient(plan.gradient);
-                    const photo = getPlanPhoto(plan);
-                    return (
-                      <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
-                        <View style={styles.miniCard}>
-                          {photo ? (
-                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
-                          ) : (
-                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                          )}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
-                          <Text style={styles.miniCardTitle} numberOfLines={2}>{plan.title}</Text>
+            {userPlans.length > 0 ? (
+              <View style={styles.instaGrid}>
+                {userPlans.map((plan) => {
+                  const colors = parseGradient(plan.gradient);
+                  const photo = getPlanPhoto(plan);
+                  return (
+                    <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                      <View style={styles.instaCell}>
+                        {photo ? (
+                          <Image source={{ uri: photo }} style={styles.instaCellImage} />
+                        ) : (
+                          <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                        )}
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <View style={styles.instaCellBottom}>
+                          <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
+                          <View style={styles.instaCellLikes}>
+                            <Ionicons name="heart" size={11} color="#FFF" />
+                            <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
+                          </View>
                         </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            )}
-
-            {donePlans.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_done_plans}</Text>
-                <View style={styles.plansGrid}>
-                  {donePlans.map((sp) => {
-                    const colors = parseGradient(sp.plan.gradient);
-                    const photo = getPlanPhoto(sp.plan);
-                    return (
-                      <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
-                        <View style={styles.miniCard}>
-                          {photo ? (
-                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
-                          ) : (
-                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                          )}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
-                          <View style={styles.doneCheck}><Text style={styles.doneCheckText}>✓</Text></View>
-                          <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {todoPlans.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_saved_plans}</Text>
-                <View style={styles.plansGrid}>
-                  {todoPlans.map((sp) => {
-                    const colors = parseGradient(sp.plan.gradient);
-                    const photo = getPlanPhoto(sp.plan);
-                    return (
-                      <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
-                        <View style={styles.miniCard}>
-                          {photo ? (
-                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
-                          ) : (
-                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                          )}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
-                          <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {userPlans.length === 0 && donePlans.length === 0 && todoPlans.length === 0 && (
+            ) : (
               <View style={styles.emptyTab}>
                 <Ionicons name="map-outline" size={36} color={C.gray500} />
                 <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun plan pour le moment</Text>
@@ -482,4 +435,13 @@ const styles = StyleSheet.create({
   draftMeta: { fontSize: 9, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
   draftMetaDark: { color: '#9A8E80' },
   draftDeleteBtn: { position: 'absolute', top: 4, right: 4 },
+  // Instagram-style grid
+  instaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  instaCell: { width: GRID_CELL, height: GRID_CELL, overflow: 'hidden' },
+  instaCellImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
+  instaCellOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%' },
+  instaCellBottom: { position: 'absolute', bottom: 8, left: 8, right: 8 },
+  instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.serifSemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 });
