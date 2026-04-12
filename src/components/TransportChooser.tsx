@@ -6,6 +6,7 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
@@ -18,6 +19,7 @@ interface Props {
   onSelect: (transport: DoItNowTransport) => void;
   recommendedTransport?: TransportMode;
   authorName?: string;
+  loading?: boolean;
 }
 
 const TRANSPORT_OPTIONS: { key: DoItNowTransport; label: string; emoji: string; icon: string }[] = [
@@ -49,6 +51,7 @@ export const TransportChooser: React.FC<Props> = ({
   onSelect,
   recommendedTransport,
   authorName,
+  loading,
 }) => {
   const C = useColors();
   const [selected, setSelected] = useState<DoItNowTransport | null>(null);
@@ -108,13 +111,19 @@ export const TransportChooser: React.FC<Props> = ({
               </View>
 
               <TouchableOpacity
-                style={[styles.goBtn, { backgroundColor: selected ? C.primary : C.gray400 }]}
-                onPress={() => selected && onSelect(selected)}
-                disabled={!selected}
+                style={[styles.goBtn, { backgroundColor: selected && !loading ? C.primary : C.gray400 }]}
+                onPress={() => selected && !loading && onSelect(selected)}
+                disabled={!selected || loading}
                 activeOpacity={0.8}
               >
-                <Text style={styles.goBtnText}>C'est parti !</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                {loading ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.goBtnText}>C'est parti !</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>

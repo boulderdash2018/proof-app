@@ -31,12 +31,13 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment, deletePlan, archivePlan } from '../services/plansService';
-import { getPlaceDetails, computeTravelDuration } from '../services/googlePlacesService';
+import { getPlaceDetails, computeTravelDuration, checkPlaceOpenStatus, PlaceOpenStatus } from '../services/googlePlacesService';
 import { useCity } from '../hooks/useCity';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
 import { PlanMapModal } from '../components/PlanMapModal';
 import { TransportChooser } from '../components/TransportChooser';
+import { ClosedPlacesSheet } from '../components/ClosedPlacesSheet';
 import { useDoItNowStore } from '../store/doItNowStore';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -109,6 +110,21 @@ export const PlanDetailModal: React.FC = () => {
   const [showMap, setShowMap] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
   const [showTransportChooser, setShowTransportChooser] = useState(false);
+  const [showClosedSheet, setShowClosedSheet] = useState(false);
+  const [closedPlaces, setClosedPlaces] = useState<PlaceOpenStatus[]>([]);
+  const [pendingTransport, setPendingTransport] = useState<any>(null);
+  const [checkingPlaces, setCheckingPlaces] = useState(false);
+
+  const launchDoItNow = useCallback((targetPlan: Plan, transport: any) => {
+    useDoItNowStore.getState().startSession(targetPlan, transport, currentUser!.id);
+    navigation.navigate('DoItNow', { planId: plan?.id });
+    if (currentUser && plan) {
+      import('../services/notificationsService').then(({ notifyDoItNow }) => {
+        notifyDoItNow(currentUser, plan).catch((e: any) => console.error('[notif trigger]', e));
+      });
+    }
+  }, [currentUser, plan, navigation]);
+
   const [showLikersSheet, setShowLikersSheet] = useState(false);
   const [likerUsers, setLikerUsers] = useState<MinimalUser[]>([]);
 
@@ -917,18 +933,49 @@ export const PlanDetailModal: React.FC = () => {
           />
           <TransportChooser
             visible={showTransportChooser}
-            onClose={() => setShowTransportChooser(false)}
+            onClose={() => { setShowTransportChooser(false); setCheckingPlaces(false); }}
             recommendedTransport={plan.transport}
             authorName={plan.author.username}
-            onSelect={(transport) => {
+            loading={checkingPlaces}
+            onSelect={async (transport) => {
+              setCheckingPlaces(true);
+              // Check open status for all places with a googlePlaceId
+              const placesToCheck = plan.places.filter(p => p.googlePlaceId);
+              const statuses = await Promise.all(
+                placesToCheck.map(p => checkPlaceOpenStatus(p.googlePlaceId!, p.name))
+              );
+              const closed = statuses.filter(s => s.isPermanentlyClosed || s.isOpen === false);
+              setCheckingPlaces(false);
               setShowTransportChooser(false);
-              useDoItNowStore.getState().startSession(plan, transport, currentUser!.id);
-              navigation.navigate('DoItNow', { planId: plan.id });
-              if (currentUser && plan) {
-                import('../services/notificationsService').then(({ notifyDoItNow }) => {
-                  notifyDoItNow(currentUser, plan).catch((e) => console.error('[notif trigger]', e));
-                });
+
+              if (closed.length > 0) {
+                setClosedPlaces(closed);
+                setPendingTransport(transport);
+                setShowClosedSheet(true);
+              } else {
+                // All open — launch directly
+                launchDoItNow(plan, transport);
               }
+            }}
+          />
+          <ClosedPlacesSheet
+            visible={showClosedSheet}
+            closedPlaces={closedPlaces}
+            allClosed={closedPlaces.length === plan.places.length}
+            onSkipClosed={() => {
+              setShowClosedSheet(false);
+              const closedIds = new Set(closedPlaces.map(cp => cp.placeId));
+              const filteredPlan = { ...plan, places: plan.places.filter(p => !closedIds.has(p.googlePlaceId || '')) };
+              launchDoItNow(filteredPlan, pendingTransport);
+            }}
+            onContinue={() => {
+              setShowClosedSheet(false);
+              launchDoItNow(plan, pendingTransport);
+            }}
+            onCancel={() => {
+              setShowClosedSheet(false);
+              setPendingTransport(null);
+              setClosedPlaces([]);
             }}
           />
         </>

@@ -192,6 +192,75 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceDetai
   }
 }
 
+// ==================== PLACE OPEN STATUS ====================
+export interface PlaceOpenStatus {
+  placeId: string;
+  name: string;
+  isOpen: boolean | null;         // null = unknown
+  isPermanentlyClosed: boolean;
+  nextOpenTime?: string;          // e.g. "09:00"
+}
+
+export async function checkPlaceOpenStatus(placeId: string, placeName: string): Promise<PlaceOpenStatus> {
+  const fallback: PlaceOpenStatus = { placeId, name: placeName, isOpen: null, isPermanentlyClosed: false };
+  const fields = ['id', 'businessStatus', 'currentOpeningHours', 'regularOpeningHours'];
+
+  try {
+    const url = isWeb
+      ? `/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
+      : `${BASE_URL}/${placeId}`;
+    const headers: Record<string, string> = isWeb
+      ? {}
+      : { 'X-Goog-Api-Key': API_KEY, 'X-Goog-FieldMask': fields.join(',') };
+
+    const res = await fetch(url, { method: 'GET', headers });
+    const data = await res.json();
+
+    const isPermanentlyClosed =
+      data.businessStatus === 'CLOSED_PERMANENTLY' ||
+      data.businessStatus === 'CLOSED_TEMPORARILY';
+
+    if (isPermanentlyClosed) {
+      return { placeId, name: placeName, isOpen: false, isPermanentlyClosed: true };
+    }
+
+    const hours = data.currentOpeningHours || data.regularOpeningHours;
+    const isOpen = hours?.openNow ?? null;
+
+    // Try to find next opening time from periods
+    let nextOpenTime: string | undefined;
+    if (isOpen === false && hours?.periods) {
+      const now = new Date();
+      const currentDay = now.getDay(); // 0=Sun
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+
+      for (const period of hours.periods) {
+        if (!period.open) continue;
+        const openDay = period.open.day;
+        const openHour = period.open.hour ?? 0;
+        const openMin = period.open.minute ?? 0;
+        const openMins = openHour * 60 + openMin;
+
+        // Same day, later time
+        if (openDay === currentDay && openMins > currentMins) {
+          nextOpenTime = `${String(openHour).padStart(2, '0')}:${String(openMin).padStart(2, '0')}`;
+          break;
+        }
+        // Next day
+        if (openDay === (currentDay + 1) % 7) {
+          nextOpenTime = `${String(openHour).padStart(2, '0')}:${String(openMin).padStart(2, '0')}`;
+          break;
+        }
+      }
+    }
+
+    return { placeId, name: placeName, isOpen, isPermanentlyClosed: false, nextOpenTime };
+  } catch (err) {
+    console.error('[checkPlaceOpenStatus] error:', err);
+    return fallback;
+  }
+}
+
 // ==================== TEXT SEARCH ====================
 export async function searchPlacesNearby(
   query: string,

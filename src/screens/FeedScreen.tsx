@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,41 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
   const [friendsFetched, setFriendsFetched] = useState(false);
+
+  // ── Contextual greeting ──
+  const getGreeting = (): string => {
+    const now = new Date();
+    const h = now.getHours();
+    const day = now.getDay(); // 0=Sun
+    if (h >= 23 || h < 6) return 'Encore debout ? proof aussi.';
+    if (day === 0) return 'Slow Sunday — voilà ce que proof te propose.';
+    if (day === 6) {
+      if (h < 11) return 'Samedi matin — la ville t\'appartient.';
+      if (h < 18) return 'Parfait pour un plan. proof t\'attend.';
+      return 'Samedi soir — proof a ce qu\'il faut.';
+    }
+    if (day === 5 && h >= 18) return 'C\'est vendredi. proof a une ou deux idées.';
+    if (h < 11) return 'Bonjour, qu\'est-ce qu\'on fait aujourd\'hui ?';
+    if (h < 18) return 'proof a quelques idées pour cet après-midi.';
+    return 'La soirée commence. proof est là.';
+  };
+
+  const [greeting, setGreeting] = useState(getGreeting);
+  const greetingOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Recalculate greeting every minute
+    const interval = setInterval(() => {
+      const next = getGreeting();
+      if (next !== greeting) {
+        Animated.timing(greetingOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+          setGreeting(next);
+          Animated.timing(greetingOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+        });
+      }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [greeting]);
 
   useEffect(() => {
     fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name);
@@ -142,9 +177,14 @@ export const FeedScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
-        <Text style={[styles.logo, { color: C.black }]}>
-          proof<Text style={{ color: C.primary }}>.</Text>
-        </Text>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.logo, { color: C.black }]}>
+            proof<Text style={{ color: C.primary }}>.</Text>
+          </Text>
+          <Animated.Text style={[styles.greeting, { color: C.gray600, opacity: greetingOpacity }]} numberOfLines={1}>
+            {greeting}
+          </Animated.Text>
+        </View>
         <View style={styles.headerRight}>
           {isGuest ? (
             <TouchableOpacity
@@ -253,6 +293,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   logo: { fontSize: 28, fontFamily: Fonts.serifBold, letterSpacing: -1 },
+  headerLeft: { flex: 1 },
+  greeting: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   bellBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   bellBadge: { position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#E85D5D', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
