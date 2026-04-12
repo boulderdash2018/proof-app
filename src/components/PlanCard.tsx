@@ -72,6 +72,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const C = useColors();
   const topTrendingTags = useTrendingStore((s) => s.topTags);
   const isTrending = plan.tags.some((t) => topTrendingTags.includes(t));
+  const isNew = plan.createdAt ? (Date.now() - new Date(plan.createdAt).getTime()) < 6 * 60 * 60 * 1000 : false;
   const gradientColors = parseGradient(plan.gradient);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
@@ -228,6 +229,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <View style={styles.photoTitleWrap} pointerEvents="none">
               <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
             </View>
+            {isNew && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>New</Text>
+              </View>
+            )}
             {allPhotos.length > 1 && (
               <View style={styles.photoDots} pointerEvents="none">
                 {allPhotos.map((_, i) => (
@@ -245,6 +251,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         ) : (
           <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
             <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
+            {isNew && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>New</Text>
+              </View>
+            )}
           </LinearGradient>
         )}
         {/* Double-tap heart overlay */}
@@ -396,6 +407,8 @@ const styles = StyleSheet.create({
   photoTitleWrap: { position: 'absolute', bottom: 14, left: 16, right: 16 },
   photoDots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 },
   photoDot: { width: 6, height: 6, borderRadius: 3 },
+  newBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  newBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FFF', letterSpacing: 0.5 },
   trendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B3520', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 6, marginBottom: 4 },
   trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
   bookAheadBadge: { backgroundColor: '#FFF0F0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginBottom: 4 },
