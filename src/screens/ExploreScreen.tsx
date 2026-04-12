@@ -85,25 +85,17 @@ export const ExploreScreen: React.FC = () => {
 
   const toggleFilter = useCallback((label: string) => {
     setSelectedFilters((prev) => {
-      const next = prev.includes(label) ? prev.filter((f) => f !== label) : [...prev, label];
-      // Debounced fetch with intersection logic
+      // Single-select: deselect if same, otherwise replace
+      const next = prev.includes(label) ? [] : [label];
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       if (next.length > 0) {
         setIsFilterLoading(true);
-        filterTimerRef.current = setTimeout(async () => {
+        // Fetch immediately — single filter, no debounce needed
+        (async () => {
           const plans = await fetchPublicPlansByTags(next, cityConfig.name);
-          // Split into person vs theme filters
-          const persons = next.filter((f) => PERSON_LABELS.has(f));
-          const themes = next.filter((f) => !PERSON_LABELS.has(f));
-          // Intersection: plan must match ≥1 from each non-empty group
-          const filtered = plans.filter((plan) => {
-            const okPerson = persons.length === 0 || persons.some((p) => plan.tags.includes(p));
-            const okTheme = themes.length === 0 || themes.some((t) => plan.tags.includes(t));
-            return okPerson && okTheme;
-          });
-          setFilteredPlans(filtered);
+          setFilteredPlans(plans);
           setIsFilterLoading(false);
-        }, 300);
+        })();
       } else {
         setFilteredPlans([]);
         setIsFilterLoading(false);
@@ -210,7 +202,7 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [hasActiveFilters]);
 
-  // ── Row 1: Person filters (multi-select) ──
+  // ── Row 1: Person filters (single-select) ──
   const renderPersonRow = () => (
     <View style={styles.filterSection}>
       <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par personne</Text>
@@ -233,7 +225,7 @@ export const ExploreScreen: React.FC = () => {
   );
 
   // ── Row 2: Theme chips ──
-  // Closed: chips are multi-select filters (like person row)
+  // Closed: chips are single-select filters (like person row)
   // Open:   chips are tabs to pick which subcategories to show
   const renderThemeRow = () => (
     <View style={styles.filterSection}>
@@ -451,18 +443,13 @@ export const ExploreScreen: React.FC = () => {
               </Animated.View>
             )}
 
-            {/* Selected filter pills + results */}
+            {/* Selected filter pill + results */}
             {hasActiveFilters && (
               <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
                 <View style={styles.activeFiltersRow}>
-                  {selectedFilters.map((f) => (
-                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
-                      <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
-                      <Ionicons name="close" size={13} color={Colors.primary} />
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
-                    <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
+                  <TouchableOpacity style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
+                    <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{selectedFilters[0]}</Text>
+                    <Ionicons name="close" size={13} color={Colors.primary} />
                   </TouchableOpacity>
                 </View>
                 {isFilterLoading ? (
