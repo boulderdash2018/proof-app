@@ -263,6 +263,33 @@ export const PlanDetailModal: React.FC = () => {
     }, 100);
   };
 
+  const pinnedIds = currentUser?.pinnedPlanIds ?? [];
+  const isPinned = plan ? pinnedIds.includes(plan.id) : false;
+
+  const handleTogglePin = () => {
+    if (!currentUser || !plan) return;
+    setShowPlanMenu(false);
+    const current = [...pinnedIds];
+    const idx = current.indexOf(plan.id);
+    if (idx !== -1) {
+      current.splice(idx, 1);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } else {
+      if (current.length >= 3) {
+        if (Platform.OS === 'web') {
+          window.alert('Maximum 3 plans épinglés — désépingle un plan pour en épingler un autre.');
+        } else {
+          const { Alert } = require('react-native');
+          Alert.alert('Maximum 3 plans épinglés', 'Désépingle un plan pour en épingler un autre.');
+        }
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      current.push(plan.id);
+    }
+    useAuthStore.getState().updateProfile({ pinnedPlanIds: current });
+  };
+
   useEffect(() => {
     const feedPlan = feedPlans.find((p) => p.id === planId);
     if (feedPlan) {
@@ -450,6 +477,13 @@ export const PlanDetailModal: React.FC = () => {
       {/* Owner menu dropdown */}
       {showPlanMenu && (
         <View style={[st.planMenu, { backgroundColor: C.gray200, borderColor: C.border, top: insets.top + 52 }]}>
+          <TouchableOpacity style={st.planMenuItem} onPress={handleTogglePin}>
+            <Ionicons name={isPinned ? 'pin-outline' : 'pin'} size={18} color={isPinned ? C.gray700 : C.primary} />
+            <Text style={[st.planMenuText, { color: isPinned ? C.black : C.primary }]}>
+              {isPinned ? 'Désépingler' : 'Épingler'}
+            </Text>
+          </TouchableOpacity>
+          <View style={[st.planMenuDivider, { backgroundColor: C.border }]} />
           <TouchableOpacity style={st.planMenuItem} onPress={handleEditPlan}>
             <Ionicons name="create-outline" size={18} color={C.gray700} />
             <Text style={[st.planMenuText, { color: C.black }]}>Modifier</Text>

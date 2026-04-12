@@ -49,7 +49,6 @@ export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
-  const updateProfile = useAuthStore((s) => s.updateProfile);
   const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
   const { savedPlans, fetchSaves } = useSavesStore();
   const drafts = useDraftStore((s) => s.drafts);
@@ -151,24 +150,6 @@ export const ProfileScreen: React.FC = () => {
     if (bPin !== -1) return 1;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
-
-  const togglePin = (planId: string) => {
-    if (!user) return;
-    const current = [...pinnedIds];
-    const idx = current.indexOf(planId);
-    if (idx !== -1) {
-      current.splice(idx, 1);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } else {
-      if (current.length >= 3) {
-        Alert.alert('Maximum 3 plans épinglés', 'Désépingle un plan pour en épingler un autre.');
-        return;
-      }
-      current.push(planId);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    updateProfile({ pinnedPlanIds: current });
-  };
 
   if (!user) return null;
 
@@ -315,8 +296,6 @@ export const ProfileScreen: React.FC = () => {
                       key={plan.id}
                       activeOpacity={0.85}
                       onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
-                      onLongPress={() => togglePin(plan.id)}
-                      delayLongPress={400}
                     >
                       <View style={styles.instaCell}>
                         {photo ? (
