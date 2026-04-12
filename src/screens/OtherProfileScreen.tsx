@@ -199,18 +199,18 @@ export const OtherProfileScreen: React.FC = () => {
           <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
           <View style={styles.statsContainer}>
             <View style={styles.statsRow}>
-              <TouchableOpacity style={styles.stat} onPress={() => navigation.push('Following', { userId: user.id })}>
-                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(otherFollowingCount)}</Text>
-                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
-              </TouchableOpacity>
+              <View style={styles.stat}>
+                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realPlanCount)}</Text>
+                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
+              </View>
               <TouchableOpacity style={styles.stat} onPress={() => navigation.push('Followers', { userId: user.id })}>
                 <Text style={[styles.statValue, { color: C.black }]}>{formatCount(otherFollowersCount)}</Text>
                 <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
               </TouchableOpacity>
-              <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realLikesReceived)}</Text>
-                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_likes_received}</Text>
-              </View>
+              <TouchableOpacity style={styles.stat} onPress={() => navigation.push('Following', { userId: user.id })}>
+                <Text style={[styles.statValue, { color: C.black }]}>{formatCount(otherFollowingCount)}</Text>
+                <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

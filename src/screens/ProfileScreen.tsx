@@ -174,20 +174,20 @@ export const ProfileScreen: React.FC = () => {
         </View>
 
         <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
-          <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Following', { userId: user.id })}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followingCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
-          </TouchableOpacity>
+          <View style={styles.stat}>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realPlanCount)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
+          </View>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
           <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers', { userId: user.id })}>
             <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followersCount)}</Text>
             <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
           </TouchableOpacity>
           <View style={[styles.statDivider, { backgroundColor: C.border }]} />
-          <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realLikesReceived)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_likes_received}</Text>
-          </View>
+          <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Following', { userId: user.id })}>
+            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followingCount)}</Text>
+            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Profile Completion */}
