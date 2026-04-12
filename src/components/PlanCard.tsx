@@ -111,9 +111,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const [heartPos, setHeartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // ── Reservation hint ──
-  const [resvHintId, setResvHintId] = useState<string | null>(null);
-
   // ── Save flash + inline label ──
   const saveFlashOpacity = useRef(new Animated.Value(0)).current;
   const saveLabelOpacity = useRef(new Animated.Value(0)).current;
@@ -285,6 +282,9 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             {plan.tags.slice(0, 3).map((tag, index) => (
               <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
             ))}
+            {plan.places.some((p) => p.reservationRecommended) && (
+              <Text style={styles.resvHint}>﹡ Réservation conseillée</Text>
+            )}
           </View>
         )}
 
@@ -308,17 +308,10 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                     <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>
                       {place.name}
                       {place.reservationRecommended && (
-                        <Text
-                          style={{ color: Colors.primary, fontSize: 14, fontFamily: Fonts.serifBold }}
-                          onPress={() => setResvHintId(resvHintId === place.id ? null : place.id)}
-                        > *</Text>
+                        <Text style={{ color: Colors.primary, fontFamily: Fonts.serifBold }}> *</Text>
                       )}
                     </Text>
-                    {resvHintId === place.id ? (
-                      <Text style={[styles.resvHint, { color: C.primary }]}>Conseil : réserver à l'avance</Text>
-                    ) : (
-                      <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
-                    )}
+                    <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
                   </View>
                 </View>
               </React.Fragment>
@@ -407,7 +400,7 @@ const styles = StyleSheet.create({
   newBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FFF', letterSpacing: 0.5 },
   trendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B3520', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 6, marginBottom: 4 },
   trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
-  resvHint: { fontSize: 10, fontFamily: Fonts.serifMedium, marginTop: 1 },
+  resvHint: { fontSize: 10, fontFamily: Fonts.serifMedium, color: '#C0392B', marginLeft: 4, alignSelf: 'center' },
   tagsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, overflow: 'hidden' },
   placesList: { paddingHorizontal: 14, paddingTop: 10 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },
