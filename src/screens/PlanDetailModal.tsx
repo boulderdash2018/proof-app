@@ -51,6 +51,16 @@ const parseGradient = (g: string): string[] => {
   return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
 };
 
+// Reverse-map a stored placePrice to a PRICE_RANGES index (CreateScreen brackets)
+const inferPriceRangeIndex = (price: number): number => {
+  if (price <= 0) return 0;  // Gratuit
+  if (price <= 15) return 1; // < 15
+  if (price <= 30) return 2; // 15–30
+  if (price <= 60) return 3; // 30–60
+  if (price <= 100) return 4; // 60–100
+  return 5;                   // 100+
+};
+
 const getCommentTimeAgo = (dateStr: string): string => {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
@@ -196,10 +206,10 @@ export const PlanDetailModal: React.FC = () => {
       name: p.name,
       type: p.type,
       address: p.address,
-      priceRangeIndex: -1,
+      priceRangeIndex: inferPriceRangeIndex(p.placePrice ?? 0),
       exactPrice: p.placePrice ? String(p.placePrice) : '',
-      price: p.placePrice ? String(p.placePrice) : '0',
-      duration: p.placeDuration ? String(p.placeDuration) : '',
+      price: p.placePrice != null ? String(p.placePrice) : '0',
+      duration: p.placeDuration != null ? String(p.placeDuration) : '30',
       customPhoto: p.customPhoto,
       comment: p.comment,
       questionAnswer: p.questionAnswer,

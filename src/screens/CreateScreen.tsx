@@ -331,7 +331,18 @@ export const CreateScreen: React.FC = () => {
     setTitle(saved.title);
     setCoverPhotos(saved.coverPhotos);
     setSelectedTags(saved.selectedTags as CategoryTag[]);
-    setPlaces((saved.places as any[]).map((p) => ({ ...p, priceRangeIndex: p.priceRangeIndex ?? -1, exactPrice: p.exactPrice ?? '' })) as PlaceEntry[]);
+    setPlaces((saved.places as any[]).map((p) => {
+      let idx = p.priceRangeIndex ?? -1;
+      // Infer price range from price when editing (priceRangeIndex not stored in plan docs)
+      if (idx < 0 && p.price) {
+        const amount = parseInt(p.price, 10);
+        if (!isNaN(amount)) {
+          idx = PRICE_RANGES.findIndex((r) => amount >= r.min && (r.max === Infinity || amount <= r.max));
+          if (idx < 0) idx = PRICE_RANGES.length - 1;
+        }
+      }
+      return { ...p, priceRangeIndex: idx, exactPrice: p.exactPrice ?? '' };
+    }) as PlaceEntry[]);
     setTravels(saved.travels as TravelEntry[]);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
