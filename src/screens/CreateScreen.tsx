@@ -71,21 +71,6 @@ const PRICE_RANGES: PriceRange[] = [
   { label: '100+', min: 100, max: Infinity },
 ];
 
-const BUDGET_LEVELS = [
-  { max: 20, icon: 'leaf-outline' },
-  { max: 50, icon: 'cafe-outline' },
-  { max: 100, icon: 'diamond-outline' },
-  { max: Infinity, icon: 'trophy-outline' },
-] as const;
-
-const getBudgetLevel = (amount: number): number => {
-  if (amount <= 0) return 0;
-  if (amount < 20) return 1;
-  if (amount <= 50) return 2;
-  if (amount <= 100) return 3;
-  return 4;
-};
-
 // ========== TYPES ==========
 interface QAPair { question: string; answer: string }
 
@@ -840,21 +825,6 @@ export const CreateScreen: React.FC = () => {
     if (totalPriceMin === totalPriceMax) return `~${totalPriceMin}${cur}`;
     return `${totalPriceMin}–${totalPriceMax}${cur}`;
   }, [totalPriceMin, totalPriceMax]);
-
-  // Animated budget level
-  const budgetLevelAnim = useRef(new Animated.Value(0)).current;
-  const prevBudgetLevel = useRef(0);
-  const currentBudgetLevel = getBudgetLevel(totalPriceExact);
-
-  useEffect(() => {
-    if (currentBudgetLevel !== prevBudgetLevel.current) {
-      prevBudgetLevel.current = currentBudgetLevel;
-      Animated.sequence([
-        Animated.timing(budgetLevelAnim, { toValue: 1.15, duration: 150, useNativeDriver: true }),
-        Animated.timing(budgetLevelAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [currentBudgetLevel]);
 
   const totalDuration = useMemo(() => {
     const placeTime = places.reduce((sum, p) => {
@@ -1671,17 +1641,6 @@ export const CreateScreen: React.FC = () => {
                   </View>
                 </View>
               </View>
-              {/* Budget level indicator */}
-              <Animated.View style={[styles.budgetLevelRow, { transform: [{ scale: budgetLevelAnim }] }]}>
-                {BUDGET_LEVELS.map((lvl, i) => {
-                  const active = i < currentBudgetLevel;
-                  return (
-                    <View key={i} style={[styles.budgetLevelDot, { backgroundColor: active ? C.primary + '15' : C.gray200 }]}>
-                      <Ionicons name={lvl.icon as any} size={16} color={active ? C.primary : C.gray500} />
-                    </View>
-                  );
-                })}
-              </Animated.View>
             </View>
           )}
 
@@ -2214,8 +2173,6 @@ const styles = StyleSheet.create({
   transportTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   transportTagEmoji: { fontSize: 11, marginRight: 3 },
   transportTagText: { fontSize: 11, fontWeight: '700' },
-  budgetLevelRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(201,69,32,0.1)' },
-  budgetLevelDot: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
