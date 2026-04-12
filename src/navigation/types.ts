@@ -16,7 +16,7 @@ export type FeedStackParamList = {
 
 export type ExploreStackParamList = {
   Explore: undefined;
-  ExploreSearch: { contentMode?: 'plans' | 'lieux' } | undefined;
+  ExploreSearch: { contentMode?: 'tous' | 'plans' | 'lieux' } | undefined;
   OtherProfile: { userId: string };
 };
 

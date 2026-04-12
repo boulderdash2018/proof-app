@@ -74,7 +74,7 @@ export const ExploreScreen: React.FC = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
-  const [contentMode, setContentMode] = useState<'plans' | 'lieux'>('plans');
+  const [contentMode, setContentMode] = useState<'tous' | 'plans' | 'lieux'>('tous');
 
   // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -82,7 +82,7 @@ export const ExploreScreen: React.FC = () => {
   const [maxDuration, setMaxDuration] = useState<number | null>(null);
   const [minLikes, setMinLikes] = useState<number | null>(null);
   const [minProofs, setMinProofs] = useState<number | null>(null);
-  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minLikes !== null || minProofs !== null || contentMode === 'lieux';
+  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minLikes !== null || minProofs !== null || contentMode !== 'tous';
 
   const BUDGET_STEPS = [20, 50, 100, 200, 500];
   const DURATION_STEPS = [30, 60, 120, 180, 360];
@@ -228,7 +228,7 @@ export const ExploreScreen: React.FC = () => {
 
   // Extract unique places from filtered plans for "Lieux" mode
   const displayedPlaces = (() => {
-    if (contentMode !== 'lieux') return [];
+    if (contentMode === 'plans') return [];
     const seen = new Set<string>();
     const places: (Place & { planTitle: string; planId: string })[] = [];
     for (const plan of displayedPlans) {
@@ -248,7 +248,7 @@ export const ExploreScreen: React.FC = () => {
     setMaxDuration(null);
     setMinLikes(null);
     setMinProofs(null);
-    setContentMode('plans');
+    setContentMode('tous');
   };
 
   const formatDuration = (mins: number): string =>
@@ -627,28 +627,29 @@ export const ExploreScreen: React.FC = () => {
                 </View>
                 {isFilterLoading ? (
                   <LoadingSkeleton variant="list" />
-                ) : contentMode === 'plans' ? (
-                  displayedPlans.length > 0 ? (
-                    <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
-                      <Text style={[styles.resultsSectionLabel, { color: C.gray700, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
-                      {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
-                    </View>
-                  ) : (
-                    <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                      <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
-                    </View>
-                  )
                 ) : (
-                  displayedPlaces.length > 0 ? (
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({displayedPlaces.length})</Text>
-                      {displayedPlaces.map((place, i) => renderCompactPlace(place, i, displayedPlaces.length))}
-                    </View>
-                  ) : (
-                    <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                      <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun lieu trouvé pour ces filtres</Text>
-                    </View>
-                  )
+                  <>
+                    {/* Plans section */}
+                    {contentMode !== 'lieux' && displayedPlans.length > 0 && (
+                      <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
+                        <Text style={[styles.resultsSectionLabel, { color: C.gray700, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
+                        {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                      </View>
+                    )}
+                    {/* Lieux section */}
+                    {contentMode !== 'plans' && displayedPlaces.length > 0 && (
+                      <View style={{ marginTop: 12 }}>
+                        <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({displayedPlaces.length})</Text>
+                        {displayedPlaces.map((place, i) => renderCompactPlace(place, i, displayedPlaces.length))}
+                      </View>
+                    )}
+                    {/* Empty */}
+                    {displayedPlans.length === 0 && displayedPlaces.length === 0 && (
+                      <View style={{ alignItems: 'center', paddingTop: 20 }}>
+                        <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun résultat pour ces filtres</Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </Animated.View>
             )}
@@ -674,8 +675,9 @@ export const ExploreScreen: React.FC = () => {
                   <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Afficher</Text>
                 </View>
                 <View style={[styles.modeRow, { backgroundColor: C.gray200 }]}>
-                  {(['plans', 'lieux'] as const).map((mode) => {
+                  {(['tous', 'plans', 'lieux'] as const).map((mode) => {
                     const active = contentMode === mode;
+                    const label = mode === 'tous' ? 'Tous' : mode === 'plans' ? 'Plans' : 'Lieux';
                     return (
                       <TouchableOpacity
                         key={mode}
@@ -684,7 +686,7 @@ export const ExploreScreen: React.FC = () => {
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.modePillText, { color: active ? C.black : C.gray600 }]}>
-                          {mode === 'plans' ? 'Plans' : 'Lieux'}
+                          {label}
                         </Text>
                       </TouchableOpacity>
                     );

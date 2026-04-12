@@ -37,7 +37,7 @@ export const SearchScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const searchMode: 'plans' | 'lieux' = route.params?.contentMode ?? 'plans';
+  const searchMode: 'tous' | 'plans' | 'lieux' = route.params?.contentMode ?? 'tous';
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
@@ -289,7 +289,7 @@ export const SearchScreen: React.FC = () => {
         <Animated.View style={[s.resultsWrap, { opacity: resultsOpacity }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
             {/* Google Places */}
-            {searchMode === 'lieux' && sortedPlaces.length > 0 && (
+            {searchMode !== 'plans' && sortedPlaces.length > 0 && (
               <View style={s.section}>
                 <Text style={[s.sectionLabel, { color: C.gray600 }]}>LIEUX</Text>
                 {sortedPlaces.map(renderPlace)}
@@ -297,22 +297,20 @@ export const SearchScreen: React.FC = () => {
             )}
 
             {/* Plans */}
-            {searchMode === 'plans' && plans.length > 0 && (
-              <View style={[s.section]}>
+            {searchMode !== 'lieux' && plans.length > 0 && (
+              <View style={[s.section, searchMode !== 'plans' && sortedPlaces.length > 0 && { marginTop: 8 }]}>
                 <Text style={[s.sectionLabel, { color: C.gray600 }]}>PLANS ({plans.length})</Text>
                 {plans.map(renderPlan)}
               </View>
             )}
 
             {/* Loading */}
-            {isSearching && (
-              (searchMode === 'plans' ? plans.length === 0 : sortedPlaces.length === 0) && (
-                <LoadingSkeleton variant="list" />
-              )
+            {isSearching && sortedPlaces.length === 0 && plans.length === 0 && (
+              <LoadingSkeleton variant="list" />
             )}
 
             {/* Empty */}
-            {!isSearching && (searchMode === 'plans' ? plans.length === 0 : sortedPlaces.length === 0) && (
+            {!isSearching && sortedPlaces.length === 0 && plans.length === 0 && (
               <EmptyState icon="🔍" title={t.explore_no_results} subtitle={t.explore_no_results_sub} />
             )}
             <View style={{ height: 40 }} />
