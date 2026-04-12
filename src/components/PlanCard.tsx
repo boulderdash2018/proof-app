@@ -45,7 +45,7 @@ function getTransportIcon(mode: TransportMode): string {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const BANNER_HEIGHT = Math.round(SCREEN_WIDTH * 0.95); // ~1:1 aspect like Instagram
+const BANNER_HEIGHT = Math.round(SCREEN_WIDTH * 0.76); // ~4:5 aspect
 
 interface PlanCardProps {
   plan: Plan;
