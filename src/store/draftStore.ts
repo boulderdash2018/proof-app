@@ -8,6 +8,7 @@ interface DraftPlace {
   name: string;
   type: string;
   address?: string;
+  placeTypes?: string[];
   priceRangeIndex: number;
   exactPrice: string;
   price: string;
@@ -16,6 +17,7 @@ interface DraftPlace {
   comment?: string;
   questionAnswer?: string;
   question?: string;
+  questions?: { question: string; answer: string }[];
 }
 
 interface DraftTravel {

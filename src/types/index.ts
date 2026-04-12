@@ -80,6 +80,7 @@ export interface Place {
   comment?: string;          // user's personal comment
   question?: string;         // the question that was shown
   questionAnswer?: string;   // answer to the question
+  questions?: { question: string; answer: string }[];  // multiple QAs
 }
 
 export interface TravelSegment {

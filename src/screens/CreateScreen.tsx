@@ -87,20 +87,24 @@ const getBudgetLevel = (amount: number): number => {
 };
 
 // ========== TYPES ==========
+interface QAPair { question: string; answer: string }
+
 interface PlaceEntry {
   id: string;
   googlePlaceId?: string;
   name: string;
   type: string;
   address?: string;
+  placeTypes?: string[];    // raw Google place types for question selection
   priceRangeIndex: number;  // index into PRICE_RANGES (-1 = not set)
   exactPrice: string;       // optional exact price (digits only)
   price: string;            // kept for compat: derived from range or exact
   duration: string;         // user input in minutes (numbers only)
   customPhoto?: string;     // user's own photo URI
   comment?: string;         // user's personal comment
-  questionAnswer?: string;  // answer to a random question
-  question?: string;        // the question that was shown
+  questionAnswer?: string;  // first QA answer (backward compat)
+  question?: string;        // first QA question (backward compat)
+  questions?: QAPair[];     // all QAs (multiple questions)
   previewPhotoUrl?: string; // Google photo fetched at selection for preview
 }
 
@@ -240,7 +244,7 @@ const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t })
             </View>
 
             {/* Hinge cards */}
-            {(place.customPhoto || place.comment || place.questionAnswer) && (
+            {(place.customPhoto || place.comment || (place.questions && place.questions.length > 0) || place.questionAnswer) && (
               <View style={{ paddingLeft: Layout.screenPadding + 42, paddingRight: Layout.screenPadding, gap: 8, marginBottom: 8 }}>
                 {place.customPhoto && (
                   <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.borderLight }}>
@@ -253,12 +257,12 @@ const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t })
                     <Text style={{ fontSize: 13, color: C.black, lineHeight: 18 }}>{place.comment}</Text>
                   </View>
                 )}
-                {place.questionAnswer && place.question && (
-                  <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.borderLight }}>
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: C.gray600, textTransform: 'uppercase', marginBottom: 4 }}>{place.question}</Text>
-                    <Text style={{ fontSize: 13, color: C.black, lineHeight: 18 }}>{place.questionAnswer}</Text>
+                {(place.questions && place.questions.length > 0 ? place.questions : (place.questionAnswer && place.question ? [{ question: place.question, answer: place.questionAnswer }] : [])).map((qa, qIdx) => (
+                  <View key={qIdx} style={{ backgroundColor: C.white, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.borderLight }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: C.gray600, textTransform: 'uppercase', marginBottom: 4 }}>{qa.question}</Text>
+                    <Text style={{ fontSize: 13, color: C.black, lineHeight: 18 }}>{qa.answer}</Text>
                   </View>
-                )}
+                ))}
               </View>
             )}
 
@@ -516,33 +520,124 @@ export const CreateScreen: React.FC = () => {
   const [pendingPlacePhoto, setPendingPlacePhoto] = useState<string | null>(null);
   const [customPhoto, setCustomPhoto] = useState('');
   const [customComment, setCustomComment] = useState('');
-  const [customAnswer, setCustomAnswer] = useState('');
-  const [customQuestion, setCustomQuestion] = useState('');
-  const [showQuestionPicker, setShowQuestionPicker] = useState(false);
+  const [customQAs, setCustomQAs] = useState<QAPair[]>([]);
+  const [activeQAPicker, setActiveQAPicker] = useState<number | null>(null);
+  const [placeQuestions, setPlaceQuestions] = useState<string[]>([]);
   const [editingPlaceIndex, setEditingPlaceIndex] = useState<number | null>(null);
 
-  const PLACE_QUESTIONS = [
-    'Quel est ton plat / drink préféré ici ?',
-    'Un conseil pour ceux qui y vont ?',
-    'Qu\'est-ce qui rend cet endroit unique ?',
-    'À quel moment de la journée y aller ?',
-    'Un souvenir marquant ici ?',
-    'Tu y vas plutôt solo ou accompagné ?',
-    'Le spot parfait pour quel mood ?',
-    'Combien de temps tu resterais ici ?',
-    'Qu\'est-ce que tu commanderais les yeux fermés ?',
-    'C\'est quoi l\'ambiance en un mot ?',
-    'Le truc que personne ne sait sur cet endroit ?',
-    'Première chose qui t\'a marqué en arrivant ?',
-    'Tu conseillerais pour un premier date ?',
-    'C\'est mieux en été ou en hiver ?',
-    'Le meilleur moment pour éviter la foule ?',
-    'Ça vaut le détour depuis l\'autre bout de Paris ?',
-    'Un endroit similaire que tu recommandes aussi ?',
-    'Si tu devais y emmener un touriste, pourquoi ?',
-    'Le rapport qualité-prix en toute honnêteté ?',
-    'Une anecdote ou fun fact sur ce lieu ?',
-  ];
+  // ── Type-specific question banks ──
+  const QUESTIONS_BY_TYPE: Record<string, string[]> = {
+    food: [
+      'Quel est ton plat préféré ici ?',
+      'Qu\'est-ce que tu commanderais les yeux fermés ?',
+      'Le service est comment ?',
+      'Tu réserves ou tu tentes ta chance ?',
+      'Plutôt déjeuner ou dîner ici ?',
+      'Un plat à absolument éviter ?',
+      'Idéal pour quel type d\'occasion ?',
+      'La taille des portions, ça donne quoi ?',
+    ],
+    cafe: [
+      'Le café est bon ? Note sur 10',
+      'Tu y vas pour bosser ou chiller ?',
+      'Le wifi est fiable ?',
+      'Ton drink préféré ici ?',
+      'Les pâtisseries valent le coup ?',
+      'Il y a des prises pour charger ?',
+      'C\'est calme ou animé ?',
+    ],
+    bar: [
+      'Quel est le meilleur cocktail ?',
+      'L\'ambiance en soirée, ça donne quoi ?',
+      'Happy hour : oui ou non ?',
+      'Plutôt before ou after ici ?',
+      'La terrasse vaut le coup ?',
+      'La musique est comment ?',
+      'Tu y vas pour boire ou pour l\'ambiance ?',
+      'Le dress code ?',
+    ],
+    culture: [
+      'Combien de temps prévoir pour la visite ?',
+      'Ça vaut le prix d\'entrée ?',
+      'Le must-see absolu à ne pas rater ?',
+      'Audio-guide ou visite libre ?',
+      'C\'est adapté pour les enfants ?',
+      'Le meilleur moment pour éviter la foule ?',
+      'La boutique souvenir vaut le détour ?',
+    ],
+    sport: [
+      'L\'équipement est en bon état ?',
+      'Le tarif est raisonnable ?',
+      'Il faut réserver en avance ?',
+      'C\'est adapté pour les débutants ?',
+      'L\'ambiance est compétitive ou détendue ?',
+      'Les vestiaires sont propres ?',
+      'Quel est le meilleur créneau horaire ?',
+    ],
+    shopping: [
+      'Ton coup de cœur dans la boutique ?',
+      'Le rapport qualité-prix ?',
+      'C\'est mieux en période de soldes ?',
+      'Le personnel est accueillant ?',
+      'Tu y vas pour quoi en général ?',
+      'Des marques ou des créateurs ?',
+    ],
+    nature: [
+      'C\'est mieux en été ou en hiver ?',
+      'Le spot parfait pour quel mood ?',
+      'Combien de temps tu y resterais ?',
+      'C\'est calme ou il y a du monde ?',
+      'Le meilleur moment de la journée ?',
+      'Idéal pour un picnic ?',
+      'Tu y vas seul ou accompagné ?',
+    ],
+    hotel: [
+      'Le confort de la chambre ?',
+      'Le petit-déjeuner vaut le coup ?',
+      'Le rapport qualité-prix en toute honnêteté ?',
+      'Le personnel est accueillant ?',
+      'La vue depuis la chambre ?',
+      'Les espaces communs sont comment ?',
+      'Tu y retournerais ?',
+    ],
+    generic: [
+      'Un conseil pour ceux qui y vont ?',
+      'Qu\'est-ce qui rend cet endroit unique ?',
+      'À quel moment de la journée y aller ?',
+      'Un souvenir marquant ici ?',
+      'Tu y vas plutôt solo ou accompagné ?',
+      'Le spot parfait pour quel mood ?',
+      'Combien de temps tu resterais ici ?',
+      'C\'est quoi l\'ambiance en un mot ?',
+      'Le truc que personne ne sait sur cet endroit ?',
+      'Première chose qui t\'a marqué en arrivant ?',
+      'Tu conseillerais pour un premier date ?',
+      'Le meilleur moment pour éviter la foule ?',
+      'Ça vaut le détour depuis l\'autre bout de Paris ?',
+      'Si tu devais y emmener un touriste, pourquoi ?',
+      'Le rapport qualité-prix en toute honnêteté ?',
+      'Une anecdote ou fun fact sur ce lieu ?',
+    ],
+  };
+
+  const getQuestionsForPlace = (types: string[]): string[] => {
+    let cat = 'generic';
+    for (const t of types) {
+      if (['restaurant', 'food', 'meal_delivery', 'meal_takeaway'].includes(t)) { cat = 'food'; break; }
+      if (['cafe', 'bakery'].includes(t)) { cat = 'cafe'; break; }
+      if (['bar', 'night_club'].includes(t)) { cat = 'bar'; break; }
+      if (['museum', 'art_gallery', 'library', 'church', 'tourist_attraction'].includes(t)) { cat = 'culture'; break; }
+      if (['gym', 'spa', 'stadium'].includes(t)) { cat = 'sport'; break; }
+      if (['clothing_store', 'book_store', 'shopping_mall', 'store'].includes(t)) { cat = 'shopping'; break; }
+      if (['park', 'campground', 'natural_feature'].includes(t)) { cat = 'nature'; break; }
+      if (['lodging'].includes(t)) { cat = 'hotel'; break; }
+    }
+    const specific = QUESTIONS_BY_TYPE[cat] || [];
+    const generic = QUESTIONS_BY_TYPE.generic;
+    const all = [...specific];
+    generic.forEach((q) => { if (!all.includes(q)) all.push(q); });
+    return all;
+  };
 
   type BlockType = 'photo' | 'comment' | 'question';
   const [blockOrder, setBlockOrder] = useState<BlockType[]>(['photo', 'comment', 'question']);
@@ -563,7 +658,11 @@ export const CreateScreen: React.FC = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (type === 'photo') setCustomPhoto('');
     if (type === 'comment') setCustomComment('');
-    if (type === 'question') setCustomAnswer('');
+    if (type === 'question') {
+      const q = placeQuestions.length > 0 ? placeQuestions[Math.floor(Math.random() * placeQuestions.length)] : '';
+      setCustomQAs([{ question: q, answer: '' }]);
+      setActiveQAPicker(null);
+    }
   };
 
   const handlePlaceSearch = useCallback((query: string) => {
@@ -587,6 +686,7 @@ export const CreateScreen: React.FC = () => {
       name: item.name,
       type,
       address: item.address,
+      placeTypes: item.types,
       priceRangeIndex: -1,
       exactPrice: '',
       price: '',
@@ -599,12 +699,14 @@ export const CreateScreen: React.FC = () => {
     setPlaceResults([]);
 
     // Fetch place photo for the customization screen
+    const questions = getQuestionsForPlace(item.types);
+    setPlaceQuestions(questions);
     setPendingPlace(newPlace);
     setPendingPlacePhoto(null);
     setCustomPhoto('');
     setCustomComment('');
-    setCustomAnswer('');
-    setCustomQuestion(PLACE_QUESTIONS[Math.floor(Math.random() * PLACE_QUESTIONS.length)]);
+    setCustomQAs([{ question: questions[Math.floor(Math.random() * questions.length)], answer: '' }]);
+    setActiveQAPicker(null);
     setShowCustomize(true);
 
     // Fetch photo in background
@@ -623,11 +725,19 @@ export const CreateScreen: React.FC = () => {
     setPendingPlace(place);
     setCustomPhoto(place.customPhoto || '');
     setCustomComment(place.comment || '');
-    setCustomAnswer(place.questionAnswer || '');
-    setCustomQuestion(place.question || PLACE_QUESTIONS[Math.floor(Math.random() * PLACE_QUESTIONS.length)]);
+    const questions = getQuestionsForPlace(place.placeTypes || []);
+    setPlaceQuestions(questions);
+    // Load existing QAs
+    if (place.questions && place.questions.length > 0) {
+      setCustomQAs(place.questions.map((q) => ({ ...q })));
+    } else if (place.questionAnswer && place.question) {
+      setCustomQAs([{ question: place.question, answer: place.questionAnswer }]);
+    } else {
+      setCustomQAs([{ question: questions[Math.floor(Math.random() * questions.length)], answer: '' }]);
+    }
+    setActiveQAPicker(null);
     setBlockOrder(['photo', 'comment', 'question']);
     setIsReordering(false);
-    setShowQuestionPicker(false);
     setPendingPlacePhoto(null);
     setShowCustomize(true);
     // Fetch photo in background
@@ -641,12 +751,15 @@ export const CreateScreen: React.FC = () => {
 
   const confirmPlace = useCallback(() => {
     if (!pendingPlace) return;
+    const filledQAs = customQAs.filter((qa) => qa.answer.trim().length > 0);
     const placeWithCustom: PlaceEntry = {
       ...pendingPlace,
       customPhoto: customPhoto || undefined,
       comment: customComment || undefined,
-      questionAnswer: customAnswer || undefined,
-      question: customAnswer ? customQuestion : undefined,
+      // Backward compat: first filled QA
+      questionAnswer: filledQAs[0]?.answer || undefined,
+      question: filledQAs[0]?.answer ? filledQAs[0].question : undefined,
+      questions: filledQAs.length > 0 ? filledQAs : undefined,
       previewPhotoUrl: pendingPlace.previewPhotoUrl || pendingPlacePhoto || undefined,
     };
 
@@ -682,7 +795,7 @@ export const CreateScreen: React.FC = () => {
     setShowCustomize(false);
     setPendingPlace(null);
     setEditingPlaceIndex(null);
-  }, [pendingPlace, places, customPhoto, customComment, customAnswer, customQuestion, editingPlaceIndex]);
+  }, [pendingPlace, places, customPhoto, customComment, customQAs, editingPlaceIndex]);
 
   const pickCustomPhoto = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -793,6 +906,7 @@ export const CreateScreen: React.FC = () => {
       comment: p.comment,
       question: p.question,
       questionAnswer: p.questionAnswer,
+      questions: p.questions,
     }));
     const travelSegs = travels.map((tr) => ({
       fromPlaceId: tr.fromId,
@@ -836,7 +950,7 @@ export const CreateScreen: React.FC = () => {
     if (hasBudget) score += 10;                          // prix renseigné
     const hasDuration = places.some((p) => p.duration && parseInt(p.duration, 10) > 0);
     if (hasDuration) score += 10;                        // durée renseignée
-    const hasWidget = places.some((p) => p.customPhoto || p.comment || p.questionAnswer);
+    const hasWidget = places.some((p) => p.customPhoto || p.comment || p.questionAnswer || (p.questions && p.questions.length > 0));
     if (hasWidget) score += 20;                          // 1 widget perso sur 1 lieu
     return Math.min(score, 100);
   }, [title, selectedTags, places, travels, coverPhotos]);
@@ -900,7 +1014,7 @@ export const CreateScreen: React.FC = () => {
   const missingCriteria = useMemo(() => {
     const list: { icon: string; text: string; pts: number }[] = [];
     if (coverPhotos.length === 0) list.push({ icon: '\uD83D\uDCF8', text: 'Une photo de couverture', pts: 10 });
-    if (!places.some((p) => p.customPhoto || p.comment || p.questionAnswer)) list.push({ icon: '\uD83D\uDCA1', text: 'Personnaliser un lieu', pts: 20 });
+    if (!places.some((p) => p.customPhoto || p.comment || p.questionAnswer || (p.questions && p.questions.length > 0))) list.push({ icon: '\uD83D\uDCA1', text: 'Personnaliser un lieu', pts: 20 });
     if (!places.some((p) => p.price && parseInt(p.price, 10) > 0)) list.push({ icon: '\uD83D\uDCB0', text: 'Le budget', pts: 10 });
     if (!places.some((p) => p.duration && parseInt(p.duration, 10) > 0)) list.push({ icon: '\u23F1', text: 'La durée', pts: 10 });
     return list.filter((c) => c.pts >= 5).slice(0, 3);
@@ -1060,6 +1174,7 @@ export const CreateScreen: React.FC = () => {
             ...(p.comment && { comment: p.comment }),
             ...(p.question && { question: p.question }),
             ...(p.questionAnswer && { questionAnswer: p.questionAnswer }),
+            ...(p.questions && p.questions.length > 0 && { questions: p.questions }),
           };
         })
       );
@@ -1243,9 +1358,9 @@ export const CreateScreen: React.FC = () => {
             onPress={() => editPlaceCustomization(index)}
             activeOpacity={0.7}
           >
-            <Ionicons name={place.customPhoto || place.comment || place.questionAnswer ? 'create-outline' : 'sparkles-outline'} size={14} color={C.primary} />
+            <Ionicons name={place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0) ? 'create-outline' : 'sparkles-outline'} size={14} color={C.primary} />
             <Text style={[styles.customizeBtnText, { color: C.primary }]}>
-              {place.customPhoto || place.comment || place.questionAnswer ? 'Modifier la personnalisation' : 'Personnaliser ce lieu'}
+              {place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0) ? 'Modifier la personnalisation' : 'Personnaliser ce lieu'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1766,7 +1881,7 @@ export const CreateScreen: React.FC = () => {
               </View>
 
               {blockOrder.map((type, idx) => {
-                const isFilled = type === 'photo' ? !!customPhoto : type === 'comment' ? !!customComment : !!customAnswer;
+                const isFilled = type === 'photo' ? !!customPhoto : type === 'comment' ? !!customComment : customQAs.some((qa) => qa.answer.trim().length > 0);
 
                 return (
                   <TouchableOpacity
@@ -1837,44 +1952,86 @@ export const CreateScreen: React.FC = () => {
 
                     {!isReordering && type === 'question' && (
                       <>
-                        <TouchableOpacity
-                          style={[styles.questionPicker, { backgroundColor: C.white, borderColor: C.borderLight }]}
-                          onPress={() => setShowQuestionPicker(!showQuestionPicker)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.questionPickerText, { color: C.gray700 }]} numberOfLines={1}>{customQuestion}</Text>
-                          <Ionicons name={showQuestionPicker ? 'chevron-up' : 'chevron-down'} size={16} color={C.gray500} />
-                        </TouchableOpacity>
-                        {showQuestionPicker && (
-                          <View style={[styles.questionDropdown, { backgroundColor: C.white, borderColor: C.borderLight }]}>
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                              {PLACE_QUESTIONS.map((q) => (
+                        {customQAs.map((qa, qaIdx) => {
+                          const usedQuestions = customQAs.map((q) => q.question);
+                          const availableQs = placeQuestions.filter((q) => !usedQuestions.includes(q) || q === qa.question);
+                          return (
+                            <View key={qaIdx} style={[qaIdx > 0 && { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.borderLight }]}>
+                              {/* Question picker */}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                 <TouchableOpacity
-                                  key={q}
-                                  style={[
-                                    styles.questionOption,
-                                    { borderBottomColor: C.borderLight },
-                                    q === customQuestion && { backgroundColor: C.primary + '12' },
-                                  ]}
-                                  onPress={() => { setCustomQuestion(q); setShowQuestionPicker(false); }}
+                                  style={[styles.questionPicker, { backgroundColor: C.white, borderColor: C.borderLight, flex: 1 }]}
+                                  onPress={() => setActiveQAPicker(activeQAPicker === qaIdx ? null : qaIdx)}
                                   activeOpacity={0.7}
                                 >
-                                  <Text style={[styles.questionOptionText, { color: q === customQuestion ? C.primary : C.black }]}>{q}</Text>
-                                  {q === customQuestion && <Ionicons name="checkmark" size={16} color={C.primary} />}
+                                  <Text style={[styles.questionPickerText, { color: C.gray700 }]} numberOfLines={1}>{qa.question}</Text>
+                                  <Ionicons name={activeQAPicker === qaIdx ? 'chevron-up' : 'chevron-down'} size={16} color={C.gray500} />
                                 </TouchableOpacity>
-                              ))}
-                            </ScrollView>
-                          </View>
+                                {customQAs.length > 1 && (
+                                  <TouchableOpacity
+                                    onPress={() => { setCustomQAs((prev) => prev.filter((_, i) => i !== qaIdx)); setActiveQAPicker(null); }}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  >
+                                    <Ionicons name="trash-outline" size={18} color={C.gray500} />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                              {/* Question dropdown */}
+                              {activeQAPicker === qaIdx && (
+                                <View style={[styles.questionDropdown, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+                                  <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                                    {availableQs.map((q) => (
+                                      <TouchableOpacity
+                                        key={q}
+                                        style={[
+                                          styles.questionOption,
+                                          { borderBottomColor: C.borderLight },
+                                          q === qa.question && { backgroundColor: C.primary + '12' },
+                                        ]}
+                                        onPress={() => {
+                                          setCustomQAs((prev) => prev.map((item, i) => i === qaIdx ? { ...item, question: q } : item));
+                                          setActiveQAPicker(null);
+                                        }}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={[styles.questionOptionText, { color: q === qa.question ? C.primary : C.black }]}>{q}</Text>
+                                        {q === qa.question && <Ionicons name="checkmark" size={16} color={C.primary} />}
+                                      </TouchableOpacity>
+                                    ))}
+                                  </ScrollView>
+                                </View>
+                              )}
+                              {/* Answer input */}
+                              <RNTextInput
+                                style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight, marginTop: 8 }]}
+                                placeholder="Ta réponse..."
+                                placeholderTextColor={C.gray500}
+                                value={qa.answer}
+                                onChangeText={(text) => setCustomQAs((prev) => prev.map((item, i) => i === qaIdx ? { ...item, answer: text } : item))}
+                                multiline
+                                maxLength={200}
+                              />
+                            </View>
+                          );
+                        })}
+
+                        {/* Add question button */}
+                        {customQAs.length < 3 && (
+                          <TouchableOpacity
+                            style={[styles.addQuestionBtn, { borderColor: C.borderLight }]}
+                            onPress={() => {
+                              const usedQuestions = customQAs.map((q) => q.question);
+                              const available = placeQuestions.filter((q) => !usedQuestions.includes(q));
+                              if (available.length === 0) return;
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setCustomQAs((prev) => [...prev, { question: available[Math.floor(Math.random() * available.length)], answer: '' }]);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="add-circle-outline" size={18} color={C.primary} />
+                            <Text style={[styles.addQuestionText, { color: C.primary }]}>Ajouter une question</Text>
+                          </TouchableOpacity>
                         )}
-                        <RNTextInput
-                          style={[styles.customizeInput, { color: C.black, backgroundColor: C.white, borderColor: C.borderLight, marginTop: 8 }]}
-                          placeholder="Ta réponse..."
-                          placeholderTextColor={C.gray500}
-                          value={customAnswer}
-                          onChangeText={setCustomAnswer}
-                          multiline
-                          maxLength={200}
-                        />
                       </>
                     )}
                   </TouchableOpacity>
@@ -2189,6 +2346,8 @@ const styles = StyleSheet.create({
   questionDropdown: { borderRadius: 10, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   questionOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1 },
   questionOptionText: { fontSize: 13, fontFamily: Fonts.serif, flex: 1, marginRight: 8 },
+  addQuestionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed' },
+  addQuestionText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   customizeFooter: { borderTopWidth: 1, paddingHorizontal: Layout.screenPadding, paddingVertical: 14 },
   customizeConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
   customizeConfirmText: { fontSize: 15, fontFamily: Fonts.serifBold, color: '#FFF' },

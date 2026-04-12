@@ -485,7 +485,7 @@ export const PlanDetailModal: React.FC = () => {
             ) || (plan.travelSegments && plan.travelSegments[index]);
             const isLast = index === plan.places.length - 1;
             const placePhoto = place.customPhoto || place.photoUrls?.[0];
-            const hasExtras = !!(place.address || place.comment || (place.questionAnswer && place.question) || place.customPhoto);
+            const hasExtras = !!(place.address || place.comment || (place.questionAnswer && place.question) || (place.questions && place.questions.length > 0) || place.customPhoto);
 
             return (
               <View key={place.id}>
@@ -544,12 +544,12 @@ export const PlanDetailModal: React.FC = () => {
                           <Text style={[st.inlineQuoteText, { color: C.gray800 }]} numberOfLines={2}>"{place.comment}"</Text>
                         </View>
                       ) : null}
-                      {place.questionAnswer && place.question ? (
-                        <View style={[st.inlineQa, { backgroundColor: C.gray300 }]}>
-                          <Text style={[st.inlineQaLabel, { color: C.gray600 }]}>{place.question}</Text>
-                          <Text style={[st.inlineQaAnswer, { color: C.black }]} numberOfLines={2}>{place.questionAnswer}</Text>
+                      {(place.questions && place.questions.length > 0 ? place.questions : (place.questionAnswer && place.question ? [{ question: place.question, answer: place.questionAnswer }] : [])).map((qa, qIdx) => (
+                        <View key={qIdx} style={[st.inlineQa, { backgroundColor: C.gray300 }]}>
+                          <Text style={[st.inlineQaLabel, { color: C.gray600 }]}>{qa.question}</Text>
+                          <Text style={[st.inlineQaAnswer, { color: C.black }]} numberOfLines={2}>{qa.answer}</Text>
                         </View>
-                      ) : null}
+                      ))}
                     </View>
                     {place.customPhoto && !placePhoto ? (
                       <Image source={{ uri: place.customPhoto }} style={st.placeCardImg} />
