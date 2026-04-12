@@ -61,8 +61,11 @@ export const ExploreScreen: React.FC = () => {
   // Fetch trending on mount (5-min cache in store)
   useEffect(() => { fetchTrending(cityConfig.name); }, [cityConfig.name]);
 
-  const [selectedTheme, setSelectedTheme] = useState(EXPLORE_GROUPS[0].key);
   const [showSubcategories, setShowSubcategories] = useState(false);
+  const voirPlusOpacity = useRef(new Animated.Value(0)).current;
+  const [voirPlusMounted, setVoirPlusMounted] = useState(false);
+  const subcatOpacity = useRef(new Animated.Value(0)).current;
+  const [subcatMounted, setSubcatMounted] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
@@ -81,7 +84,10 @@ export const ExploreScreen: React.FC = () => {
   const LIKES_STEPS = [1, 5, 10, 25, 50];
   const PROOFS_STEPS = [1, 3, 5, 10, 25];
 
-  const activeGroup = THEME_GROUPS.find((g) => g.key === selectedTheme) || THEME_GROUPS[0];
+  // Derive active theme group from selected filters
+  const activeThemeFilter = selectedFilters.find(f => !PERSON_LABELS.has(f));
+  const hasActiveThemeChip = !!activeThemeFilter && THEME_GROUPS.some(g => g.label === activeThemeFilter);
+  const activeThemeGroup = hasActiveThemeChip ? THEME_GROUPS.find(g => g.label === activeThemeFilter)! : null;
 
   const toggleFilter = useCallback((label: string) => {
     setSelectedFilters((prev) => {
@@ -97,8 +103,8 @@ export const ExploreScreen: React.FC = () => {
       if (newPerson) next.push(newPerson);
       if (newTheme) next.push(newTheme);
 
-      // Hide subcategories when a theme is selected
-      if (!isPerson && newTheme) setShowSubcategories(false);
+      // Close subcategories on any theme change
+      if (!isPerson) setShowSubcategories(false);
 
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       if (next.length > 0) {
@@ -218,6 +224,33 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [hasActiveFilters]);
 
+  // Fade "Voir +" button in/out based on active theme chip
+  useEffect(() => {
+    if (hasActiveThemeChip) {
+      setVoirPlusMounted(true);
+      voirPlusOpacity.setValue(0);
+      Animated.timing(voirPlusOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    } else {
+      setShowSubcategories(false);
+      Animated.timing(voirPlusOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+        setVoirPlusMounted(false);
+      });
+    }
+  }, [hasActiveThemeChip]);
+
+  // Fade subcategories panel in/out
+  useEffect(() => {
+    if (showSubcategories) {
+      setSubcatMounted(true);
+      subcatOpacity.setValue(0);
+      Animated.timing(subcatOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    } else {
+      Animated.timing(subcatOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+        setSubcatMounted(false);
+      });
+    }
+  }, [showSubcategories]);
+
   // ── Row 1: Person filters (single-select) ──
   const renderPersonRow = () => (
     <View style={styles.filterSection}>
@@ -240,42 +273,24 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Row 2: Theme chips ──
-  // Closed: chips are single-select filters (like person row)
-  // Open:   chips are tabs to pick which subcategories to show
+  // ── Row 2: Theme chips (always single-select filter mode) ──
   const renderThemeRow = () => (
     <View style={styles.filterSection}>
       <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par thème</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
         {THEME_GROUPS.map((group) => {
-          const isActive = showSubcategories
-            ? group.key === selectedTheme
-            : selectedFilters.includes(group.label);
+          const isActive = selectedFilters.includes(group.label);
           return (
             <TouchableOpacity
               key={group.key}
               style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border }]}
-              onPress={() => {
-                if (showSubcategories) {
-                  setSelectedTheme(group.key);
-                } else {
-                  toggleFilter(group.label);
-                }
-              }}
+              onPress={() => toggleFilter(group.label)}
               activeOpacity={0.8}
             >
               <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.emoji} {group.label}</Text>
             </TouchableOpacity>
           );
         })}
-        <TouchableOpacity
-          style={[styles.chip, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: C.gray200, borderColor: C.border }]}
-          onPress={() => setShowSubcategories(!showSubcategories)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray800, fontWeight: '700' }]}>Voir +</Text>
-          <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray800} />
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -407,9 +422,27 @@ export const ExploreScreen: React.FC = () => {
       {renderPersonRow()}
       {renderThemeRow()}
 
+      {/* "Voir +" button — only when a theme chip is active */}
+      {voirPlusMounted && (
+        <Animated.View style={[styles.voirPlusRow, { opacity: voirPlusOpacity }]}>
+          <TouchableOpacity
+            style={[styles.voirPlusBtn, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: C.gray200, borderColor: C.border }]}
+            onPress={() => setShowSubcategories(!showSubcategories)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.voirPlusText, { color: showSubcategories ? '#FFF' : C.gray800 }]}>Voir +</Text>
+            <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={14} color={showSubcategories ? '#FFF' : C.gray800} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Subcategories when "Voir +" is open */}
-            {showSubcategories && activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))}
+            {subcatMounted && activeThemeGroup && (
+              <Animated.View style={{ opacity: subcatOpacity }}>
+                {activeThemeGroup.sections.map((section, idx) => renderSection(section, idx, activeThemeGroup.layout))}
+              </Animated.View>
+            )}
 
             {/* Trending categories list — hidden when any filter is active */}
             {showTrending && !hasActiveFilters && (
@@ -528,6 +561,11 @@ const styles = StyleSheet.create({
   chipsContainer: { paddingRight: Layout.screenPadding, gap: 8, paddingBottom: 4 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+
+  // "Voir +" standalone button
+  voirPlusRow: { alignItems: 'flex-end', paddingHorizontal: Layout.screenPadding, paddingTop: 2, paddingBottom: 6 },
+  voirPlusBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  voirPlusText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, fontWeight: '700' },
 
   // Trending section
   trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6 },
