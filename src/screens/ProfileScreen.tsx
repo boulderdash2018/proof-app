@@ -91,7 +91,7 @@ export const ProfileScreen: React.FC = () => {
     }, [user])
   );
 
-  const donePlans = savedPlans.filter((sp) => sp.isDone);
+  const donePlans = savedPlans.filter((sp) => sp.isDone && sp.plan?.author?.id !== user?.id);
   const todoPlans = savedPlans.filter((sp) => !sp.isDone);
 
   // Profile tabs
@@ -270,6 +270,57 @@ export const ProfileScreen: React.FC = () => {
         {/* ═══ Tab content ═══ */}
         {profileTab === 'plans' && (
           <>
+            {userPlans.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_recent_plans}</Text>
+                <View style={styles.plansGrid}>
+                  {userPlans.map((plan) => {
+                    const colors = parseGradient(plan.gradient);
+                    const photo = getPlanPhoto(plan);
+                    return (
+                      <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                        <View style={styles.miniCard}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                          ) : (
+                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
+                          <Text style={styles.miniCardTitle} numberOfLines={2}>{plan.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {donePlans.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_done_plans}</Text>
+                <View style={styles.plansGrid}>
+                  {donePlans.map((sp) => {
+                    const colors = parseGradient(sp.plan.gradient);
+                    const photo = getPlanPhoto(sp.plan);
+                    return (
+                      <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
+                        <View style={styles.miniCard}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                          ) : (
+                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
+                          <View style={styles.doneCheck}><Text style={styles.doneCheckText}>✓</Text></View>
+                          <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
             {todoPlans.length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_saved_plans}</Text>
@@ -295,7 +346,7 @@ export const ProfileScreen: React.FC = () => {
               </View>
             )}
 
-            {todoPlans.length === 0 && (
+            {userPlans.length === 0 && donePlans.length === 0 && todoPlans.length === 0 && (
               <View style={styles.emptyTab}>
                 <Ionicons name="map-outline" size={36} color={C.gray500} />
                 <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun plan pour le moment</Text>
