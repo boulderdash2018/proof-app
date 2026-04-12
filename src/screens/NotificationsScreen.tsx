@@ -9,10 +9,10 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, EmptyState } from '../components';
-import { useNotifStore, useAuthStore } from '../store';
+import { useNotifStore, useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { Notification, NotificationType } from '../types';
-import { getUserById } from '../services/friendsService';
+import { getUserById, isFollowingUser } from '../services/friendsService';
 
 // ========== HELPERS ==========
 
@@ -85,6 +85,8 @@ export const NotificationsScreen: React.FC = () => {
     fetchNotifications, loadMore, markAllRead, markRead, subscribe,
   } = useNotifStore();
 
+  const follow = useFriendsStore((s) => s.follow);
+
   // Fade-out animation for mark all read
   const fadeAnims = useRef<Record<string, Animated.Value>>({}).current;
 
@@ -94,6 +96,54 @@ export const NotificationsScreen: React.FC = () => {
       fetchNotifications(user.id);
     }
   }, [user?.id]);
+
+  // ── Follow-back status for new_follower notifs ──
+  const [followStatus, setFollowStatus] = useState<Record<string, 'loading' | 'following' | 'not_following'>>({});
+  const checkedFollowRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const followerNotifs = notifications.filter((n) => n.type === 'new_follower' && n.senderId);
+    const toCheck = followerNotifs.filter((n) => !checkedFollowRef.current.has(n.senderId));
+    if (toCheck.length === 0) return;
+
+    toCheck.forEach((n) => checkedFollowRef.current.add(n.senderId));
+    // Set loading for unchecked ones
+    setFollowStatus((prev) => {
+      const next = { ...prev };
+      toCheck.forEach((n) => { if (!next[n.senderId]) next[n.senderId] = 'loading'; });
+      return next;
+    });
+
+    Promise.all(
+      toCheck.map(async (n) => {
+        try {
+          const following = await isFollowingUser(user.id, n.senderId);
+          return { id: n.senderId, status: following ? 'following' : 'not_following' } as const;
+        } catch {
+          return { id: n.senderId, status: 'not_following' } as const;
+        }
+      }),
+    ).then((results) => {
+      setFollowStatus((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => { next[r.id] = r.status; });
+        return next;
+      });
+    });
+  }, [notifications, user?.id]);
+
+  const handleFollowBack = useCallback(async (senderId: string) => {
+    if (!user?.id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFollowStatus((prev) => ({ ...prev, [senderId]: 'loading' }));
+    try {
+      await follow(user.id, senderId);
+      setFollowStatus((prev) => ({ ...prev, [senderId]: 'following' }));
+    } catch {
+      setFollowStatus((prev) => ({ ...prev, [senderId]: 'not_following' }));
+    }
+  }, [user?.id, follow]);
 
   // Fetch sender avatarUrl live from Firestore (works for old + new notifs)
   const [senderAvatars, setSenderAvatars] = useState<Record<string, string | null>>({});
@@ -216,13 +266,34 @@ export const NotificationsScreen: React.FC = () => {
           <Text style={[styles.notifTime, { color: C.gray600 }]}>{formatTimeAgo(notif.createdAt)}</Text>
         </View>
 
+        {/* Follow-back button for new_follower notifs */}
+        {notif.type === 'new_follower' && (() => {
+          const status = followStatus[notif.senderId];
+          if (status === 'loading') return <ActivityIndicator size="small" color={C.primary} style={{ width: 110 }} />;
+          if (status === 'following') return (
+            <View style={[styles.followBtn, styles.followBtnFollowing, { borderColor: C.gray400 }]}>
+              <Text style={[styles.followBtnText, { color: C.gray700 }]}>Suivi(e)</Text>
+            </View>
+          );
+          if (status === 'not_following') return (
+            <TouchableOpacity
+              style={[styles.followBtn, styles.followBtnFollow, { backgroundColor: Colors.primary }]}
+              onPress={() => handleFollowBack(notif.senderId)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.followBtnText, { color: '#FFF' }]}>Suivre en retour</Text>
+            </TouchableOpacity>
+          );
+          return null;
+        })()}
+
         {/* Plan cover thumbnail */}
-        {notif.planCover && (
+        {notif.type !== 'new_follower' && notif.planCover && (
           <Image source={{ uri: notif.planCover }} style={styles.planThumb} />
         )}
       </TouchableOpacity>
     );
-  }, [C, handlePress, senderAvatars]);
+  }, [C, handlePress, senderAvatars, followStatus, handleFollowBack]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -303,4 +374,10 @@ const styles = StyleSheet.create({
   notifBold: { fontFamily: Fonts.serifBold },
   notifTime: { fontSize: 11, marginTop: 3 },
   planThumb: { width: 44, height: 44, borderRadius: 8 },
+
+  // Follow-back buttons
+  followBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  followBtnFollow: {},
+  followBtnFollowing: { borderWidth: 1 },
+  followBtnText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
 });
