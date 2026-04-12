@@ -183,21 +183,32 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Trending section fade ──
+  // ── Trending / results fade ──
+  const hasActiveFilters = selectedFilters.length > 0;
+  const shouldHideTrending = showSubcategories || hasActiveFilters;
   const [showTrending, setShowTrending] = useState(true);
   const trendingOpacity = useRef(new Animated.Value(1)).current;
+  const resultsOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (showSubcategories) {
-      Animated.timing(trendingOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+    if (shouldHideTrending) {
+      Animated.timing(trendingOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
         setShowTrending(false);
       });
     } else {
       setShowTrending(true);
       trendingOpacity.setValue(0);
-      Animated.timing(trendingOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      Animated.timing(trendingOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     }
-  }, [showSubcategories]);
+  }, [shouldHideTrending]);
+
+  // Fade in results when filters become active
+  useEffect(() => {
+    if (hasActiveFilters) {
+      resultsOpacity.setValue(0);
+      Animated.timing(resultsOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    }
+  }, [hasActiveFilters]);
 
   // ── Row 1: Person filters (multi-select) ──
   const renderPersonRow = () => (
@@ -408,8 +419,8 @@ export const ExploreScreen: React.FC = () => {
         {/* Subcategories when "Voir +" is open */}
             {showSubcategories && activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))}
 
-            {/* Trending categories list — fades in/out when Voir + toggles */}
-            {showTrending && (
+            {/* Trending categories list — hidden when any filter is active */}
+            {showTrending && !hasActiveFilters && (
               <Animated.View style={{ opacity: trendingOpacity }}>
                 <Text style={[styles.trendingLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
                 {trendingLoading ? (
@@ -441,8 +452,8 @@ export const ExploreScreen: React.FC = () => {
             )}
 
             {/* Selected filter pills + results */}
-            {selectedFilters.length > 0 && (
-              <View style={styles.activeFiltersWrap}>
+            {hasActiveFilters && (
+              <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
                 <View style={styles.activeFiltersRow}>
                   {selectedFilters.map((f) => (
                     <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
@@ -466,7 +477,7 @@ export const ExploreScreen: React.FC = () => {
                     <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
                   </View>
                 )}
-              </View>
+              </Animated.View>
             )}
         <View style={{ height: 30 }} />
       </ScrollView>
