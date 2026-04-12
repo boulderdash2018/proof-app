@@ -505,21 +505,30 @@ export const ExploreScreen: React.FC = () => {
             {/* Subcategories when "Voir +" is open */}
             {showSubcategories && activeGroup.sections.map((section, idx) => renderSection(section, idx, activeGroup.layout))}
 
-            {/* Trending categories grid — fades in/out when Voir + toggles */}
+            {/* Trending categories list — fades in/out when Voir + toggles */}
             {showTrending && (
               <Animated.View style={{ opacity: trendingOpacity }}>
                 <Text style={[styles.trendingLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
                 {trendingLoading ? (
                   <LoadingSkeleton variant="list" />
                 ) : (
-                  <View style={styles.catGrid}>
-                    {trendingCategories.map((cat, i) =>
-                      renderCategoryCard(
-                        { name: cat.name, emoji: cat.emoji, icon: CATEGORY_ICON_MAP.get(cat.name), gradient: cat.gradient, subtitle: cat.subtitle, planCount: cat.planCount, hot: cat.hot, badgeLabel: cat.badgeLabel ?? undefined },
-                        i,
-                        trendingCategories.length,
-                      )
-                    )}
+                  <View>
+                    {trendingCategories.map((cat, i) => {
+                      const isSelected = selectedFilters.includes(cat.name);
+                      const isLast = i === trendingCategories.length - 1;
+                      return (
+                        <TouchableOpacity
+                          key={cat.name}
+                          style={[styles.trendingRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }]}
+                          activeOpacity={0.7}
+                          onPress={() => toggleFilter(cat.name)}
+                        >
+                          <Text style={styles.trendingEmoji}>{cat.emoji}</Text>
+                          <Text style={[styles.trendingName, { color: C.black }]}>{cat.name}</Text>
+                          {isSelected && <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
               </Animated.View>
@@ -611,8 +620,11 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
 
-  // Trending section label
-  trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, marginTop: 6 },
+  // Trending section
+  trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6 },
+  trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
+  trendingEmoji: { fontSize: 28 },
+  trendingName: { flex: 1, fontSize: 15, fontFamily: Fonts.serifSemiBold },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
