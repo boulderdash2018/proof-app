@@ -238,7 +238,7 @@ export const OrganizeScreen: React.FC = () => {
           {/* Row 2: Par thème + Voir + */}
           <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 10 }]}>Par thème</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
-            {EXPLORE_GROUPS.map((group) => {
+            {EXPLORE_GROUPS.filter(g => g.key !== 'mood' && g.key !== 'trending').map((group) => {
               const isActive = showSubcategories
                 ? selectedGroup === group.key
                 : selectedTags.includes(group.label);
@@ -271,7 +271,7 @@ export const OrganizeScreen: React.FC = () => {
           </ScrollView>
 
           {/* Subcategory cards */}
-          {showSubcategories && (EXPLORE_GROUPS.find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
+          {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'mood' && g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
             <View key={section.title} style={styles.subcategorySection}>
               <Text style={[styles.subcategorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
               <View style={styles.subcategoryGrid}>
