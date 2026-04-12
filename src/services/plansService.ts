@@ -100,6 +100,35 @@ export const createPlan = async (
   return plan;
 };
 
+/** Update an existing plan in Firestore (edit flow) */
+export const updatePlan = async (
+  planId: string,
+  data: {
+    title: string;
+    tags: CategoryTag[];
+    places: Place[];
+    price: string;
+    duration: string;
+    transport: TransportMode;
+    travelSegments?: TravelSegment[];
+    coverPhotos?: string[];
+    city?: string;
+  }
+): Promise<void> => {
+  const ref = doc(db, PLANS, planId);
+  await updateDoc(ref, {
+    title: data.title,
+    tags: data.tags,
+    places: data.places,
+    price: data.price,
+    duration: data.duration,
+    transport: data.transport,
+    travelSegments: data.travelSegments || [],
+    coverPhotos: data.coverPhotos || [],
+    ...(data.city && { city: data.city }),
+  });
+};
+
 /** Fetch all plans for the feed (ordered by date), optionally filtered by city */
 export const fetchFeedPlans = async (city?: string): Promise<Plan[]> => {
   try {

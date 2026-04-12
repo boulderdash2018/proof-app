@@ -33,7 +33,7 @@ import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, TravelSegment, Plan } from '../types';
-import { createPlan } from '../services/plansService';
+import { createPlan, updatePlan } from '../services/plansService';
 import { trackEvent } from '../services/posthogConfig';
 import {
   searchPlacesAutocomplete,
@@ -307,8 +307,10 @@ export const CreateScreen: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // ========== DRAFT ==========
+  // ========== DRAFT / EDIT ==========
   const draftIdRef = useRef<string>(route.params?.draftId || 'draft-' + Date.now());
+  const editPlanIdRef = useRef<string | undefined>(route.params?.editPlanId);
+  const isEditing = !!editPlanIdRef.current;
   const draftRestoredRef = useRef(false);
   const toastShownRef = useRef(false);
   const [showDraftToast, setShowDraftToast] = useState(false);
@@ -1156,23 +1158,36 @@ export const CreateScreen: React.FC = () => {
         })
       );
 
-      const newPlan = await createPlan(
-        {
-          title,
-          tags: selectedTags,
-          places: placesWithPhotos,
-          price: formatPriceRange(cityConfig.currency),
-          duration: formatDuration(totalDuration),
-          transport: mainTransport,
-          travelSegments,
-          coverPhotos,
-          city: cityConfig.name,
-        },
-        user
-      );
-      addPlan(newPlan);
-      addCreatedPlan(newPlan);
-      trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport: mainTransport });
+      const planPayload = {
+        title,
+        tags: selectedTags,
+        places: placesWithPhotos,
+        price: formatPriceRange(cityConfig.currency),
+        duration: formatDuration(totalDuration),
+        transport: mainTransport,
+        travelSegments,
+        coverPhotos,
+        city: cityConfig.name,
+      };
+
+      if (isEditing && editPlanIdRef.current) {
+        // Update existing plan
+        await updatePlan(editPlanIdRef.current, planPayload);
+        // Refresh feed with updated data
+        useFeedStore.setState((s) => ({
+          plans: s.plans.map((p) =>
+            p.id === editPlanIdRef.current
+              ? { ...p, ...planPayload, places: placesWithPhotos }
+              : p
+          ),
+        }));
+        trackEvent('plan_edited', { planId: editPlanIdRef.current, title });
+      } else {
+        const newPlan = await createPlan(planPayload, user);
+        addPlan(newPlan);
+        addCreatedPlan(newPlan);
+        trackEvent('plan_created', { title, tags_count: selectedTags.length, places_count: places.length, transport: mainTransport });
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       useDraftStore.getState().deleteDraft(draftIdRef.current);
       setIsSuccess(true);
@@ -1218,9 +1233,9 @@ export const CreateScreen: React.FC = () => {
     return (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
         <View style={styles.successContainer}>
-          <Text style={styles.successEmoji}>🎉</Text>
-          <Text style={[styles.successTitle, { color: C.black }]}>{t.create_success_title}</Text>
-          <Text style={[styles.successDesc, { color: C.gray700 }]}>{t.create_success_desc}</Text>
+          <Text style={styles.successEmoji}>{isEditing ? '✅' : '🎉'}</Text>
+          <Text style={[styles.successTitle, { color: C.black }]}>{isEditing ? 'Plan modifié !' : t.create_success_title}</Text>
+          <Text style={[styles.successDesc, { color: C.gray700 }]}>{isEditing ? 'Tes modifications sont en ligne.' : t.create_success_desc}</Text>
           <PrimaryButton label={t.create_success_back} onPress={() => {
             setIsSuccess(false); setTitle(''); setSelectedTags([]); setPlaces([]); setTravels([]);
             publishTranslateY.setValue(0); publishScale.setValue(1); publishOpacity.setValue(1); setIsFlying(false);

@@ -21,7 +21,7 @@ export type ExploreStackParamList = {
 };
 
 export type CreateStackParamList = {
-  Create: undefined;
+  Create: { draftId?: string; editPlanId?: string } | undefined;
   Organize: undefined;
 };
 

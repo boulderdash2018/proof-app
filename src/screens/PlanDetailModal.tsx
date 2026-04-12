@@ -25,7 +25,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, Chip, UserBadge } from '../components';
-import { useAuthStore, useFeedStore, useSavesStore, useGuestStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore, useGuestStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
@@ -169,6 +169,47 @@ export const PlanDetailModal: React.FC = () => {
       useFeedStore.setState((s) => ({ plans: s.plans.filter((p) => p.id !== planId) }));
       navigation.goBack();
     });
+  };
+
+  const handleEditPlan = () => {
+    if (!plan) return;
+    setShowPlanMenu(false);
+    // Convert plan places to draft format
+    const draftId = 'edit-' + plan.id;
+    const draftPlaces = plan.places.map((p) => ({
+      id: p.id,
+      googlePlaceId: p.googlePlaceId,
+      name: p.name,
+      type: p.type,
+      address: p.address,
+      priceRangeIndex: -1,
+      exactPrice: p.placePrice ? String(p.placePrice) : '',
+      price: p.placePrice ? String(p.placePrice) : '0',
+      duration: p.placeDuration ? String(p.placeDuration) : '',
+      customPhoto: p.customPhoto,
+      comment: p.comment,
+      questionAnswer: p.questionAnswer,
+      question: p.question,
+      questions: p.questions,
+      reservationRecommended: p.reservationRecommended,
+    }));
+    const draftTravels = (plan.travelSegments || []).map((ts) => ({
+      fromId: ts.fromPlaceId,
+      toId: ts.toPlaceId,
+      duration: String(ts.duration),
+      transport: ts.transport,
+    }));
+    useDraftStore.getState().saveDraft(draftId, {
+      title: plan.title,
+      coverPhotos: plan.coverPhotos || [],
+      selectedTags: plan.tags,
+      places: draftPlaces,
+      travels: draftTravels,
+    });
+    navigation.goBack();
+    setTimeout(() => {
+      (navigation as any).navigate('CreateTab', { screen: 'Create', params: { draftId, editPlanId: plan.id } });
+    }, 100);
   };
 
   useEffect(() => {
@@ -358,6 +399,11 @@ export const PlanDetailModal: React.FC = () => {
       {/* Owner menu dropdown */}
       {showPlanMenu && (
         <View style={[st.planMenu, { backgroundColor: C.gray200, borderColor: C.border, top: insets.top + 52 }]}>
+          <TouchableOpacity style={st.planMenuItem} onPress={handleEditPlan}>
+            <Ionicons name="create-outline" size={18} color={C.gray700} />
+            <Text style={[st.planMenuText, { color: C.black }]}>Modifier</Text>
+          </TouchableOpacity>
+          <View style={[st.planMenuDivider, { backgroundColor: C.border }]} />
           <TouchableOpacity style={st.planMenuItem} onPress={handleArchivePlan}>
             <Ionicons name="archive-outline" size={18} color={C.gray700} />
             <Text style={[st.planMenuText, { color: C.black }]}>Archiver</Text>
