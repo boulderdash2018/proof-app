@@ -164,6 +164,57 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     ],
   },
 
+  // ── OUTDOOR ──
+  {
+    key: 'outdoor',
+    label: 'Outdoor',
+    emoji: '☀️',
+    layout: 'grid',
+    sections: [
+      {
+        title: 'OUTDOOR',
+        items: [
+          { name: 'Enjoying the sun', emoji: '🌞', gradient: ['#8B7530', '#5C4E20'], subtitle: 'Profiter du beau temps' },
+          { name: 'Long walk', emoji: '🚶', gradient: ['#4A6A50', '#2D4830'], subtitle: 'Se balader sans pression' },
+          { name: 'Outdoor architecture', emoji: '🏛️', gradient: ['#5A6880', '#3A4858'], subtitle: 'Bâtiments & façades en plein air' },
+          { name: 'Outdoor restaurant & café', emoji: '🪴', gradient: ['#8B6A50', '#5C4030'], subtitle: 'Terrasses & rooftops' },
+          { name: 'Golden hour spots', emoji: '🌅', gradient: ['#7B4A4A', '#553030'], subtitle: 'Les meilleurs couchers de soleil' },
+          { name: 'Picnic day', emoji: '🧺', gradient: ['#4A7068', '#2D4A44'], subtitle: 'Pique-nique au grand air' },
+        ],
+      },
+    ],
+  },
+
+  // ── LATE NIGHT ──
+  {
+    key: 'late-night',
+    label: 'Late Night',
+    emoji: '🌙',
+    layout: 'grid',
+    sections: [
+      {
+        title: 'LATE NIGHT',
+        items: [
+          { name: 'Chill drink', emoji: '🥃', gradient: ['#6B5A70', '#4A3D55'], subtitle: 'Un verre tranquille' },
+          { name: 'Busy night', emoji: '🎉', gradient: ['#8B5070', '#5C3048'], subtitle: 'Ambiance festive & bondée' },
+          { name: 'Music lovers', emoji: '🎵', gradient: ['#6B5080', '#4A3560'], subtitle: 'DJ sets, concerts, live music' },
+          { name: 'Late night food', emoji: '🍜', gradient: ['#8B6A50', '#5C4030'], subtitle: 'Manger après minuit' },
+          { name: 'City spots at night', emoji: '🌃', gradient: ['#5A6878', '#3A4858'], subtitle: 'La ville qui brille' },
+          { name: 'After midnight', emoji: '🕐', gradient: ['#5A5048', '#3D352E'], subtitle: 'Quand la nuit commence vraiment' },
+        ],
+      },
+    ],
+  },
+
+  // ── DANS TON QUARTIER ──
+  {
+    key: 'nearby',
+    label: 'Dans ton quartier',
+    emoji: '📍',
+    layout: 'grid',
+    sections: [],
+  },
+
   // ── TENDANCE (unchanged) ──
   {
     key: 'trending',

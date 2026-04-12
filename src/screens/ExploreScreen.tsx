@@ -22,7 +22,8 @@ import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuthStore, useTrendingStore } from '../store';
-import { fetchPublicPlansByTags } from '../services/plansService';
+import { fetchPublicPlansByTags, fetchPublicPlansNearby } from '../services/plansService';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 const CARD_GAP = 10;
@@ -36,6 +37,8 @@ const parseGradientColors = (gradient: string): string[] => {
 const THEME_GROUPS = EXPLORE_GROUPS.filter(g => g.key !== 'trending');
 const FILTERED_PERSONS = PERSON_FILTERS.filter(p => p.key !== 'around-you');
 const PERSON_LABELS = new Set(PERSON_FILTERS.map(p => p.label));
+const NEARBY_LABEL = 'Dans ton quartier';
+const MOOD_LABEL = 'Mood';
 
 // Build name→icon lookup from all category items for trending grid
 const CATEGORY_ICON_MAP = new Map<string, string>();
@@ -70,6 +73,7 @@ export const ExploreScreen: React.FC = () => {
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
 
   // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -88,6 +92,7 @@ export const ExploreScreen: React.FC = () => {
   const activeThemeFilter = selectedFilters.find(f => !PERSON_LABELS.has(f));
   const hasActiveThemeChip = !!activeThemeFilter && THEME_GROUPS.some(g => g.label === activeThemeFilter);
   const activeThemeGroup = hasActiveThemeChip ? THEME_GROUPS.find(g => g.label === activeThemeFilter)! : null;
+  const showVoirPlusForTheme = hasActiveThemeChip && activeThemeFilter !== MOOD_LABEL && activeThemeFilter !== NEARBY_LABEL;
 
   const toggleFilter = useCallback((label: string) => {
     setSelectedFilters((prev) => {
@@ -103,8 +108,14 @@ export const ExploreScreen: React.FC = () => {
       if (newPerson) next.push(newPerson);
       if (newTheme) next.push(newTheme);
 
-      // Close subcategories on any theme change
-      if (!isPerson) setShowSubcategories(false);
+      // Auto-open subcategories for Mood, close for everything else
+      if (!isPerson) {
+        if (newTheme === MOOD_LABEL) {
+          setShowSubcategories(true);
+        } else {
+          setShowSubcategories(false);
+        }
+      }
 
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       if (next.length > 0) {
@@ -125,6 +136,67 @@ export const ExploreScreen: React.FC = () => {
       return next;
     });
   }, [cityConfig.name]);
+
+  // ── "Dans ton quartier" handler ──
+  const handleNearbyFilter = async () => {
+    const currentTheme = selectedFilters.find(f => !PERSON_LABELS.has(f));
+    const currentPerson = selectedFilters.find(f => PERSON_LABELS.has(f));
+    const isActive = currentTheme === NEARBY_LABEL;
+
+    if (isActive) {
+      // Deselect nearby
+      const next = currentPerson ? [currentPerson] : [];
+      setSelectedFilters(next);
+      setLocationDenied(false);
+      setShowSubcategories(false);
+      if (currentPerson) {
+        setIsFilterLoading(true);
+        fetchPublicPlansByTags([currentPerson], cityConfig.name).then(plans => {
+          setFilteredPlans(plans);
+          setIsFilterLoading(false);
+        });
+      } else {
+        setFilteredPlans([]);
+      }
+      return;
+    }
+
+    // Request location permission
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setLocationDenied(true);
+      setTimeout(() => setLocationDenied(false), 4000);
+      return;
+    }
+
+    setLocationDenied(false);
+    setShowSubcategories(false);
+
+    const next: string[] = [];
+    if (currentPerson) next.push(currentPerson);
+    next.push(NEARBY_LABEL);
+    setSelectedFilters(next);
+    setIsFilterLoading(true);
+
+    try {
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      let plans = await fetchPublicPlansNearby(
+        location.coords.latitude,
+        location.coords.longitude,
+        2,
+        cityConfig.name,
+      );
+      if (currentPerson) {
+        plans = plans.filter(p => p.tags.includes(currentPerson));
+      }
+      setFilteredPlans(plans);
+    } catch (err) {
+      console.error('[ExploreScreen] Nearby error:', err);
+      setFilteredPlans([]);
+    } finally {
+      setIsFilterLoading(false);
+    }
+  };
 
   // ── Parse helpers for plan fields ──
   const parsePrice = (p: string): number => {
@@ -224,19 +296,23 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [hasActiveFilters]);
 
-  // Fade "Voir +" button in/out based on active theme chip
+  // Close subcategories when no theme is active
   useEffect(() => {
-    if (hasActiveThemeChip) {
+    if (!hasActiveThemeChip) setShowSubcategories(false);
+  }, [hasActiveThemeChip]);
+
+  // Fade "Voir +" button in/out (excluded for Mood & Nearby)
+  useEffect(() => {
+    if (showVoirPlusForTheme) {
       setVoirPlusMounted(true);
       voirPlusOpacity.setValue(0);
       Animated.timing(voirPlusOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     } else {
-      setShowSubcategories(false);
       Animated.timing(voirPlusOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
         setVoirPlusMounted(false);
       });
     }
-  }, [hasActiveThemeChip]);
+  }, [showVoirPlusForTheme]);
 
   // Fade subcategories panel in/out
   useEffect(() => {
@@ -284,7 +360,7 @@ export const ExploreScreen: React.FC = () => {
             <TouchableOpacity
               key={group.key}
               style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border }]}
-              onPress={() => toggleFilter(group.label)}
+              onPress={() => group.key === 'nearby' ? handleNearbyFilter() : toggleFilter(group.label)}
               activeOpacity={0.8}
             >
               <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.emoji} {group.label}</Text>
@@ -422,7 +498,7 @@ export const ExploreScreen: React.FC = () => {
       {renderPersonRow()}
       {renderThemeRow()}
 
-      {/* "Voir +" button — only when a theme chip is active */}
+      {/* "Voir +" button — only for themes with subcategories (not Mood/Nearby) */}
       {voirPlusMounted && (
         <Animated.View style={[styles.voirPlusRow, { opacity: voirPlusOpacity }]}>
           <TouchableOpacity
@@ -434,6 +510,14 @@ export const ExploreScreen: React.FC = () => {
             <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={14} color={showSubcategories ? '#FFF' : C.gray800} />
           </TouchableOpacity>
         </Animated.View>
+      )}
+
+      {/* Location denied message */}
+      {locationDenied && (
+        <View style={styles.locationDeniedRow}>
+          <Ionicons name="location-outline" size={14} color={C.gray600} />
+          <Text style={[styles.locationDeniedText, { color: C.gray600 }]}>Active ta localisation pour voir les plans près de toi</Text>
+        </View>
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -481,13 +565,13 @@ export const ExploreScreen: React.FC = () => {
               <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
                 <View style={styles.activeFiltersRow}>
                   {selectedFilters.map((f) => (
-                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleFilter(f)}>
+                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => f === NEARBY_LABEL ? handleNearbyFilter() : toggleFilter(f)}>
                       <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
                       <Ionicons name="close" size={13} color={Colors.primary} />
                     </TouchableOpacity>
                   ))}
                   {selectedFilters.length > 1 && (
-                    <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); }}>
+                    <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); setLocationDenied(false); setShowSubcategories(false); }}>
                       <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
                     </TouchableOpacity>
                   )}
@@ -566,6 +650,10 @@ const styles = StyleSheet.create({
   voirPlusRow: { alignItems: 'flex-end', paddingHorizontal: Layout.screenPadding, paddingTop: 2, paddingBottom: 6 },
   voirPlusBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   voirPlusText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, fontWeight: '700' },
+
+  // Location denied
+  locationDeniedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Layout.screenPadding, paddingVertical: 8 },
+  locationDeniedText: { fontSize: 12, fontFamily: Fonts.serif },
 
   // Trending section
   trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6 },

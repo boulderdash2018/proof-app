@@ -404,6 +404,50 @@ export const fetchPublicPlansByTags = async (tags: string[], city?: string): Pro
   }
 };
 
+/** Haversine distance in km between two lat/lng pairs */
+const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+/** Fetch public plans whose places fall within a radius (km) of a given point */
+export const fetchPublicPlansNearby = async (
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  city?: string,
+): Promise<Plan[]> => {
+  try {
+    const snap = await getDocs(collection(db, PLANS));
+    const plans = snap.docs
+      .map((d) => {
+        const data = d.data() as Plan;
+        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      })
+      .filter((p) => {
+        if (p.author?.isPrivate !== false) return false;
+        if (!planMatchesCity(p, city)) return false;
+        return p.places.some(
+          (place) =>
+            place.latitude != null &&
+            place.longitude != null &&
+            haversineDistance(lat, lng, place.latitude, place.longitude) <= radiusKm,
+        );
+      });
+    plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return plans;
+  } catch (err) {
+    console.error('[plansService] fetchPublicPlansNearby error:', err);
+    return [];
+  }
+};
+
 /** Fetch public plans that contain a given place (by googlePlaceId or placeId) */
 export const fetchPublicPlansWithPlace = async (placeId: string, googlePlaceId?: string): Promise<Plan[]> => {
   try {
