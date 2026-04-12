@@ -69,6 +69,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'Original', icon: 'sparkles-outline', emoji: '🎪', gradient: ['#8B7530', '#5C4E20'] },
           { name: 'Loved by Proofers', icon: 'heart-outline', emoji: '🏅', gradient: ['#8B5070', '#5C3048'], hot: true },
           { name: 'Bar to watch sports', icon: 'tv-outline', emoji: '📡', gradient: ['#4A6A50', '#2D4830'] },
+          { name: 'Brunch', icon: 'sunny-outline', emoji: '🥐', gradient: ['#C89A50', '#8B6A30'] },
         ],
       },
     ],
