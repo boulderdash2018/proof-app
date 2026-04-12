@@ -44,6 +44,8 @@ function getTransportIcon(mode: TransportMode): string {
   return TRANSPORT_ICONS[mode] ?? 'walk-outline';
 }
 
+const CARD_HEIGHT = 520;
+
 interface PlanCardProps {
   plan: Plan;
   isLiked: boolean;
@@ -224,7 +226,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               )}
             />
             <View style={styles.photoTitleWrap} pointerEvents="none">
-              <Text style={styles.bannerTitle}>{plan.title}</Text>
+              <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
             </View>
             {allPhotos.length > 1 && (
               <View style={styles.photoDots} pointerEvents="none">
@@ -242,7 +244,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </>
         ) : (
           <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-            <Text style={styles.bannerTitle}>{plan.title}</Text>
+            <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
           </LinearGradient>
         )}
         {/* Double-tap heart overlay */}
@@ -262,7 +264,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </Animated.View>
       </TouchableOpacity>
 
-      <TouchableOpacity activeOpacity={0.92} onPress={onPress} onPressIn={onCardPressIn} onPressOut={onCardPressOut}>
+      <TouchableOpacity activeOpacity={0.92} onPress={onPress} onPressIn={onCardPressIn} onPressOut={onCardPressOut} style={styles.contentArea}>
         {plan.tags.length > 0 && (
           <View style={styles.tagsRow}>
             {isTrending && (
@@ -270,7 +272,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                 <Text style={styles.trendingBadgeText}>🔥 Trending</Text>
               </View>
             )}
-            {plan.tags.map((tag, index) => (
+            {plan.tags.slice(0, 3).map((tag, index) => (
               <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
             ))}
             {plan.places.some((p) => p.reservationRecommended) && (
@@ -283,7 +285,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
         {plan.places.length > 0 && (
           <View style={styles.placesList}>
-            {plan.places.map((place, index) => (
+            {plan.places.slice(0, 3).map((place, index) => (
               <React.Fragment key={place.id}>
                 {index > 0 && <View style={[styles.placeSeparator, { backgroundColor: C.border }]} />}
                 <View style={styles.placeRow}>
@@ -291,8 +293,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                     <Text style={[styles.placeIndexText, { color: C.primary }]}>{index + 1}</Text>
                   </View>
                   <View style={styles.placeInfo}>
-                    <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
-                    <Text style={[styles.placeType, { color: C.gray600 }]}>{place.type}</Text>
+                    <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+                    <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
                   </View>
                 </View>
               </React.Fragment>
@@ -366,10 +368,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
+    height: CARD_HEIGHT,
     borderRadius: Layout.cardRadius,
     marginHorizontal: Layout.screenPadding,
     marginBottom: 16,
     borderWidth: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -380,6 +384,7 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
   displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
+  contentArea: { flex: 1, overflow: 'hidden' },
   bannerWrap: { marginHorizontal: 12, borderRadius: 14, overflow: 'hidden', position: 'relative' } as any,
   doubleTapHeart: { position: 'absolute', width: 70, height: 70, alignItems: 'center', justifyContent: 'center' },
   banner: { height: 180, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
@@ -395,7 +400,7 @@ const styles = StyleSheet.create({
   trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
   bookAheadBadge: { backgroundColor: '#FFF0F0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginBottom: 4 },
   bookAheadText: { fontSize: 9, fontFamily: Fonts.serifSemiBold, color: '#C0392B' },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12 },
+  tagsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, overflow: 'hidden' },
   placesList: { paddingHorizontal: 16, paddingTop: 12 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },
   placeRow: { flexDirection: 'row', alignItems: 'center' },

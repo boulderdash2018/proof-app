@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
 
   // Results
   resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
-  compactCard: { borderRadius: 18, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
+  compactCard: { height: 130, borderRadius: 18, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
   compactBanner: { height: 90, justifyContent: 'flex-end', padding: 12, overflow: 'hidden' },
   compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
   compactBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
