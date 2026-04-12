@@ -17,7 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, RankProgressBar, BadgeGrid, FounderBadge } from '../components';
+import { Avatar, RankBadge, BadgeGrid, FounderBadge } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -258,12 +258,10 @@ export const ProfileScreen: React.FC = () => {
         <View style={[styles.profileTabBar, { borderBottomColor: C.borderLight }]}>
           {(['plans', 'drafts', 'badges'] as const).map((tab) => {
             const isActive = profileTab === tab;
-            const labels: Record<string, string> = { plans: 'Plans', drafts: 'Brouillons', badges: 'Badges' };
-            const counts: Record<string, number> = { plans: userPlans.length + donePlans.length + todoPlans.length, drafts: drafts.length, badges: unlockedAchievements.length };
+            const emojis: Record<string, string> = { plans: '🗺️', drafts: '📝', badges: '🏅' };
             return (
               <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: C.primary }]} onPress={() => setProfileTab(tab)} activeOpacity={0.7}>
-                <Text style={[styles.profileTabText, { color: isActive ? C.primary : C.gray600 }]}>{labels[tab]}</Text>
-                <Text style={[styles.profileTabCount, { color: isActive ? C.primary : C.gray600 }]}>{counts[tab]}</Text>
+                <Text style={[styles.profileTabEmoji, { opacity: isActive ? 1 : 0.45 }]}>{emojis[tab]}</Text>
               </TouchableOpacity>
             );
           })}
@@ -272,12 +270,6 @@ export const ProfileScreen: React.FC = () => {
         {/* ═══ Tab content ═══ */}
         {profileTab === 'plans' && (
           <>
-            {/* Rank Progress */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: C.gray700 }]}>RANK</Text>
-              <RankProgressBar totalProofs={totalProofs} />
-            </View>
-
             {userPlans.length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_recent_plans}</Text>
@@ -463,9 +455,8 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 28 },
   // Profile tabs
   profileTabBar: { flexDirection: 'row', borderBottomWidth: 1, marginTop: 4 },
-  profileTabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
-  profileTabText: { fontSize: 13, fontFamily: Fonts.serifBold },
-  profileTabCount: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  profileTabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
+  profileTabEmoji: { fontSize: 22 },
   emptyTab: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50, gap: 10 },
   emptyTabText: { fontSize: 14, fontFamily: Fonts.serif },
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
