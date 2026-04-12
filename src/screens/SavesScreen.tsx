@@ -13,20 +13,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout, Fonts } from '../constants';
 import { Chip, EmptyState, LoadingSkeleton } from '../components';
 import { Plan } from '../types';
-import { useAuthStore, useSavesStore, useSavedPlacesStore } from '../store';
+import { useAuthStore, useSavesStore } from '../store';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { SavedPlan } from '../types';
-import { SavedPlace } from '../store/savedPlacesStore';
 
 export const SavesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const { savedPlans, isLoading, fetchSaves, markAsDone, unsave } = useSavesStore();
-  const { places: savedPlaces, unsavePlace } = useSavedPlacesStore();
-  const [topTab, setTopTab] = useState<'plans' | 'lieux'>('plans');
   const [activeTab, setActiveTab] = useState<'todo' | 'done'>('todo');
   const C = useColors();
   const { t } = useTranslation();
@@ -108,113 +105,57 @@ export const SavesScreen: React.FC = () => {
     );
   };
 
-  const renderPlaceItem = ({ item }: { item: SavedPlace }) => (
-    <View style={[styles.placeRow, { borderBottomColor: C.borderLight }]}>
-      <TouchableOpacity
-        style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: item.placeId })}
-      >
-        {item.photoUrl ? (
-          <Image source={{ uri: item.photoUrl }} style={styles.placeThumb} />
-        ) : (
-          <View style={[styles.placeThumb, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}>
-            <Ionicons name="location" size={20} color={C.gray600} />
-          </View>
-        )}
-        <View style={styles.placeInfo}>
-          <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{item.name}</Text>
-          {item.rating > 0 && (
-            <View style={styles.placeRating}>
-              <Ionicons name="star" size={11} color={Colors.primary} />
-              <Text style={[styles.placeRatingText, { color: C.black }]}>{item.rating.toFixed(1)}</Text>
-              <Text style={[styles.placeReviewCount, { color: C.gray600 }]}>({item.reviewCount})</Text>
-            </View>
-          )}
-          <Text style={[styles.placeAddress, { color: C.gray600 }]} numberOfLines={1}>{item.address}</Text>
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => unsavePlace(item.placeId)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        activeOpacity={0.6}
-      >
-        <Ionicons name="star" size={20} color={Colors.gold} />
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <Text style={[styles.pageTitle, { color: C.black }]}>{t.saves_title}</Text>
-
-      {/* ── Top-level tabs: Plans / Lieux ── */}
-      <View style={[styles.topTabBar, { borderBottomColor: C.borderLight }]}>
-        {(['plans', 'lieux'] as const).map((tab) => {
-          const isActive = topTab === tab;
-          const labels: Record<string, string> = { plans: 'Plans', lieux: 'Lieux' };
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.topTabItem, isActive && { borderBottomColor: Colors.primary }]}
-              onPress={() => setTopTab(tab)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.topTabText, { color: isActive ? C.black : C.gray600 }]}>{labels[tab]}</Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Header: title centered + star button right */}
+      <View style={styles.headerRow}>
+        <View style={{ width: 34 }} />
+        <Text style={[styles.pageTitle, { color: C.black }]}>Plans</Text>
+        <TouchableOpacity
+          style={[styles.starBtn, { backgroundColor: C.gray200 }]}
+          onPress={() => navigation.navigate('SavedPlaces')}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="star" size={16} color={Colors.gold} />
+        </TouchableOpacity>
       </View>
 
-      {topTab === 'plans' ? (
-        <>
-          <View style={[styles.tabBar, { backgroundColor: C.gray300 }]}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'todo' && [styles.tabActive, { backgroundColor: C.white }]]}
-              onPress={() => setActiveTab('todo')}
-            >
-              <Text style={[styles.tabText, { color: C.gray700 }, activeTab === 'todo' && { color: C.black }]}>
-                {t.saves_tab_todo}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'done' && [styles.tabActive, { backgroundColor: C.white }]]}
-              onPress={() => setActiveTab('done')}
-            >
-              <Text style={[styles.tabText, { color: C.gray700 }, activeTab === 'done' && { color: C.black }]}>
-                {t.saves_tab_done}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      {/* Segmented control: À faire / Faites */}
+      <View style={[styles.tabBar, { backgroundColor: C.gray300 }]}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'todo' && [styles.tabActive, { backgroundColor: C.white }]]}
+          onPress={() => setActiveTab('todo')}
+        >
+          <Text style={[styles.tabText, { color: C.gray700 }, activeTab === 'todo' && { color: C.black }]}>
+            {t.saves_tab_todo}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'done' && [styles.tabActive, { backgroundColor: C.white }]]}
+          onPress={() => setActiveTab('done')}
+        >
+          <Text style={[styles.tabText, { color: C.gray700 }, activeTab === 'done' && { color: C.black }]}>
+            {t.saves_tab_done}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          {isLoading ? (
-            <LoadingSkeleton variant="saves" />
-          ) : (
-            <FlatList
-              data={filteredPlans}
-              renderItem={renderItem}
-              keyExtractor={(item) => item.planId}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                activeTab === 'todo' ? (
-                  <EmptyState icon="🔖" title={t.saves_empty_todo_title} subtitle={t.saves_empty_todo_sub} />
-                ) : (
-                  <EmptyState icon="🗺️" title={t.saves_empty_done_title} subtitle={t.saves_empty_done_sub} />
-                )
-              }
-            />
-          )}
-        </>
+      {isLoading ? (
+        <LoadingSkeleton variant="saves" />
       ) : (
         <FlatList
-          data={savedPlaces}
-          renderItem={renderPlaceItem}
-          keyExtractor={(item) => item.placeId}
+          data={filteredPlans}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.planId}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <EmptyState icon="📍" title="Aucun lieu sauvegardé" subtitle="Sauvegarde des lieux depuis Explorer avec ⭐" />
+            activeTab === 'todo' ? (
+              <EmptyState icon="🔖" title={t.saves_empty_todo_title} subtitle={t.saves_empty_todo_sub} />
+            ) : (
+              <EmptyState icon="🗺️" title={t.saves_empty_done_title} subtitle={t.saves_empty_done_sub} />
+            )
           }
         />
       )}
@@ -224,10 +165,9 @@ export const SavesScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3, paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
-  topTabBar: { flexDirection: 'row', borderBottomWidth: 1, marginBottom: 14 },
-  topTabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
-  topTabText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
+  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  starBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   tabBar: { flexDirection: 'row', marginHorizontal: Layout.screenPadding, borderRadius: 14, padding: 3, marginBottom: 14 },
   tab: { flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center' },
   tabActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
@@ -250,14 +190,4 @@ const styles = StyleSheet.create({
   saveItemPrice: { fontSize: 11 },
   saveItemDuration: { fontSize: 11 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap' },
-
-  // Saved places (Lieux tab)
-  placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: Layout.screenPadding, borderBottomWidth: 1, gap: 12 },
-  placeThumb: { width: 52, height: 52, borderRadius: 12 },
-  placeInfo: { flex: 1 },
-  placeName: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 2 },
-  placeRating: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 2 },
-  placeRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
-  placeReviewCount: { fontSize: 11 },
-  placeAddress: { fontSize: 11 },
 });

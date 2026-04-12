@@ -17,6 +17,7 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { CreateScreen } from '../screens/CreateScreen';
 import { OrganizeScreen } from '../screens/OrganizeScreen';
 import { SavesScreen } from '../screens/SavesScreen';
+import { SavedPlacesScreen } from '../screens/SavedPlacesScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -69,6 +70,7 @@ const SavesStack = createNativeStackNavigator<SavesStackParamList>();
 const SavesStackNavigator: React.FC = () => (
   <SavesStack.Navigator screenOptions={{ headerShown: false }}>
     <SavesStack.Screen name="Saves" component={SavesScreen} />
+    <SavesStack.Screen name="SavedPlaces" component={SavedPlacesScreen} />
   </SavesStack.Navigator>
 );
 

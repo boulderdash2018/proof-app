@@ -27,6 +27,7 @@ export type CreateStackParamList = {
 
 export type SavesStackParamList = {
   Saves: undefined;
+  SavedPlaces: undefined;
 };
 
 export type ProfileStackParamList = {
