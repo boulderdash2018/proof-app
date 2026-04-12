@@ -49,6 +49,7 @@ export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
+  const updateProfile = useAuthStore((s) => s.updateProfile);
   const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
   const { savedPlans, fetchSaves } = useSavesStore();
   const drafts = useDraftStore((s) => s.drafts);
@@ -138,6 +139,36 @@ export const ProfileScreen: React.FC = () => {
       ]).start(() => setProfileDismissed(true));
     }
   }, [completionPct, isProfileComplete]);
+
+  // ========== PINNED PLANS ==========
+  const pinnedIds = user?.pinnedPlanIds ?? [];
+
+  const sortedPlans = [...userPlans].sort((a, b) => {
+    const aPin = pinnedIds.indexOf(a.id);
+    const bPin = pinnedIds.indexOf(b.id);
+    if (aPin !== -1 && bPin !== -1) return aPin - bPin;
+    if (aPin !== -1) return -1;
+    if (bPin !== -1) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const togglePin = (planId: string) => {
+    if (!user) return;
+    const current = [...pinnedIds];
+    const idx = current.indexOf(planId);
+    if (idx !== -1) {
+      current.splice(idx, 1);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } else {
+      if (current.length >= 3) {
+        Alert.alert('Maximum 3 plans épinglés', 'Désépingle un plan pour en épingler un autre.');
+        return;
+      }
+      current.push(planId);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    updateProfile({ pinnedPlanIds: current });
+  };
 
   if (!user) return null;
 
@@ -273,13 +304,20 @@ export const ProfileScreen: React.FC = () => {
         {/* ═══ Tab content ═══ */}
         {profileTab === 'plans' && (
           <>
-            {userPlans.length > 0 ? (
+            {sortedPlans.length > 0 ? (
               <View style={styles.instaGrid}>
-                {userPlans.map((plan) => {
+                {sortedPlans.map((plan) => {
                   const colors = parseGradient(plan.gradient);
                   const photo = getPlanPhoto(plan);
+                  const isPinned = pinnedIds.includes(plan.id);
                   return (
-                    <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                    <TouchableOpacity
+                      key={plan.id}
+                      activeOpacity={0.85}
+                      onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
+                      onLongPress={() => togglePin(plan.id)}
+                      delayLongPress={400}
+                    >
                       <View style={styles.instaCell}>
                         {photo ? (
                           <Image source={{ uri: photo }} style={styles.instaCellImage} />
@@ -287,6 +325,11 @@ export const ProfileScreen: React.FC = () => {
                           <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
                         )}
                         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        {isPinned && (
+                          <View style={styles.pinBadge}>
+                            <Ionicons name="pin" size={12} color="#FFF" />
+                          </View>
+                        )}
                         <View style={styles.instaCellBottom}>
                           <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
                           <View style={styles.instaCellLikes}>
@@ -444,4 +487,5 @@ const styles = StyleSheet.create({
   instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
   instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.serifSemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
 });

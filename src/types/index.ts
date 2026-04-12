@@ -42,6 +42,7 @@ export interface User {
   last_active_dates?: string[];
   streak_count?: number;
   isFounder?: boolean;
+  pinnedPlanIds?: string[];
   createdAt: string;
 }
 

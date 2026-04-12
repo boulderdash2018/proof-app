@@ -241,29 +241,46 @@ export const OtherProfileScreen: React.FC = () => {
             {/* Plans grid — Instagram style */}
             {userPlans.length > 0 ? (
               <View style={styles.instaGrid}>
-                {userPlans.map((plan) => {
-                  const colors = parseGradient(plan.gradient);
-                  const photo = getPlanPhoto(plan);
-                  return (
-                    <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
-                      <View style={styles.instaCell}>
-                        {photo ? (
-                          <Image source={{ uri: photo }} style={styles.instaCellImage} />
-                        ) : (
-                          <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                        )}
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
-                        <View style={styles.instaCellBottom}>
-                          <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
-                          <View style={styles.instaCellLikes}>
-                            <Ionicons name="heart" size={11} color="#FFF" />
-                            <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
+                {(() => {
+                  const otherPinnedIds = user?.pinnedPlanIds ?? [];
+                  const sorted = [...userPlans].sort((a, b) => {
+                    const aPin = otherPinnedIds.indexOf(a.id);
+                    const bPin = otherPinnedIds.indexOf(b.id);
+                    if (aPin !== -1 && bPin !== -1) return aPin - bPin;
+                    if (aPin !== -1) return -1;
+                    if (bPin !== -1) return 1;
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  });
+                  return sorted.map((plan) => {
+                    const colors = parseGradient(plan.gradient);
+                    const photo = getPlanPhoto(plan);
+                    const isPinned = otherPinnedIds.includes(plan.id);
+                    return (
+                      <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                        <View style={styles.instaCell}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.instaCellImage} />
+                          ) : (
+                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                          {isPinned && (
+                            <View style={styles.pinBadge}>
+                              <Ionicons name="pin" size={12} color="#FFF" />
+                            </View>
+                          )}
+                          <View style={styles.instaCellBottom}>
+                            <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
+                            <View style={styles.instaCellLikes}>
+                              <Ionicons name="heart" size={11} color="#FFF" />
+                              <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                      </TouchableOpacity>
+                    );
+                  });
+                })()}
               </View>
             ) : (
               <View style={styles.emptyPlans}>
@@ -474,4 +491,5 @@ const styles = StyleSheet.create({
   instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 } as any,
   instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.serifSemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
 });
