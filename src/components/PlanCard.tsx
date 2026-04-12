@@ -290,6 +290,13 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         )}
 
+        {(plan.proofCount ?? 0) > 0 && (
+          <View style={styles.proofRow}>
+            <MiniStampIcon type="proof" size={16} />
+            <Text style={styles.proofMainText}>+{plan.proofCount} proof</Text>
+          </View>
+        )}
+
         {plan.places.length > 0 && (
           <View style={styles.placesList}>
             {plan.places.slice(0, 3).map((place, index) => (
@@ -357,14 +364,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             )}
           </TouchableOpacity>
           <View style={styles.actionSpacer} />
-          {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
-            <View style={styles.proofStats}>
-              <MiniStampIcon type="proof" size={14} />
-              <Text style={styles.proofCountText}>{plan.proofCount ?? 0}</Text>
-              <MiniStampIcon type="declined" size={14} />
-              <Text style={styles.declinedCountText}>{plan.declinedCount ?? 0}</Text>
-            </View>
-          )}
         </View>
         <FriendActivity plan={plan} />
       </View>
@@ -420,7 +419,6 @@ const styles = StyleSheet.create({
   saveLabel: { fontSize: 11, fontFamily: Fonts.serifBold, marginLeft: 4 },
   actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
   actionSpacer: { flex: 1 },
-  proofStats: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  proofCountText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#C8571A' },
-  declinedCountText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#6B7A8D' },
+  proofRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, gap: 6 },
+  proofMainText: { fontSize: 13, fontFamily: Fonts.serifBold, color: '#C8571A', letterSpacing: 0.2 },
 });

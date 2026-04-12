@@ -51,17 +51,16 @@ interface Props {
   visible: boolean;
   plan: Plan;
   onProof: () => void;
-  onDecline: () => void;
+  onDecline?: () => void;
   skipRating?: boolean;
 }
 
-export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDecline, skipRating }) => {
+export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skipRating }) => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
-  const [stampType, setStampType] = useState<'none' | 'proof' | 'declined'>('none');
+  const [stampType, setStampType] = useState<'none' | 'proof'>('none');
   const [step, setStep] = useState<'vote' | 'rate'>('vote');
-  const [pendingType, setPendingType] = useState<'proof' | 'declined'>('proof');
   const [placeRatings, setPlaceRatings] = useState<PlaceRating[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const stampScale = useRef(new Animated.Value(0)).current;
@@ -78,12 +77,9 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
     );
   };
 
-  const playStamp = (type: 'proof' | 'declined') => {
-    setStampType(type);
-    setPendingType(type);
-    Haptics.impactAsync(
-      type === 'proof' ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light
-    );
+  const playStamp = () => {
+    setStampType('proof');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
     stampScale.setValue(0);
     overlayOpacity.setValue(0);
@@ -164,8 +160,7 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
   const finishAndClose = () => {
     setStep('vote');
     setPlaceRatings([]);
-    if (pendingType === 'proof') onProof();
-    else onDecline();
+    onProof();
   };
 
   // Get first available photo
@@ -178,7 +173,7 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
   })();
 
   const gradientColors = parseGradient(plan.gradient);
-  const stampColor = stampType === 'proof' ? STAMP_PROOF : STAMP_DECLINE;
+  const stampColor = STAMP_PROOF;
 
   const renderStars = (placeId: string, currentRating: number) => {
     return (
@@ -276,38 +271,11 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
                           stroke={stampColor}
                           strokeWidth={STROKE_W}
                         />
-                        {stampType === 'declined' && (
-                          <G clipPath="url(#hatchClip)" opacity={0.12}>
-                            {Array.from({ length: 25 }).map((_, i) => {
-                              const offset = (i - 12) * 7;
-                              return (
-                                <Line
-                                  key={`h${i}`}
-                                  x1={STAMP_CTR + offset - MAIN_R}
-                                  y1={STAMP_CTR - MAIN_R}
-                                  x2={STAMP_CTR + offset + MAIN_R}
-                                  y2={STAMP_CTR + MAIN_R}
-                                  stroke={stampColor}
-                                  strokeWidth={1}
-                                />
-                              );
-                            })}
-                          </G>
-                        )}
                       </Svg>
                       <View style={styles.stampTextOverlay}>
                         <Text style={[styles.stampWord, { color: stampColor }]}>proof</Text>
-                        <Text
-                          style={[
-                            stampType === 'proof' ? styles.stampCheck : styles.stampX,
-                            { color: stampColor },
-                          ]}
-                        >
-                          {stampType === 'proof' ? '✓' : '✗'}
-                        </Text>
-                        <Text style={[styles.stampSub, { color: stampColor }]}>
-                          {stampType === 'proof' ? 'VERIFIED' : 'DECLINED'}
-                        </Text>
+                        <Text style={[styles.stampCheck, { color: stampColor }]}>✓</Text>
+                        <Text style={[styles.stampSub, { color: stampColor }]}>VERIFIED</Text>
                       </View>
                     </View>
                   </Animated.View>
@@ -316,20 +284,12 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDe
 
               <View style={styles.btnRow}>
                 <TouchableOpacity
-                  style={[styles.btnProof, { backgroundColor: STAMP_PROOF }]}
-                  onPress={() => playStamp('proof')}
+                  style={[styles.btnProof, { backgroundColor: STAMP_PROOF, flex: 1 }]}
+                  onPress={playStamp}
                   activeOpacity={0.8}
                   disabled={stampType !== 'none'}
                 >
                   <Text style={styles.btnProofText}>Proof it ✓</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnDecline, { backgroundColor: C.gray300, borderColor: C.border }]}
-                  onPress={() => playStamp('declined')}
-                  activeOpacity={0.8}
-                  disabled={stampType !== 'none'}
-                >
-                  <Text style={[styles.btnDeclineText, { color: STAMP_DECLINE }]}>Not for me ✗</Text>
                 </TouchableOpacity>
               </View>
 
@@ -528,12 +488,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 24,
   },
-  stampX: {
-    fontSize: 20,
-    fontWeight: '900',
-    lineHeight: 24,
-    textDecorationLine: 'line-through',
-  },
   stampSub: {
     fontSize: 8,
     fontWeight: '800',
@@ -560,17 +514,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: Fonts.serifBold,
     letterSpacing: 0.3,
-  },
-  btnDecline: {
-    flex: 0.7,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    alignItems: 'center',
-  },
-  btnDeclineText: {
-    fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
   },
   hint: {
     fontSize: 10,
