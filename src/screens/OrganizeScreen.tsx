@@ -18,7 +18,6 @@ import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useAuthStore } from '../store/authStore';
@@ -270,22 +269,27 @@ export const OrganizeScreen: React.FC = () => {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Subcategory cards */}
+          {/* Subcategory list */}
           {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
             <View key={section.title} style={styles.subcategorySection}>
               <Text style={[styles.subcategorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
-              <View style={styles.subcategoryGrid}>
-                {section.items.map((item) => {
+              <View>
+                {section.items.map((item, idx) => {
                   const isSelected = selectedTags.includes(item.name);
+                  const isLast = idx === section.items.length - 1;
                   return (
-                    <TouchableOpacity key={item.name} style={styles.subcategoryCard} onPress={() => toggleTag(item.name)} activeOpacity={0.8}>
-                      <LinearGradient colors={item.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.subcategoryGradient, isSelected && { borderColor: Colors.primary, borderWidth: 2 }]}>
-                        {item.icon && (
-                          <View style={styles.subcategoryIconWrap}><Ionicons name={item.icon as any} size={18} color="rgba(255,255,255,0.5)" /></View>
-                        )}
-                        <Text style={styles.subcategoryName}>{item.name}</Text>
-                        {isSelected && <View style={styles.subcategoryCheck}><Ionicons name="checkmark-circle" size={18} color="#FFF" /></View>}
-                      </LinearGradient>
+                    <TouchableOpacity
+                      key={item.name}
+                      style={[styles.flatSubcatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }, isSelected && { backgroundColor: Colors.primary + '10' }]}
+                      onPress={() => toggleTag(item.name)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.flatSubcatEmoji}>{item.emoji}</Text>
+                      <View style={styles.flatSubcatTextCol}>
+                        <Text style={[styles.flatSubcatName, { color: C.black }]}>{item.name}</Text>
+                        {item.subtitle ? <Text style={[styles.flatSubcatSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+                      </View>
+                      {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : null}
                     </TouchableOpacity>
                   );
                 })}
@@ -488,15 +492,14 @@ const styles = StyleSheet.create({
   chipEmoji: { fontSize: 14 },
   chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
 
-  // Subcategory cards
+  // Subcategory flat list
   subcategorySection: { marginBottom: 12 },
   subcategorySectionTitle: { fontSize: 10, fontFamily: Fonts.serifSemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
-  subcategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  subcategoryCard: { width: '48%' as any, borderRadius: 14, overflow: 'hidden' },
-  subcategoryGradient: { padding: 12, minHeight: 80, justifyContent: 'flex-end', borderRadius: 14 },
-  subcategoryIconWrap: { position: 'absolute', top: 10, right: 10 },
-  subcategoryName: { fontSize: 13, fontFamily: Fonts.serifBold, color: '#FFF' },
-  subcategoryCheck: { position: 'absolute', top: 10, left: 10 },
+  flatSubcatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  flatSubcatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
+  flatSubcatTextCol: { flex: 1 },
+  flatSubcatName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  flatSubcatSub: { fontSize: 11, marginTop: 2 },
 
   // Selected tags
   selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },

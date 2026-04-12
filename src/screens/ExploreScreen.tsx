@@ -281,44 +281,28 @@ export const ExploreScreen: React.FC = () => {
   );
 
   // ── Renderers ──
-  const renderCategoryCard = (item: ExploreCategoryItem, index: number, rowLength: number) => {
+  const renderCategoryItem = (item: ExploreCategoryItem, index: number, totalItems: number) => {
     const isSelected = selectedFilters.includes(item.name);
+    const isLast = index === totalItems - 1;
     return (
       <TouchableOpacity
         key={item.name}
-        style={[styles.catCard, { marginRight: index % 2 === 0 && rowLength > 1 ? CARD_GAP : 0 }]}
-        activeOpacity={0.85}
+        style={[styles.flatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }, isSelected && { backgroundColor: Colors.primary + '10' }]}
+        activeOpacity={0.7}
         onPress={() => toggleFilter(item.name)}
       >
-        <LinearGradient colors={item.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.catCardGradient, isSelected && { borderColor: Colors.primary, borderWidth: 2.5 }]}>
-          {isSelected && (
-            <View style={styles.catCheckMark}>
-              <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-            </View>
-          )}
-          <View style={styles.catIconWrap}>
-            <Ionicons name={(item.icon || 'ellipse-outline') as any} size={26} color={Colors.gold} />
-          </View>
-          <View style={styles.catCardContent}>
-            <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
-            {item.subtitle ? <Text style={styles.catSubtitle}>{item.subtitle}</Text> : null}
-            {item.hot ? <View style={styles.catHotDot} /> : null}
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderMoodItem = (item: ExploreCategoryItem) => {
-    const isSelected = selectedFilters.includes(item.name);
-    return (
-      <TouchableOpacity key={item.name} style={[styles.moodCard, { backgroundColor: C.gray200, borderColor: isSelected ? Colors.primary : C.border, borderWidth: isSelected ? 2 : 1 }]} activeOpacity={0.7} onPress={() => toggleFilter(item.name)}>
-        <Text style={styles.moodEmoji}>{item.emoji}</Text>
-        <View style={styles.moodTextCol}>
-          <Text style={[styles.moodName, { color: C.black }]}>{item.name}</Text>
-          {item.subtitle ? <Text style={[styles.moodSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+        <Text style={styles.flatEmoji}>{item.emoji}</Text>
+        <View style={styles.flatTextCol}>
+          <Text style={[styles.flatName, { color: C.black }]}>{item.name}</Text>
+          {item.subtitle ? <Text style={[styles.flatSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
         </View>
-        {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : <Ionicons name="chevron-forward" size={18} color={C.gray500} />}
+        {isSelected ? (
+          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+        ) : item.hot ? (
+          <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
+            <Text style={[styles.hotBadgeText, { color: C.primary }]}>🔥</Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -358,11 +342,11 @@ export const ExploreScreen: React.FC = () => {
     <View key={`${section.title}-${idx}`} style={styles.section}>
       <Text style={[styles.sectionTitle, { color: C.gray600 }]}>{section.title}</Text>
       {layout === 'mood-list' ? (
-        <View style={styles.moodList}>{section.items.map((item) => renderMoodItem(item))}</View>
+        <View>{section.items.map((item, i) => renderCategoryItem(item, i, section.items.length))}</View>
       ) : layout === 'ranked-list' ? (
         <View>{section.items.map((item, i) => renderRankedItem(item, i + 1))}</View>
       ) : (
-        <View style={styles.catGrid}>{section.items.map((item, i) => renderCategoryCard(item, i, section.items.length))}</View>
+        <View>{section.items.map((item, i) => renderCategoryItem(item, i, section.items.length))}</View>
       )}
     </View>
   );
@@ -556,15 +540,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: Layout.screenPadding },
   section: { marginTop: 18 },
   sectionTitle: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  catCard: { width: CARD_WIDTH, marginBottom: CARD_GAP, borderRadius: 16, overflow: 'hidden' },
-  catCardGradient: { height: 110, padding: 14, justifyContent: 'flex-end', position: 'relative' },
-  catIconWrap: { position: 'absolute', top: 12, right: 14, width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.2)', alignItems: 'center', justifyContent: 'center' },
-  catCardContent: {},
-  catName: { color: '#FFFFFF', fontSize: 14, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  catSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '500', marginTop: 2 },
-  catCheckMark: { position: 'absolute', top: 10, left: 10, zIndex: 1 },
-  catHotDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.error },
+  // Flat list items
+  flatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  flatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
+  flatTextCol: { flex: 1 },
+  flatName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  flatSub: { fontSize: 11, marginTop: 2 },
 
   // Results
   resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
@@ -577,13 +558,7 @@ const styles = StyleSheet.create({
   compactMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactMetaText: { fontSize: 12 },
 
-  // Mood
-  moodList: { gap: 10 },
-  moodCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, paddingVertical: 16, paddingHorizontal: 16 },
-  moodEmoji: { fontSize: 32, marginRight: 14 },
-  moodTextCol: { flex: 1 },
-  moodName: { fontSize: 15, fontFamily: Fonts.serifBold },
-  moodSub: { fontSize: 12, marginTop: 3 },
+  // (mood-list now uses flatRow renderer)
 
   // Ranked
   rankedRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },

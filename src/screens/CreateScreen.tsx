@@ -1673,42 +1673,27 @@ export const CreateScreen: React.FC = () => {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Subcategory cards (visible when Voir + toggled) */}
+          {/* Subcategory list (visible when Voir + toggled) */}
           {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
             <View key={section.title} style={styles.categorySectionWrap}>
               <Text style={[styles.categorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
-              <View style={styles.categoryGrid}>
-                {section.items.map((item) => {
+              <View>
+                {section.items.map((item, idx) => {
                   const isSelected = selectedTags.includes(item.name);
-                  const gradColors = item.gradient as [string, string];
+                  const isLast = idx === section.items.length - 1;
                   return (
                     <TouchableOpacity
                       key={item.name}
-                      style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
+                      style={[styles.flatSubcatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }, isSelected && { backgroundColor: Colors.primary + '10' }]}
                       onPress={() => toggleTag(item.name)}
-                      activeOpacity={0.8}
+                      activeOpacity={0.7}
                     >
-                      <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.categoryCardGradient, isSelected && { borderColor: C.primary, borderWidth: 2 }]}>
-                        {item.icon && (
-                          <View style={styles.categoryCardIconWrap}>
-                            <Ionicons name={item.icon as any} size={18} color="rgba(255,255,255,0.5)" />
-                          </View>
-                        )}
-                        {!item.icon && item.emoji && (
-                          <View style={styles.categoryCardIconWrap}>
-                            <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
-                          </View>
-                        )}
-                        <View style={styles.categoryCardBottom}>
-                          <Text style={styles.categoryCardName}>{item.name}</Text>
-                          {item.subtitle ? <Text style={styles.categoryCardSub}>{item.subtitle}</Text> : null}
-                        </View>
-                        {isSelected && (
-                          <View style={styles.categoryCardCheck}>
-                            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                          </View>
-                        )}
-                      </LinearGradient>
+                      <Text style={styles.flatSubcatEmoji}>{item.emoji}</Text>
+                      <View style={styles.flatSubcatTextCol}>
+                        <Text style={[styles.flatSubcatName, { color: C.black }]}>{item.name}</Text>
+                        {item.subtitle ? <Text style={[styles.flatSubcatSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+                      </View>
+                      {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : null}
                     </TouchableOpacity>
                   );
                 })}
@@ -2422,15 +2407,11 @@ const styles = StyleSheet.create({
   // Category sections & cards
   categorySectionWrap: { marginBottom: 12 },
   categorySectionTitle: { fontSize: 10, fontFamily: Fonts.serifSemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryCard: { width: '48%' as any, borderRadius: 14, overflow: 'hidden' },
-  categoryCardSelected: {},
-  categoryCardGradient: { padding: 12, minHeight: 80, justifyContent: 'flex-end', borderRadius: 14 },
-  categoryCardIconWrap: { position: 'absolute', top: 10, right: 10 },
-  categoryCardBottom: {},
-  categoryCardName: { fontSize: 13, fontFamily: Fonts.serifBold, color: '#FFF' },
-  categoryCardSub: { fontSize: 10, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  categoryCardCheck: { position: 'absolute', top: 10, left: 10 },
+  flatSubcatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  flatSubcatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
+  flatSubcatTextCol: { flex: 1 },
+  flatSubcatName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  flatSubcatSub: { fontSize: 11, marginTop: 2 },
 
   // Selected tags
   selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },
