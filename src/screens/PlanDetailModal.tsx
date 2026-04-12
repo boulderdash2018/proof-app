@@ -30,7 +30,7 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment, deletePlan, archivePlan } from '../services/plansService';
-import { getPlaceDetails } from '../services/googlePlacesService';
+import { getPlaceDetails, computeTravelDuration } from '../services/googlePlacesService';
 import { useCity } from '../hooks/useCity';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { MiniStampIcon } from '../components/MiniStampIcon';
@@ -98,6 +98,39 @@ export const PlanDetailModal: React.FC = () => {
   const [showMap, setShowMap] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
   const [showTransportChooser, setShowTransportChooser] = useState(false);
+
+  // Auto-compute missing travel segments
+  const [computedSegments, setComputedSegments] = useState<Record<string, TravelSegment>>({});
+
+  useEffect(() => {
+    if (!plan || plan.places.length < 2) return;
+    const hasTravelData = plan.travelSegments && plan.travelSegments.length > 0;
+
+    plan.places.forEach((place, idx) => {
+      if (idx >= plan.places.length - 1) return; // skip last place
+      const nextPlace = plan.places[idx + 1];
+
+      // Check if a segment already exists for this pair
+      const existing = hasTravelData && plan.travelSegments!.find(
+        (ts) => ts.fromPlaceId === place.id || ts.fromPlaceId === place.googlePlaceId
+      );
+      if (existing && existing.duration > 0) return; // already have valid data
+      if (computedSegments[place.id]) return; // already computed
+
+      const originId = place.googlePlaceId || place.id;
+      const destId = nextPlace.googlePlaceId || nextPlace.id;
+      const transport = plan.transport || 'À pied';
+
+      computeTravelDuration(originId, destId, transport).then((mins) => {
+        if (mins !== null) {
+          setComputedSegments((prev) => ({
+            ...prev,
+            [place.id]: { fromPlaceId: place.id, toPlaceId: nextPlace.id, duration: mins, transport },
+          }));
+        }
+      }).catch(() => {});
+    });
+  }, [plan?.id]);
 
   // Redesign state
   const [showCommentSheet, setShowCommentSheet] = useState(false);
@@ -480,9 +513,10 @@ export const PlanDetailModal: React.FC = () => {
 
         <View style={st.itinerary}>
           {plan.places.map((place, index) => {
-            const travelToNext: TravelSegment | undefined = plan.travelSegments?.find(
-              (ts) => ts.fromPlaceId === place.id
-            ) || (plan.travelSegments && plan.travelSegments[index]);
+            const travelToNext: TravelSegment | undefined =
+              plan.travelSegments?.find((ts) => ts.fromPlaceId === place.id || ts.fromPlaceId === place.googlePlaceId) ||
+              (plan.travelSegments && plan.travelSegments[index]) ||
+              computedSegments[place.id];
             const isLast = index === plan.places.length - 1;
             const placePhoto = place.customPhoto || place.photoUrls?.[0];
             const hasExtras = !!(place.address || place.comment || (place.questionAnswer && place.question) || (place.questions && place.questions.length > 0) || place.customPhoto);
@@ -572,7 +606,7 @@ export const PlanDetailModal: React.FC = () => {
                           <Text style={[st.travelText, { color: C.gray700 }]}>{travelToNext.duration}min</Text>
                         </>
                       ) : (
-                        <Text style={[st.travelText, { color: C.gray500 }]}>⋯</Text>
+                        <ActivityIndicator size="small" color={C.gray500} />
                       )}
                     </View>
                   </View>
