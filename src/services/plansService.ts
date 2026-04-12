@@ -31,6 +31,8 @@ const GRADIENTS = [
   'linear-gradient(135deg, #82E0F5, #3EADD1, #1A7BA0)',
 ];
 
+const capitalize = (s: string): string => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
 const getTimeAgo = (dateStr: string): string => {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
@@ -138,7 +140,7 @@ export const fetchFeedPlans = async (city?: string): Promise<Plan[]> => {
     console.log(`[plansService] fetchFeedPlans: ${snap.docs.length} plans found`);
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
-      return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
     }).filter((p) => !(p as any).archived && planMatchesCity(p, city));
     // Sort client-side (avoids Firestore index requirement)
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -157,7 +159,7 @@ export const fetchUserPlans = async (userId: string): Promise<Plan[]> => {
     console.log(`[plansService] fetchUserPlans(${userId}): ${snap.docs.length} plans found`);
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
-      return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
     }).filter((p) => !(p as any).archived);
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
@@ -189,7 +191,7 @@ export const fetchArchivedPlans = async (userId: string): Promise<Plan[]> => {
     const snap = await getDocs(q);
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
-      return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+      return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
     });
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;
@@ -205,7 +207,7 @@ export const fetchPlanById = async (planId: string): Promise<Plan | null> => {
     const snap = await getDoc(doc(db, PLANS, planId));
     if (!snap.exists()) return null;
     const data = snap.data() as Plan;
-    return { ...data, id: snap.id, timeAgo: getTimeAgo(data.createdAt) };
+    return { ...data, id: snap.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
   } catch (err) {
     console.error('[plansService] fetchPlanById error:', err);
     return null;
@@ -365,7 +367,7 @@ export const fetchPublicPlansByTag = async (tag: string, city?: string): Promise
     const plans = snap.docs
       .map((d) => {
         const data = d.data() as Plan;
-        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+        return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
       })
       .filter((p) => p.author?.isPrivate === false && planMatchesCity(p, city));
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -391,7 +393,7 @@ export const fetchPublicPlansByTags = async (tags: string[], city?: string): Pro
       snap.docs.forEach((d) => {
         if (!allPlans.has(d.id)) {
           const data = d.data() as Plan;
-          allPlans.set(d.id, { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) });
+          allPlans.set(d.id, { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) });
         }
       });
     }
@@ -428,7 +430,7 @@ export const fetchPublicPlansNearby = async (
     const plans = snap.docs
       .map((d) => {
         const data = d.data() as Plan;
-        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+        return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
       })
       .filter((p) => {
         if (p.author?.isPrivate !== false) return false;
@@ -455,7 +457,7 @@ export const fetchPublicPlansWithPlace = async (placeId: string, googlePlaceId?:
     const plans = snap.docs
       .map((d) => {
         const data = d.data() as Plan;
-        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+        return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
       })
       .filter((p) => {
         if (p.author?.isPrivate !== false) return false;
@@ -481,7 +483,7 @@ export const searchPublicPlans = async (queryStr: string, city?: string): Promis
     const plans = snap.docs
       .map((d) => {
         const data = d.data() as Plan;
-        return { ...data, id: d.id, timeAgo: getTimeAgo(data.createdAt) };
+        return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
       })
       .filter((p) => {
         if (p.author?.isPrivate !== false) return false;
