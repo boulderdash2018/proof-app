@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
 import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
 import { LoadingSkeleton } from '../components';
-import { Plan } from '../types';
+import { Plan, Place } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
@@ -74,6 +74,7 @@ export const ExploreScreen: React.FC = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
+  const [contentMode, setContentMode] = useState<'plans' | 'lieux'>('plans');
 
   // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -224,6 +225,23 @@ export const ExploreScreen: React.FC = () => {
   };
 
   const displayedPlans = applyAdvancedFilters(filteredPlans);
+
+  // Extract unique places from filtered plans for "Lieux" mode
+  const displayedPlaces = (() => {
+    if (contentMode !== 'lieux') return [];
+    const seen = new Set<string>();
+    const places: (Place & { planTitle: string; planId: string })[] = [];
+    for (const plan of displayedPlans) {
+      for (const place of plan.places) {
+        const key = place.googlePlaceId || place.id;
+        if (!seen.has(key)) {
+          seen.add(key);
+          places.push({ ...place, planTitle: plan.title, planId: plan.id });
+        }
+      }
+    }
+    return places;
+  })();
 
   const clearAdvancedFilters = () => {
     setMaxBudget(null);
@@ -470,6 +488,36 @@ export const ExploreScreen: React.FC = () => {
     );
   };
 
+  const renderCompactPlace = (place: Place & { planTitle: string; planId: string }, index: number, total: number) => {
+    const photo = place.photoUrls?.[0] || place.customPhoto;
+    return (
+      <TouchableOpacity
+        key={`${place.googlePlaceId || place.id}-${index}`}
+        style={[styles.placeRow, index < total - 1 && { borderBottomWidth: 1, borderBottomColor: C.borderLight }]}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('PlanDetail', { planId: place.planId })}
+      >
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.placeThumb} />
+        ) : (
+          <View style={[styles.placeThumb, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="location-outline" size={18} color={C.gray600} />
+          </View>
+        )}
+        <View style={styles.placeInfo}>
+          <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+          <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
+        </View>
+        {place.rating > 0 && (
+          <View style={styles.placeRating}>
+            <Ionicons name="star" size={12} color={Colors.gold} />
+            <Text style={[styles.placeRatingText, { color: C.gray800 }]}>{place.rating.toFixed(1)}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <View style={styles.headerRow}>
@@ -493,6 +541,25 @@ export const ExploreScreen: React.FC = () => {
         <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
         <Text style={[styles.searchInput, { color: C.gray600 }]}>{t.explore_search_placeholder}</Text>
       </TouchableOpacity>
+
+      {/* Content mode toggle */}
+      <View style={[styles.modeRow, { backgroundColor: C.gray200 }]}>
+        {(['plans', 'lieux'] as const).map((mode) => {
+          const active = contentMode === mode;
+          return (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.modePill, active && { backgroundColor: C.white }]}
+              onPress={() => setContentMode(mode)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modePillText, { color: active ? C.black : C.gray600 }]}>
+                {mode === 'plans' ? 'Plans' : 'Lieux'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* Filter rows */}
       {renderPersonRow()}
@@ -578,15 +645,28 @@ export const ExploreScreen: React.FC = () => {
                 </View>
                 {isFilterLoading ? (
                   <LoadingSkeleton variant="list" />
-                ) : displayedPlans.length > 0 ? (
-                  <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
-                    <Text style={[styles.resultsSectionLabel, { color: C.gray700, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
-                    {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
-                  </View>
+                ) : contentMode === 'plans' ? (
+                  displayedPlans.length > 0 ? (
+                    <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
+                      <Text style={[styles.resultsSectionLabel, { color: C.gray700, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
+                      {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', paddingTop: 20 }}>
+                      <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
+                    </View>
+                  )
                 ) : (
-                  <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                    <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun plan trouvé pour ces filtres</Text>
-                  </View>
+                  displayedPlaces.length > 0 ? (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({displayedPlaces.length})</Text>
+                      {displayedPlaces.map((place, i) => renderCompactPlace(place, i, displayedPlaces.length))}
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', paddingTop: 20 }}>
+                      <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun lieu trouvé pour ces filtres</Text>
+                    </View>
+                  )
                 )}
               </Animated.View>
             )}
@@ -638,6 +718,11 @@ const styles = StyleSheet.create({
   filterBtnDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, marginHorizontal: Layout.screenPadding, paddingHorizontal: 14, height: 44, marginBottom: 8 },
   searchInput: { flex: 1, fontSize: 14 },
+
+  // Content mode toggle
+  modeRow: { flexDirection: 'row', marginHorizontal: Layout.screenPadding, borderRadius: 10, padding: 3, marginBottom: 10 },
+  modePill: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
+  modePillText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
 
   // Filter rows
   filterSection: { marginBottom: 4, paddingLeft: Layout.screenPadding },
@@ -724,4 +809,13 @@ const styles = StyleSheet.create({
   filtersClearText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   filtersApplyBtn: { flex: 2, alignItems: 'center', paddingVertical: 14, borderRadius: 12 },
   filtersApplyText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
+
+  // Place list items
+  placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
+  placeThumb: { width: 48, height: 48, borderRadius: 10, overflow: 'hidden' },
+  placeInfo: { flex: 1 },
+  placeName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  placeRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  placeRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
 });
