@@ -94,6 +94,9 @@ export const ProfileScreen: React.FC = () => {
   const donePlans = savedPlans.filter((sp) => sp.isDone);
   const todoPlans = savedPlans.filter((sp) => !sp.isDone);
 
+  // Profile tabs
+  const [profileTab, setProfileTab] = useState<'plans' | 'drafts' | 'badges'>('plans');
+
   // Compute real stats from fetched plans
   const realPlanCount = userPlans.length;
   const realLikesReceived = userPlans.reduce((sum: number, p: any) => sum + (p.likesCount || 0), 0);
@@ -251,154 +254,187 @@ export const ProfileScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Rank Progress */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.gray700 }]}>RANK</Text>
-          <RankProgressBar totalProofs={totalProofs} />
+        {/* ═══ Tab bar ═══ */}
+        <View style={[styles.profileTabBar, { borderBottomColor: C.borderLight }]}>
+          {(['plans', 'drafts', 'badges'] as const).map((tab) => {
+            const isActive = profileTab === tab;
+            const labels: Record<string, string> = { plans: 'Plans', drafts: 'Brouillons', badges: 'Badges' };
+            const counts: Record<string, number> = { plans: userPlans.length + donePlans.length + todoPlans.length, drafts: drafts.length, badges: unlockedAchievements.length };
+            return (
+              <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: C.primary }]} onPress={() => setProfileTab(tab)} activeOpacity={0.7}>
+                <Text style={[styles.profileTabText, { color: isActive ? C.primary : C.gray600 }]}>{labels[tab]}</Text>
+                <Text style={[styles.profileTabCount, { color: isActive ? C.primary : C.gray600 }]}>{counts[tab]}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Achievements / Badges */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_badges}</Text>
-          <BadgeGrid unlockedIds={unlockedAchievements} lang={lang} />
-        </View>
-
-        {userPlans.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_recent_plans}</Text>
-            <View style={styles.plansGrid}>
-              {userPlans.map((plan) => {
-                const colors = parseGradient(plan.gradient);
-                const photo = getPlanPhoto(plan);
-                return (
-                  <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
-                    <View style={styles.miniCard}>
-                      {photo ? (
-                        <Image source={{ uri: photo }} style={styles.miniCardImage} />
-                      ) : (
-                        <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                      )}
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
-                      <Text style={styles.miniCardTitle} numberOfLines={2}>{plan.title}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+        {/* ═══ Tab content ═══ */}
+        {profileTab === 'plans' && (
+          <>
+            {/* Rank Progress */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: C.gray700 }]}>RANK</Text>
+              <RankProgressBar totalProofs={totalProofs} />
             </View>
-          </View>
-        )}
 
-        {donePlans.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_done_plans}</Text>
-            <View style={styles.plansGrid}>
-              {donePlans.map((sp) => {
-                const colors = parseGradient(sp.plan.gradient);
-                const photo = getPlanPhoto(sp.plan);
-                return (
-                  <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
-                    <View style={styles.miniCard}>
-                      {photo ? (
-                        <Image source={{ uri: photo }} style={styles.miniCardImage} />
-                      ) : (
-                        <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                      )}
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
-                      <View style={styles.doneCheck}><Text style={styles.doneCheckText}>✓</Text></View>
-                      <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {todoPlans.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_saved_plans}</Text>
-            <View style={styles.plansGrid}>
-              {todoPlans.map((sp) => {
-                const colors = parseGradient(sp.plan.gradient);
-                const photo = getPlanPhoto(sp.plan);
-                return (
-                  <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
-                    <View style={styles.miniCard}>
-                      {photo ? (
-                        <Image source={{ uri: photo }} style={styles.miniCardImage} />
-                      ) : (
-                        <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                      )}
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
-                      <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* ===== DRAFTS ===== */}
-        {drafts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: C.gray700 }]}>DRAFTS</Text>
-            <View style={styles.plansGrid}>
-              {[...drafts].sort((a, b) => b.updatedAt - a.updatedAt).map((d) => {
-                const draftPhoto = d.coverPhotos?.[0];
-                const timeAgo = (() => {
-                  const mins = Math.floor((Date.now() - d.updatedAt) / 60000);
-                  if (mins < 1) return 'just now';
-                  if (mins < 60) return `${mins}min ago`;
-                  const hrs = Math.floor(mins / 60);
-                  if (hrs < 24) return `${hrs}h ago`;
-                  return `${Math.floor(hrs / 24)}d ago`;
-                })();
-                return (
-                  <TouchableOpacity
-                    key={d.id}
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate('CreateTab', { screen: 'Create', params: { draftId: d.id } })}
-                  >
-                    <View style={[styles.miniCard, styles.draftCard]}>
-                      {draftPhoto ? (
-                        <Image source={{ uri: draftPhoto }} style={styles.miniCardImage} />
-                      ) : (
-                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#EDE8E0' }]} />
-                      )}
-                      {!draftPhoto && (
-                        <Ionicons name="document-text-outline" size={18} color="#B5A998" style={styles.draftIcon} />
-                      )}
-                      {draftPhoto && <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />}
-                      <Text style={[styles.miniCardTitle, !draftPhoto && styles.draftCardTitle]} numberOfLines={1}>
-                        {d.title || 'Untitled plan'}
-                      </Text>
-                      <Text style={[styles.draftMeta, !draftPhoto && styles.draftMetaDark]}>
-                        {d.places.length} {d.places.length === 1 ? 'place' : 'places'} · {timeAgo}
-                      </Text>
-                      {/* Delete button */}
-                      <TouchableOpacity
-                        style={styles.draftDeleteBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          if (Platform.OS === 'web') {
-                            if (window.confirm('Delete draft?')) deleteDraft(d.id);
-                          } else {
-                            Alert.alert('Delete draft?', '', [
-                              { text: 'Cancel', style: 'cancel' },
-                              { text: 'Delete', style: 'destructive', onPress: () => deleteDraft(d.id) },
-                            ]);
-                          }
-                        }}
-                      >
-                        <Ionicons name="close-circle" size={18} color="rgba(0,0,0,0.4)" />
+            {userPlans.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_recent_plans}</Text>
+                <View style={styles.plansGrid}>
+                  {userPlans.map((plan) => {
+                    const colors = parseGradient(plan.gradient);
+                    const photo = getPlanPhoto(plan);
+                    return (
+                      <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                        <View style={styles.miniCard}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                          ) : (
+                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
+                          <Text style={styles.miniCardTitle} numberOfLines={2}>{plan.title}</Text>
+                        </View>
                       </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {donePlans.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_done_plans}</Text>
+                <View style={styles.plansGrid}>
+                  {donePlans.map((sp) => {
+                    const colors = parseGradient(sp.plan.gradient);
+                    const photo = getPlanPhoto(sp.plan);
+                    return (
+                      <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
+                        <View style={styles.miniCard}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                          ) : (
+                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
+                          <View style={styles.doneCheck}><Text style={styles.doneCheckText}>✓</Text></View>
+                          <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {todoPlans.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: C.gray700 }]}>{t.profile_saved_plans}</Text>
+                <View style={styles.plansGrid}>
+                  {todoPlans.map((sp) => {
+                    const colors = parseGradient(sp.plan.gradient);
+                    const photo = getPlanPhoto(sp.plan);
+                    return (
+                      <TouchableOpacity key={sp.planId} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: sp.planId })}>
+                        <View style={styles.miniCard}>
+                          {photo ? (
+                            <Image source={{ uri: photo }} style={styles.miniCardImage} />
+                          ) : (
+                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          )}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />
+                          <Text style={styles.miniCardTitle} numberOfLines={2}>{sp.plan.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {userPlans.length === 0 && donePlans.length === 0 && todoPlans.length === 0 && (
+              <View style={styles.emptyTab}>
+                <Ionicons name="map-outline" size={36} color={C.gray500} />
+                <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun plan pour le moment</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {profileTab === 'drafts' && (
+          <>
+            {drafts.length > 0 ? (
+              <View style={styles.section}>
+                <View style={styles.plansGrid}>
+                  {[...drafts].sort((a, b) => b.updatedAt - a.updatedAt).map((d) => {
+                    const draftPhoto = d.coverPhotos?.[0];
+                    const timeAgo = (() => {
+                      const mins = Math.floor((Date.now() - d.updatedAt) / 60000);
+                      if (mins < 1) return 'just now';
+                      if (mins < 60) return `${mins}min ago`;
+                      const hrs = Math.floor(mins / 60);
+                      if (hrs < 24) return `${hrs}h ago`;
+                      return `${Math.floor(hrs / 24)}d ago`;
+                    })();
+                    return (
+                      <TouchableOpacity
+                        key={d.id}
+                        activeOpacity={0.85}
+                        onPress={() => navigation.navigate('CreateTab', { screen: 'Create', params: { draftId: d.id } })}
+                      >
+                        <View style={[styles.miniCard, styles.draftCard]}>
+                          {draftPhoto ? (
+                            <Image source={{ uri: draftPhoto }} style={styles.miniCardImage} />
+                          ) : (
+                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#EDE8E0' }]} />
+                          )}
+                          {!draftPhoto && (
+                            <Ionicons name="document-text-outline" size={18} color="#B5A998" style={styles.draftIcon} />
+                          )}
+                          {draftPhoto && <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />}
+                          <Text style={[styles.miniCardTitle, !draftPhoto && styles.draftCardTitle]} numberOfLines={1}>
+                            {d.title || 'Untitled plan'}
+                          </Text>
+                          <Text style={[styles.draftMeta, !draftPhoto && styles.draftMetaDark]}>
+                            {d.places.length} {d.places.length === 1 ? 'place' : 'places'} · {timeAgo}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.draftDeleteBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            onPress={(e) => {
+                              e.stopPropagation?.();
+                              if (Platform.OS === 'web') {
+                                if (window.confirm('Delete draft?')) deleteDraft(d.id);
+                              } else {
+                                Alert.alert('Delete draft?', '', [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Delete', style: 'destructive', onPress: () => deleteDraft(d.id) },
+                                ]);
+                              }
+                            }}
+                          >
+                            <Ionicons name="close-circle" size={18} color="rgba(0,0,0,0.4)" />
+                          </TouchableOpacity>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyTab}>
+                <Ionicons name="document-text-outline" size={36} color={C.gray500} />
+                <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun brouillon</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {profileTab === 'badges' && (
+          <View style={styles.section}>
+            <BadgeGrid unlockedIds={unlockedAchievements} lang={lang} />
           </View>
         )}
       </ScrollView>
@@ -425,6 +461,13 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
   statLabel: { fontSize: 11, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
   statDivider: { width: 1, height: 28 },
+  // Profile tabs
+  profileTabBar: { flexDirection: 'row', borderBottomWidth: 1, marginTop: 4 },
+  profileTabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
+  profileTabText: { fontSize: 13, fontFamily: Fonts.serifBold },
+  profileTabCount: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  emptyTab: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50, gap: 10 },
+  emptyTabText: { fontSize: 14, fontFamily: Fonts.serif },
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
   sectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   completionSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 16, paddingBottom: 4 },
