@@ -18,6 +18,7 @@ interface DraftPlace {
   questionAnswer?: string;
   question?: string;
   questions?: { question: string; answer: string }[];
+  reservationRecommended?: boolean;
 }
 
 interface DraftTravel {

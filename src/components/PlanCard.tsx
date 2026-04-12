@@ -272,6 +272,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             {plan.tags.map((tag, index) => (
               <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
             ))}
+            {plan.places.some((p) => p.reservationRecommended) && (
+              <View style={styles.bookAheadBadge}>
+                <Text style={styles.bookAheadText}>﹡ Book ahead</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -384,6 +389,8 @@ const styles = StyleSheet.create({
   photoDot: { width: 6, height: 6, borderRadius: 3 },
   trendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B3520', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 6, marginBottom: 4 },
   trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
+  bookAheadBadge: { backgroundColor: '#FFF0F0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginBottom: 4 },
+  bookAheadText: { fontSize: 9, fontFamily: Fonts.serifSemiBold, color: '#C0392B' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12 },
   placesList: { paddingHorizontal: 16, paddingTop: 12 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },

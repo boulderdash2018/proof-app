@@ -91,6 +91,7 @@ interface PlaceEntry {
   question?: string;        // first QA question (backward compat)
   questions?: QAPair[];     // all QAs (multiple questions)
   previewPhotoUrl?: string; // Google photo fetched at selection for preview
+  reservationRecommended?: boolean; // book in advance toggle
 }
 
 interface TravelEntry {
@@ -877,6 +878,7 @@ export const CreateScreen: React.FC = () => {
       question: p.question,
       questionAnswer: p.questionAnswer,
       questions: p.questions,
+      ...(p.reservationRecommended && { reservationRecommended: true }),
     }));
     const travelSegs = travels.map((tr) => ({
       fromPlaceId: tr.fromId,
@@ -1054,6 +1056,10 @@ export const CreateScreen: React.FC = () => {
     setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, duration: p.duration === value ? '' : value } : p));
   };
 
+  const toggleReservation = (id: string) => {
+    setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, reservationRecommended: !p.reservationRecommended } : p));
+  };
+
   const updateTravelDuration = (index: number, value: string) => {
     const cleaned = value.replace(/[^0-9]/g, '');
     setTravels((prev) => prev.map((t, i) => i === index ? { ...t, duration: cleaned } : t));
@@ -1145,6 +1151,7 @@ export const CreateScreen: React.FC = () => {
             ...(p.question && { question: p.question }),
             ...(p.questionAnswer && { questionAnswer: p.questionAnswer }),
             ...(p.questions && p.questions.length > 0 && { questions: p.questions }),
+            ...(p.reservationRecommended && { reservationRecommended: true }),
           };
         })
       );
@@ -1239,6 +1246,16 @@ export const CreateScreen: React.FC = () => {
             <View style={styles.placeCardInfo}>
               <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
               <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type}</Text>
+              <TouchableOpacity
+                style={styles.reservationRow}
+                onPress={() => toggleReservation(place.id)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.reservationLabel, { color: place.reservationRecommended ? '#8B5E3C' : C.gray500 }]}>Book in advance</Text>
+                <View style={[styles.reservationToggle, { backgroundColor: place.reservationRecommended ? '#C8571A' : C.gray400 }]}>
+                  <View style={[styles.reservationThumb, place.reservationRecommended && styles.reservationThumbOn]} />
+                </View>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={[styles.placeRemove, { color: C.gray600 }]}>✕</Text>
@@ -2134,6 +2151,11 @@ const styles = StyleSheet.create({
   placeCardInfo: { flex: 1 },
   placeName: { fontSize: 13, fontWeight: '700' },
   placeType: { fontSize: 11, marginTop: 1 },
+  reservationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, paddingTop: 5 },
+  reservationLabel: { fontSize: 11 },
+  reservationToggle: { width: 34, height: 18, borderRadius: 9, justifyContent: 'center', paddingHorizontal: 2 },
+  reservationThumb: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF' },
+  reservationThumbOn: { alignSelf: 'flex-end' },
   placeRemove: { fontSize: 14, paddingHorizontal: 6 },
   customizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   customizeBtnText: { fontSize: 12, fontWeight: '600' },

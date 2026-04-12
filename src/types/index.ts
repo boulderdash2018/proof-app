@@ -81,6 +81,7 @@ export interface Place {
   question?: string;         // the question that was shown
   questionAnswer?: string;   // answer to the question
   questions?: { question: string; answer: string }[];  // multiple QAs
+  reservationRecommended?: boolean;
 }
 
 export interface TravelSegment {

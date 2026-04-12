@@ -542,7 +542,7 @@ export const PlanDetailModal: React.FC = () => {
                     <View style={st.placeCardBody}>
                       <View style={st.placeCardHead}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[st.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+                          <Text style={[st.placeName, { color: C.black }]} numberOfLines={1}>{place.name}{place.reservationRecommended ? <Text style={st.reservationAsterisk}>{' ﹡'}</Text> : null}</Text>
                           <Text style={[st.placeType, { color: C.gray600 }]}>{place.type}</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={C.gray500} />
@@ -615,6 +615,11 @@ export const PlanDetailModal: React.FC = () => {
             );
           })}
         </View>
+
+        {/* Reservation legend */}
+        {plan.places.some((p) => p.reservationRecommended) && (
+          <Text style={[st.reservationLegend, { color: C.gray600 }]}>﹡ Reservation recommended</Text>
+        )}
 
         {/* ===== SOCIAL PROOF ===== */}
         {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
@@ -881,6 +886,8 @@ const st = StyleSheet.create({
   placeCardBody: { padding: 12 },
   placeCardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   placeName: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 2 },
+  reservationAsterisk: { fontSize: 10, color: '#C8571A' },
+  reservationLegend: { fontSize: 10, fontStyle: 'italic', paddingHorizontal: 20, marginTop: 8, marginBottom: 4 },
   placeType: { fontSize: 12, fontFamily: Fonts.serif, marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   ratingNum: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginRight: 4 },
