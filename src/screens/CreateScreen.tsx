@@ -27,7 +27,7 @@ import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getC
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput, PlanCard } from '../components';
 import { PhotoEditorSheet } from '../components/PhotoEditorSheet';
-import { useAuthStore, useFeedStore, useSavesStore, useDraftStore } from '../store';
+import { useAuthStore, useFeedStore, useSavesStore, useDraftStore, useSavedPlacesStore } from '../store';
 import { activeCreateSession } from '../store/draftStore';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
@@ -290,6 +290,7 @@ export const CreateScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const addPlan = useFeedStore((s) => s.addPlan);
   const addCreatedPlan = useSavesStore((s) => s.addCreatedPlan);
+  const savedPlacesList = useSavedPlacesStore((s) => s.places);
   const C = useColors();
   const { t } = useTranslation();
   const cityConfig = useCity();
@@ -1688,12 +1689,35 @@ export const CreateScreen: React.FC = () => {
                     </Text>
                   </View>
                 ) : placeSearch.length < 2 ? (
-                  <View style={{ alignItems: 'center', paddingTop: 40 }}>
-                    <Ionicons name="location" size={32} color={C.gray500} />
-                    <Text style={[styles.modalSectionLabel, { color: C.gray600, textAlign: 'center', marginTop: 12 }]}>
-                      Recherche un lieu...
-                    </Text>
-                  </View>
+                  savedPlacesList.length > 0 ? (
+                    <View>
+                      <Text style={[styles.modalSectionLabel, { color: C.gray700 }]}>Lieux sauvegardés</Text>
+                      {savedPlacesList.map((sp) => (
+                        <TouchableOpacity
+                          key={sp.placeId}
+                          style={[styles.placeOption, { borderBottomColor: C.borderLight }]}
+                          activeOpacity={0.6}
+                          onPress={() => selectGooglePlace({ placeId: sp.placeId, name: sp.name, address: sp.address, types: sp.types })}
+                        >
+                          <View style={[styles.placeOptionEmoji, { backgroundColor: C.gray200 }]}>
+                            <Ionicons name="star" size={22} color={Colors.gold} />
+                          </View>
+                          <View style={styles.placeOptionInfo}>
+                            <Text style={[styles.placeOptionName, { color: C.black }]}>{sp.name}</Text>
+                            <Text style={[styles.placeOptionType, { color: C.gray700 }]} numberOfLines={1}>{sp.address}</Text>
+                          </View>
+                          <Ionicons name="add-circle-outline" size={24} color={Colors.primary} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                      <Ionicons name="location" size={32} color={C.gray500} />
+                      <Text style={[styles.modalSectionLabel, { color: C.gray600, textAlign: 'center', marginTop: 12 }]}>
+                        Recherche un lieu...
+                      </Text>
+                    </View>
+                  )
                 ) : null
               }
             />

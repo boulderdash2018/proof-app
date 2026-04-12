@@ -23,7 +23,7 @@ import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { searchUsers } from '../services/friendsService';
-import { useAuthStore, useTrendingStore } from '../store';
+import { useAuthStore, useTrendingStore, useSavedPlacesStore } from '../store';
 import { fetchPublicPlansByTags, searchPublicPlans } from '../services/plansService';
 import {
   searchPlacesNearby,
@@ -65,6 +65,7 @@ export const ExploreScreen: React.FC = () => {
   const trendingLoading = useTrendingStore((s) => s.isLoading);
   const fetchTrending = useTrendingStore((s) => s.fetchTrending);
   const cityConfig = useCity();
+  const savedPlacesStore = useSavedPlacesStore();
 
   // Fetch trending on mount (5-min cache in store)
   useEffect(() => { fetchTrending(cityConfig.name); }, [cityConfig.name]);
@@ -476,7 +477,9 @@ export const ExploreScreen: React.FC = () => {
               {googlePlaces.length > 0 && (
                 <>
                   <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({Math.min(googlePlaces.length, 3)})</Text>
-                  {[...googlePlaces].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 3).map((place) => (
+                  {[...googlePlaces].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 3).map((place) => {
+                    const isSaved = savedPlacesStore.isPlaceSaved(place.placeId);
+                    return (
                     <TouchableOpacity key={place.placeId} style={[styles.googlePlaceCard, { backgroundColor: C.gray200, borderColor: C.border }]} activeOpacity={0.7} onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId })}>
                       {place.photoUrls.length > 0 ? <Image source={{ uri: place.photoUrls[0] }} style={styles.googlePlacePhoto} /> : <View style={[styles.googlePlacePhoto, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}><Ionicons name="location" size={24} color={C.gray600} /></View>}
                       <View style={styles.googlePlaceInfo}>
@@ -485,8 +488,33 @@ export const ExploreScreen: React.FC = () => {
                         {place.rating > 0 && <View style={styles.googlePlaceRating}><Ionicons name="star" size={12} color={C.primary} /><Text style={[styles.googlePlaceRatingText, { color: C.black }]}>{place.rating.toFixed(1)}</Text><Text style={[styles.googlePlaceReviewCount, { color: C.gray600 }]}>({place.reviewCount})</Text></View>}
                         <Text style={[styles.googlePlaceAddress, { color: C.gray600 }]} numberOfLines={1}>{place.address}</Text>
                       </View>
+                      <TouchableOpacity
+                        style={styles.saveStarBtn}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (isSaved) {
+                            savedPlacesStore.unsavePlace(place.placeId);
+                          } else {
+                            savedPlacesStore.savePlace({
+                              placeId: place.placeId,
+                              name: place.name,
+                              address: place.address,
+                              types: place.types,
+                              rating: place.rating,
+                              reviewCount: place.reviewCount,
+                              photoUrl: place.photoUrls.length > 0 ? place.photoUrls[0] : null,
+                              savedAt: Date.now(),
+                            });
+                          }
+                        }}
+                      >
+                        <Ionicons name={isSaved ? 'star' : 'star-outline'} size={20} color={isSaved ? Colors.gold : C.gray600} />
+                      </TouchableOpacity>
                     </TouchableOpacity>
-                  ))}
+                    );
+                  })}
                 </>
               )}
               {displayedPlans.length > 0 && (
@@ -693,6 +721,7 @@ const styles = StyleSheet.create({
   googlePlaceRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
   googlePlaceReviewCount: { fontSize: 11 },
   googlePlaceAddress: { fontSize: 11 },
+  saveStarBtn: { position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
 
   // Active filters
   activeFiltersWrap: { marginTop: 14 },

@@ -11,3 +11,5 @@ export { useDoItNowStore } from './doItNowStore';
 export { useTrendingStore } from './trendingStore';
 export { useDraftStore } from './draftStore';
 export type { DraftState, DraftItem } from './draftStore';
+export { useSavedPlacesStore } from './savedPlacesStore';
+export type { SavedPlace } from './savedPlacesStore';
