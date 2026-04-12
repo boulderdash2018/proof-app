@@ -41,6 +41,7 @@ export const PERSON_FILTERS: PersonFilter[] = [
   { key: 'family', label: 'Family', emoji: '👨‍👩‍👧' },
   { key: 'pet-friendly', label: 'Pet-Friendly', emoji: '🐾' },
   { key: 'co-worker', label: 'Co-Worker', emoji: '💼' },
+  { key: 'girly', label: 'Girly', emoji: '💅' },
   { key: 'around-you', label: 'Around You', emoji: '📍' },
 ];
 
