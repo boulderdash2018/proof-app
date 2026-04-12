@@ -142,7 +142,7 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     ],
   },
 
-  // ── MOOD (unchanged) ──
+  // ── MOOD ──
   {
     key: 'mood',
     label: 'Mood',
@@ -152,12 +152,12 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
       {
         title: 'COMMENT TU TE SENS ?',
         items: [
-          { name: 'Sad-day reset', emoji: '🫶', gradient: ['#5A6880', '#3A4858'], subtitle: 'Plans doux pour repartir doucement' },
-          { name: 'Dopamine day', emoji: '🚀', gradient: ['#8B7530', '#5C4E20'], subtitle: 'Boost garanti, énergie max' },
-          { name: 'Breakup recovery', emoji: '🩹', gradient: ['#7B6088', '#4A3555'], subtitle: "Tu vas t'en remettre, promis" },
-          { name: 'Romantic solo day', emoji: '🕯️', gradient: ['#8B5070', '#5C3048'], subtitle: 'Prendre soin de soi' },
-          { name: 'Get your life together', emoji: '📝', gradient: ['#4A6A50', '#2D4830'], subtitle: 'Productive reset day' },
-          { name: 'Productive reset day', emoji: '🔋', gradient: ['#7B4A4A', '#553030'], subtitle: 'Remise à zéro complète' },
+          { name: 'Reset', emoji: '🔄', gradient: ['#5A6880', '#3A4858'], subtitle: 'Repartir de zéro, doucement' },
+          { name: 'Social battery', emoji: '🔋', gradient: ['#8B7530', '#5C4E20'], subtitle: 'Recharger son énergie sociale' },
+          { name: 'Lock in', emoji: '🔒', gradient: ['#4A6A50', '#2D4830'], subtitle: 'Focus mode activé' },
+          { name: 'Unwinding', emoji: '🌀', gradient: ['#7B6088', '#4A3555'], subtitle: 'Décompresser après une longue journée' },
+          { name: 'Chill / Peace of mind', emoji: '☁️', gradient: ['#8B5070', '#5C3048'], subtitle: 'Calme, douceur, sérénité' },
+          { name: 'Forget about it', emoji: '🫠', gradient: ['#7B4A4A', '#553030'], subtitle: 'Tout oublier le temps d\'une journée' },
         ],
       },
     ],

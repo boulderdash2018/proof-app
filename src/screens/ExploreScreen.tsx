@@ -33,7 +33,7 @@ const parseGradientColors = (gradient: string): string[] => {
   return matches && matches.length >= 2 ? matches : ['#8B6A50', '#5C4030'];
 };
 
-const THEME_GROUPS = EXPLORE_GROUPS.filter(g => g.key !== 'mood' && g.key !== 'trending');
+const THEME_GROUPS = EXPLORE_GROUPS.filter(g => g.key !== 'trending');
 const FILTERED_PERSONS = PERSON_FILTERS.filter(p => p.key !== 'around-you');
 const PERSON_LABELS = new Set(PERSON_FILTERS.map(p => p.label));
 
