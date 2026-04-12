@@ -88,6 +88,8 @@ export const ExploreScreen: React.FC = () => {
       // Single-select: deselect if same, otherwise replace
       const next = prev.includes(label) ? [] : [label];
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+      // Hide subcategories when a filter is selected
+      if (next.length > 0) setShowSubcategories(false);
       if (next.length > 0) {
         setIsFilterLoading(true);
         // Fetch immediately — single filter, no debounce needed
