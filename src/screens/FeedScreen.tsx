@@ -270,9 +270,9 @@ export const FeedScreen: React.FC = () => {
               <EmptyState
                 icon="👥"
                 title="Aucun plan d'amis"
-                subtitle="Suivez des personnes qui vous suivent pour voir leurs plans ici"
-                ctaLabel="Explorer"
-                onCtaPress={() => navigation.navigate('ExploreTab')}
+                subtitle="Suivez des personnes pour voir leurs plans ici"
+                ctaLabel="Trouver des amis"
+                onCtaPress={() => navigation.navigate('ProfileTab', { screen: 'FriendRequests' })}
               />
             )
           }
