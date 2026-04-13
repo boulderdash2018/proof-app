@@ -24,6 +24,8 @@ export interface TrendingCategory {
 const buildCategoryMeta = (): Map<string, { emoji: string; gradient: [string, string] }> => {
   const map = new Map<string, { emoji: string; gradient: [string, string] }>();
   for (const group of EXPLORE_GROUPS) {
+    // Skip editorial trending group — those are fallback items, not real subcategories
+    if (group.key === 'trending') continue;
     for (const section of group.sections) {
       for (const item of section.items) {
         if (!map.has(item.name)) {
@@ -37,6 +39,13 @@ const buildCategoryMeta = (): Map<string, { emoji: string; gradient: [string, st
 
 const CATEGORY_META = buildCategoryMeta();
 const DEFAULT_GRADIENT: [string, string] = ['#5A5048', '#3D352E'];
+
+// ─── Valid subcategory whitelist ─────────────────────────
+// Only theme subcategories are valid for trending.
+// Person filters (Date, Friends, Solo…) are NOT in CATEGORY_META so they
+// are automatically excluded — they appear on nearly every plan and would
+// always dominate the ranking.
+const VALID_SUBCATEGORIES = new Set(CATEGORY_META.keys());
 
 // ─── Scoring engine ──────────────────────────────────────
 
@@ -90,6 +99,9 @@ export const computeTrendingCategories = async (city?: string): Promise<Trending
       const recentContribution = age <= SEVEN_DAYS ? planScore : 0;
 
       for (const tag of tags) {
+        // Only count subcategory tags — skip person filters (Date, Friends…)
+        if (!VALID_SUBCATEGORIES.has(tag)) continue;
+
         const acc = tagScores.get(tag) || { totalScore: 0, recentScore: 0, planCount: 0 };
         acc.totalScore += planScore;
         acc.recentScore += recentContribution;
