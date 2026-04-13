@@ -295,20 +295,22 @@ export const DoItNowScreen: React.FC = () => {
           {plan.places.map((place, i) => {
             if (!place.latitude || !place.longitude) return null;
             const isCurrent = i === currentIndex;
-            const isVisited = session.placesVisited.some((v) => v.placeId === place.id);
+            const isVisited = i < currentIndex || session.placesVisited.some((v) => v.placeId === place.id);
             return (
               <Marker
-                key={place.id}
+                key={`${place.id}-${isCurrent ? 'c' : isVisited ? 'v' : 'f'}`}
                 coordinate={{ latitude: place.latitude, longitude: place.longitude }}
                 anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges
               >
                 <View style={[
                   styles.marker,
                   {
-                    backgroundColor: isCurrent ? Colors.gold : isVisited ? Colors.gold + '80' : Colors.gray500,
-                    width: isCurrent ? 32 : 26,
-                    height: isCurrent ? 32 : 26,
-                    borderRadius: isCurrent ? 16 : 13,
+                    backgroundColor: isCurrent ? Colors.gold : isVisited ? '#8B7B3C' : Colors.gray500,
+                    borderColor: isCurrent ? Colors.gold : '#FFF',
+                    width: isCurrent ? 34 : 26,
+                    height: isCurrent ? 34 : 26,
+                    borderRadius: isCurrent ? 17 : 13,
                   },
                 ]}>
                   <Text style={[styles.markerText, { fontSize: isCurrent ? 14 : 11 }]}>{i + 1}</Text>
