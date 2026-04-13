@@ -18,9 +18,10 @@ import { useDoItNowStore } from '../store/doItNowStore';
 import { useAuthStore } from '../store/authStore';
 import { useFeedStore } from '../store/feedStore';
 import { useSavesStore } from '../store/savesStore';
+import { useDraftStore } from '../store/draftStore';
 import { createPlan } from '../services/plansService';
 import { useCity } from '../hooks/useCity';
-import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan } from '../types';
+import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan, CategoryTag } from '../types';
 import { getDirections } from '../services/directionsService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 
@@ -204,6 +205,45 @@ export const OrganizeCompleteScreen: React.FC = () => {
     setPublished(true);
   };
 
+  const handleCustomize = () => {
+    // Save organize data as a draft and navigate to CreateScreen
+    const draftId = 'organize-' + Date.now();
+    const draftPlaces = p.places.map((place) => {
+      const visit = s.placesVisited.find((v) => v.placeId === place.id);
+      const price = visit?.pricePaid || 0;
+      return {
+        id: place.id,
+        googlePlaceId: place.googlePlaceId || place.id,
+        name: place.name,
+        type: place.type || '',
+        address: place.address || '',
+        placeTypes: (place as any).placeTypes || [],
+        priceRangeIndex: price === 0 ? 0 : price <= 15 ? 1 : price <= 30 ? 2 : price <= 60 ? 3 : price <= 100 ? 4 : 5,
+        exactPrice: price > 0 ? String(price) : '',
+        price: String(price),
+        duration: String(visit?.timeSpentMinutes || ''),
+        comment: visit?.reviewText || '',
+      };
+    });
+    const draftTravels = draftPlaces.slice(0, -1).map((pl, i) => ({
+      fromId: pl.id,
+      toId: draftPlaces[i + 1].id,
+      duration: '',
+      transport: mapTransport(s.transport),
+    }));
+
+    useDraftStore.getState().saveDraft(draftId, {
+      title: s.organizeTitle || s.planTitle,
+      coverPhotos: [],
+      selectedTags: (s.organizeTags || []) as string[],
+      places: draftPlaces,
+      travels: draftTravels,
+    });
+
+    clearSession();
+    navigation.navigate('CreateTab', { screen: 'Create', params: { draftId } });
+  };
+
   // ── Success screen ──
   if (published) {
     return (
@@ -326,6 +366,16 @@ export const OrganizeCompleteScreen: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.customizeBtn, { borderColor: C.primary }]}
+          onPress={handleCustomize}
+          activeOpacity={0.7}
+          disabled={isPublishing}
+        >
+          <Ionicons name="create-outline" size={18} color={C.primary} />
+          <Text style={[styles.customizeBtnText, { color: C.primary }]}>Personnaliser ce plan</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.closeBtn, { borderColor: C.borderLight }]}
           onPress={handleGoHome}
           activeOpacity={0.7}
@@ -398,6 +448,8 @@ const styles = StyleSheet.create({
 
   publishBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   publishBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  customizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', paddingVertical: 14, borderRadius: 14, marginTop: 10, borderWidth: 1.5 },
+  customizeBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
   closeBtn: { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 10, borderWidth: 1.5 },
   closeBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
 });

@@ -22,6 +22,7 @@ import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useAuthStore } from '../store/authStore';
 import { useDoItNowStore } from '../store/doItNowStore';
+import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { CategoryTag, Place, Plan, DoItNowTransport } from '../types';
 import { TransportChooser } from '../components/TransportChooser';
 import {
@@ -46,6 +47,7 @@ export const OrganizeScreen: React.FC = () => {
   const cityConfig = useCity();
   const CITY_CENTER = cityConfig.coordinates;
   const user = useAuthStore((s) => s.user);
+  const savedPlacesList = useSavedPlacesStore((s) => s.places);
 
   // ── State ──
   const [title, setTitle] = useState('');
@@ -428,10 +430,33 @@ export const OrganizeScreen: React.FC = () => {
                     <Text style={[styles.emptyText, { color: C.gray600 }]}>Aucun résultat</Text>
                   </View>
                 ) : placeSearch.length < 2 ? (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="location" size={32} color={C.gray500} />
-                    <Text style={[styles.emptyText, { color: C.gray600 }]}>Recherche un lieu...</Text>
-                  </View>
+                  savedPlacesList.length > 0 ? (
+                    <View>
+                      <Text style={[styles.savedSectionLabel, { color: C.gray700 }]}>Lieux sauvegardés</Text>
+                      {savedPlacesList.map((sp) => (
+                        <TouchableOpacity
+                          key={sp.placeId}
+                          style={[styles.placeOption, { borderBottomColor: C.borderLight }]}
+                          activeOpacity={0.6}
+                          onPress={() => selectPlace({ placeId: sp.placeId, name: sp.name, address: sp.address, types: sp.types })}
+                        >
+                          <View style={[styles.placeOptionIcon, { backgroundColor: C.gray200 }]}>
+                            <Ionicons name="star" size={22} color={Colors.gold} />
+                          </View>
+                          <View style={styles.placeOptionInfo}>
+                            <Text style={[styles.placeOptionName, { color: C.black }]}>{sp.name}</Text>
+                            <Text style={[styles.placeOptionAddr, { color: C.gray700 }]} numberOfLines={1}>{sp.address}</Text>
+                          </View>
+                          <Ionicons name="add-circle-outline" size={24} color={Colors.primary} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <Ionicons name="location" size={32} color={C.gray500} />
+                      <Text style={[styles.emptyText, { color: C.gray600 }]}>Recherche un lieu...</Text>
+                    </View>
+                  )
                 ) : null
               }
             />
@@ -589,4 +614,5 @@ const styles = StyleSheet.create({
   placeOptionAddr: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingTop: 40, gap: 12 },
   emptyText: { fontSize: 14, fontFamily: Fonts.serif, textAlign: 'center' },
+  savedSectionLabel: { fontSize: 12, fontFamily: Fonts.serifBold, letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
 });
