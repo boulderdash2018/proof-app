@@ -427,7 +427,7 @@ export const OrganizeScreen: React.FC = () => {
                   ]}
                   {...getOrCreateDragHandlers(place.id).panHandlers}
                 >
-                  <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={styles.placeCardInner}>
+                  <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={[styles.placeCardInner, { userSelect: 'none', cursor: draggingId === place.id ? 'grabbing' : 'default' } as any]}>
                   <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
                     <Text style={styles.placeNumberText}>{index + 1}</Text>
                   </View>

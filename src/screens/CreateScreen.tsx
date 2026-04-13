@@ -1476,7 +1476,7 @@ export const CreateScreen: React.FC = () => {
           ]}
           {...getOrCreateDragHandlers(place.id).panHandlers}
         >
-          <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350}>
+          <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={{ userSelect: 'none', cursor: draggingId === place.id ? 'grabbing' : 'default' } as any}>
           <View style={styles.placeCardHeader}>
             <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
               <Text style={styles.placeNumberText}>{index + 1}</Text>
