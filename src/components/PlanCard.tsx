@@ -349,19 +349,19 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionButton} onPress={handleLikePress} activeOpacity={0.7}>
             <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-              <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? C.primary : C.gray600} />
+              <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? C.primary : C.gray600} />
             </Animated.View>
             <Text style={[styles.actionCount, { color: isLiked ? C.primary : C.gray700 }]}>{plan.likesCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={onComment} activeOpacity={0.7}>
-            <Ionicons name="chatbubble-outline" size={16} color={C.gray600} />
+            <Ionicons name="chatbubble-outline" size={20} color={C.gray600} />
             <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
             <View style={styles.saveIconWrap}>
               <Animated.View pointerEvents="none" style={[styles.saveFlash, { backgroundColor: C.primary, opacity: saveFlashOpacity }]} />
               <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={16} color={isSaved ? C.primary : C.gray600} />
+                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={isSaved ? C.primary : C.gray600} />
               </Animated.View>
             </View>
             {showSaveLabel && (
@@ -419,11 +419,11 @@ const styles = StyleSheet.create({
   metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
   actionBar: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
-  actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
-  saveIconWrap: { position: 'relative', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  saveFlash: { position: 'absolute', width: 28, height: 28, borderRadius: 14 },
-  saveLabel: { fontSize: 11, fontFamily: Fonts.serifBold, marginLeft: 4 },
-  actionCount: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 5 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
+  saveIconWrap: { position: 'relative', width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  saveFlash: { position: 'absolute', width: 32, height: 32, borderRadius: 16 },
+  saveLabel: { fontSize: 12, fontFamily: Fonts.serifBold, marginLeft: 4 },
+  actionCount: { fontSize: 14, fontFamily: Fonts.serifSemiBold, marginLeft: 6 },
   actionSpacer: { flex: 1 },
   proofRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, gap: 6 },
   proofMainText: { fontSize: 13, fontFamily: Fonts.serifBold, color: '#C8571A', letterSpacing: 0.2 },
