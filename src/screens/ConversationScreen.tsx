@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, Keyboard, Image, Animated,
+  KeyboardAvoidingView, Platform, Keyboard, Image, Animated, PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -15,9 +15,13 @@ import { useColors } from '../hooks/useColors';
 import { ChatMessage, ConversationParticipant, markConversationRead } from '../services/chatService';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
+const HEART_EMOJI = '❤️';
+const DOUBLE_TAP_DELAY = 300;
+const SWIPE_THRESHOLD = 55;
+const SWIPE_MAX = 80;
 
 // ═══════════════════════════════════════════════
-// Typing Indicator Component
+// Typing Indicator
 // ═══════════════════════════════════════════════
 
 const TypingIndicator: React.FC<{ otherUser: ConversationParticipant; color: string; bgColor: string }> = ({ otherUser, color, bgColor }) => {
@@ -53,6 +57,257 @@ const TypingIndicator: React.FC<{ otherUser: ConversationParticipant; color: str
     </View>
   );
 };
+
+// ═══════════════════════════════════════════════
+// Swipeable Message Row
+// ═══════════════════════════════════════════════
+
+interface MessageRowProps {
+  item: ChatMessage;
+  prevMsg: ChatMessage | undefined;
+  userId: string | undefined;
+  otherUser: ConversationParticipant;
+  C: any;
+  isLastSent: boolean;
+  isPickerTarget: boolean;
+  pickerScale: Animated.Value;
+  onSwipeReply: (msg: ChatMessage) => void;
+  onDoubleTapLike: (msgId: string, currentlyLiked: boolean) => void;
+  onLongPress: (msgId: string) => void;
+  onDismissPicker: () => void;
+  onReaction: (emoji: string) => void;
+  onScrollToQuote: (msgId: string) => void;
+  onPlanPress: (planId: string) => void;
+}
+
+const MessageRow = React.memo<MessageRowProps>(({
+  item, prevMsg, userId, otherUser, C, isLastSent,
+  isPickerTarget, pickerScale,
+  onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
+  onScrollToQuote, onPlanPress,
+}) => {
+  const isMine = item.senderId === userId;
+  const showDate = shouldShowDateSeparator(item, prevMsg);
+  const myReaction = item.reactions.find((r) => r.userId === userId);
+  const hasReply = !!item.replyToId;
+  const isReadByOther = item.readBy?.includes(otherUser.userId);
+
+  // ── Animated values ──
+  const translateX = useRef(new Animated.Value(0)).current;
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const lastTapRef = useRef(0);
+
+  // ── Stable refs for PanResponder callbacks ──
+  const itemRef = useRef(item);
+  itemRef.current = item;
+  const onSwipeReplyRef = useRef(onSwipeReply);
+  onSwipeReplyRef.current = onSwipeReply;
+
+  // ── Swipe PanResponder ──
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => g.dx > 15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onMoveShouldSetPanResponderCapture: () => false,
+    onPanResponderMove: (_, g) => {
+      const x = Math.max(0, Math.min(g.dx, SWIPE_MAX));
+      translateX.setValue(x);
+    },
+    onPanResponderRelease: (_, g) => {
+      if (g.dx > SWIPE_THRESHOLD) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onSwipeReplyRef.current(itemRef.current);
+      }
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 7, tension: 40 }).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+    },
+  }), []);
+
+  // ── Swipe reply icon interpolation ──
+  const replyIconOpacity = translateX.interpolate({ inputRange: [0, 25, SWIPE_THRESHOLD], outputRange: [0, 0.4, 1], extrapolate: 'clamp' });
+  const replyIconScale = translateX.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0.4, 1], extrapolate: 'clamp' });
+
+  // ── Tap handler (double-tap = like) ──
+  const handlePress = useCallback(() => {
+    if (isPickerTarget) { onDismissPicker(); return; }
+
+    const now = Date.now();
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      lastTapRef.current = 0;
+      const hasLike = item.reactions.some((r) => r.userId === userId && r.emoji === HEART_EMOJI);
+      onDoubleTapLike(item.id, hasLike);
+
+      if (!hasLike) {
+        heartOpacity.setValue(1);
+        heartScale.setValue(0);
+        Animated.sequence([
+          Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, friction: 3, tension: 200 }),
+          Animated.delay(500),
+          Animated.parallel([
+            Animated.timing(heartScale, { toValue: 0, duration: 200, useNativeDriver: true }),
+            Animated.timing(heartOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+          ]),
+        ]).start();
+      }
+    } else {
+      lastTapRef.current = now;
+    }
+  }, [item, userId, isPickerTarget, onDoubleTapLike, onDismissPicker]);
+
+  // ── Long press → reaction picker ──
+  const handleLongPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onLongPress(item.id);
+  }, [item.id, onLongPress]);
+
+  return (
+    <View>
+      {showDate && (
+        <View style={styles.dateSeparator}>
+          <Text style={[styles.dateSeparatorText, { color: C.gray600 }]}>
+            {formatDateSeparator(item.createdAt)}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.msgWrapper}>
+        {/* Swipe reply indicator — fixed behind, revealed by slide */}
+        <Animated.View style={[
+          styles.swipeIndicator,
+          { opacity: replyIconOpacity, transform: [{ scale: replyIconScale }] },
+        ]}>
+          <View style={[styles.swipeIndicatorCircle, { backgroundColor: C.gray200 }]}>
+            <Ionicons name="arrow-undo" size={14} color={C.gray600} />
+          </View>
+        </Animated.View>
+
+        {/* Swipeable message content */}
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft,
+            { transform: [{ translateX }] },
+          ]}
+        >
+          {!isMine && (
+            <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
+          )}
+
+          <TouchableOpacity
+            onPress={handlePress}
+            onLongPress={handleLongPress}
+            activeOpacity={0.9}
+            delayLongPress={400}
+            style={{ maxWidth: '80%' }}
+          >
+            {/* Quoted reply preview */}
+            {hasReply && (
+              <TouchableOpacity
+                onPress={() => item.replyToId && onScrollToQuote(item.replyToId)}
+                style={[styles.quotedReply, { backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : C.primary + '10', borderLeftColor: C.primary }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.quotedName, { color: isMine ? 'rgba(255,255,255,0.8)' : C.primary }]} numberOfLines={1}>
+                  {item.replyToSenderId === userId ? 'Toi' : otherUser.displayName}
+                </Text>
+                <Text style={[styles.quotedText, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]} numberOfLines={1}>
+                  {item.replyToType === 'plan' ? 'Plan partagé ✦' : item.replyToContent}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={[
+              styles.bubble,
+              isMine ? [styles.bubbleMine, { backgroundColor: C.primary }] : [styles.bubbleOther, { backgroundColor: C.gray200 }],
+              hasReply && styles.bubbleWithReply,
+            ]}>
+              {item.type === 'plan' ? (
+                <TouchableOpacity onPress={() => item.planId && onPlanPress(item.planId)} activeOpacity={0.8}>
+                  {item.planCover ? (
+                    <Image source={{ uri: item.planCover }} style={styles.planCover} />
+                  ) : (
+                    <View style={[styles.planCoverPlaceholder, { backgroundColor: C.primary + '20' }]}>
+                      <Ionicons name="map-outline" size={24} color={C.primary} />
+                    </View>
+                  )}
+                  <View style={styles.planInfo}>
+                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,255,255,0.7)' : C.gray600 }]}>Plan partagé</Text>
+                    <Text style={[styles.planTitle, { color: isMine ? '#FFF' : C.black }]} numberOfLines={2}>{item.planTitle}</Text>
+                    {item.planAuthorName && (
+                      <Text style={[styles.planAuthor, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>par {item.planAuthorName}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <Text style={[styles.msgText, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
+              )}
+              <Text style={[styles.msgTime, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>{formatTime(item.createdAt)}</Text>
+
+              {/* Heart animation overlay */}
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}
+              >
+                <Text style={styles.heartEmoji}>❤️</Text>
+              </Animated.View>
+            </View>
+
+            {/* Reactions display */}
+            {item.reactions.length > 0 && (
+              <View style={[styles.reactionsRow, isMine ? styles.reactionsRight : styles.reactionsLeft]}>
+                {item.reactions.map((r) => (
+                  <View
+                    key={`${r.emoji}-${r.userId}`}
+                    style={[
+                      styles.reactionChip, { backgroundColor: C.gray200 },
+                      r.userId === userId && { backgroundColor: C.primary + '20', borderWidth: 1, borderColor: C.primary + '40' },
+                    ]}
+                  >
+                    <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Read receipt — only under last sent message by me */}
+            {isMine && isLastSent && (
+              <View style={styles.readReceipt}>
+                {isReadByOther ? (
+                  <View style={styles.readReceiptInner}>
+                    <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XS" avatarUrl={otherUser.avatarUrl || undefined} />
+                    <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Vu</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Envoyé</Text>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Reaction picker (long press) — emoji row directly */}
+          {isPickerTarget && (
+            <Animated.View style={[
+              styles.reactionPicker,
+              { backgroundColor: C.white, transform: [{ scale: pickerScale }] },
+              isMine ? styles.reactionPickerRight : styles.reactionPickerLeft,
+            ]}>
+              {REACTION_EMOJIS.map((emoji) => (
+                <TouchableOpacity key={emoji} onPress={() => onReaction(emoji)} style={styles.reactionPickerBtn}>
+                  <Text style={[
+                    styles.reactionPickerEmoji,
+                    myReaction?.emoji === emoji && styles.reactionPickerActive,
+                  ]}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </Animated.View>
+          )}
+        </Animated.View>
+      </View>
+    </View>
+  );
+});
 
 // ═══════════════════════════════════════════════
 // Helpers
@@ -105,19 +360,16 @@ export const ConversationScreen: React.FC = () => {
   const setTypingStore = useChatStore((s) => s.setTyping);
 
   const [text, setText] = useState('');
-  const [contextMenuMsgId, setContextMenuMsgId] = useState<string | null>(null);
-  const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [pickerMsgId, setPickerMsgId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
-  const menuScale = useRef(new Animated.Value(0)).current;
+  const pickerScale = useRef(new Animated.Value(0)).current;
   const convIdRef = useRef(conversationId);
 
-  // ── Typing indicator freshness timer ──
+  // ── Typing freshness timer ──
   useEffect(() => {
     if (!otherTyping) return;
     const timer = setInterval(() => {
-      // Force re-check via conversations (store derives otherTyping)
-      // If the typing timestamp is stale, the store will set otherTyping=false
       const convs = useChatStore.getState().conversations;
       const conv = convs.find((c) => c.id === conversationId);
       if (conv?.typing) {
@@ -133,35 +385,31 @@ export const ConversationScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [otherTyping, conversationId, user?.id]);
 
-  // ── Open conversation + mark read ──
+  // ── Open conversation ──
   useEffect(() => {
     convIdRef.current = conversationId;
     if (user?.id) openConversation(conversationId, user.id);
-    return () => {
-      if (convIdRef.current === conversationId) closeConversation();
-    };
+    return () => { if (convIdRef.current === conversationId) closeConversation(); };
   }, [conversationId, user?.id]);
 
-  // ── Mark read when new messages arrive (for read receipts) ──
+  // ── Mark read on new messages ──
   useEffect(() => {
     if (messages.length > 0 && user?.id) {
       markConversationRead(conversationId, user.id).catch(() => {});
     }
   }, [messages.length, conversationId, user?.id]);
 
-  // ── Auto-scroll on new messages ──
+  // ── Auto-scroll ──
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
 
-  // ── Text change → typing indicator ──
+  // ── Text change → typing ──
   const handleTextChange = useCallback((val: string) => {
     setText(val);
-    if (val.trim().length > 0) {
-      setTypingStore(true);
-    }
+    if (val.trim().length > 0) setTypingStore(true);
   }, [setTypingStore]);
 
   // ── Send ──
@@ -180,61 +428,53 @@ export const ConversationScreen: React.FC = () => {
     await sendText(trimmed, reply);
   }, [text, sendText, replyTo]);
 
-  // ── Long press → context menu ──
-  const handleLongPress = useCallback((messageId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setContextMenuMsgId(messageId);
-    setShowReactionPicker(false);
-    Animated.spring(menuScale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 100 }).start();
+  // ── Swipe → reply ──
+  const handleSwipeReply = useCallback((msg: ChatMessage) => {
+    setReplyTo(msg);
+    setPickerMsgId(null);
   }, []);
 
-  const dismissMenu = useCallback(() => {
-    if (!contextMenuMsgId) return;
-    Animated.timing(menuScale, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
-      setContextMenuMsgId(null);
-      setShowReactionPicker(false);
-    });
-  }, [contextMenuMsgId]);
-
-  // ── Context menu: Reply ──
-  const handleReply = useCallback(() => {
-    const msg = messages.find((m) => m.id === contextMenuMsgId);
-    if (msg) setReplyTo(msg);
-    Animated.timing(menuScale, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
-      setContextMenuMsgId(null);
-      setShowReactionPicker(false);
-    });
-  }, [contextMenuMsgId, messages]);
-
-  // ── Context menu: Show reactions ──
-  const handleShowReactions = useCallback(() => {
-    setShowReactionPicker(true);
-  }, []);
-
-  // ── Reaction tap ──
-  const handleReaction = useCallback((emoji: string) => {
-    if (!contextMenuMsgId) return;
+  // ── Double tap → like / unlike ──
+  const handleDoubleTapLike = useCallback((msgId: string, currentlyLiked: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    toggleReaction(contextMenuMsgId, emoji);
-    Animated.timing(menuScale, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
-      setContextMenuMsgId(null);
-      setShowReactionPicker(false);
+    toggleReaction(msgId, HEART_EMOJI);
+  }, [toggleReaction]);
+
+  // ── Long press → reaction picker ──
+  const handleLongPressOpen = useCallback((msgId: string) => {
+    setPickerMsgId(msgId);
+    pickerScale.setValue(0);
+    Animated.spring(pickerScale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 100 }).start();
+  }, []);
+
+  // ── Dismiss picker ──
+  const handleDismissPicker = useCallback(() => {
+    Animated.timing(pickerScale, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
+      setPickerMsgId(null);
     });
-  }, [contextMenuMsgId, toggleReaction]);
+  }, []);
+
+  // ── Reaction from picker ──
+  const handleReaction = useCallback((emoji: string) => {
+    if (!pickerMsgId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    toggleReaction(pickerMsgId, emoji);
+    Animated.timing(pickerScale, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
+      setPickerMsgId(null);
+    });
+  }, [pickerMsgId, toggleReaction]);
 
   // ── Scroll to quoted message ──
-  const scrollToMessage = useCallback((messageId: string) => {
+  const handleScrollToQuote = useCallback((messageId: string) => {
     const idx = messages.findIndex((m) => m.id === messageId);
-    if (idx >= 0) {
-      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
-    }
+    if (idx >= 0) flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
   }, [messages]);
 
   const handlePlanPress = useCallback((planId: string) => {
     navigation.navigate('PlanDetail', { planId });
   }, [navigation]);
 
-  // ── Find last message sent by me (for read receipt) ──
+  // ── Last sent message ID (for read receipt) ──
   const lastSentMsgId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].senderId === user?.id) return messages[i].id;
@@ -242,150 +482,26 @@ export const ConversationScreen: React.FC = () => {
     return null;
   }, [messages, user?.id]);
 
-  // ── Render message ──
-  const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
-    const isMine = item.senderId === user?.id;
-    const prevMsg = index > 0 ? messages[index - 1] : undefined;
-    const showDate = shouldShowDateSeparator(item, prevMsg);
-    const isMenuTarget = contextMenuMsgId === item.id;
-    const isLastSent = item.id === lastSentMsgId;
-    const myReaction = item.reactions.find((r) => r.userId === user?.id);
-    const hasReply = !!item.replyToId;
-    const isReadByOther = item.readBy?.includes(otherUser.userId);
-
-    return (
-      <View>
-        {showDate && (
-          <View style={styles.dateSeparator}>
-            <Text style={[styles.dateSeparatorText, { color: C.gray600 }]}>
-              {formatDateSeparator(item.createdAt)}
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onLongPress={() => handleLongPress(item.id)}
-          onPress={dismissMenu}
-          style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}
-        >
-          {/* Avatar for other person */}
-          {!isMine && (
-            <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
-          )}
-
-          <View style={{ maxWidth: '80%' }}>
-            {/* Quoted reply preview inside bubble */}
-            {hasReply && (
-              <TouchableOpacity
-                onPress={() => item.replyToId && scrollToMessage(item.replyToId)}
-                style={[styles.quotedReply, { backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : C.primary + '10', borderLeftColor: C.primary }]}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.quotedName, { color: isMine ? 'rgba(255,255,255,0.8)' : C.primary }]} numberOfLines={1}>
-                  {item.replyToSenderId === user?.id ? 'Toi' : otherUser.displayName}
-                </Text>
-                <Text style={[styles.quotedText, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]} numberOfLines={1}>
-                  {item.replyToType === 'plan' ? 'Plan partagé ✦' : item.replyToContent}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <View style={[
-              styles.bubble,
-              isMine ? [styles.bubbleMine, { backgroundColor: C.primary }] : [styles.bubbleOther, { backgroundColor: C.gray200 }],
-              hasReply && styles.bubbleWithReply,
-            ]}>
-              {item.type === 'plan' ? (
-                <TouchableOpacity onPress={() => item.planId && handlePlanPress(item.planId)} activeOpacity={0.8}>
-                  {item.planCover ? (
-                    <Image source={{ uri: item.planCover }} style={styles.planCover} />
-                  ) : (
-                    <View style={[styles.planCoverPlaceholder, { backgroundColor: C.primary + '20' }]}>
-                      <Ionicons name="map-outline" size={24} color={C.primary} />
-                    </View>
-                  )}
-                  <View style={styles.planInfo}>
-                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,255,255,0.7)' : C.gray600 }]}>Plan partagé</Text>
-                    <Text style={[styles.planTitle, { color: isMine ? '#FFF' : C.black }]} numberOfLines={2}>{item.planTitle}</Text>
-                    {item.planAuthorName && (
-                      <Text style={[styles.planAuthor, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>par {item.planAuthorName}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <Text style={[styles.msgText, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
-              )}
-              <Text style={[styles.msgTime, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>{formatTime(item.createdAt)}</Text>
-            </View>
-
-            {/* Reactions display */}
-            {item.reactions.length > 0 && (
-              <View style={[styles.reactionsRow, isMine ? styles.reactionsRight : styles.reactionsLeft]}>
-                {item.reactions.map((r) => (
-                  <View
-                    key={`${r.emoji}-${r.userId}`}
-                    style={[
-                      styles.reactionChip,
-                      { backgroundColor: C.gray200 },
-                      r.userId === user?.id && { backgroundColor: C.primary + '20', borderWidth: 1, borderColor: C.primary + '40' },
-                    ]}
-                  >
-                    <Text style={styles.reactionEmoji}>{r.emoji}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Read receipt — only under last sent message by me */}
-            {isMine && isLastSent && (
-              <View style={styles.readReceipt}>
-                {isReadByOther ? (
-                  <View style={styles.readReceiptInner}>
-                    <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XS" avatarUrl={otherUser.avatarUrl || undefined} />
-                    <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Vu</Text>
-                  </View>
-                ) : (
-                  <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Envoyé</Text>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Context menu */}
-          {isMenuTarget && (
-            <Animated.View style={[
-              styles.contextMenu,
-              { backgroundColor: C.white, transform: [{ scale: menuScale }] },
-              isMine ? styles.contextMenuRight : styles.contextMenuLeft,
-            ]}>
-              {showReactionPicker ? (
-                <View style={styles.reactionPickerRow}>
-                  {REACTION_EMOJIS.map((emoji) => (
-                    <TouchableOpacity key={emoji} onPress={() => handleReaction(emoji)} style={styles.reactionPickerBtn}>
-                      <Text style={[styles.reactionPickerEmoji, myReaction?.emoji === emoji && styles.reactionPickerActive]}>{emoji}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity style={styles.contextMenuItem} onPress={handleReply} activeOpacity={0.7}>
-                    <Ionicons name="arrow-undo-outline" size={16} color={C.black} />
-                    <Text style={[styles.contextMenuText, { color: C.black }]}>Répondre</Text>
-                  </TouchableOpacity>
-                  <View style={[styles.contextMenuDivider, { backgroundColor: C.borderLight }]} />
-                  <TouchableOpacity style={styles.contextMenuItem} onPress={handleShowReactions} activeOpacity={0.7}>
-                    <Ionicons name="happy-outline" size={16} color={C.black} />
-                    <Text style={[styles.contextMenuText, { color: C.black }]}>Réagir</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </Animated.View>
-          )}
-        </TouchableOpacity>
-      </View>
-    );
-  }, [user?.id, messages, contextMenuMsgId, showReactionPicker, lastSentMsgId, otherUser, C, menuScale, handleLongPress, dismissMenu, handleReply, handleShowReactions, handleReaction, scrollToMessage, handlePlanPress]);
+  // ── Render item ──
+  const renderItem = useCallback(({ item, index }: { item: ChatMessage; index: number }) => (
+    <MessageRow
+      item={item}
+      prevMsg={index > 0 ? messages[index - 1] : undefined}
+      userId={user?.id}
+      otherUser={otherUser}
+      C={C}
+      isLastSent={item.id === lastSentMsgId}
+      isPickerTarget={pickerMsgId === item.id}
+      pickerScale={pickerScale}
+      onSwipeReply={handleSwipeReply}
+      onDoubleTapLike={handleDoubleTapLike}
+      onLongPress={handleLongPressOpen}
+      onDismissPicker={handleDismissPicker}
+      onReaction={handleReaction}
+      onScrollToQuote={handleScrollToQuote}
+      onPlanPress={handlePlanPress}
+    />
+  ), [messages, user?.id, otherUser, C, lastSentMsgId, pickerMsgId, pickerScale, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -410,7 +526,7 @@ export const ConversationScreen: React.FC = () => {
         <FlatList
           ref={flatListRef}
           data={messages}
-          renderItem={renderMessage}
+          renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.messagesList, { paddingBottom: 10 }]}
           showsVerticalScrollIndicator={false}
@@ -479,18 +595,38 @@ const styles = StyleSheet.create({
   dateSeparator: { alignItems: 'center', marginVertical: 16 },
   dateSeparatorText: { fontSize: 12, fontFamily: Fonts.serifSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
 
+  // Message wrapper (holds swipe indicator + row)
+  msgWrapper: { position: 'relative', marginBottom: 6 },
+
+  // Swipe reply indicator
+  swipeIndicator: {
+    position: 'absolute', left: 12, top: 0, bottom: 0,
+    justifyContent: 'center', zIndex: -1,
+  },
+  swipeIndicatorCircle: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
   // Message row
-  msgRow: { flexDirection: 'row', marginBottom: 6, alignItems: 'flex-end', gap: 6, position: 'relative' },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   msgRowLeft: { justifyContent: 'flex-start', marginRight: 50 },
   msgRowRight: { justifyContent: 'flex-end', marginLeft: 50 },
 
   // Bubble
-  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, overflow: 'hidden' },
   bubbleMine: { borderBottomRightRadius: 4 },
   bubbleOther: { borderBottomLeftRadius: 4 },
   bubbleWithReply: { borderTopLeftRadius: 8, borderTopRightRadius: 8 },
   msgText: { fontSize: 15, fontFamily: Fonts.serif, lineHeight: 20 },
   msgTime: { fontSize: 10, fontFamily: Fonts.serif, marginTop: 4, alignSelf: 'flex-end' },
+
+  // Heart animation overlay
+  heartOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  heartEmoji: { fontSize: 36 },
 
   // Plan in message
   planCover: { width: '100%', height: 120, borderRadius: 12, marginBottom: 8 },
@@ -512,10 +648,7 @@ const styles = StyleSheet.create({
   reactionsRow: { flexDirection: 'row', gap: 3, marginTop: 2 },
   reactionsLeft: { justifyContent: 'flex-start' },
   reactionsRight: { justifyContent: 'flex-end' },
-  reactionChip: {
-    flexDirection: 'row', alignItems: 'center', borderRadius: 10,
-    paddingHorizontal: 5, paddingVertical: 2,
-  },
+  reactionChip: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 2 },
   reactionEmoji: { fontSize: 13 },
 
   // Read receipt
@@ -523,20 +656,16 @@ const styles = StyleSheet.create({
   readReceiptInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   readReceiptText: { fontSize: 10, fontFamily: Fonts.serif },
 
-  // Context menu (Reply + React)
-  contextMenu: {
-    position: 'absolute', top: -52, borderRadius: 14,
-    paddingVertical: 4, paddingHorizontal: 4, minWidth: 140,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 6,
+  // Reaction picker (long press — emojis directly)
+  reactionPicker: {
+    position: 'absolute', top: -48,
+    flexDirection: 'row', borderRadius: 22,
+    paddingHorizontal: 6, paddingVertical: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5,
+    gap: 2,
   },
-  contextMenuLeft: { left: 30 },
-  contextMenuRight: { right: 0 },
-  contextMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
-  contextMenuText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  contextMenuDivider: { height: 1, marginHorizontal: 8 },
-
-  // Reaction picker (inside context menu)
-  reactionPickerRow: { flexDirection: 'row', paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
+  reactionPickerLeft: { left: 26 },
+  reactionPickerRight: { right: 0 },
   reactionPickerBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   reactionPickerEmoji: { fontSize: 22 },
   reactionPickerActive: { fontSize: 26 },
