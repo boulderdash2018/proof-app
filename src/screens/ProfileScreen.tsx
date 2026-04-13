@@ -336,7 +336,11 @@ export const ProfileScreen: React.FC = () => {
               <View style={styles.section}>
                 <View style={styles.plansGrid}>
                   {[...drafts].sort((a, b) => b.updatedAt - a.updatedAt).map((d) => {
-                    const draftPhoto = d.coverPhotos?.[0];
+                    // Resolve photo: explicit cover first, then first place's custom photo
+                    const draftPhoto = d.coverPhotos?.[0]
+                      || d.places?.find((p) => p.customPhoto)?.customPhoto
+                      || null;
+                    const hasPhoto = !!draftPhoto;
                     const timeAgo = (() => {
                       const mins = Math.floor((Date.now() - d.updatedAt) / 60000);
                       if (mins < 1) return 'just now';
@@ -351,22 +355,29 @@ export const ProfileScreen: React.FC = () => {
                         activeOpacity={0.85}
                         onPress={() => navigation.navigate('CreateTab', { screen: 'Create', params: { draftId: d.id } })}
                       >
-                        <View style={[styles.miniCard, styles.draftCard]}>
-                          {draftPhoto ? (
-                            <Image source={{ uri: draftPhoto }} style={styles.miniCardImage} />
+                        <View style={styles.miniCard}>
+                          {hasPhoto ? (
+                            <Image source={{ uri: draftPhoto! }} style={styles.miniCardImage} />
                           ) : (
-                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#EDE8E0' }]} />
+                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
                           )}
-                          {!draftPhoto && (
-                            <Ionicons name="document-text-outline" size={18} color="#B5A998" style={styles.draftIcon} />
-                          )}
-                          {draftPhoto && <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.miniCardOverlay} />}
-                          <Text style={[styles.miniCardTitle, !draftPhoto && styles.draftCardTitle]} numberOfLines={1}>
+                          <LinearGradient
+                            colors={hasPhoto ? ['transparent', 'rgba(0,0,0,0.6)'] : ['transparent', 'rgba(0,0,0,0.25)']}
+                            style={styles.miniCardOverlay}
+                          />
+                          <Text
+                            style={[styles.miniCardTitle, !hasPhoto && styles.draftCardTitleNoPhoto]}
+                            numberOfLines={1}
+                          >
                             {d.title || 'Untitled plan'}
                           </Text>
-                          <Text style={[styles.draftMeta, !draftPhoto && styles.draftMetaDark]}>
+                          <Text style={[styles.draftMeta, !hasPhoto && { color: C.gray600 }]}>
                             {d.places.length} {d.places.length === 1 ? 'place' : 'places'} · {timeAgo}
                           </Text>
+                          {/* Draft badge */}
+                          <View style={styles.draftBadge}>
+                            <Text style={styles.draftBadgeText}>Draft</Text>
+                          </View>
                           <TouchableOpacity
                             style={styles.draftDeleteBtn}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -382,7 +393,7 @@ export const ProfileScreen: React.FC = () => {
                               }
                             }}
                           >
-                            <Ionicons name="close-circle" size={18} color="rgba(0,0,0,0.4)" />
+                            <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.5)" />
                           </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
@@ -451,11 +462,10 @@ const styles = StyleSheet.create({
   doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   // Drafts
-  draftCard: { borderWidth: 1, borderColor: '#D6CEC4' },
-  draftIcon: { position: 'absolute', top: 8, right: 8 },
-  draftCardTitle: { color: '#6B5E50', textShadowColor: 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 0 },
+  draftCardTitleNoPhoto: { color: Colors.gray700, fontStyle: 'italic', textShadowColor: 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 0 },
   draftMeta: { fontSize: 9, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
-  draftMetaDark: { color: '#9A8E80' },
+  draftBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  draftBadgeText: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.3 },
   draftDeleteBtn: { position: 'absolute', top: 4, right: 4 },
   // Instagram-style grid
   instaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
