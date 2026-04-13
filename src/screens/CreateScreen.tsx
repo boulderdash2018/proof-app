@@ -319,6 +319,8 @@ export const CreateScreen: React.FC = () => {
   const draftToastAnim = useRef(new Animated.Value(0)).current;
   const [showResumeSheet, setShowResumeSheet] = useState(false);
   const resumeSheetSlide = useRef(new Animated.Value(300)).current;
+  const [pickupDraft, setPickupDraft] = useState<import('../store/draftStore').DraftItem | null>(null);
+  const pickupSheetSlide = useRef(new Animated.Value(300)).current;
 
   // Ref for current form state (read from interval without stale closures)
   const formRef = useRef({ title: '', coverPhotos: [] as string[], selectedTags: [] as CategoryTag[], places: [] as PlaceEntry[], travels: [] as TravelEntry[] });
@@ -602,6 +604,44 @@ export const CreateScreen: React.FC = () => {
     const has = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
     activeCreateSession.hasContent = has && !isSuccess && !isPublishing;
   });
+
+  // ── Show "Pick up where you left off?" when returning with no specific draft ──
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Only show when opening a fresh form (no explicit draftId from params)
+      if (route.params?.draftId || route.params?.editPlanId) return;
+      // Don't show if form already has content
+      const { title: t, places: p, selectedTags: st, coverPhotos: cp } = formRef.current;
+      if (t.length > 0 || p.length > 0 || st.length > 0 || cp.length > 0) return;
+
+      const allDrafts = useDraftStore.getState().drafts
+        .filter((d) => !d.id.startsWith('edit-') && !d.id.endsWith('-fresh'))
+        .filter((d) => d.title.length > 0 || d.places.length > 0)
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+
+      if (allDrafts.length === 0) return;
+
+      const latest = allDrafts[0];
+      setPickupDraft(latest);
+      pickupSheetSlide.setValue(300);
+      Animated.spring(pickupSheetSlide, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }).start();
+    });
+    return unsubscribe;
+  }, [navigation, route.params?.draftId, route.params?.editPlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePickupResume = () => {
+    if (!pickupDraft) return;
+    Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
+    // Switch to the draft's ID so future saves go to the right slot
+    draftIdRef.current = pickupDraft.id;
+    activeCreateSession.draftId = pickupDraft.id;
+    loadDraftIntoForm(pickupDraft);
+  };
+
+  const handlePickupNew = () => {
+    Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
+    // Keep the fresh draftId — user starts a brand-new plan
+  };
 
   const discardDraft = () => {
     resetForm();
@@ -2344,6 +2384,27 @@ export const CreateScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
+        {/* ========== PICK UP DRAFT BOTTOM SHEET (non-blocking) ========== */}
+        {pickupDraft && (
+          <Animated.View style={[styles.pickupSheet, { backgroundColor: C.white, transform: [{ translateY: pickupSheetSlide }] }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: C.gray400 }]} />
+            <Text style={[styles.pickupTitle, { color: C.black }]}>Pick up where you left off?</Text>
+            <Text style={[styles.pickupSubtitle, { color: C.gray600 }]}>
+              {pickupDraft.title
+                ? pickupDraft.title
+                : `Untitled plan · ${pickupDraft.places.length} place${pickupDraft.places.length !== 1 ? 's' : ''} added`}
+            </Text>
+            <View style={styles.sheetButtons}>
+              <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: C.gray500 }]} onPress={handlePickupNew} activeOpacity={0.7}>
+                <Text style={[styles.sheetBtnOutlineText, { color: C.gray700 }]}>New plan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={handlePickupResume} activeOpacity={0.7}>
+                <Text style={styles.sheetBtnFillText}>Resume draft</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Photo Editor */}
         <PhotoEditorSheet
           visible={editingPhotoIdx !== null}
@@ -2485,6 +2546,15 @@ const styles = StyleSheet.create({
   sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.serifBold },
   sheetBtnFill: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
+  // Pickup draft sheet (non-blocking — no overlay)
+  pickupSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 900,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 20, paddingBottom: 34,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 12,
+  },
+  pickupTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.serifBold, marginBottom: 4 },
+  pickupSubtitle: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 14 },
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   successEmoji: { fontSize: 56, marginBottom: 16 },
   successTitle: { fontSize: 20, fontWeight: '800', marginBottom: 8 },
