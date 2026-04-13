@@ -47,12 +47,14 @@ const TypingIndicator: React.FC<{ otherUser: ConversationParticipant; color: str
   }, []);
 
   return (
-    <View style={styles.typingRow}>
-      <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
-      <View style={[styles.typingBubble, { backgroundColor: bgColor }]}>
-        {[dot1, dot2, dot3].map((dot, i) => (
-          <Animated.View key={i} style={[styles.typingDot, { backgroundColor: color, transform: [{ translateY: dot }] }]} />
-        ))}
+    <View style={styles.msgWrapper}>
+      <View style={[styles.msgRow, styles.msgRowLeft]}>
+        <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
+        <View style={[styles.typingBubble, { backgroundColor: bgColor }]}>
+          {[dot1, dot2, dot3].map((dot, i) => (
+            <Animated.View key={i} style={[styles.typingDot, { backgroundColor: color, transform: [{ translateY: dot }] }]} />
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -92,29 +94,52 @@ const MessageRow = React.memo<MessageRowProps>(({
   const myReaction = item.reactions.find((r) => r.userId === userId);
   const hasReply = !!item.replyToId;
 
+  // ── Heart like state ──
+  const hasMyLike = item.reactions.some((r) => r.userId === userId && r.emoji === HEART_EMOJI);
+  const nonHeartReactions = item.reactions.filter((r) => !(r.userId === userId && r.emoji === HEART_EMOJI));
+
   // ── Animated values ──
   const translateX = useRef(new Animated.Value(0)).current;
-  const heartScale = useRef(new Animated.Value(0)).current;
-  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const heartScale = useRef(new Animated.Value(hasMyLike ? 1 : 0)).current;
+  const isAnimatingRef = useRef(false);
+  const wasLikedRef = useRef(hasMyLike);
   const lastTapRef = useRef(0);
 
   // ── Stable refs for PanResponder callbacks ──
   const itemRef = useRef(item);
   itemRef.current = item;
+  const isMineRef = useRef(isMine);
+  isMineRef.current = isMine;
   const onSwipeReplyRef = useRef(onSwipeReply);
   onSwipeReplyRef.current = onSwipeReply;
 
-  // ── Swipe PanResponder ──
+  // ── Sync heartScale with external data changes ──
+  useEffect(() => {
+    if (!isAnimatingRef.current) {
+      heartScale.setValue(hasMyLike ? 1 : 0);
+    }
+    wasLikedRef.current = hasMyLike;
+  }, [hasMyLike]);
+
+  // ── Swipe PanResponder (bidirectional: right for received, left for sent) ──
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, g) => g.dx > 15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onMoveShouldSetPanResponder: (_, g) => {
+      const mine = isMineRef.current;
+      if (mine) return g.dx < -15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+      return g.dx > 15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+    },
     onMoveShouldSetPanResponderCapture: () => false,
     onPanResponderMove: (_, g) => {
-      const x = Math.max(0, Math.min(g.dx, SWIPE_MAX));
-      translateX.setValue(x);
+      if (isMineRef.current) {
+        translateX.setValue(Math.min(0, Math.max(g.dx, -SWIPE_MAX)));
+      } else {
+        translateX.setValue(Math.max(0, Math.min(g.dx, SWIPE_MAX)));
+      }
     },
     onPanResponderRelease: (_, g) => {
-      if (g.dx > SWIPE_THRESHOLD) {
+      const triggered = isMineRef.current ? g.dx < -SWIPE_THRESHOLD : g.dx > SWIPE_THRESHOLD;
+      if (triggered) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onSwipeReplyRef.current(itemRef.current);
       }
@@ -125,11 +150,14 @@ const MessageRow = React.memo<MessageRowProps>(({
     },
   }), []);
 
-  // ── Swipe reply icon interpolation ──
-  const replyIconOpacity = translateX.interpolate({ inputRange: [0, 25, SWIPE_THRESHOLD], outputRange: [0, 0.4, 1], extrapolate: 'clamp' });
-  const replyIconScale = translateX.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0.4, 1], extrapolate: 'clamp' });
+  // ── Swipe reply icon interpolation (bidirectional) ──
+  const swipeProgress = isMine
+    ? translateX.interpolate({ inputRange: [-SWIPE_MAX, 0], outputRange: [SWIPE_MAX, 0], extrapolate: 'clamp' })
+    : translateX;
+  const replyIconOpacity = swipeProgress.interpolate({ inputRange: [0, 25, SWIPE_THRESHOLD], outputRange: [0, 0.4, 1], extrapolate: 'clamp' });
+  const replyIconScale = swipeProgress.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0.4, 1], extrapolate: 'clamp' });
 
-  // ── Tap handler (double-tap = like) ──
+  // ── Tap handler (double-tap = like / unlike) ──
   const handlePress = useCallback(() => {
     if (isPickerTarget) { onDismissPicker(); return; }
 
@@ -138,18 +166,19 @@ const MessageRow = React.memo<MessageRowProps>(({
       lastTapRef.current = 0;
       const hasLike = item.reactions.some((r) => r.userId === userId && r.emoji === HEART_EMOJI);
       onDoubleTapLike(item.id, hasLike);
-
+      isAnimatingRef.current = true;
+      wasLikedRef.current = !hasLike;
       if (!hasLike) {
-        heartOpacity.setValue(1);
+        // Adding like — pop in
         heartScale.setValue(0);
-        Animated.sequence([
-          Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, friction: 3, tension: 200 }),
-          Animated.delay(500),
-          Animated.parallel([
-            Animated.timing(heartScale, { toValue: 0, duration: 200, useNativeDriver: true }),
-            Animated.timing(heartOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-          ]),
-        ]).start();
+        Animated.timing(heartScale, { toValue: 1, duration: 150, useNativeDriver: false }).start(() => {
+          isAnimatingRef.current = false;
+        });
+      } else {
+        // Removing like — pop out
+        Animated.timing(heartScale, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => {
+          isAnimatingRef.current = false;
+        });
       }
     } else {
       lastTapRef.current = now;
@@ -175,7 +204,8 @@ const MessageRow = React.memo<MessageRowProps>(({
       <View style={styles.msgWrapper}>
         {/* Swipe reply indicator — fixed behind, revealed by slide */}
         <Animated.View style={[
-          styles.swipeIndicator,
+          styles.swipeIndicatorBase,
+          isMine ? styles.swipeIndicatorRight : styles.swipeIndicatorLeft,
           { opacity: replyIconOpacity, transform: [{ scale: replyIconScale }] },
         ]}>
           <View style={[styles.swipeIndicatorCircle, { backgroundColor: C.gray200 }]}>
@@ -244,20 +274,26 @@ const MessageRow = React.memo<MessageRowProps>(({
                 <Text style={[styles.msgText, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
               )}
               <Text style={[styles.msgTime, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>{formatTime(item.createdAt)}</Text>
-
-              {/* Heart animation overlay */}
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}
-              >
-                <Text style={styles.heartEmoji}>❤️</Text>
-              </Animated.View>
             </View>
 
-            {/* Reactions display */}
-            {item.reactions.length > 0 && (
+            {/* Heart like — below bubble, animated pop */}
+            <Animated.View style={[
+              styles.heartLike,
+              isMine ? styles.heartLikeRight : styles.heartLikeLeft,
+              {
+                transform: [{ scale: heartScale }],
+                opacity: heartScale,
+                height: heartScale.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
+                marginTop: heartScale.interpolate({ inputRange: [0, 1], outputRange: [0, 2] }),
+              },
+            ]}>
+              <Text style={styles.heartLikeEmoji}>❤️</Text>
+            </Animated.View>
+
+            {/* Reactions display (excluding my heart, shown above) */}
+            {nonHeartReactions.length > 0 && (
               <View style={[styles.reactionsRow, isMine ? styles.reactionsRight : styles.reactionsLeft]}>
-                {item.reactions.map((r) => (
+                {nonHeartReactions.map((r) => (
                   <View
                     key={`${r.emoji}-${r.userId}`}
                     style={[
@@ -607,10 +643,12 @@ const styles = StyleSheet.create({
   msgWrapper: { position: 'relative', marginBottom: 6 },
 
   // Swipe reply indicator
-  swipeIndicator: {
-    position: 'absolute', left: 12, top: 0, bottom: 0,
+  swipeIndicatorBase: {
+    position: 'absolute', top: 0, bottom: 0,
     justifyContent: 'center', zIndex: -1,
   },
+  swipeIndicatorLeft: { left: 12 },
+  swipeIndicatorRight: { right: 12 },
   swipeIndicatorCircle: {
     width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
@@ -629,12 +667,11 @@ const styles = StyleSheet.create({
   msgText: { fontSize: 15, fontFamily: Fonts.serif, lineHeight: 20 },
   msgTime: { fontSize: 10, fontFamily: Fonts.serif, marginTop: 4, alignSelf: 'flex-end' },
 
-  // Heart animation overlay
-  heartOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  heartEmoji: { fontSize: 36 },
+  // Heart like below bubble
+  heartLike: { overflow: 'hidden' },
+  heartLikeLeft: { alignSelf: 'flex-start' },
+  heartLikeRight: { alignSelf: 'flex-end' },
+  heartLikeEmoji: { fontSize: 14 },
 
   // Plan in message
   planCover: { width: '100%', height: 120, borderRadius: 12, marginBottom: 8 },
@@ -687,8 +724,7 @@ const styles = StyleSheet.create({
   replyBarName: { fontSize: 12, fontFamily: Fonts.serifBold },
   replyBarText: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
 
-  // Typing indicator
-  typingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginLeft: 12, marginBottom: 6 },
+  // Typing indicator (uses msgWrapper + msgRow + msgRowLeft for perfect avatar alignment)
   typingBubble: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 12,
