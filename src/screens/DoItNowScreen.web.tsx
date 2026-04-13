@@ -91,6 +91,7 @@ export const DoItNowScreen: React.FC = () => {
   const userMarkerRef = useRef<any>(null);
   const directionsServiceRef = useRef<any>(null);
   const directionsRendererRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
   const watchIdRef = useRef<number | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -126,16 +127,20 @@ export const DoItNowScreen: React.FC = () => {
       mapObjRef.current = map;
 
       // Place markers
+      markersRef.current = [];
       plan.places.forEach((p, i) => {
         if (!p.latitude || !p.longitude) return;
         const isCurrent = i === currentIndex;
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="13" fill="${isCurrent ? '%23D4845A' : '%235A5249'}" stroke="white" stroke-width="2"/><text x="14" y="18.5" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
-        new gm.Marker({
+        const size = isCurrent ? 32 : 26;
+        const color = isCurrent ? '%23C9A84C' : '%235A5249';
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="white" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
+        const marker = new gm.Marker({
           position: { lat: p.latitude, lng: p.longitude },
           map,
-          icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new gm.Size(isCurrent ? 32 : 26, isCurrent ? 32 : 26), anchor: new gm.Point(isCurrent ? 16 : 13, isCurrent ? 16 : 13) },
+          icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new gm.Size(size, size), anchor: new gm.Point(size / 2, size / 2) },
           zIndex: isCurrent ? 200 : 100 + i,
         });
+        markersRef.current.push(marker);
       });
 
       // Initialize DirectionsService & DirectionsRenderer for route display
@@ -247,6 +252,27 @@ export const DoItNowScreen: React.FC = () => {
     }
   }, [userLoc]);
 
+  // Update marker icons when step changes (gold for current/visited)
+  useEffect(() => {
+    const gm = (window as any).google?.maps;
+    if (!gm || markersRef.current.length === 0) return;
+    plan.places.forEach((p, i) => {
+      if (!p.latitude || !p.longitude || i >= markersRef.current.length) return;
+      const isCurrent = i === currentIndex;
+      const isVisited = session.placesVisited.some((v: any) => v.placeId === p.id);
+      const size = isCurrent ? 32 : 26;
+      const color = isCurrent ? '%23C9A84C' : isVisited ? '%23C9A84C' : '%235A5249';
+      const opacity = isCurrent ? '1' : isVisited ? '0.55' : '1';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" fill-opacity="${opacity}" stroke="white" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
+      markersRef.current[i].setIcon({
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+        scaledSize: new gm.Size(size, size),
+        anchor: new gm.Point(size / 2, size / 2),
+      });
+      markersRef.current[i].setZIndex(isCurrent ? 200 : 100 + i);
+    });
+  }, [currentIndex]);
+
   // Hidden timer helper — snapshot, not live
   const getHiddenTimerMinutes = (): number => {
     if (!placeMode) return 0;
@@ -300,8 +326,23 @@ export const DoItNowScreen: React.FC = () => {
       <View style={[styles.progressBar, { paddingTop: insets.top + 6 }]}>
         <View style={styles.progressInfo}>
           <Text style={[styles.progressText, { color: C.primary }]}>Lieu {currentIndex + 1} / {plan.places.length}</Text>
-          <View style={[styles.progressTrack, { backgroundColor: C.gray300 }]}>
-            <View style={[styles.progressFill, { width: `${((currentIndex + (placeMode ? 1 : 0)) / plan.places.length) * 100}%`, backgroundColor: C.primary }]} />
+          <View style={styles.progressDots}>
+            {plan.places.map((place, i) => {
+              const isCur = i === currentIndex;
+              const isDone = i < currentIndex || session.placesVisited.some((v: any) => v.placeId === place.id);
+              return (
+                <View
+                  key={i}
+                  style={{
+                    width: isCur ? 12 : 8,
+                    height: isCur ? 12 : 8,
+                    borderRadius: isCur ? 6 : 4,
+                    backgroundColor: isCur ? Colors.gold : isDone ? Colors.gold : 'rgba(255,255,255,0.25)',
+                    opacity: isCur ? 1 : isDone ? 0.55 : 1,
+                  }}
+                />
+              );
+            })}
           </View>
         </View>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
@@ -316,7 +357,13 @@ export const DoItNowScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Map or Place Mode */}
+      {/* Map — always rendered to preserve instance */}
+      <View style={[styles.mapContainer, placeMode ? { position: 'absolute' as any, width: 1, height: 1, overflow: 'hidden' as any } : undefined]}>
+        {loading && <ActivityIndicator style={styles.mapLoading} size="large" color={C.primary} />}
+        <div ref={mapDivRef} style={{ width: '100%', height: '100%' }} />
+      </View>
+
+      {/* Place Mode */}
       {placeMode && currentPlace ? (
         <View style={[styles.placeModeContainer, { backgroundColor: C.white }]}>
           <View style={[styles.placeModeIcon, { backgroundColor: C.primary + '15' }]}>
@@ -427,12 +474,7 @@ export const DoItNowScreen: React.FC = () => {
             <Text style={styles.nextBtnText}>{isLastPlace ? 'Terminer le plan 🏁' : 'Prochain arrêt →'}</Text>
           </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.mapContainer}>
-          {loading && <ActivityIndicator style={styles.mapLoading} size="large" color={C.primary} />}
-          <div ref={mapDivRef} style={{ width: '100%', height: '100%' }} />
-        </View>
-      )}
+      ) : null}
 
       {/* Bottom card */}
       {!placeMode && currentPlace && (
@@ -493,8 +535,7 @@ const styles = StyleSheet.create({
   iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   progressInfo: { flex: 1, gap: 4 },
   progressText: { fontSize: 13, fontFamily: Fonts.serifBold, textAlign: 'center' },
-  progressTrack: { height: 4, borderRadius: 2 },
-  progressFill: { height: 4, borderRadius: 2 },
+  progressDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   arrivedBanner: { position: 'absolute', top: 100, left: 20, right: 20, zIndex: 20, paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
   arrivedText: { color: '#FFF', fontSize: 15, fontFamily: Fonts.serifBold },
   mapContainer: { flex: 1 },

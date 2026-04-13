@@ -247,8 +247,23 @@ export const DoItNowScreen: React.FC = () => {
           <Text style={[styles.progressText, { color: C.primary }]}>
             Lieu {currentIndex + 1} / {totalPlaces}
           </Text>
-          <View style={[styles.progressTrack, { backgroundColor: C.gray300 }]}>
-            <View style={[styles.progressFill, { width: `${((currentIndex + (placeMode ? 1 : 0)) / totalPlaces) * 100}%`, backgroundColor: C.primary }]} />
+          <View style={styles.progressDots}>
+            {plan.places.map((place, i) => {
+              const isCur = i === currentIndex;
+              const isDone = i < currentIndex || session.placesVisited.some((v) => v.placeId === place.id);
+              return (
+                <View
+                  key={i}
+                  style={{
+                    width: isCur ? 12 : 8,
+                    height: isCur ? 12 : 8,
+                    borderRadius: isCur ? 6 : 4,
+                    backgroundColor: isCur ? Colors.gold : isDone ? Colors.gold : 'rgba(255,255,255,0.25)',
+                    opacity: isCur ? 1 : isDone ? 0.55 : 1,
+                  }}
+                />
+              );
+            })}
           </View>
         </View>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
@@ -263,19 +278,19 @@ export const DoItNowScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Map */}
-      {!placeMode && (
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          customMapStyle={MAP_STYLE}
-          showsUserLocation
-          showsMyLocationButton={false}
-          showsCompass={false}
-          showsPointsOfInterest={false}
-          toolbarEnabled={false}
-        >
+      {/* Map — always mounted to preserve tiles between steps */}
+      <MapView
+        ref={mapRef}
+        style={placeMode ? styles.mapHidden : styles.map}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        customMapStyle={MAP_STYLE}
+        showsUserLocation
+        showsMyLocationButton={false}
+        showsCompass={false}
+        showsPointsOfInterest={false}
+        toolbarEnabled={false}
+        pointerEvents={placeMode ? 'none' : 'auto'}
+      >
           {/* All place markers */}
           {plan.places.map((place, i) => {
             if (!place.latitude || !place.longitude) return null;
@@ -290,7 +305,7 @@ export const DoItNowScreen: React.FC = () => {
                 <View style={[
                   styles.marker,
                   {
-                    backgroundColor: isCurrent ? Colors.primary : isVisited ? Colors.success : Colors.gray500,
+                    backgroundColor: isCurrent ? Colors.gold : isVisited ? Colors.gold + '80' : Colors.gray500,
                     width: isCurrent ? 32 : 26,
                     height: isCurrent ? 32 : 26,
                     borderRadius: isCurrent ? 16 : 13,
@@ -310,8 +325,7 @@ export const DoItNowScreen: React.FC = () => {
               strokeWidth={4}
             />
           )}
-        </MapView>
-      )}
+      </MapView>
 
       {/* Place mode */}
       {placeMode && currentPlace && (
@@ -515,15 +529,15 @@ const styles = StyleSheet.create({
   closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   progressInfo: { flex: 1, gap: 4 },
   progressText: { fontSize: 13, fontFamily: Fonts.serifBold, textAlign: 'center' },
-  progressTrack: { height: 4, borderRadius: 2 },
-  progressFill: { height: 4, borderRadius: 2 },
+  progressDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
 
   // Arrived banner
   arrivedBanner: { position: 'absolute', top: 100, left: 20, right: 20, zIndex: 20, paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
   arrivedText: { color: '#FFF', fontSize: 15, fontFamily: Fonts.serifBold },
 
   // Map
-  map: { flex: 1 },
+  map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as any,
+  mapHidden: { position: 'absolute', width: 1, height: 1, opacity: 0 } as any,
 
   // Markers
   marker: { borderWidth: 2.5, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
