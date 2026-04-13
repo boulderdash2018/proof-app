@@ -32,9 +32,9 @@ const GROUP_GAP = 2;
 const NORMAL_GAP = 8;
 
 // ── Reaction overlay ──
-const REACTION_OVERLAP = 6;
-const REACTION_CHIP_H = 24;
-const REACTION_EXTRA = REACTION_CHIP_H - REACTION_OVERLAP + 2; // 20px
+const REACTION_OVERLAP = 8;
+const REACTION_CHIP_H = 22;
+const REACTION_EXTRA = REACTION_CHIP_H - REACTION_OVERLAP; // 14px
 
 // ── Gradient fade ──
 const FADE_H = 30;
@@ -63,13 +63,20 @@ const getBubblePos = (msg: ChatMessage, prev?: ChatMessage, next?: ChatMessage):
 };
 
 const getBubbleRadii = (pos: BubblePos, isMine: boolean) => {
-  if (pos === 'single' || pos === 'first') return { borderRadius: BUBBLE_R };
+  if (pos === 'single') return { borderRadius: BUBBLE_R };
+  // first: bottom sender-side corner flat (connects to next)
+  if (pos === 'first') {
+    return isMine
+      ? { borderTopLeftRadius: BUBBLE_R, borderTopRightRadius: BUBBLE_R, borderBottomLeftRadius: BUBBLE_R, borderBottomRightRadius: BUBBLE_FLAT }
+      : { borderTopLeftRadius: BUBBLE_R, borderTopRightRadius: BUBBLE_R, borderBottomLeftRadius: BUBBLE_FLAT, borderBottomRightRadius: BUBBLE_R };
+  }
+  // middle: both sender-side corners flat
   if (pos === 'middle') {
     return isMine
       ? { borderTopLeftRadius: BUBBLE_R, borderBottomLeftRadius: BUBBLE_R, borderTopRightRadius: BUBBLE_FLAT, borderBottomRightRadius: BUBBLE_FLAT }
       : { borderTopRightRadius: BUBBLE_R, borderBottomRightRadius: BUBBLE_R, borderTopLeftRadius: BUBBLE_FLAT, borderBottomLeftRadius: BUBBLE_FLAT };
   }
-  // last
+  // last: top sender-side flat, bottom rounded
   return isMine
     ? { borderTopLeftRadius: BUBBLE_R, borderBottomLeftRadius: BUBBLE_R, borderTopRightRadius: BUBBLE_FLAT, borderBottomRightRadius: BUBBLE_R }
     : { borderTopRightRadius: BUBBLE_R, borderBottomRightRadius: BUBBLE_R, borderTopLeftRadius: BUBBLE_FLAT, borderBottomLeftRadius: BUBBLE_R };
@@ -79,8 +86,10 @@ const getSpacing = (msg: ChatMessage, next?: ChatMessage): number => {
   const hasReact = msgHasReaction(msg);
   const extra = hasReact ? REACTION_EXTRA : 0;
   if (!next) return extra;
-  const grouped = isGroupedWith(msg, next) && !hasReact;
-  return (grouped ? GROUP_GAP : NORMAL_GAP) + extra;
+  const sameSender = isGroupedWith(msg, next);
+  if (sameSender && !hasReact) return GROUP_GAP;            // tight group
+  if (sameSender && hasReact) return GROUP_GAP + extra;     // reaction breaks visual, keep close
+  return NORMAL_GAP + extra;                                // different sender
 };
 
 // ═══════════════════════════════════════════════
@@ -355,7 +364,7 @@ const MessageRow = React.memo<MessageRowProps>(({
               ]}>
                 {showHeart && (
                   <Animated.View style={[
-                    styles.reactionChip, { backgroundColor: C.white, borderColor: C.borderLight },
+                    styles.reactionChip, { backgroundColor: C.gray300 + 'DD', borderColor: C.primary + '30' },
                     { transform: [{ scale: heartScale }], opacity: heartScale },
                   ]}>
                     <Text style={styles.reactionEmoji}>{HEART_EMOJI}</Text>
@@ -366,8 +375,7 @@ const MessageRow = React.memo<MessageRowProps>(({
                     key={`${r.emoji}-${r.userId}`}
                     style={[
                       styles.reactionChip,
-                      { backgroundColor: C.white, borderColor: C.borderLight },
-                      r.userId === userId && { backgroundColor: C.primary + '20', borderColor: C.primary + '40' },
+                      { backgroundColor: C.gray300 + 'DD', borderColor: C.primary + '30' },
                     ]}
                   >
                     <Text style={styles.reactionEmoji}>{r.emoji}</Text>
@@ -772,8 +780,8 @@ const styles = StyleSheet.create({
   msgRowLeft: { justifyContent: 'flex-start', marginRight: 50 },
   msgRowRight: { justifyContent: 'flex-end', marginLeft: 50 },
 
-  // Avatar spacer (for non-avatar messages in a group)
-  avatarSpacer: { width: 24 },
+  // Avatar spacer (matches Avatar SS = 20px)
+  avatarSpacer: { width: 20 },
 
   // Bubble
   bubble: { paddingHorizontal: 14, paddingVertical: 10, overflow: 'visible' },
@@ -789,8 +797,8 @@ const styles = StyleSheet.create({
   reactionOverlayRight: { alignSelf: 'flex-end', paddingRight: 8 },
   reactionChip: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 12, borderWidth: 1,
-    paddingHorizontal: 5, paddingVertical: 2, minWidth: 28, height: REACTION_CHIP_H,
+    borderRadius: 11, borderWidth: 1,
+    paddingHorizontal: 5, paddingVertical: 1, minWidth: 26, height: REACTION_CHIP_H,
   },
   reactionEmoji: { fontSize: 13 },
 
