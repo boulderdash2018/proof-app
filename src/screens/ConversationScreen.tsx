@@ -520,6 +520,8 @@ export const ConversationScreen: React.FC = () => {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [pickerMsgId, setPickerMsgId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
   const pickerScale = useRef(new Animated.Value(0)).current;
   const convIdRef = useRef(conversationId);
 
@@ -669,20 +671,21 @@ export const ConversationScreen: React.FC = () => {
   }, [messages, user?.id]);
 
   // ── Render item ──
+  // Uses messagesRef instead of messages closure to keep a STABLE callback
+  // reference — prevents FlatList render thrashing (default batch = 10 items).
   const renderItem = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
-    // When typing indicator is shown and this is the last received message,
-    // inject a virtual "next message" so it doesn't show avatar (typing indicator will)
-    const isLast = index === messages.length - 1;
+    const msgs = messagesRef.current;
+    const isLast = index === msgs.length - 1;
     const typingContinuesGroup = isLast && otherTyping && item.senderId !== user?.id;
     const virtualNext = typingContinuesGroup
       ? ({ senderId: item.senderId, createdAt: new Date().toISOString(), reactions: [] } as unknown as ChatMessage)
       : undefined;
-    const effectiveNext = index < messages.length - 1 ? messages[index + 1] : virtualNext;
+    const effectiveNext = index < msgs.length - 1 ? msgs[index + 1] : virtualNext;
 
     return (
     <MessageRow
       item={item}
-      prevMsg={index > 0 ? messages[index - 1] : undefined}
+      prevMsg={index > 0 ? msgs[index - 1] : undefined}
       nextMsg={effectiveNext}
       userId={user?.id}
       otherUser={otherUser}
@@ -701,7 +704,7 @@ export const ConversationScreen: React.FC = () => {
       onPlanPress={handlePlanPress}
     />
     );
-  }, [messages, user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
+  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
 
   // ── Typing indicator grouping with last received message ──
   const typingIsGrouped = useMemo(() => {
@@ -738,6 +741,10 @@ export const ConversationScreen: React.FC = () => {
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
+            extraData={messages.length}
+            initialNumToRender={50}
+            maxToRenderPerBatch={50}
+            windowSize={51}
             contentContainerStyle={[styles.messagesList, { paddingBottom: 10 }]}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}

@@ -9,6 +9,8 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  orderBy,
+  limit,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -342,6 +344,8 @@ export const subscribeMessages = (
 ): (() => void) => {
   const q = query(
     collection(db, CONVERSATIONS, conversationId, MESSAGES),
+    orderBy('createdAt', 'asc'),
+    limit(500),
   );
   return onSnapshot(
     q,
@@ -369,7 +373,11 @@ export const subscribeMessages = (
 export const fetchMessages = async (
   conversationId: string,
 ): Promise<ChatMessage[]> => {
-  const q = query(collection(db, CONVERSATIONS, conversationId, MESSAGES));
+  const q = query(
+    collection(db, CONVERSATIONS, conversationId, MESSAGES),
+    orderBy('createdAt', 'asc'),
+    limit(500),
+  );
   const snap = await getDocs(q);
   const messages: ChatMessage[] = snap.docs.map((d) => ({
     id: d.id,
