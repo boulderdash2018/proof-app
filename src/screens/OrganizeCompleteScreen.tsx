@@ -149,10 +149,14 @@ export const OrganizeCompleteScreen: React.FC = () => {
         });
       }
 
-      // Collect cover photos from places
-      const coverPhotos = enrichedPlaces
-        .flatMap((pl: any) => pl.photoUrls || [])
-        .slice(0, 5);
+      // Collect cover photos — one per place first, then fill remaining
+      const firstPerPlace = enrichedPlaces
+        .map((pl: any) => (pl.photoUrls && pl.photoUrls.length > 0 ? pl.photoUrls[0] : null))
+        .filter(Boolean) as string[];
+      const remaining = enrichedPlaces
+        .flatMap((pl: any) => (pl.photoUrls || []).slice(1))
+        .filter((url: string) => !firstPerPlace.includes(url));
+      const coverPhotos = [...firstPerPlace, ...remaining].slice(0, 5);
 
       // Compute real duration: sum of place times + travel times
       const placeTime = enrichedPlaces.reduce((sum: number, pl: any) => sum + (pl.placeDuration || 0), 0);
