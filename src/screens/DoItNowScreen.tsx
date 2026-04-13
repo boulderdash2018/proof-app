@@ -84,6 +84,7 @@ export const DoItNowScreen: React.FC = () => {
   const [arrivedMessage, setArrivedMessage] = useState<string | null>(null);
   const [placePrice, setPlacePrice] = useState('');
   const [placeTime, setPlaceTime] = useState('');
+  const [placeComment, setPlaceComment] = useState('');
   const [timeMode, setTimeMode] = useState<'none' | 'manual' | 'auto'>('none');
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
@@ -165,10 +166,15 @@ export const DoItNowScreen: React.FC = () => {
     if (placeTime) {
       useDoItNowStore.getState().setTimeForPlace(currentIndex, parseInt(placeTime, 10) || 0);
     }
+    // Save comment with rating
+    if (placeMode && placeMode.rating > 0) {
+      useDoItNowStore.getState().ratePlace(currentIndex, placeMode.rating, placeComment.trim() || undefined);
+    }
 
     setPlaceMode(null);
     setPlacePrice('');
     setPlaceTime('');
+    setPlaceComment('');
     setTimeMode('none');
     setRoute(null);
     setRouteCoords([]);
@@ -387,6 +393,19 @@ export const DoItNowScreen: React.FC = () => {
             ))}
           </View>
 
+          {/* Comment (appears when rated) */}
+          {placeMode.rating > 0 && (
+            <RNTextInput
+              style={[styles.commentInput, { color: C.black, backgroundColor: C.gray200, borderColor: C.borderLight }]}
+              placeholder="Un commentaire ? (optionnel)"
+              placeholderTextColor={C.gray500}
+              value={placeComment}
+              onChangeText={setPlaceComment}
+              multiline
+              maxLength={300}
+            />
+          )}
+
           {/* Price input — organize mode only */}
           {session.isOrganizeMode && (
             <View style={styles.priceSection}>
@@ -524,6 +543,11 @@ const styles = StyleSheet.create({
   timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
   timeUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
   ratingRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  commentInput: {
+    width: '100%', marginTop: 10, borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 14, fontFamily: Fonts.serif, maxHeight: 80, minHeight: 40,
+  },
   durationChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   durationChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   durationChipText: { fontSize: 12, fontWeight: '600' },
