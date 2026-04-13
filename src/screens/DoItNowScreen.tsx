@@ -79,6 +79,7 @@ export const DoItNowScreen: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [planRouteCoords, setPlanRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   const [placeMode, setPlaceMode] = useState<PlaceModeState | null>(null);
   const [loading, setLoading] = useState(true);
   const [arrivedMessage, setArrivedMessage] = useState<string | null>(null);
@@ -113,6 +114,28 @@ export const DoItNowScreen: React.FC = () => {
     return () => {
       locationSub.current?.remove();
     };
+  }, []);
+
+  // Fetch plan route polyline (static — connects all places in order)
+  useEffect(() => {
+    const validPlaces = plan.places.filter(p => p.latitude && p.longitude);
+    if (validPlaces.length < 2) return;
+    // Build a straight-line path through all places; upgrade to Directions API if needed
+    const origin = { lat: validPlaces[0].latitude!, lng: validPlaces[0].longitude! };
+    const dest = { lat: validPlaces[validPlaces.length - 1].latitude!, lng: validPlaces[validPlaces.length - 1].longitude! };
+    const waypoints = validPlaces.slice(1, -1).map(p => ({ lat: p.latitude!, lng: p.longitude! }));
+
+    // Try getting walking directions for the full plan route
+    getDirections(origin, dest, 'walking').then((result) => {
+      if (result?.overviewPolyline) {
+        setPlanRouteCoords(decodePolyline(result.overviewPolyline));
+      } else {
+        // Fallback: straight lines
+        setPlanRouteCoords(validPlaces.map(p => ({ latitude: p.latitude!, longitude: p.longitude! })));
+      }
+    }).catch(() => {
+      setPlanRouteCoords(validPlaces.map(p => ({ latitude: p.latitude!, longitude: p.longitude! })));
+    });
   }, []);
 
   // Fetch directions when user location or destination changes
@@ -218,6 +241,19 @@ export const DoItNowScreen: React.FC = () => {
     }
   };
 
+  // Fit map to all places on mount
+  useEffect(() => {
+    const valid = plan.places.filter(p => p.latitude && p.longitude);
+    if (valid.length === 0) return;
+    const timer = setTimeout(() => {
+      mapRef.current?.fitToCoordinates(
+        valid.map(p => ({ latitude: p.latitude!, longitude: p.longitude! })),
+        { edgePadding: { top: 120, right: 60, bottom: 250, left: 60 }, animated: false }
+      );
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Fit map to show user + destination
   useEffect(() => {
     if (!userLocation || !currentPlace?.latitude || placeMode) return;
@@ -306,11 +342,11 @@ export const DoItNowScreen: React.FC = () => {
                 <View style={[
                   styles.marker,
                   {
-                    backgroundColor: isCurrent ? Colors.gold : isVisited ? '#8B7B3C' : Colors.gray500,
-                    borderColor: isCurrent ? Colors.gold : '#FFF',
-                    width: isCurrent ? 34 : 26,
-                    height: isCurrent ? 34 : 26,
-                    borderRadius: isCurrent ? 17 : 13,
+                    backgroundColor: isCurrent ? '#C8571A' : isVisited ? '#A06840' : '#D4845A',
+                    borderColor: '#FFF',
+                    width: isCurrent ? 32 : 26,
+                    height: isCurrent ? 32 : 26,
+                    borderRadius: isCurrent ? 16 : 13,
                   },
                 ]}>
                   <Text style={[styles.markerText, { fontSize: isCurrent ? 14 : 11 }]}>{i + 1}</Text>
@@ -319,12 +355,23 @@ export const DoItNowScreen: React.FC = () => {
             );
           })}
 
-          {/* Route polyline */}
+          {/* Plan route polyline (static — all places connected) */}
+          {planRouteCoords.length > 0 && (
+            <Polyline
+              coordinates={planRouteCoords}
+              strokeColor="#C8571A"
+              strokeWidth={4}
+              lineDashPattern={[0]}
+            />
+          )}
+
+          {/* User-to-destination route polyline (dynamic) */}
           {routeCoords.length > 0 && (
             <Polyline
               coordinates={routeCoords}
               strokeColor={Colors.primary}
-              strokeWidth={4}
+              strokeWidth={3}
+              lineDashPattern={[8, 6]}
             />
           )}
       </MapView>

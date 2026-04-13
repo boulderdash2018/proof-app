@@ -79,6 +79,75 @@ function distBetween(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ── Custom user overlay: 🚶 in a pulsing terracotta circle ──
+
+function injectPulseCSS() {
+  if (document.getElementById('proof-pulse-css')) return;
+  const style = document.createElement('style');
+  style.id = 'proof-pulse-css';
+  style.textContent = `@keyframes proofPulse{0%{transform:scale(1);opacity:.45}100%{transform:scale(2.4);opacity:0}}`;
+  document.head.appendChild(style);
+}
+
+function createUserOverlayClass(gm: any) {
+  class ProofUserOverlay extends gm.OverlayView {
+    private position_: any;
+    private div_: HTMLDivElement | null;
+    constructor(position: any, map: any) {
+      super();
+      this.position_ = position;
+      this.div_ = null;
+      this.setMap(map);
+    }
+    onAdd() {
+      this.div_ = document.createElement('div');
+      this.div_.style.position = 'absolute';
+      this.div_.style.pointerEvents = 'none';
+      this.div_.innerHTML =
+        '<div style="position:relative;width:44px;height:44px;margin:-22px 0 0 -22px;">' +
+          '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(200,87,26,0.3);animation:proofPulse 2s ease-out infinite;"></div>' +
+          '<div style="position:absolute;top:6px;left:6px;width:32px;height:32px;border-radius:50%;background:#C8571A;border:2.5px solid white;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,0.35);z-index:1;">🚶</div>' +
+        '</div>';
+      const panes = this.getPanes();
+      panes.overlayMouseTarget.appendChild(this.div_);
+    }
+    draw() {
+      if (!this.div_) return;
+      const proj = this.getProjection();
+      if (!proj) return;
+      const px = proj.fromLatLngToDivPixel(this.position_);
+      if (px) { this.div_.style.left = px.x + 'px'; this.div_.style.top = px.y + 'px'; }
+    }
+    setPosition(pos: any) { this.position_ = pos; this.draw(); }
+    getPosition() { return this.position_; }
+    onRemove() { if (this.div_?.parentNode) this.div_.parentNode.removeChild(this.div_); this.div_ = null; }
+  }
+  return ProofUserOverlay;
+}
+
+function animateOverlayTo(overlay: any, target: any, gm: any, duration = 800) {
+  const start = overlay.getPosition();
+  if (!start) return;
+  const sLat = start.lat(), sLng = start.lng();
+  const eLat = target.lat(), eLng = target.lng();
+  const t0 = performance.now();
+  function step(now: number) {
+    const t = Math.min((now - t0) / duration, 1);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    overlay.setPosition(new gm.LatLng(sLat + (eLat - sLat) * ease, sLng + (eLng - sLng) * ease));
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ── Marker SVG builder (terracotta, numbered — matches PlanMapModal) ──
+
+function buildPinSVG(index: number, size: number, fill: string): string {
+  const r = size / 2 - 1.5;
+  const fs = size >= 32 ? 14 : 12;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="${fill}" stroke="white" stroke-width="2.5"/><text x="${size/2}" y="${size/2 + 4.5}" text-anchor="middle" fill="white" font-size="${fs}" font-weight="700" font-family="-apple-system,sans-serif">${index + 1}</text></svg>`;
+}
+
 export const DoItNowScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -88,11 +157,11 @@ export const DoItNowScreen: React.FC = () => {
   const { session, plan, arriveAtPlace, nextStop, completeSession } = useDoItNowStore();
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapObjRef = useRef<any>(null);
-  const userMarkerRef = useRef<any>(null);
   const directionsServiceRef = useRef<any>(null);
-  const directionsRendererRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const watchIdRef = useRef<number | null>(null);
+  const userOverlayRef = useRef<any>(null);
+  const justAdvancedRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -110,11 +179,15 @@ export const DoItNowScreen: React.FC = () => {
   const currentPlace = plan.places[currentIndex];
   const isLastPlace = currentIndex === plan.places.length - 1;
 
-  // Init map
+  // ── Init map: terracotta pins + plan route polyline ──
   useEffect(() => {
+    injectPulseCSS();
+
     loadGM(() => {
       if (!mapDivRef.current) return;
       const gm = (window as any).google.maps;
+      const validPlaces = plan.places.filter(p => p.latitude && p.longitude);
+
       const map = new gm.Map(mapDivRef.current, {
         styles: MAP_STYLE,
         disableDefaultUI: true,
@@ -126,43 +199,66 @@ export const DoItNowScreen: React.FC = () => {
       });
       mapObjRef.current = map;
 
-      // Place markers
+      // Numbered terracotta markers — same style as PlanMapModal
       markersRef.current = [];
       plan.places.forEach((p, i) => {
         if (!p.latitude || !p.longitude) return;
         const isCurrent = i === currentIndex;
-        const isVisited = i < currentIndex || session.placesVisited.some((v: any) => v.placeId === p.id);
-        const size = isCurrent ? 34 : 26;
-        const color = isCurrent ? '#C9A84C' : isVisited ? '#8B7B3C' : '#5A5249';
-        const border = isCurrent ? '#C9A84C' : '#FFFFFF';
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="${border}" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
+        const size = isCurrent ? 32 : 26;
+        const svg = buildPinSVG(i, size, isCurrent ? '#C8571A' : '#D4845A');
         const marker = new gm.Marker({
           position: { lat: p.latitude, lng: p.longitude },
           map,
           icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new gm.Size(size, size), anchor: new gm.Point(size / 2, size / 2) },
           zIndex: isCurrent ? 200 : 100 + i,
+          clickable: false,
         });
         markersRef.current.push(marker);
       });
 
-      // Initialize DirectionsService & DirectionsRenderer for route display
+      // Plan route polyline via DirectionsService (terracotta, all places connected)
+      if (validPlaces.length >= 2) {
+        const ds = new gm.DirectionsService();
+        const origin = { lat: validPlaces[0].latitude, lng: validPlaces[0].longitude };
+        const dest = { lat: validPlaces[validPlaces.length - 1].latitude, lng: validPlaces[validPlaces.length - 1].longitude };
+        const waypoints = validPlaces.slice(1, -1).map((p: any) => ({
+          location: { lat: p.latitude, lng: p.longitude },
+          stopover: true,
+        }));
+        ds.route({
+          origin, destination: dest, waypoints,
+          travelMode: gm.TravelMode.WALKING,
+          optimizeWaypoints: false,
+        }, (result: any, status: string) => {
+          if (status === 'OK' && result) {
+            result.routes[0].legs.forEach((leg: any) => {
+              const path = leg.steps.reduce((acc: any[], step: any) => acc.concat(step.path), []);
+              new gm.Polyline({ path, strokeColor: '#C8571A', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50 });
+            });
+          } else {
+            // Fallback: straight lines
+            new gm.Polyline({
+              path: validPlaces.map((p: any) => ({ lat: p.latitude, lng: p.longitude })),
+              strokeColor: '#C8571A', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50,
+            });
+          }
+        });
+      }
+
+      // Fit bounds to all places
+      const bounds = new gm.LatLngBounds();
+      validPlaces.forEach((p: any) => bounds.extend({ lat: p.latitude, lng: p.longitude }));
+      map.fitBounds(bounds, { top: 80, right: 60, bottom: 250, left: 60 });
+      gm.event.addListenerOnce(map, 'bounds_changed', () => { if (map.getZoom() > 15) map.setZoom(15); });
+
+      // DirectionsService for route info (data only, no visual renderer)
       directionsServiceRef.current = new gm.DirectionsService();
-      directionsRendererRef.current = new gm.DirectionsRenderer({
-        map,
-        suppressMarkers: true, // We use our own numbered markers
-        polylineOptions: {
-          strokeColor: '#D4845A',
-          strokeOpacity: 0.9,
-          strokeWeight: 5,
-        },
-        preserveViewport: true,
-      });
 
       setLoading(false);
     });
   }, []);
 
-  // Watch GPS
+  // ── Watch GPS — custom 🚶 overlay ──
   useEffect(() => {
     if (!navigator.geolocation) return;
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -170,25 +266,13 @@ export const DoItNowScreen: React.FC = () => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLoc(loc);
 
-        // Update user marker on map
         const gm = (window as any).google?.maps;
         if (gm && mapObjRef.current) {
-          if (!userMarkerRef.current) {
-            userMarkerRef.current = new gm.Marker({
-              position: loc,
-              map: mapObjRef.current,
-              icon: {
-                path: gm.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: '#4A90D9',
-                fillOpacity: 1,
-                strokeColor: '#FFF',
-                strokeWeight: 3,
-              },
-              zIndex: 999,
-            });
+          if (!userOverlayRef.current) {
+            const Cls = createUserOverlayClass(gm);
+            userOverlayRef.current = new Cls(new gm.LatLng(loc.lat, loc.lng), mapObjRef.current);
           } else {
-            userMarkerRef.current.setPosition(loc);
+            userOverlayRef.current.setPosition(new gm.LatLng(loc.lat, loc.lng));
           }
         }
       },
@@ -198,11 +282,10 @@ export const DoItNowScreen: React.FC = () => {
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, []);
 
-  // Fetch route using Google Maps JS API DirectionsService (avoids CORS issues)
+  // ── Fetch route info for bottom card (data only — no visual on map) ──
   useEffect(() => {
     if (!userLoc || !currentPlace?.latitude || !currentPlace?.longitude || placeMode) return;
-    if (!directionsServiceRef.current || !directionsRendererRef.current) return;
-
+    if (!directionsServiceRef.current) return;
     const gm = (window as any).google?.maps;
     if (!gm) return;
 
@@ -214,7 +297,6 @@ export const DoItNowScreen: React.FC = () => {
       },
       (result: any, status: any) => {
         if (status === 'OK' && result) {
-          directionsRendererRef.current.setDirections(result);
           const leg = result.routes[0].legs[0];
           setRoute({
             distanceText: leg.distance.text,
@@ -232,7 +314,7 @@ export const DoItNowScreen: React.FC = () => {
             })),
           });
 
-          // Fit bounds to show user + destination
+          // Pan to show user + destination
           const bounds = new gm.LatLngBounds();
           bounds.extend(userLoc);
           bounds.extend({ lat: currentPlace.latitude, lng: currentPlace.longitude });
@@ -242,30 +324,35 @@ export const DoItNowScreen: React.FC = () => {
     );
   }, [userLoc?.lat, currentIndex, placeMode]);
 
-  // Arrival detection
+  // ── Arrival detection ──
   useEffect(() => {
     if (!userLoc || !currentPlace?.latitude || !currentPlace?.longitude || placeMode) return;
     const dist = distBetween(userLoc.lat, userLoc.lng, currentPlace.latitude, currentPlace.longitude);
     if (dist < ARRIVAL_THRESHOLD) {
       arriveAtPlace(currentIndex);
+      // Snap user marker to the place
+      const gm = (window as any).google?.maps;
+      if (gm && userOverlayRef.current) {
+        animateOverlayTo(userOverlayRef.current, new gm.LatLng(currentPlace.latitude, currentPlace.longitude), gm, 500);
+      }
       setPlaceMode({ placeIndex: currentIndex, arrivedAt: new Date(), rating: 0 });
       setArrived(`Bienvenue chez ${currentPlace.name} !`);
       setTimeout(() => setArrived(null), 3000);
     }
   }, [userLoc]);
 
-  // Update marker icons when step changes (gold for current/visited)
+  // ── Update markers when step changes + animate user marker to next destination ──
   useEffect(() => {
     const gm = (window as any).google?.maps;
     if (!gm || markersRef.current.length === 0) return;
+
     plan.places.forEach((p, i) => {
       if (!p.latitude || !p.longitude || i >= markersRef.current.length) return;
       const isCurrent = i === currentIndex;
-      const isVisited = i < currentIndex || session.placesVisited.some((v: any) => v.placeId === p.id);
-      const size = isCurrent ? 34 : 26;
-      const color = isCurrent ? '#C9A84C' : isVisited ? '#8B7B3C' : '#5A5249';
-      const border = isCurrent ? '#C9A84C' : '#FFFFFF';
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="${border}" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
+      const isVisited = i < currentIndex;
+      const size = isCurrent ? 32 : 26;
+      const fill = isCurrent ? '#C8571A' : isVisited ? '#A06840' : '#D4845A';
+      const svg = buildPinSVG(i, size, fill);
       markersRef.current[i].setIcon({
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
         scaledSize: new gm.Size(size, size),
@@ -273,6 +360,15 @@ export const DoItNowScreen: React.FC = () => {
       });
       markersRef.current[i].setZIndex(isCurrent ? 200 : 100 + i);
     });
+
+    // Animate user marker to the new destination when advancing
+    if (justAdvancedRef.current && userOverlayRef.current) {
+      const dest = plan.places[currentIndex];
+      if (dest?.latitude && dest?.longitude) {
+        animateOverlayTo(userOverlayRef.current, new gm.LatLng(dest.latitude, dest.longitude), gm);
+      }
+      justAdvancedRef.current = false;
+    }
   }, [currentIndex]);
 
   // Hidden timer helper — snapshot, not live
@@ -308,17 +404,22 @@ export const DoItNowScreen: React.FC = () => {
     setPlaceComment('');
     setTimeMode('none');
     setRoute(null);
-    if (directionsRendererRef.current) directionsRendererRef.current.setDirections({ routes: [] });
     if (isLastPlace) {
       completeSession();
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {
+      justAdvancedRef.current = true;
       nextStop();
     }
   };
 
   const handleManualArrive = () => {
     arriveAtPlace(currentIndex);
+    // Snap user marker to the place with a smooth animation
+    const gm = (window as any).google?.maps;
+    if (gm && userOverlayRef.current && currentPlace?.latitude && currentPlace?.longitude) {
+      animateOverlayTo(userOverlayRef.current, new gm.LatLng(currentPlace.latitude, currentPlace.longitude), gm, 500);
+    }
     setPlaceMode({ placeIndex: currentIndex, arrivedAt: new Date(), rating: 0 });
   };
 
@@ -521,7 +622,7 @@ export const DoItNowScreen: React.FC = () => {
               onPress={handleManualArrive}
               activeOpacity={0.7}
             >
-              <Text style={[styles.arrivedBtnText, { color: C.primary }]}>Je suis arrivé(e)</Text>
+              <Text style={[styles.arrivedBtnText, { color: C.primary }]}>J'y suis ✓</Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.quote, { color: C.gray500 }]}>proof. — discover your city</Text>
