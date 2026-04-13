@@ -637,8 +637,8 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 14, fontFamily: Fonts.serifBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
-  dragHandle: { paddingVertical: 6, paddingHorizontal: 6, justifyContent: 'center' as const, alignItems: 'center' as const },
-  dragBar: { width: 3.5, height: 24, borderRadius: 2 },
+  dragHandle: { paddingHorizontal: 8, justifyContent: 'center' as const, alignItems: 'center' as const, alignSelf: 'stretch' as const },
+  dragBar: { width: 5, height: '100%' as any, borderRadius: 3 },
   addPlaceBtn: {
     flexDirection: 'row',
     alignItems: 'center',
