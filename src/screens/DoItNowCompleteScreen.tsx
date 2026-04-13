@@ -184,7 +184,16 @@ export const DoItNowCompleteScreen: React.FC = () => {
         plan={plan}
         onProof={handleProofIt}
         onDecline={handleDecline}
-        skipRating
+        initialRatings={
+          session.placesVisited
+            .filter((v) => v.rating && v.rating > 0)
+            .map((v) => ({
+              placeId: v.placeId,
+              rating: v.rating!,
+              comment: v.reviewText || '',
+            }))
+        }
+        source="do_it_now"
       />
     </View>
   );

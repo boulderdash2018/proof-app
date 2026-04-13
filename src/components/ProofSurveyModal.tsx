@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { Plan } from '../types';
+import { Plan, ReviewSource } from '../types';
 import { useAuthStore } from '../store';
 import { submitPlaceReviews } from '../services/placeReviewService';
 import Svg, { Circle, Line, G, Defs, ClipPath } from 'react-native-svg';
@@ -47,15 +47,23 @@ interface PlaceRating {
   comment: string;
 }
 
+interface InitialPlaceRating {
+  placeId: string;
+  rating: number;
+  comment?: string;
+}
+
 interface Props {
   visible: boolean;
   plan: Plan;
   onProof: () => void;
   onDecline?: () => void;
   skipRating?: boolean;
+  initialRatings?: InitialPlaceRating[];
+  source?: ReviewSource;
 }
 
-export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skipRating }) => {
+export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skipRating, initialRatings, source = 'already_done' }) => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
@@ -68,12 +76,15 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
 
   const initPlaceRatings = () => {
     setPlaceRatings(
-      plan.places.map((p) => ({
-        placeId: p.id,
-        googlePlaceId: p.googlePlaceId,
-        rating: 0,
-        comment: '',
-      }))
+      plan.places.map((p) => {
+        const initial = initialRatings?.find((r) => r.placeId === p.id);
+        return {
+          placeId: p.id,
+          googlePlaceId: p.googlePlaceId,
+          rating: initial?.rating ?? 0,
+          comment: initial?.comment ?? '',
+        };
+      })
     );
   };
 
@@ -142,7 +153,8 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
               rating: pr.rating,
               text: pr.comment.trim() || undefined,
             })),
-          currentUser
+          currentUser,
+          source,
         );
       } catch (err) {
         console.error('[ProofSurvey] submit reviews error:', err);

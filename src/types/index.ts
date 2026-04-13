@@ -155,6 +155,8 @@ export interface Notification {
   createdAt: string;             // ISO string
 }
 
+export type ReviewSource = 'do_it_now' | 'already_done';
+
 export interface PlaceReview {
   id: string;
   placeId: string;
@@ -168,7 +170,9 @@ export interface PlaceReview {
   authorAvatarUrl?: string | null;
   rating: number;
   text?: string;
+  source?: ReviewSource;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type ProofStatus = 'validated' | 'declined';

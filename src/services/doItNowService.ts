@@ -6,33 +6,32 @@ const PLANS = 'plans';
 const USERS = 'users';
 const PLACE_REVIEWS = 'placeReviews';
 
-/** Save a completed session to the user's document */
+/** Save a completed session to the user's document (preserves ratings & comments) */
 export async function saveSession(session: DoItNowSession): Promise<void> {
   const userRef = doc(db, USERS, session.userId);
+
+  const sessionData = {
+    plan_id: session.planId,
+    started_at: session.startedAt,
+    completed_at: session.completedAt,
+    transport_used: session.transport,
+    places_visited: session.placesVisited.map((v) => ({
+      placeId: v.placeId,
+      timeSpentMinutes: v.timeSpentMinutes ?? null,
+      rating: v.rating ?? null,
+      reviewText: v.reviewText ?? null,
+      photoUrl: v.photoUrl ?? null,
+    })),
+    photos: session.placesVisited.filter((v) => v.photoUrl).map((v) => v.photoUrl),
+    total_duration_minutes: session.totalDurationMinutes,
+  };
+
   await updateDoc(userRef, {
-    plan_sessions: arrayUnion({
-      plan_id: session.planId,
-      started_at: session.startedAt,
-      completed_at: session.completedAt,
-      transport_used: session.transport,
-      places_visited: session.placesVisited.map((v) => v.placeId),
-      photos: session.placesVisited.filter((v) => v.photoUrl).map((v) => v.photoUrl),
-      total_duration_minutes: session.totalDurationMinutes,
-    }),
+    plan_sessions: arrayUnion(sessionData),
     plans_completed_count: increment(1),
   }).catch(() => {
     // If field doesn't exist yet, set it
-    setDoc(userRef, {
-      plan_sessions: [{
-        plan_id: session.planId,
-        started_at: session.startedAt,
-        completed_at: session.completedAt,
-        transport_used: session.transport,
-        places_visited: session.placesVisited.map((v) => v.placeId),
-        photos: session.placesVisited.filter((v) => v.photoUrl).map((v) => v.photoUrl),
-        total_duration_minutes: session.totalDurationMinutes,
-      }],
-    }, { merge: true });
+    setDoc(userRef, { plan_sessions: [sessionData] }, { merge: true });
   });
 }
 
