@@ -73,6 +73,7 @@ export const OrganizeScreen: React.FC = () => {
   const placesRef = useRef(places);
   placesRef.current = places;
   const dragYMap = useRef<Record<string, Animated.Value>>({});
+  const dragXMap = useRef<Record<string, Animated.Value>>({});
   const dragHandlersMap = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
   const lastSwapDyRef = useRef(0);
   const DRAG_SWAP_THRESHOLD = 58;
@@ -80,6 +81,10 @@ export const OrganizeScreen: React.FC = () => {
   const getDragY = (id: string): Animated.Value => {
     if (!dragYMap.current[id]) dragYMap.current[id] = new Animated.Value(0);
     return dragYMap.current[id];
+  };
+  const getDragX = (id: string): Animated.Value => {
+    if (!dragXMap.current[id]) dragXMap.current[id] = new Animated.Value(0);
+    return dragXMap.current[id];
   };
 
   const getOrCreateDragHandlers = (placeId: string) => {
@@ -95,6 +100,7 @@ export const OrganizeScreen: React.FC = () => {
       },
       onPanResponderMove: (_, gs) => {
         getDragY(placeId).setValue(gs.dy - lastSwapDyRef.current);
+        getDragX(placeId).setValue(gs.dx * 0.4);
         const offset = gs.dy - lastSwapDyRef.current;
         const cur = placesRef.current;
         const idx = cur.findIndex((p) => p.id === placeId);
@@ -117,11 +123,17 @@ export const OrganizeScreen: React.FC = () => {
         }
       },
       onPanResponderRelease: () => {
-        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        Animated.parallel([
+          Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+          Animated.spring(getDragX(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+        ]).start();
         setDraggingId(null);
       },
       onPanResponderTerminate: () => {
-        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        Animated.parallel([
+          Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+          Animated.spring(getDragX(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+        ]).start();
         setDraggingId(null);
       },
     });
@@ -387,7 +399,7 @@ export const OrganizeScreen: React.FC = () => {
                   style={[
                     styles.placeCard,
                     { backgroundColor: C.gray200, borderColor: C.borderLight },
-                    { transform: [{ translateY: getDragY(place.id) }] },
+                    { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
                     draggingId === place.id && {
                       shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
                       shadowRadius: 8, elevation: 8, borderColor: C.primary,
@@ -396,7 +408,7 @@ export const OrganizeScreen: React.FC = () => {
                   ]}
                 >
                   <View {...getOrCreateDragHandlers(place.id).panHandlers} style={styles.dragHandle}>
-                    <Ionicons name="reorder-three" size={20} color={draggingId === place.id ? C.primary : C.gray500} />
+                    <View style={[styles.dragBar, { backgroundColor: draggingId === place.id ? C.primary : C.gray500 }]} />
                   </View>
                   <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
                     <Text style={styles.placeNumberText}>{index + 1}</Text>
@@ -625,7 +637,8 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 14, fontFamily: Fonts.serifBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
-  dragHandle: { paddingVertical: 6, paddingHorizontal: 4, justifyContent: 'center' as const },
+  dragHandle: { paddingVertical: 6, paddingHorizontal: 6, justifyContent: 'center' as const, alignItems: 'center' as const },
+  dragBar: { width: 3.5, height: 24, borderRadius: 2 },
   addPlaceBtn: {
     flexDirection: 'row',
     alignItems: 'center',

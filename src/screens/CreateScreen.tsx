@@ -328,6 +328,7 @@ export const CreateScreen: React.FC = () => {
   const placesRef = useRef(places);
   placesRef.current = places;
   const dragYMap = useRef<Record<string, Animated.Value>>({});
+  const dragXMap = useRef<Record<string, Animated.Value>>({});
   const dragHandlersMap = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
   const lastSwapDyRef = useRef(0);
   const DRAG_SWAP_THRESHOLD = 80;
@@ -335,6 +336,10 @@ export const CreateScreen: React.FC = () => {
   const getDragY = (id: string): Animated.Value => {
     if (!dragYMap.current[id]) dragYMap.current[id] = new Animated.Value(0);
     return dragYMap.current[id];
+  };
+  const getDragX = (id: string): Animated.Value => {
+    if (!dragXMap.current[id]) dragXMap.current[id] = new Animated.Value(0);
+    return dragXMap.current[id];
   };
 
   const rebuildTravelsAfterSwap = (newPlaces: PlaceEntry[]) => {
@@ -362,6 +367,7 @@ export const CreateScreen: React.FC = () => {
       },
       onPanResponderMove: (_, gs) => {
         getDragY(placeId).setValue(gs.dy - lastSwapDyRef.current);
+        getDragX(placeId).setValue(gs.dx * 0.4);
         const offset = gs.dy - lastSwapDyRef.current;
         const cur = placesRef.current;
         const idx = cur.findIndex((p) => p.id === placeId);
@@ -386,11 +392,17 @@ export const CreateScreen: React.FC = () => {
         }
       },
       onPanResponderRelease: () => {
-        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        Animated.parallel([
+          Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+          Animated.spring(getDragX(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+        ]).start();
         setDraggingId(null);
       },
       onPanResponderTerminate: () => {
-        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        Animated.parallel([
+          Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+          Animated.spring(getDragX(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
+        ]).start();
         setDraggingId(null);
       },
     });
@@ -1436,7 +1448,7 @@ export const CreateScreen: React.FC = () => {
           style={[
             styles.placeCard,
             { backgroundColor: C.white, borderColor: C.borderLight },
-            { transform: [{ translateY: getDragY(place.id) }] },
+            { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
             draggingId === place.id && {
               shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
               shadowRadius: 8, elevation: 8, borderColor: C.primary,
@@ -1446,7 +1458,7 @@ export const CreateScreen: React.FC = () => {
         >
           <View style={styles.placeCardHeader}>
             <View {...getOrCreateDragHandlers(place.id).panHandlers} style={styles.dragHandle}>
-              <Ionicons name="reorder-three" size={20} color={draggingId === place.id ? C.primary : C.gray500} />
+              <View style={[styles.dragBar, { backgroundColor: draggingId === place.id ? C.primary : C.gray500 }]} />
             </View>
             <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
               <Text style={styles.placeNumberText}>{index + 1}</Text>
@@ -2377,7 +2389,8 @@ const styles = StyleSheet.create({
   reservationThumb: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF' },
   reservationThumbOn: { alignSelf: 'flex-end' },
   placeRemove: { fontSize: 14, paddingHorizontal: 6 },
-  dragHandle: { paddingVertical: 8, paddingHorizontal: 4, justifyContent: 'center' as const },
+  dragHandle: { paddingVertical: 8, paddingHorizontal: 6, justifyContent: 'center' as const, alignItems: 'center' as const },
+  dragBar: { width: 3.5, height: 28, borderRadius: 2 },
   customizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   customizeBtnText: { fontSize: 12, fontWeight: '600' },
   placeInputsRow: { flexDirection: 'row' },
