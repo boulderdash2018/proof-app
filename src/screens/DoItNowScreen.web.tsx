@@ -131,9 +131,11 @@ export const DoItNowScreen: React.FC = () => {
       plan.places.forEach((p, i) => {
         if (!p.latitude || !p.longitude) return;
         const isCurrent = i === currentIndex;
-        const size = isCurrent ? 32 : 26;
-        const color = isCurrent ? '%23C9A84C' : '%235A5249';
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="white" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
+        const isVisited = i < currentIndex || session.placesVisited.some((v: any) => v.placeId === p.id);
+        const size = isCurrent ? 34 : 26;
+        const color = isCurrent ? '#C9A84C' : isVisited ? '#8B7B3C' : '#5A5249';
+        const border = isCurrent ? '#C9A84C' : '#FFFFFF';
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="${border}" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
         const marker = new gm.Marker({
           position: { lat: p.latitude, lng: p.longitude },
           map,
@@ -259,11 +261,11 @@ export const DoItNowScreen: React.FC = () => {
     plan.places.forEach((p, i) => {
       if (!p.latitude || !p.longitude || i >= markersRef.current.length) return;
       const isCurrent = i === currentIndex;
-      const isVisited = session.placesVisited.some((v: any) => v.placeId === p.id);
-      const size = isCurrent ? 32 : 26;
-      const color = isCurrent ? '%23C9A84C' : isVisited ? '%23C9A84C' : '%235A5249';
-      const opacity = isCurrent ? '1' : isVisited ? '0.55' : '1';
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" fill-opacity="${opacity}" stroke="white" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
+      const isVisited = i < currentIndex || session.placesVisited.some((v: any) => v.placeId === p.id);
+      const size = isCurrent ? 34 : 26;
+      const color = isCurrent ? '#C9A84C' : isVisited ? '#8B7B3C' : '#5A5249';
+      const border = isCurrent ? '#C9A84C' : '#FFFFFF';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="${border}" stroke-width="2"/><text x="${size/2}" y="${size/2+4.5}" text-anchor="middle" fill="white" font-size="${isCurrent ? 14 : 12}" font-weight="700" font-family="sans-serif">${i + 1}</text></svg>`;
       markersRef.current[i].setIcon({
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
         scaledSize: new gm.Size(size, size),
