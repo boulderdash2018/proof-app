@@ -128,22 +128,6 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     ],
   },
 
-  // ── OTHER ──
-  {
-    key: 'other',
-    label: 'Other',
-    emoji: '🔮',
-    layout: 'grid',
-    sections: [
-      {
-        title: 'OTHER',
-        items: [
-          { name: 'Tout le reste', icon: 'apps-outline', emoji: '🎲', gradient: ['#5A5048', '#3D352E'], subtitle: 'Ce qui ne rentre nulle part ailleurs' },
-        ],
-      },
-    ],
-  },
-
   // ── MOOD ──
   {
     key: 'mood',
@@ -202,6 +186,22 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
           { name: 'Late night food', emoji: '🍜', gradient: ['#8B6A50', '#5C4030'], subtitle: 'Manger après minuit' },
           { name: 'City spots at night', emoji: '🌃', gradient: ['#5A6878', '#3A4858'], subtitle: 'La ville qui brille' },
           { name: 'After midnight', emoji: '🕐', gradient: ['#5A5048', '#3D352E'], subtitle: 'Quand la nuit commence vraiment' },
+        ],
+      },
+    ],
+  },
+
+  // ── OTHER (always last thematic category) ──
+  {
+    key: 'other',
+    label: 'Other',
+    emoji: '🔮',
+    layout: 'grid',
+    sections: [
+      {
+        title: 'OTHER',
+        items: [
+          { name: 'Tout le reste', icon: 'apps-outline', emoji: '🎲', gradient: ['#5A5048', '#3D352E'], subtitle: 'Ce qui ne rentre nulle part ailleurs' },
         ],
       },
     ],
