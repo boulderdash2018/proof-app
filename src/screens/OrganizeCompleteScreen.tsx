@@ -22,6 +22,7 @@ import { createPlan } from '../services/plansService';
 import { useCity } from '../hooks/useCity';
 import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan } from '../types';
 import { getDirections } from '../services/directionsService';
+import { ProofSurveyModal } from '../components/ProofSurveyModal';
 
 const mapTransport = (t: string): TransportMode => {
   switch (t) {
@@ -52,6 +53,8 @@ export const OrganizeCompleteScreen: React.FC = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [showRating, setShowRating] = useState(false);
+  const publishedPlanRef = useRef<Plan | null>(null);
 
   // Snapshot session/plan data so it survives clearSession
   const sessionRef = useRef<DoItNowSession | null>(session);
@@ -172,9 +175,17 @@ export const OrganizeCompleteScreen: React.FC = () => {
       // Update stores
       addPlan(createdPlan);
       addCreatedPlan(createdPlan);
+      publishedPlanRef.current = createdPlan;
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPublished(true);
+
+      // Check if any places were unrated — propose rating
+      const hasUnrated = s.placesVisited.some((v) => !v.rating || v.rating === 0);
+      if (hasUnrated) {
+        setShowRating(true);
+      } else {
+        setPublished(true);
+      }
     } catch (err: any) {
       console.error('Publish error:', err);
       setPublishError(`Erreur: ${err?.message || 'Impossible de publier le plan.'}`);
@@ -186,6 +197,11 @@ export const OrganizeCompleteScreen: React.FC = () => {
   const handleGoHome = () => {
     clearSession();
     navigation.popToTop();
+  };
+
+  const handleRatingDone = () => {
+    setShowRating(false);
+    setPublished(true);
   };
 
   // ── Success screen ──
@@ -319,6 +335,25 @@ export const OrganizeCompleteScreen: React.FC = () => {
 
         <View style={{ height: insets.bottom + 20 }} />
       </ScrollView>
+
+      {publishedPlanRef.current && (
+        <ProofSurveyModal
+          visible={showRating}
+          plan={publishedPlanRef.current}
+          onProof={handleRatingDone}
+          rateOnly
+          initialRatings={
+            s.placesVisited
+              .filter((v) => v.rating && v.rating > 0)
+              .map((v) => ({
+                placeId: v.placeId,
+                rating: v.rating!,
+                comment: v.reviewText || '',
+              }))
+          }
+          source="organize"
+        />
+      )}
     </View>
   );
 };

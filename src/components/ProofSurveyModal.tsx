@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -59,16 +59,18 @@ interface Props {
   onProof: () => void;
   onDecline?: () => void;
   skipRating?: boolean;
+  rateOnly?: boolean;
   initialRatings?: InitialPlaceRating[];
   source?: ReviewSource;
 }
 
-export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skipRating, initialRatings, source = 'already_done' }) => {
+export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skipRating, rateOnly, initialRatings, source = 'already_done' }) => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
   const [stampType, setStampType] = useState<'none' | 'proof'>('none');
-  const [step, setStep] = useState<'vote' | 'rate'>('vote');
+  const [step, setStep] = useState<'vote' | 'rate'>(rateOnly ? 'rate' : 'vote');
+  const prevVisible = useRef(visible);
   const [placeRatings, setPlaceRatings] = useState<PlaceRating[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const stampScale = useRef(new Animated.Value(0)).current;
@@ -87,6 +89,15 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
       })
     );
   };
+
+  // When modal opens in rateOnly mode, go directly to rate step
+  useEffect(() => {
+    if (visible && !prevVisible.current && rateOnly) {
+      setStep('rate');
+      initPlaceRatings();
+    }
+    prevVisible.current = visible;
+  }, [visible]);
 
   const playStamp = () => {
     setStampType('proof');
@@ -170,7 +181,7 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
   };
 
   const finishAndClose = () => {
-    setStep('vote');
+    setStep(rateOnly ? 'rate' : 'vote');
     setPlaceRatings([]);
     onProof();
   };

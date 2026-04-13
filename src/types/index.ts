@@ -155,7 +155,7 @@ export interface Notification {
   createdAt: string;             // ISO string
 }
 
-export type ReviewSource = 'do_it_now' | 'already_done';
+export type ReviewSource = 'do_it_now' | 'already_done' | 'organize';
 
 export interface PlaceReview {
   id: string;
