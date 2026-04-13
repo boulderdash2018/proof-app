@@ -57,6 +57,7 @@ interface PlanCardProps {
   onSave: () => void;
   onComment: () => void;
   onAuthorPress: () => void;
+  onShare?: () => void;
 }
 
 export const PlanCard: React.FC<PlanCardProps> = ({
@@ -69,6 +70,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   onSave,
   onComment,
   onAuthorPress,
+  onShare,
 }) => {
   const C = useColors();
   const topTrendingTags = useTrendingStore((s) => s.topTags);
@@ -370,6 +372,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               </Animated.Text>
             )}
           </TouchableOpacity>
+          {onShare && (
+            <TouchableOpacity style={styles.actionButton} onPress={onShare} activeOpacity={0.7}>
+              <Ionicons name="paper-plane-outline" size={20} color={C.gray600} />
+            </TouchableOpacity>
+          )}
           <View style={styles.actionSpacer} />
         </View>
         <FriendActivity plan={plan} />

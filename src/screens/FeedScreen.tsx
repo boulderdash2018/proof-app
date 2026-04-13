@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
+import { SharePlanSheet } from '../components/SharePlanSheet';
 import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore, useSocialProofStore, useChatStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
@@ -55,6 +56,7 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
   const [friendsFetched, setFriendsFetched] = useState(false);
+  const [sharePlan, setSharePlan] = useState<Plan | null>(null);
 
   // ── Contextual greeting ──
   const getGreeting = (): string => {
@@ -167,6 +169,10 @@ export const FeedScreen: React.FC = () => {
       onAuthorPress={() => {
         if (requireAuth()) return;
         navigation.navigate('OtherProfile', { userId: item.authorId });
+      }}
+      onShare={() => {
+        if (requireAuth()) return;
+        setSharePlan(item);
       }}
     />
   );
@@ -291,6 +297,18 @@ export const FeedScreen: React.FC = () => {
               />
             )
           }
+        />
+      )}
+
+      {/* Share plan sheet */}
+      {sharePlan && (
+        <SharePlanSheet
+          visible={!!sharePlan}
+          onClose={() => setSharePlan(null)}
+          planId={sharePlan.id}
+          planTitle={sharePlan.title}
+          planCover={sharePlan.coverPhotos?.[0]}
+          planAuthorName={sharePlan.author.displayName}
         />
       )}
     </View>
