@@ -48,6 +48,14 @@ const TRANSPORT_ICONS: Record<TransportMode, string> = {
   'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline', 'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
 };
 
+/** Format raw minutes → "45min" / "1h30" / "2h" */
+const fmtMin = (m: number): string => {
+  if (m < 60) return `${m}min`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
+};
+
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[0-9A-Fa-f]{6}/g);
   return m && m.length >= 2 ? m : ['#FF6B35', '#C94520'];
@@ -713,7 +721,7 @@ export const PlanDetailModal: React.FC = () => {
                           )}
                           {place.placeDuration != null && place.placeDuration > 0 && (
                             <View style={[st.placeMetaPill, { backgroundColor: C.gray300 }]}>
-                              <Text style={[st.placeMetaText, { color: C.gray700 }]}>{place.placeDuration}min</Text>
+                              <Text style={[st.placeMetaText, { color: C.gray700 }]}>{fmtMin(place.placeDuration!)}</Text>
                             </View>
                           )}
                         </View>
@@ -755,7 +763,7 @@ export const PlanDetailModal: React.FC = () => {
                           <Ionicons name={(TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any} size={13} color={C.primary} />
                           <Text style={[st.travelText, { color: C.gray700 }]}>{travelToNext.transport}</Text>
                           <View style={[st.travelDot, { backgroundColor: C.gray500 }]} />
-                          <Text style={[st.travelText, { color: C.gray700 }]}>{travelToNext.duration}min</Text>
+                          <Text style={[st.travelText, { color: C.gray700 }]}>{fmtMin(travelToNext.duration)}</Text>
                         </>
                       ) : (
                         <ActivityIndicator size="small" color={C.gray500} />
