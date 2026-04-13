@@ -28,8 +28,8 @@ const TIME_REVEAL_MAX = 70;
 // ── Bubble shape (Instagram-style grouping) ──
 const BUBBLE_R = 20;
 const BUBBLE_FLAT = 4;
-const GROUP_GAP = 2;
-const NORMAL_GAP = 8;
+const GROUP_GAP = 4;
+const NORMAL_GAP = 12;
 
 // ── Reaction overlay ──
 const REACTION_OVERLAP = 8;
@@ -47,15 +47,16 @@ type BubblePos = 'single' | 'first' | 'middle' | 'last';
 
 const isGroupedWith = (a: ChatMessage, b: ChatMessage): boolean => {
   if (a.senderId !== b.senderId) return false;
-  return Math.abs(new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) < 5 * 60_000;
+  return Math.abs(new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) < 2 * 60_000;
 };
 
-const msgHasReaction = (msg: ChatMessage): boolean => msg.reactions.length > 0;
+const msgHasHeartReaction = (msg: ChatMessage): boolean =>
+  msg.reactions.some((r) => r.emoji === HEART_EMOJI);
 
 const getBubblePos = (msg: ChatMessage, prev?: ChatMessage, next?: ChatMessage): BubblePos => {
-  const prevReacted = prev ? msgHasReaction(prev) : false;
+  const prevReacted = prev ? msgHasHeartReaction(prev) : false;
   const withPrev = !!prev && isGroupedWith(prev, msg) && !prevReacted;
-  const withNext = !!next && isGroupedWith(msg, next) && !msgHasReaction(msg);
+  const withNext = !!next && isGroupedWith(msg, next) && !msgHasHeartReaction(msg);
   if (withPrev && withNext) return 'middle';
   if (withPrev) return 'last';
   if (withNext) return 'first';
@@ -83,20 +84,28 @@ const getBubbleRadii = (pos: BubblePos, isMine: boolean) => {
 };
 
 const getSpacing = (msg: ChatMessage, next?: ChatMessage): number => {
-  const hasReact = msgHasReaction(msg);
-  const extra = hasReact ? REACTION_EXTRA : 0;
+  const hasAnyReact = msg.reactions.length > 0;
+  const extra = hasAnyReact ? REACTION_EXTRA : 0;
   if (!next) return extra;
-  const sameSender = isGroupedWith(msg, next);
-  if (sameSender && !hasReact) return GROUP_GAP;            // tight group
-  if (sameSender && hasReact) return GROUP_GAP + extra;     // reaction breaks visual, keep close
-  return NORMAL_GAP + extra;                                // different sender
+  const hasHeart = msg.reactions.some((r) => r.emoji === HEART_EMOJI);
+  const sameGroup = isGroupedWith(msg, next) && !hasHeart;  // only heart breaks group
+  if (sameGroup) return hasAnyReact ? GROUP_GAP + extra : GROUP_GAP;
+  return NORMAL_GAP + extra;
 };
 
 // ═══════════════════════════════════════════════
 // Typing Indicator
 // ═══════════════════════════════════════════════
 
-const TypingIndicator: React.FC<{ otherUser: ConversationParticipant; color: string; bgColor: string }> = ({ otherUser, color, bgColor }) => {
+interface TypingIndicatorProps {
+  otherUser: ConversationParticipant;
+  color: string;
+  bgColor: string;
+  isGrouped: boolean;
+  listSlideX: Animated.Value;
+}
+
+const TypingIndicator: React.FC<TypingIndicatorProps> = ({ otherUser, color, bgColor, isGrouped, listSlideX }) => {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -118,16 +127,21 @@ const TypingIndicator: React.FC<{ otherUser: ConversationParticipant; color: str
     return () => { a1.stop(); a2.stop(); a3.stop(); };
   }, []);
 
+  // When grouped with previous received message, use 'last' bubble radii (flat top-left)
+  const typingRadii = isGrouped
+    ? { borderTopLeftRadius: BUBBLE_FLAT, borderTopRightRadius: BUBBLE_R, borderBottomLeftRadius: BUBBLE_R, borderBottomRightRadius: BUBBLE_R }
+    : {};
+
   return (
     <View style={styles.msgWrapper}>
-      <View style={[styles.msgRow, styles.msgRowLeft]}>
+      <Animated.View style={[styles.msgRow, styles.msgRowLeft, { transform: [{ translateX: listSlideX }] }]}>
         <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
-        <View style={[styles.typingBubble, { backgroundColor: bgColor }]}>
+        <View style={[styles.typingBubble, { backgroundColor: bgColor }, typingRadii]}>
           {[dot1, dot2, dot3].map((dot, i) => (
             <Animated.View key={i} style={[styles.typingDot, { backgroundColor: color, transform: [{ translateY: dot }] }]} />
           ))}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -200,6 +214,8 @@ const MessageRow = React.memo<MessageRowProps>(({
   itemRef.current = item;
   const onSwipeReplyRef = useRef(onSwipeReply);
   onSwipeReplyRef.current = onSwipeReply;
+  const isMineRef = useRef(isMine);
+  isMineRef.current = isMine;
 
   // ── Sync heart with data (outside animation) ──
   useEffect(() => {
@@ -209,16 +225,27 @@ const MessageRow = React.memo<MessageRowProps>(({
     }
   }, [hasMyLike]);
 
-  // ── Swipe PanResponder (always RIGHT for reply) ──
+  // ── Swipe PanResponder (mine → LEFT, received → RIGHT) ──
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, g) => g.dx > 15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onMoveShouldSetPanResponder: (_, g) => {
+      const mine = isMineRef.current;
+      if (mine) return g.dx < -15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+      return g.dx > 15 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+    },
     onMoveShouldSetPanResponderCapture: () => false,
     onPanResponderMove: (_, g) => {
-      translateX.setValue(Math.max(0, Math.min(g.dx, SWIPE_MAX)));
+      const mine = isMineRef.current;
+      if (mine) {
+        translateX.setValue(Math.min(0, Math.max(g.dx, -SWIPE_MAX)));
+      } else {
+        translateX.setValue(Math.max(0, Math.min(g.dx, SWIPE_MAX)));
+      }
     },
     onPanResponderRelease: (_, g) => {
-      if (g.dx > SWIPE_THRESHOLD) {
+      const mine = isMineRef.current;
+      const triggered = mine ? g.dx < -SWIPE_THRESHOLD : g.dx > SWIPE_THRESHOLD;
+      if (triggered) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onSwipeReplyRef.current(itemRef.current);
       }
@@ -229,9 +256,13 @@ const MessageRow = React.memo<MessageRowProps>(({
     },
   }), []);
 
-  // ── Reply icon interpolation (swipe right reveals left icon) ──
-  const replyIconOpacity = translateX.interpolate({ inputRange: [0, 25, SWIPE_THRESHOLD], outputRange: [0, 0.4, 1], extrapolate: 'clamp' });
-  const replyIconScale = translateX.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0.4, 1], extrapolate: 'clamp' });
+  // ── Reply icon interpolation (bidirectional) ──
+  const replyIconOpacity = isMine
+    ? translateX.interpolate({ inputRange: [-SWIPE_THRESHOLD, -25, 0], outputRange: [1, 0.4, 0], extrapolate: 'clamp' })
+    : translateX.interpolate({ inputRange: [0, 25, SWIPE_THRESHOLD], outputRange: [0, 0.4, 1], extrapolate: 'clamp' });
+  const replyIconScale = isMine
+    ? translateX.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0.4], extrapolate: 'clamp' })
+    : translateX.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0.4, 1], extrapolate: 'clamp' });
 
   // ── Tap handler (double-tap = like/unlike) ──
   const handlePress = useCallback(() => {
@@ -279,9 +310,10 @@ const MessageRow = React.memo<MessageRowProps>(({
       )}
 
       <View style={[styles.msgWrapper, { marginBottom: spacing }]}>
-        {/* Swipe reply indicator — fixed left, revealed on right-swipe */}
+        {/* Swipe reply indicator — left for received, right for mine */}
         <Animated.View style={[
-          styles.swipeIndicatorBase, styles.swipeIndicatorLeft,
+          styles.swipeIndicatorBase,
+          isMine ? styles.swipeIndicatorRight : styles.swipeIndicatorLeft,
           { opacity: replyIconOpacity, transform: [{ scale: replyIconScale }] },
         ]}>
           <View style={[styles.swipeIndicatorCircle, { backgroundColor: C.gray200 }]}>
@@ -494,7 +526,7 @@ export const ConversationScreen: React.FC = () => {
   // ── Page-level slide for time reveal ──
   const listSlideX = useRef(new Animated.Value(0)).current;
   const listPanResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_, g) =>
+    onMoveShouldSetPanResponder: (_, g) =>
       g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
     onPanResponderMove: (_, g) => {
       listSlideX.setValue(Math.max(g.dx, -TIME_REVEAL_MAX));
@@ -632,11 +664,21 @@ export const ConversationScreen: React.FC = () => {
   }, [messages, user?.id]);
 
   // ── Render item ──
-  const renderItem = useCallback(({ item, index }: { item: ChatMessage; index: number }) => (
+  const renderItem = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
+    // When typing indicator is shown and this is the last received message,
+    // inject a virtual "next message" so it doesn't show avatar (typing indicator will)
+    const isLast = index === messages.length - 1;
+    const typingContinuesGroup = isLast && otherTyping && item.senderId !== user?.id;
+    const virtualNext = typingContinuesGroup
+      ? ({ senderId: item.senderId, createdAt: new Date().toISOString(), reactions: [] } as unknown as ChatMessage)
+      : undefined;
+    const effectiveNext = index < messages.length - 1 ? messages[index + 1] : virtualNext;
+
+    return (
     <MessageRow
       item={item}
       prevMsg={index > 0 ? messages[index - 1] : undefined}
-      nextMsg={index < messages.length - 1 ? messages[index + 1] : undefined}
+      nextMsg={effectiveNext}
       userId={user?.id}
       otherUser={otherUser}
       C={C}
@@ -653,7 +695,17 @@ export const ConversationScreen: React.FC = () => {
       onScrollToQuote={handleScrollToQuote}
       onPlanPress={handlePlanPress}
     />
-  ), [messages, user?.id, otherUser, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
+    );
+  }, [messages, user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
+
+  // ── Typing indicator grouping with last received message ──
+  const typingIsGrouped = useMemo(() => {
+    if (messages.length === 0) return false;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.senderId === user?.id) return false;
+    if (msgHasHeartReaction(lastMsg)) return false;
+    return Math.abs(Date.now() - new Date(lastMsg.createdAt).getTime()) < 2 * 60_000;
+  }, [messages, user?.id]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -684,7 +736,15 @@ export const ConversationScreen: React.FC = () => {
             contentContainerStyle={[styles.messagesList, { paddingBottom: 10 }]}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            ListFooterComponent={otherTyping ? <TypingIndicator otherUser={otherUser} color={C.gray600} bgColor={C.gray200} /> : null}
+            ListFooterComponent={otherTyping ? (
+              <TypingIndicator
+                otherUser={otherUser}
+                color={C.gray600}
+                bgColor={C.gray200}
+                isGrouped={typingIsGrouped}
+                listSlideX={listSlideX}
+              />
+            ) : null}
             onScrollToIndexFailed={() => {}}
             onScroll={handleScroll}
             scrollEventThrottle={16}
@@ -764,12 +824,13 @@ const styles = StyleSheet.create({
   // Message wrapper
   msgWrapper: { position: 'relative' },
 
-  // Swipe reply indicator (always on left — swipe right to reply)
+  // Swipe reply indicator (left for received, right for mine)
   swipeIndicatorBase: {
     position: 'absolute', top: 0, bottom: 0,
     justifyContent: 'center', zIndex: -1,
   },
   swipeIndicatorLeft: { left: 12 },
+  swipeIndicatorRight: { right: 12 },
   swipeIndicatorCircle: {
     width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
