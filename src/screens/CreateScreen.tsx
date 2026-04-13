@@ -1664,9 +1664,6 @@ export const CreateScreen: React.FC = () => {
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <Text style={[styles.headerTitle, { color: C.black }]}>{t.create_title}</Text>
-          <View style={[styles.costPill, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
-            <Text style={[styles.costText, { color: C.gold }]}>{t.create_cost}</Text>
-          </View>
         </View>
 
         <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
