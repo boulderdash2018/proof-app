@@ -16,3 +16,4 @@ export { MiniStampIcon } from './MiniStampIcon';
 export { FounderBadge } from './FounderBadge';
 export { AccountPromptModal } from './AccountPromptModal';
 export { PlanMapModal } from './PlanMapModal';
+export { SharePlanSheet } from './SharePlanSheet';

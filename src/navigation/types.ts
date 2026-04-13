@@ -56,6 +56,9 @@ export type RootStackParamList = {
   PlanDetail: { planId: string };
   PlaceDetail: { placeId?: string; planId?: string; googlePlaceId?: string };
   Notifications: undefined;
+  ChatList: undefined;
+  NewConversation: undefined;
+  Conversation: { conversationId: string; otherUser: { userId: string; displayName: string; username: string; avatarUrl: string | null; avatarBg: string; avatarColor: string; initials: string } };
   DoItNow: { planId: string };
   DoItNowComplete: undefined;
   OrganizeComplete: undefined;

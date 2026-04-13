@@ -16,3 +16,4 @@ export type { SavedPlace } from './savedPlacesStore';
 export { useRecentSearchesStore } from './recentSearchesStore';
 export { useSocialProofStore } from './socialProofStore';
 export type { MinimalUser } from './socialProofStore';
+export { useChatStore } from './chatStore';

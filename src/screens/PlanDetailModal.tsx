@@ -38,6 +38,7 @@ import { MiniStampIcon } from '../components/MiniStampIcon';
 import { PlanMapModal } from '../components/PlanMapModal';
 import { TransportChooser } from '../components/TransportChooser';
 import { ClosedPlacesSheet } from '../components/ClosedPlacesSheet';
+import { SharePlanSheet } from '../components/SharePlanSheet';
 import { useDoItNowStore } from '../store/doItNowStore';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -114,6 +115,7 @@ export const PlanDetailModal: React.FC = () => {
   const [closedPlaces, setClosedPlaces] = useState<PlaceOpenStatus[]>([]);
   const [pendingTransport, setPendingTransport] = useState<any>(null);
   const [checkingPlaces, setCheckingPlaces] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
 
   const launchDoItNow = useCallback((targetPlan: Plan, transport: any) => {
     useDoItNowStore.getState().startSession(targetPlan, transport, currentUser!.id);
@@ -849,6 +851,9 @@ export const PlanDetailModal: React.FC = () => {
             <Text style={[st.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
             {isSaved && isDone && <Ionicons name="lock-closed" size={10} color={C.gray500} style={{ marginLeft: 2 }} />}
           </TouchableOpacity>
+          <TouchableOpacity style={st.actionBtn} onPress={() => { if (isGuest) { setShowAccountPrompt(true); return; } setShowShareSheet(true); }} activeOpacity={0.7}>
+            <Ionicons name="paper-plane-outline" size={20} color={C.gray600} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1013,6 +1018,18 @@ export const PlanDetailModal: React.FC = () => {
             }}
           />
         </>
+      )}
+
+      {/* ===== SHARE PLAN SHEET ===== */}
+      {plan && (
+        <SharePlanSheet
+          visible={showShareSheet}
+          onClose={() => setShowShareSheet(false)}
+          planId={plan.id}
+          planTitle={plan.title}
+          planCover={plan.coverPhotos?.[0]}
+          planAuthorName={plan.author.displayName}
+        />
       )}
     </View>
   );

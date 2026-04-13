@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { PlanCard, LoadingSkeleton, EmptyState } from '../components';
-import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore, useSocialProofStore } from '../store';
+import { useAuthStore, useFeedStore, useNotifStore, useTrendingStore, useSocialProofStore, useChatStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
@@ -48,6 +48,7 @@ export const FeedScreen: React.FC = () => {
     toggleLike, toggleSave,
   } = useFeedStore();
   const { unreadCount, subscribe: subscribeNotifs } = useNotifStore();
+  const { totalUnread: chatUnread, subscribe: subscribeChat } = useChatStore();
 
   const [activeTab, setActiveTab] = useState<FeedTab>('reco');
   const indicatorX = useRef(new Animated.Value(0)).current;
@@ -94,6 +95,7 @@ export const FeedScreen: React.FC = () => {
     fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name);
     if (!isGuest && user?.id) {
       subscribeNotifs(user.id);
+      subscribeChat(user.id);
       useSocialProofStore.getState().init(user.id);
     }
     // Pre-fetch trending tags so PlanCard badges appear
@@ -194,19 +196,32 @@ export const FeedScreen: React.FC = () => {
               <Ionicons name="person-add-outline" size={16} color="#FFF" />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
-              onPress={() => navigation.navigate('Notifications')}
-            >
-              <Animated.View style={{ transform: [{ scale: bellPulse }] }}>
-                <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={18} color={unreadCount > 0 ? C.primary : C.gray800} />
-              </Animated.View>
-              {unreadCount > 0 && (
-                <View style={styles.bellBadge}>
-                  <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+                onPress={() => navigation.navigate('ChatList')}
+              >
+                <Ionicons name={chatUnread > 0 ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={17} color={chatUnread > 0 ? C.primary : C.gray800} />
+                {chatUnread > 0 && (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+                onPress={() => navigation.navigate('Notifications')}
+              >
+                <Animated.View style={{ transform: [{ scale: bellPulse }] }}>
+                  <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={18} color={unreadCount > 0 ? C.primary : C.gray800} />
+                </Animated.View>
+                {unreadCount > 0 && (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
