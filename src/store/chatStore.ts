@@ -8,7 +8,7 @@ import {
   sendTextMessage,
   sendPlanMessage,
   toggleReaction as toggleReactionService,
-  markConversationRead,
+  resetUnreadCount,
   getOrCreateConversation,
   setTypingStatus,
 } from '../services/chatService';
@@ -128,9 +128,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   openConversation: (conversationId: string, userId: string) => {
     const { activeConversationId, _msgsUnsub } = get();
 
-    // Already subscribed to this conversation — just mark read, don't reset
+    // Already subscribed to this conversation — just reset unread, don't reset listener
     if (activeConversationId === conversationId && _msgsUnsub) {
-      markConversationRead(conversationId, userId).catch(() => {});
+      resetUnreadCount(conversationId, userId);
       return;
     }
 
@@ -164,8 +164,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     setupListener();
 
-    // Mark as read
-    markConversationRead(conversationId, userId).catch(() => {});
+    // Reset unread count (lightweight — no message-level writes that kill the listener)
+    resetUnreadCount(conversationId, userId);
   },
 
   closeConversation: () => {

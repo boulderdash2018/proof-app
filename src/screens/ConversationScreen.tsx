@@ -12,7 +12,7 @@ import { Avatar } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
-import { ChatMessage, ConversationParticipant, markConversationRead, markNewMessagesAsRead } from '../services/chatService';
+import { ChatMessage, ConversationParticipant, resetUnreadCount } from '../services/chatService';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
 const HEART_EMOJI = '❤️';
@@ -69,6 +69,7 @@ interface MessageRowProps {
   otherUser: ConversationParticipant;
   C: any;
   isLastSent: boolean;
+  otherHasRead: boolean;
   isPickerTarget: boolean;
   pickerScale: Animated.Value;
   onSwipeReply: (msg: ChatMessage) => void;
@@ -81,7 +82,7 @@ interface MessageRowProps {
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
-  item, prevMsg, userId, otherUser, C, isLastSent,
+  item, prevMsg, userId, otherUser, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
   onScrollToQuote, onPlanPress,
@@ -90,7 +91,6 @@ const MessageRow = React.memo<MessageRowProps>(({
   const showDate = shouldShowDateSeparator(item, prevMsg);
   const myReaction = item.reactions.find((r) => r.userId === userId);
   const hasReply = !!item.replyToId;
-  const isReadByOther = item.readBy?.includes(otherUser.userId);
 
   // ── Animated values ──
   const translateX = useRef(new Animated.Value(0)).current;
@@ -274,7 +274,7 @@ const MessageRow = React.memo<MessageRowProps>(({
             {/* Read receipt — only under last sent message by me */}
             {isMine && isLastSent && (
               <View style={styles.readReceipt}>
-                {isReadByOther ? (
+                {otherHasRead ? (
                   <View style={styles.readReceiptInner}>
                     <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XS" avatarUrl={otherUser.avatarUrl || undefined} />
                     <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Vu</Text>
@@ -353,11 +353,18 @@ export const ConversationScreen: React.FC = () => {
   const messages = useChatStore((s) => s.messages);
   const isMessagesLoading = useChatStore((s) => s.isMessagesLoading);
   const otherTyping = useChatStore((s) => s.otherTyping);
+  const conversations = useChatStore((s) => s.conversations);
   const openConversation = useChatStore((s) => s.openConversation);
   const closeConversation = useChatStore((s) => s.closeConversation);
   const sendText = useChatStore((s) => s.sendText);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const setTypingStore = useChatStore((s) => s.setTyping);
+
+  // Derive read status from conversation-level unreadCount (no message-level writes)
+  const otherHasRead = useMemo(() => {
+    const conv = conversations.find((c) => c.id === conversationId);
+    return (conv?.unreadCount[otherUser.userId] || 0) === 0;
+  }, [conversations, conversationId, otherUser.userId]);
 
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -365,7 +372,6 @@ export const ConversationScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const pickerScale = useRef(new Animated.Value(0)).current;
   const convIdRef = useRef(conversationId);
-  const markedIdsRef = useRef<Set<string>>(new Set());
 
   // ── Typing freshness timer ──
   useEffect(() => {
@@ -393,27 +399,12 @@ export const ConversationScreen: React.FC = () => {
     return () => { if (convIdRef.current === conversationId) closeConversation(); };
   }, [conversationId, user?.id]);
 
-  // ── Mark read incrementally (only new unread messages, not full refetch) ──
+  // ── Reset unread on new messages (lightweight — only touches conversation doc, not messages) ──
   useEffect(() => {
     if (!user?.id || messages.length === 0) return;
-
-    const newUnreadIds = messages
-      .filter((m) => {
-        if (m.senderId === user.id) return false; // skip own messages
-        if (markedIdsRef.current.has(m.id)) return false; // already marked
-        if (m.readBy?.includes(user.id)) {
-          markedIdsRef.current.add(m.id); // already read server-side
-          return false;
-        }
-        return true;
-      })
-      .map((m) => m.id);
-
-    if (newUnreadIds.length > 0) {
-      newUnreadIds.forEach((id) => markedIdsRef.current.add(id));
-      markNewMessagesAsRead(conversationId, newUnreadIds, user.id).catch(() => {});
-    }
-  }, [messages, conversationId, user?.id]);
+    // Just reset the counter — no writes to individual message documents
+    resetUnreadCount(conversationId, user.id);
+  }, [messages.length, conversationId, user?.id]);
 
   // ── Auto-scroll ──
   useEffect(() => {
@@ -507,6 +498,7 @@ export const ConversationScreen: React.FC = () => {
       otherUser={otherUser}
       C={C}
       isLastSent={item.id === lastSentMsgId}
+      otherHasRead={otherHasRead}
       isPickerTarget={pickerMsgId === item.id}
       pickerScale={pickerScale}
       onSwipeReply={handleSwipeReply}
@@ -517,7 +509,7 @@ export const ConversationScreen: React.FC = () => {
       onScrollToQuote={handleScrollToQuote}
       onPlanPress={handlePlanPress}
     />
-  ), [messages, user?.id, otherUser, C, lastSentMsgId, pickerMsgId, pickerScale, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
+  ), [messages, user?.id, otherUser, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>

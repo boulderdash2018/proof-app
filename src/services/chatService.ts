@@ -336,6 +336,19 @@ export const markNewMessagesAsRead = async (
   }
 };
 
+/** Lightweight: reset unread count only (no message-level readBy writes) */
+export const resetUnreadCount = async (
+  conversationId: string,
+  userId: string,
+): Promise<void> => {
+  try {
+    const convRef = doc(db, CONVERSATIONS, conversationId);
+    await updateDoc(convRef, { [`unreadCount.${userId}`]: 0 });
+  } catch {
+    // Silently ignore
+  }
+};
+
 /** Set typing status */
 export const setTypingStatus = async (
   conversationId: string,
