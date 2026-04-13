@@ -12,6 +12,8 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -65,6 +67,67 @@ export const OrganizeScreen: React.FC = () => {
   const [placeResults, setPlaceResults] = useState<GooglePlaceAutocomplete[]>([]);
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Drag-to-reorder ──
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const placesRef = useRef(places);
+  placesRef.current = places;
+  const dragYMap = useRef<Record<string, Animated.Value>>({});
+  const dragHandlersMap = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
+  const lastSwapDyRef = useRef(0);
+  const DRAG_SWAP_THRESHOLD = 58;
+
+  const getDragY = (id: string): Animated.Value => {
+    if (!dragYMap.current[id]) dragYMap.current[id] = new Animated.Value(0);
+    return dragYMap.current[id];
+  };
+
+  const getOrCreateDragHandlers = (placeId: string) => {
+    if (dragHandlersMap.current[placeId]) return dragHandlersMap.current[placeId];
+    const handler = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        setDraggingId(placeId);
+        lastSwapDyRef.current = 0;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      },
+      onPanResponderMove: (_, gs) => {
+        getDragY(placeId).setValue(gs.dy - lastSwapDyRef.current);
+        const offset = gs.dy - lastSwapDyRef.current;
+        const cur = placesRef.current;
+        const idx = cur.findIndex((p) => p.id === placeId);
+        if (offset > DRAG_SWAP_THRESHOLD && idx < cur.length - 1) {
+          const next = [...cur];
+          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+          setPlaces(next);
+          placesRef.current = next;
+          lastSwapDyRef.current = gs.dy;
+          getDragY(placeId).setValue(0);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } else if (offset < -DRAG_SWAP_THRESHOLD && idx > 0) {
+          const next = [...cur];
+          [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+          setPlaces(next);
+          placesRef.current = next;
+          lastSwapDyRef.current = gs.dy;
+          getDragY(placeId).setValue(0);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      },
+      onPanResponderRelease: () => {
+        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        setDraggingId(null);
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        setDraggingId(null);
+      },
+    });
+    dragHandlersMap.current[placeId] = handler;
+    return handler;
+  };
 
   // ── Handlers ──
   const toggleTag = (tag: CategoryTag) => {
@@ -198,6 +261,7 @@ export const OrganizeScreen: React.FC = () => {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={!draggingId}
         >
           {/* ── Title ── */}
           <Text style={[styles.sectionLabel, { color: C.gray800 }]}>Titre de la journée</Text>
@@ -318,7 +382,22 @@ export const OrganizeScreen: React.FC = () => {
           {places.length > 0 && (
             <View style={styles.placesList}>
               {places.map((place, index) => (
-                <View key={place.id} style={[styles.placeCard, { backgroundColor: C.gray200, borderColor: C.borderLight }]}>
+                <Animated.View
+                  key={place.id}
+                  style={[
+                    styles.placeCard,
+                    { backgroundColor: C.gray200, borderColor: C.borderLight },
+                    { transform: [{ translateY: getDragY(place.id) }] },
+                    draggingId === place.id && {
+                      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
+                      shadowRadius: 8, elevation: 8, borderColor: C.primary,
+                    },
+                    { zIndex: draggingId === place.id ? 100 : 1 },
+                  ]}
+                >
+                  <View {...getOrCreateDragHandlers(place.id).panHandlers} style={styles.dragHandle}>
+                    <Ionicons name="reorder-three" size={20} color={draggingId === place.id ? C.primary : C.gray500} />
+                  </View>
                   <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
                     <Text style={styles.placeNumberText}>{index + 1}</Text>
                   </View>
@@ -329,7 +408,7 @@ export const OrganizeScreen: React.FC = () => {
                   <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close-circle" size={20} color={C.gray500} />
                   </TouchableOpacity>
-                </View>
+                </Animated.View>
               ))}
             </View>
           )}
@@ -546,6 +625,7 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 14, fontFamily: Fonts.serifBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  dragHandle: { paddingVertical: 6, paddingHorizontal: 4, justifyContent: 'center' as const },
   addPlaceBtn: {
     flexDirection: 'row',
     alignItems: 'center',

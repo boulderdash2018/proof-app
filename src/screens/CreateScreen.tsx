@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Image,
   Animated,
+  PanResponder,
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -321,6 +322,81 @@ export const CreateScreen: React.FC = () => {
   // Ref for current form state (read from interval without stale closures)
   const formRef = useRef({ title: '', coverPhotos: [] as string[], selectedTags: [] as CategoryTag[], places: [] as PlaceEntry[], travels: [] as TravelEntry[] });
   formRef.current = { title, coverPhotos, selectedTags, places, travels };
+
+  // ── Drag-to-reorder ──
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const placesRef = useRef(places);
+  placesRef.current = places;
+  const dragYMap = useRef<Record<string, Animated.Value>>({});
+  const dragHandlersMap = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
+  const lastSwapDyRef = useRef(0);
+  const DRAG_SWAP_THRESHOLD = 80;
+
+  const getDragY = (id: string): Animated.Value => {
+    if (!dragYMap.current[id]) dragYMap.current[id] = new Animated.Value(0);
+    return dragYMap.current[id];
+  };
+
+  const rebuildTravelsAfterSwap = (newPlaces: PlaceEntry[]) => {
+    setTravels((prev) => {
+      if (newPlaces.length <= 1) return [];
+      const result: TravelEntry[] = [];
+      for (let i = 0; i < newPlaces.length - 1; i++) {
+        const existing = prev.find((t) => t.fromId === newPlaces[i].id && t.toId === newPlaces[i + 1].id);
+        result.push(existing || { fromId: newPlaces[i].id, toId: newPlaces[i + 1].id, duration: '', transport: 'À pied' });
+      }
+      return result;
+    });
+  };
+
+  const getOrCreateDragHandlers = (placeId: string) => {
+    if (dragHandlersMap.current[placeId]) return dragHandlersMap.current[placeId];
+    const handler = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        setDraggingId(placeId);
+        lastSwapDyRef.current = 0;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      },
+      onPanResponderMove: (_, gs) => {
+        getDragY(placeId).setValue(gs.dy - lastSwapDyRef.current);
+        const offset = gs.dy - lastSwapDyRef.current;
+        const cur = placesRef.current;
+        const idx = cur.findIndex((p) => p.id === placeId);
+        if (offset > DRAG_SWAP_THRESHOLD && idx < cur.length - 1) {
+          const next = [...cur];
+          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+          setPlaces(next);
+          placesRef.current = next;
+          rebuildTravelsAfterSwap(next);
+          lastSwapDyRef.current = gs.dy;
+          getDragY(placeId).setValue(0);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } else if (offset < -DRAG_SWAP_THRESHOLD && idx > 0) {
+          const next = [...cur];
+          [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+          setPlaces(next);
+          placesRef.current = next;
+          rebuildTravelsAfterSwap(next);
+          lastSwapDyRef.current = gs.dy;
+          getDragY(placeId).setValue(0);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      },
+      onPanResponderRelease: () => {
+        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        setDraggingId(null);
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }).start();
+        setDraggingId(null);
+      },
+    });
+    dragHandlersMap.current[placeId] = handler;
+    return handler;
+  };
 
   // Helper: load a draft into form state
   const loadDraftIntoForm = useCallback((saved: ReturnType<typeof useDraftStore.getState>['drafts'][number]) => {
@@ -1355,8 +1431,23 @@ export const CreateScreen: React.FC = () => {
     places.forEach((place, index) => {
       // Place card
       items.push(
-        <View key={`place-${place.id}`} style={[styles.placeCard, { backgroundColor: C.white, borderColor: C.borderLight }]}>
+        <Animated.View
+          key={`place-${place.id}`}
+          style={[
+            styles.placeCard,
+            { backgroundColor: C.white, borderColor: C.borderLight },
+            { transform: [{ translateY: getDragY(place.id) }] },
+            draggingId === place.id && {
+              shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
+              shadowRadius: 8, elevation: 8, borderColor: C.primary,
+            },
+            { zIndex: draggingId === place.id ? 100 : 1 },
+          ]}
+        >
           <View style={styles.placeCardHeader}>
+            <View {...getOrCreateDragHandlers(place.id).panHandlers} style={styles.dragHandle}>
+              <Ionicons name="reorder-three" size={20} color={draggingId === place.id ? C.primary : C.gray500} />
+            </View>
             <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
               <Text style={styles.placeNumberText}>{index + 1}</Text>
             </View>
@@ -1467,7 +1558,7 @@ export const CreateScreen: React.FC = () => {
               {place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0) ? 'Modifier la personnalisation' : 'Personnaliser ce lieu'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       );
 
       // Travel segment between this place and the next one
@@ -1570,7 +1661,7 @@ export const CreateScreen: React.FC = () => {
           </Animated.View>
         </Animated.View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" scrollEnabled={!draggingId}>
           {/* Draft indicator with discard option */}
           {(title.length > 0 || places.length > 0 || coverPhotos.length > 0) && useDraftStore.getState().getDraft(draftIdRef.current) && (
             <View style={[styles.draftBanner, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
@@ -2280,6 +2371,7 @@ const styles = StyleSheet.create({
   reservationThumb: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF' },
   reservationThumbOn: { alignSelf: 'flex-end' },
   placeRemove: { fontSize: 14, paddingHorizontal: 6 },
+  dragHandle: { paddingVertical: 8, paddingHorizontal: 4, justifyContent: 'center' as const },
   customizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   customizeBtnText: { fontSize: 12, fontWeight: '600' },
   placeInputsRow: { flexDirection: 'row' },
