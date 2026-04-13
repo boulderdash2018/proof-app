@@ -5,6 +5,7 @@ import {
   ConversationParticipant,
   subscribeConversations,
   subscribeMessages,
+  fetchMessages,
   sendTextMessage,
   sendPlanMessage,
   toggleReaction as toggleReactionService,
@@ -37,6 +38,8 @@ interface ChatStore {
   _msgsUnsub: (() => void) | null;
   _userId: string | null;
   _typingTimer: ReturnType<typeof setTimeout> | null;
+  _pollTimer: ReturnType<typeof setInterval> | null;
+  _lastSnapshotAt: number;
 
   // Actions — conversations
   subscribe: (userId: string) => void;
@@ -68,6 +71,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   _msgsUnsub: null,
   _userId: null,
   _typingTimer: null,
+  _pollTimer: null,
+  _lastSnapshotAt: 0,
 
   // ── Subscribe to conversations list ──
   subscribe: (userId: string) => {
@@ -111,11 +116,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     get()._msgsUnsub?.();
     const timer = get()._typingTimer;
     if (timer) clearTimeout(timer);
+    const poll = get()._pollTimer;
+    if (poll) clearInterval(poll);
     set({
       _convsUnsub: null,
       _msgsUnsub: null,
       _userId: null,
       _typingTimer: null,
+      _pollTimer: null,
       conversations: [],
       totalUnread: 0,
       messages: [],
@@ -126,7 +134,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   // ── Open a conversation (subscribe to messages) ──
   openConversation: (conversationId: string, userId: string) => {
-    const { activeConversationId, _msgsUnsub } = get();
+    const { activeConversationId, _msgsUnsub, _pollTimer } = get();
 
     // Already subscribed to this conversation — just reset unread, don't reset listener
     if (activeConversationId === conversationId && _msgsUnsub) {
@@ -134,11 +142,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return;
     }
 
-    // Close previous messages listener
+    // Close previous messages listener + poll
     _msgsUnsub?.();
+    if (_pollTimer) clearInterval(_pollTimer);
 
-    set({ activeConversationId: conversationId, messages: [], isMessagesLoading: true, _msgsUnsub: null });
+    set({ activeConversationId: conversationId, messages: [], isMessagesLoading: true, _msgsUnsub: null, _pollTimer: null, _lastSnapshotAt: 0 });
 
+    // ── Recovery fetch: one-shot getDocs to catch up if listener is stale ──
+    const recoveryFetch = async () => {
+      if (get().activeConversationId !== conversationId) return;
+      try {
+        const fresh = await fetchMessages(conversationId);
+        if (get().activeConversationId !== conversationId) return;
+        const current = get().messages;
+        // Only update if the fetch returned more messages (listener missed some)
+        if (fresh.length > current.length) {
+          console.warn(`[chatStore] recovery fetch found ${fresh.length} msgs (had ${current.length})`);
+          set({ messages: fresh, isMessagesLoading: false, _lastSnapshotAt: Date.now() });
+        }
+      } catch (e) {
+        // Silently ignore — listener is the primary source
+      }
+    };
+
+    // ── onSnapshot listener (primary) ──
     let retryCount = 0;
     const MAX_RETRIES = 5;
 
@@ -146,19 +173,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const unsub = subscribeMessages(
         conversationId,
         (messages) => {
-          // Only update if this is still the active conversation
           if (get().activeConversationId === conversationId) {
-            set({ messages, isMessagesLoading: false });
-            retryCount = 0; // reset on successful data
+            set({ messages, isMessagesLoading: false, _lastSnapshotAt: Date.now() });
+            retryCount = 0;
           }
         },
         (err) => {
           console.warn('[chatStore] messages listener error:', err);
+          // Immediately try a recovery fetch so messages aren't lost
+          recoveryFetch();
           if (retryCount >= MAX_RETRIES) {
-            console.warn('[chatStore] max retries reached, giving up listener for', conversationId);
+            console.warn('[chatStore] max retries reached — relying on poll for', conversationId);
             return;
           }
-          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
           const delay = Math.min(1000 * Math.pow(2, retryCount), 16000);
           retryCount++;
           setTimeout(() => {
@@ -174,19 +201,31 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     setupListener();
 
-    // Reset unread count (lightweight — no message-level writes that kill the listener)
+    // ── Poll safety net: every 5s, check if listener is stale and fetch if so ──
+    const poll = setInterval(() => {
+      if (get().activeConversationId !== conversationId) return;
+      const age = Date.now() - get()._lastSnapshotAt;
+      // If no snapshot in the last 8 seconds, do a recovery fetch
+      if (age > 8000) {
+        recoveryFetch();
+      }
+    }, 5000);
+    set({ _pollTimer: poll });
+
+    // Reset unread count
     resetUnreadCount(conversationId, userId);
   },
 
   closeConversation: () => {
-    const { activeConversationId, _userId, _typingTimer } = get();
+    const { activeConversationId, _userId, _typingTimer, _pollTimer } = get();
     // Clear typing on close
     if (activeConversationId && _userId) {
       setTypingStatus(activeConversationId, _userId, false).catch(() => {});
     }
     get()._msgsUnsub?.();
     if (_typingTimer) clearTimeout(_typingTimer);
-    set({ _msgsUnsub: null, activeConversationId: null, messages: [], otherTyping: false, _typingTimer: null });
+    if (_pollTimer) clearInterval(_pollTimer);
+    set({ _msgsUnsub: null, _pollTimer: null, activeConversationId: null, messages: [], otherTyping: false, _typingTimer: null });
   },
 
   // ── Send text ──
@@ -198,6 +237,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (timer) clearTimeout(timer);
     set({ _typingTimer: null });
     await sendTextMessage(activeConversationId, _userId, text, replyTo);
+
+    // Recovery fetch 2s after send — catches case where listener died silently
+    const cid = activeConversationId;
+    setTimeout(async () => {
+      if (get().activeConversationId !== cid) return;
+      try {
+        const fresh = await fetchMessages(cid);
+        if (get().activeConversationId !== cid) return;
+        const current = get().messages;
+        if (fresh.length > current.length) {
+          set({ messages: fresh, _lastSnapshotAt: Date.now() });
+        }
+      } catch { /* ignore */ }
+    }, 2000);
   },
 
   // ── Send plan share ──

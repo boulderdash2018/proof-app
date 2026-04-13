@@ -9,7 +9,6 @@ import {
   doc,
   getDoc,
   onSnapshot,
-  orderBy,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -343,7 +342,6 @@ export const subscribeMessages = (
 ): (() => void) => {
   const q = query(
     collection(db, CONVERSATIONS, conversationId, MESSAGES),
-    orderBy('createdAt', 'asc'),
   );
   return onSnapshot(
     q,
@@ -354,8 +352,6 @@ export const subscribeMessages = (
           ...d.data(),
           createdAt: toISO(d.data().createdAt),
         } as ChatMessage));
-        // orderBy handles sorting, but pending serverTimestamp docs may
-        // have estimated timestamps — resort to be safe
         messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
         onData(messages);
       } catch (e) {
@@ -367,4 +363,19 @@ export const subscribeMessages = (
       onError?.(err);
     },
   );
+};
+
+/** One-shot fetch — fallback when onSnapshot listener dies silently */
+export const fetchMessages = async (
+  conversationId: string,
+): Promise<ChatMessage[]> => {
+  const q = query(collection(db, CONVERSATIONS, conversationId, MESSAGES));
+  const snap = await getDocs(q);
+  const messages: ChatMessage[] = snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    createdAt: toISO(d.data().createdAt),
+  } as ChatMessage));
+  messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return messages;
 };
