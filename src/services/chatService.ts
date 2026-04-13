@@ -6,7 +6,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  deleteField,
+  arrayUnion,
   doc,
   getDoc,
   onSnapshot,
@@ -269,7 +269,7 @@ export const toggleReaction = async (
   await updateDoc(msgRef, { reactions });
 };
 
-/** Mark all messages in a conversation as read */
+/** Mark all messages in a conversation as read (chunked batches for >500 msgs) */
 export const markConversationRead = async (
   conversationId: string,
   userId: string,
@@ -284,22 +284,55 @@ export const markConversationRead = async (
     }
   }
 
-  // Fetch all messages, filter client-side, batch-update readBy
+  // Fetch all messages, filter client-side, batch-update readBy in chunks of 499
   const q = query(collection(db, CONVERSATIONS, conversationId, MESSAGES));
   try {
     const snap = await getDocs(q);
-    const batch = writeBatch(db);
-    let count = 0;
-    snap.docs.forEach((d) => {
+    const unreadDocs = snap.docs.filter((d) => {
       const readBy: string[] = d.data().readBy || [];
-      if (!readBy.includes(userId)) {
-        batch.update(d.ref, { readBy: [...readBy, userId] });
-        count++;
-      }
+      return !readBy.includes(userId);
     });
-    if (count > 0) await batch.commit();
+
+    // Process in chunks of 499 to stay under Firestore's 500-op batch limit
+    const BATCH_LIMIT = 499;
+    for (let i = 0; i < unreadDocs.length; i += BATCH_LIMIT) {
+      const chunk = unreadDocs.slice(i, i + BATCH_LIMIT);
+      const batch = writeBatch(db);
+      chunk.forEach((d) => {
+        batch.update(d.ref, { readBy: arrayUnion(userId) });
+      });
+      await batch.commit();
+    }
   } catch (err) {
     console.warn('[chatService] markRead batch error:', err);
+  }
+};
+
+/** Lightweight: mark specific new messages as read (incremental) */
+export const markNewMessagesAsRead = async (
+  conversationId: string,
+  messageIds: string[],
+  userId: string,
+): Promise<void> => {
+  if (messageIds.length === 0) return;
+  try {
+    // Reset unread count
+    const convRef = doc(db, CONVERSATIONS, conversationId);
+    await updateDoc(convRef, { [`unreadCount.${userId}`]: 0 }).catch(() => {});
+
+    // Update only the specified messages
+    const BATCH_LIMIT = 499;
+    for (let i = 0; i < messageIds.length; i += BATCH_LIMIT) {
+      const chunk = messageIds.slice(i, i + BATCH_LIMIT);
+      const batch = writeBatch(db);
+      chunk.forEach((msgId) => {
+        const msgRef = doc(db, CONVERSATIONS, conversationId, MESSAGES, msgId);
+        batch.update(msgRef, { readBy: arrayUnion(userId) });
+      });
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('[chatService] markNewMessagesAsRead error:', err);
   }
 };
 

@@ -12,7 +12,7 @@ import { Avatar } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
-import { ChatMessage, ConversationParticipant, markConversationRead } from '../services/chatService';
+import { ChatMessage, ConversationParticipant, markConversationRead, markNewMessagesAsRead } from '../services/chatService';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
 const HEART_EMOJI = '❤️';
@@ -365,6 +365,7 @@ export const ConversationScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const pickerScale = useRef(new Animated.Value(0)).current;
   const convIdRef = useRef(conversationId);
+  const markedIdsRef = useRef<Set<string>>(new Set());
 
   // ── Typing freshness timer ──
   useEffect(() => {
@@ -392,12 +393,27 @@ export const ConversationScreen: React.FC = () => {
     return () => { if (convIdRef.current === conversationId) closeConversation(); };
   }, [conversationId, user?.id]);
 
-  // ── Mark read on new messages ──
+  // ── Mark read incrementally (only new unread messages, not full refetch) ──
   useEffect(() => {
-    if (messages.length > 0 && user?.id) {
-      markConversationRead(conversationId, user.id).catch(() => {});
+    if (!user?.id || messages.length === 0) return;
+
+    const newUnreadIds = messages
+      .filter((m) => {
+        if (m.senderId === user.id) return false; // skip own messages
+        if (markedIdsRef.current.has(m.id)) return false; // already marked
+        if (m.readBy?.includes(user.id)) {
+          markedIdsRef.current.add(m.id); // already read server-side
+          return false;
+        }
+        return true;
+      })
+      .map((m) => m.id);
+
+    if (newUnreadIds.length > 0) {
+      newUnreadIds.forEach((id) => markedIdsRef.current.add(id));
+      markNewMessagesAsRead(conversationId, newUnreadIds, user.id).catch(() => {});
     }
-  }, [messages.length, conversationId, user?.id]);
+  }, [messages, conversationId, user?.id]);
 
   // ── Auto-scroll ──
   useEffect(() => {
