@@ -1850,6 +1850,12 @@ export const CreateScreen: React.FC = () => {
                     ))}
                   </View>
                 </View>
+                <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
+                <View style={styles.totalItem}>
+                  <Text style={styles.totalEmoji}>📍</Text>
+                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>ÉTAPES</Text>
+                  <Text style={[styles.totalValue, { color: C.black }]}>{places.length}</Text>
+                </View>
               </View>
             </View>
           )}

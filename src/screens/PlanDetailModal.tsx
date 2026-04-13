@@ -593,6 +593,10 @@ export const PlanDetailModal: React.FC = () => {
               <Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={13} color={C.primary} />
               <Text style={[st.pillText, { color: C.gray800 }]}>{plan.transport}</Text>
             </View>
+            <View style={[st.pill, { backgroundColor: C.gray300 }]}>
+              <Ionicons name="location-outline" size={13} color={C.primary} />
+              <Text style={[st.pillText, { color: C.gray800 }]}>{plan.places.length} étapes</Text>
+            </View>
             {hasMapPlaces && (
               <TouchableOpacity style={[st.pill, { backgroundColor: C.primary + '20' }]} onPress={() => setShowMap(true)} activeOpacity={0.7}>
                 <Ionicons name="map-outline" size={13} color={C.primary} />

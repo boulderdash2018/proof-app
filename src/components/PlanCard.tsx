@@ -338,6 +338,10 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <Ionicons name={getTransportIcon(plan.transport) as any} size={13} color={C.gold} style={{ marginRight: 4 }} />
             <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.transport}</Text>
           </View>
+          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
+            <Ionicons name="location-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
+            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.places.length} étapes</Text>
+          </View>
         </View>
       </TouchableOpacity>
 
