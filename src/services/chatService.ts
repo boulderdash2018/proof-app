@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -32,13 +33,14 @@ export interface ConversationParticipant {
 
 export interface Conversation {
   id: string;
-  participants: string[];                    // array of userIds
+  participants: string[];
   participantDetails: Record<string, ConversationParticipant>;
   lastMessage: string;
   lastMessageType: 'text' | 'plan';
   lastMessageSenderId: string;
-  lastMessageAt: string;                     // ISO string
-  unreadCount: Record<string, number>;       // { [userId]: count }
+  lastMessageAt: string;
+  unreadCount: Record<string, number>;
+  typing: Record<string, number>;          // { userId: timestamp }
   createdAt: string;
 }
 
@@ -52,13 +54,17 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   type: 'text' | 'plan';
-  content: string;                           // text content or empty for plan
-  planId?: string;                           // for plan shares
+  content: string;
+  planId?: string;
   planTitle?: string;
   planCover?: string;
   planAuthorName?: string;
   reactions: MessageReaction[];
   readBy: string[];
+  replyToId?: string;
+  replyToSenderId?: string;
+  replyToContent?: string;
+  replyToType?: 'text' | 'plan';
   createdAt: string;
 }
 
@@ -80,7 +86,6 @@ const toISO = (ts: any): string => {
 // Conversations
 // ═══════════════════════════════════════════════
 
-/** Find existing 1-on-1 conversation between two users */
 export const findConversation = async (
   userId1: string,
   userId2: string,
@@ -104,7 +109,6 @@ export const findConversation = async (
   return null;
 };
 
-/** Create a new conversation */
 export const createConversation = async (
   participants: ConversationParticipant[],
 ): Promise<string> => {
@@ -123,12 +127,12 @@ export const createConversation = async (
     lastMessageSenderId: '',
     lastMessageAt: serverTimestamp(),
     unreadCount,
+    typing: {},
     createdAt: serverTimestamp(),
   });
   return docRef.id;
 };
 
-/** Get or create a conversation between two users */
 export const getOrCreateConversation = async (
   me: ConversationParticipant,
   other: ConversationParticipant,
@@ -142,27 +146,35 @@ export const getOrCreateConversation = async (
 // Messages
 // ═══════════════════════════════════════════════
 
-/** Send a text message */
 export const sendTextMessage = async (
   conversationId: string,
   senderId: string,
   content: string,
+  replyTo?: { id: string; senderId: string; content: string; type: 'text' | 'plan' },
 ): Promise<string> => {
-  // Add message
+  const msgData: Record<string, any> = {
+    conversationId,
+    senderId,
+    type: 'text',
+    content,
+    reactions: [],
+    readBy: [senderId],
+    createdAt: serverTimestamp(),
+  };
+
+  if (replyTo) {
+    msgData.replyToId = replyTo.id;
+    msgData.replyToSenderId = replyTo.senderId;
+    msgData.replyToContent = replyTo.content;
+    msgData.replyToType = replyTo.type;
+  }
+
   const msgRef = await addDoc(
     collection(db, CONVERSATIONS, conversationId, MESSAGES),
-    {
-      conversationId,
-      senderId,
-      type: 'text',
-      content,
-      reactions: [],
-      readBy: [senderId],
-      createdAt: serverTimestamp(),
-    },
+    msgData,
   );
 
-  // Update conversation metadata
+  // Update conversation metadata + clear typing
   const convRef = doc(db, CONVERSATIONS, conversationId);
   const convSnap = await getDoc(convRef);
   if (convSnap.exists()) {
@@ -177,13 +189,13 @@ export const sendTextMessage = async (
       lastMessageSenderId: senderId,
       lastMessageAt: serverTimestamp(),
       unreadCount: newUnread,
+      [`typing.${senderId}`]: 0,
     });
   }
 
   return msgRef.id;
 };
 
-/** Send a plan share message */
 export const sendPlanMessage = async (
   conversationId: string,
   senderId: string,
@@ -220,13 +232,14 @@ export const sendPlanMessage = async (
       lastMessageSenderId: senderId,
       lastMessageAt: serverTimestamp(),
       unreadCount: newUnread,
+      [`typing.${senderId}`]: 0,
     });
   }
 
   return msgRef.id;
 };
 
-/** Toggle a reaction on a message */
+/** Toggle reaction — one per user per message. Same emoji = remove, different = replace */
 export const toggleReaction = async (
   conversationId: string,
   messageId: string,
@@ -238,13 +251,17 @@ export const toggleReaction = async (
   if (!snap.exists()) return;
 
   const data = snap.data();
-  const reactions: MessageReaction[] = data.reactions || [];
-  const existingIdx = reactions.findIndex(
-    (r) => r.userId === userId && r.emoji === emoji,
-  );
+  const reactions: MessageReaction[] = [...(data.reactions || [])];
+  const existingIdx = reactions.findIndex((r) => r.userId === userId);
 
   if (existingIdx >= 0) {
-    reactions.splice(existingIdx, 1);
+    if (reactions[existingIdx].emoji === emoji) {
+      // Same emoji — toggle off
+      reactions.splice(existingIdx, 1);
+    } else {
+      // Different emoji — replace
+      reactions[existingIdx] = { emoji, userId };
+    }
   } else {
     reactions.push({ emoji, userId });
   }
@@ -252,41 +269,56 @@ export const toggleReaction = async (
   await updateDoc(msgRef, { reactions });
 };
 
-/** Mark all messages in a conversation as read for a user */
+/** Mark all messages in a conversation as read */
 export const markConversationRead = async (
   conversationId: string,
   userId: string,
 ): Promise<void> => {
-  // Reset unread count for this user
+  // Reset unread count
   const convRef = doc(db, CONVERSATIONS, conversationId);
   const convSnap = await getDoc(convRef);
   if (convSnap.exists()) {
     const data = convSnap.data();
-    const newUnread = { ...data.unreadCount, [userId]: 0 };
-    await updateDoc(convRef, { unreadCount: newUnread });
+    if ((data.unreadCount?.[userId] || 0) > 0) {
+      await updateDoc(convRef, { [`unreadCount.${userId}`]: 0 });
+    }
   }
 
-  // Mark individual messages as read
-  const q = query(
-    collection(db, CONVERSATIONS, conversationId, MESSAGES),
-    where('readBy', 'not-in', [[userId]]),
-  );
+  // Fetch all messages, filter client-side, batch-update readBy
+  const q = query(collection(db, CONVERSATIONS, conversationId, MESSAGES));
   try {
     const snap = await getDocs(q);
     const batch = writeBatch(db);
+    let count = 0;
     snap.docs.forEach((d) => {
       const readBy: string[] = d.data().readBy || [];
       if (!readBy.includes(userId)) {
         batch.update(d.ref, { readBy: [...readBy, userId] });
+        count++;
       }
     });
-    await batch.commit();
-  } catch {
-    // not-in query may fail on empty — silently ignore
+    if (count > 0) await batch.commit();
+  } catch (err) {
+    console.warn('[chatService] markRead batch error:', err);
   }
 };
 
-/** Delete a conversation (for current user — soft delete) */
+/** Set typing status */
+export const setTypingStatus = async (
+  conversationId: string,
+  userId: string,
+  isTyping: boolean,
+): Promise<void> => {
+  try {
+    const convRef = doc(db, CONVERSATIONS, conversationId);
+    await updateDoc(convRef, {
+      [`typing.${userId}`]: isTyping ? Date.now() : 0,
+    });
+  } catch {
+    // Silently ignore typing errors
+  }
+};
+
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   await deleteDoc(doc(db, CONVERSATIONS, conversationId));
 };
@@ -295,7 +327,6 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
 // Real-time listeners
 // ═══════════════════════════════════════════════
 
-/** Subscribe to all conversations for a user */
 export const subscribeConversations = (
   userId: string,
   onData: (conversations: Conversation[]) => void,
@@ -308,13 +339,16 @@ export const subscribeConversations = (
   return onSnapshot(
     q,
     (snap) => {
-      const conversations: Conversation[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-        lastMessageAt: toISO(d.data().lastMessageAt),
-        createdAt: toISO(d.data().createdAt),
-      } as Conversation));
-      // Sort newest first
+      const conversations: Conversation[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          typing: data.typing || {},
+          lastMessageAt: toISO(data.lastMessageAt),
+          createdAt: toISO(data.createdAt),
+        } as Conversation;
+      });
       conversations.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
       onData(conversations);
     },
@@ -325,7 +359,6 @@ export const subscribeConversations = (
   );
 };
 
-/** Subscribe to messages in a conversation */
 export const subscribeMessages = (
   conversationId: string,
   onData: (messages: ChatMessage[]) => void,
@@ -342,7 +375,6 @@ export const subscribeMessages = (
         ...d.data(),
         createdAt: toISO(d.data().createdAt),
       } as ChatMessage));
-      // Sort oldest first for chat display
       messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       onData(messages);
     },
