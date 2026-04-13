@@ -273,10 +273,15 @@ export const ProfileScreen: React.FC = () => {
         <View style={[styles.profileTabBar, { borderBottomColor: C.borderLight }]}>
           {(['plans', 'drafts', 'badges'] as const).map((tab) => {
             const isActive = profileTab === tab;
-            const emojis: Record<string, string> = { plans: '🗺️', drafts: '📝', badges: '🏅' };
+            const iconMap: Record<string, { active: string; inactive: string }> = {
+              plans: { active: 'map', inactive: 'map-outline' },
+              drafts: { active: 'document-text', inactive: 'document-text-outline' },
+              badges: { active: 'ribbon', inactive: 'ribbon-outline' },
+            };
+            const icon = iconMap[tab];
             return (
               <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: C.primary }]} onPress={() => setProfileTab(tab)} activeOpacity={0.7}>
-                <Text style={[styles.profileTabEmoji, { opacity: isActive ? 1 : 0.45 }]}>{emojis[tab]}</Text>
+                <Ionicons name={(isActive ? icon.active : icon.inactive) as any} size={22} color={isActive ? C.primary : C.gray600} />
               </TouchableOpacity>
             );
           })}
@@ -442,7 +447,6 @@ const styles = StyleSheet.create({
   // Profile tabs
   profileTabBar: { flexDirection: 'row', borderBottomWidth: 1, marginTop: 4 },
   profileTabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
-  profileTabEmoji: { fontSize: 22 },
   emptyTab: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50, gap: 10 },
   emptyTabText: { fontSize: 14, fontFamily: Fonts.serif },
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
