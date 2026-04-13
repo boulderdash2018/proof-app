@@ -14,6 +14,7 @@ import {
   Alert,
   Animated,
   PanResponder,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -76,6 +77,9 @@ export const OrganizeScreen: React.FC = () => {
   const dragXMap = useRef<Record<string, Animated.Value>>({});
   const dragHandlersMap = useRef<Record<string, ReturnType<typeof PanResponder.create>>>({});
   const lastSwapDyRef = useRef(0);
+  const grantDyRef = useRef(0);
+  const grantDxRef = useRef(0);
+  const longPressActiveRef = useRef(false);
   const DRAG_SWAP_THRESHOLD = 58;
 
   const getDragY = (id: string): Animated.Value => {
@@ -87,21 +91,34 @@ export const OrganizeScreen: React.FC = () => {
     return dragXMap.current[id];
   };
 
+  const handleLongPressPlace = useCallback((placeId: string) => {
+    longPressActiveRef.current = true;
+    setDraggingId(placeId);
+    lastSwapDyRef.current = 0;
+    grantDyRef.current = 0;
+    grantDxRef.current = 0;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
   const getOrCreateDragHandlers = (placeId: string) => {
     if (dragHandlersMap.current[placeId]) return dragHandlersMap.current[placeId];
     const handler = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        setDraggingId(placeId);
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: () => longPressActiveRef.current,
+      onMoveShouldSetPanResponder: () => longPressActiveRef.current,
+      onPanResponderTerminationRequest: () => !longPressActiveRef.current,
+      onPanResponderGrant: (_, gs) => {
+        grantDyRef.current = gs.dy;
+        grantDxRef.current = gs.dx;
         lastSwapDyRef.current = 0;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       },
       onPanResponderMove: (_, gs) => {
-        getDragY(placeId).setValue(gs.dy - lastSwapDyRef.current);
-        getDragX(placeId).setValue(gs.dx * 0.4);
-        const offset = gs.dy - lastSwapDyRef.current;
+        if (!longPressActiveRef.current) return;
+        const relDy = gs.dy - grantDyRef.current;
+        const relDx = gs.dx - grantDxRef.current;
+        getDragY(placeId).setValue(relDy - lastSwapDyRef.current);
+        getDragX(placeId).setValue(relDx * 0.4);
+        const offset = relDy - lastSwapDyRef.current;
         const cur = placesRef.current;
         const idx = cur.findIndex((p) => p.id === placeId);
         if (offset > DRAG_SWAP_THRESHOLD && idx < cur.length - 1) {
@@ -109,7 +126,7 @@ export const OrganizeScreen: React.FC = () => {
           [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
           setPlaces(next);
           placesRef.current = next;
-          lastSwapDyRef.current = gs.dy;
+          lastSwapDyRef.current = relDy;
           getDragY(placeId).setValue(0);
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         } else if (offset < -DRAG_SWAP_THRESHOLD && idx > 0) {
@@ -117,12 +134,13 @@ export const OrganizeScreen: React.FC = () => {
           [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
           setPlaces(next);
           placesRef.current = next;
-          lastSwapDyRef.current = gs.dy;
+          lastSwapDyRef.current = relDy;
           getDragY(placeId).setValue(0);
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       },
       onPanResponderRelease: () => {
+        longPressActiveRef.current = false;
         Animated.parallel([
           Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
           Animated.spring(getDragX(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
@@ -130,6 +148,7 @@ export const OrganizeScreen: React.FC = () => {
         setDraggingId(null);
       },
       onPanResponderTerminate: () => {
+        longPressActiveRef.current = false;
         Animated.parallel([
           Animated.spring(getDragY(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
           Animated.spring(getDragX(placeId), { toValue: 0, useNativeDriver: true, friction: 8, tension: 100 }),
@@ -406,10 +425,9 @@ export const OrganizeScreen: React.FC = () => {
                     },
                     { zIndex: draggingId === place.id ? 100 : 1 },
                   ]}
+                  {...getOrCreateDragHandlers(place.id).panHandlers}
                 >
-                  <View {...getOrCreateDragHandlers(place.id).panHandlers} style={styles.dragHandle}>
-                    <View style={[styles.dragBar, { backgroundColor: draggingId === place.id ? C.primary : C.gray500 }]} />
-                  </View>
+                  <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={styles.placeCardInner}>
                   <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
                     <Text style={styles.placeNumberText}>{index + 1}</Text>
                   </View>
@@ -420,6 +438,7 @@ export const OrganizeScreen: React.FC = () => {
                   <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close-circle" size={20} color={C.gray500} />
                   </TouchableOpacity>
+                  </Pressable>
                 </Animated.View>
               ))}
             </View>
@@ -637,8 +656,7 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 14, fontFamily: Fonts.serifBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
-  dragHandle: { paddingHorizontal: 8, justifyContent: 'center' as const, alignItems: 'center' as const, alignSelf: 'stretch' as const },
-  dragBar: { width: 5, height: '100%' as any, borderRadius: 3 },
+  placeCardInner: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, flex: 1 },
   addPlaceBtn: {
     flexDirection: 'row',
     alignItems: 'center',
