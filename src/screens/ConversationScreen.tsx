@@ -742,9 +742,9 @@ export const ConversationScreen: React.FC = () => {
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             extraData={messages.length}
-            initialNumToRender={50}
-            maxToRenderPerBatch={50}
-            windowSize={51}
+            initialNumToRender={9999}
+            maxToRenderPerBatch={9999}
+            removeClippedSubviews={false}
             contentContainerStyle={[styles.messagesList, { paddingBottom: 10 }]}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
