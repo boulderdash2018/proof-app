@@ -139,6 +139,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     set({ activeConversationId: conversationId, messages: [], isMessagesLoading: true, _msgsUnsub: null });
 
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
+
     const setupListener = () => {
       const unsub = subscribeMessages(
         conversationId,
@@ -146,17 +149,24 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           // Only update if this is still the active conversation
           if (get().activeConversationId === conversationId) {
             set({ messages, isMessagesLoading: false });
+            retryCount = 0; // reset on successful data
           }
         },
         (err) => {
-          console.warn('[chatStore] messages listener error, reconnecting…', err);
-          // Auto-reconnect after 2s on error
+          console.warn('[chatStore] messages listener error:', err);
+          if (retryCount >= MAX_RETRIES) {
+            console.warn('[chatStore] max retries reached, giving up listener for', conversationId);
+            return;
+          }
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 16000);
+          retryCount++;
           setTimeout(() => {
             if (get().activeConversationId === conversationId) {
               get()._msgsUnsub?.();
               setupListener();
             }
-          }, 2000);
+          }, delay);
         },
       );
       set({ _msgsUnsub: unsub });
@@ -197,11 +207,33 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     await sendPlanMessage(activeConversationId, _userId, plan);
   },
 
-  // ── Toggle reaction (one per user per message) ──
+  // ── Toggle reaction (optimistic — apply locally, write to Firestore in background) ──
   toggleReaction: (messageId: string, emoji: string) => {
-    const { activeConversationId, _userId } = get();
+    const { activeConversationId, _userId, messages } = get();
     if (!activeConversationId || !_userId) return;
-    toggleReactionService(activeConversationId, messageId, _userId, emoji).catch(() => {});
+
+    // Optimistic local update — avoids waiting for Firestore round-trip
+    const updatedMessages = messages.map((msg) => {
+      if (msg.id !== messageId) return msg;
+      const reactions = [...(msg.reactions || [])];
+      const existingIdx = reactions.findIndex((r) => r.userId === _userId);
+      if (existingIdx >= 0) {
+        if (reactions[existingIdx].emoji === emoji) {
+          reactions.splice(existingIdx, 1); // toggle off
+        } else {
+          reactions[existingIdx] = { emoji, userId: _userId }; // replace
+        }
+      } else {
+        reactions.push({ emoji, userId: _userId });
+      }
+      return { ...msg, reactions };
+    });
+    set({ messages: updatedMessages });
+
+    // Write to Firestore in background — onSnapshot will reconcile if needed
+    toggleReactionService(activeConversationId, messageId, _userId, emoji).catch((err) => {
+      console.warn('[chatStore] toggleReaction write error:', err);
+    });
   },
 
   // ── Typing indicator ──

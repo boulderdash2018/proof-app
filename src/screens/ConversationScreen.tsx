@@ -574,10 +574,15 @@ export const ConversationScreen: React.FC = () => {
     return () => { if (convIdRef.current === conversationId) closeConversation(); };
   }, [conversationId, user?.id]);
 
-  // ── Reset unread on new messages ──
+  // ── Reset unread — debounced so it fires at most once per second ──
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!user?.id || messages.length === 0) return;
-    resetUnreadCount(conversationId, user.id);
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
+      resetUnreadCount(conversationId, user.id);
+    }, 1000);
+    return () => { if (resetTimerRef.current) clearTimeout(resetTimerRef.current); };
   }, [messages.length, conversationId, user?.id]);
 
   // ── Auto-scroll ──
