@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Animated, Text } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Image, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Plan } from '../types';
 import { useSocialProofStore, MinimalUser } from '../store';
-import { Avatar } from './Avatar';
+import { MiniStampIcon } from './MiniStampIcon';
 
 type InteractionType = 'proof' | 'save' | 'like';
 
@@ -18,26 +18,19 @@ interface FloatingAvatarsProps {
 }
 
 const MAX_SLOTS = 3;
-const AVATAR_SIZE = 32;
-
-// Triangle positions — bottom-right to top-left diagonal (like Instagram Reels)
-// Index 0 = bottom-right (highest priority), 1 = middle, 2 = top-left
-const POSITIONS = [
-  { bottom: 0, right: 0 },
-  { bottom: 22, right: 20 },
-  { bottom: 44, right: 40 },
-];
+const AVATAR_SIZE = 34;
+const BORDER_W = 2.5;
+const AVATAR_OUTER = AVATAR_SIZE + BORDER_W * 2; // 39px total
+const OVERLAP = 10;
+const BADGE_SIZE = 14;
 
 export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfilePress }) => {
   const followingIds = useSocialProofStore((s) => s.followingIds);
-  const getUser = useSocialProofStore((s) => s.getUser);
+  // Subscribe to userCache OBJECT — re-renders when profiles arrive
+  const userCache = useSocialProofStore((s) => s.userCache);
   const ensureUsers = useSocialProofStore((s) => s.ensureUsers);
-  const loaded = useSocialProofStore((s) => s.loaded);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-
-  // Gather all interacting user IDs and ensure their profiles are cached
+  // Collect all user IDs who interacted with this plan
   const allIds = [
     ...(plan.recreatedByIds || []),
     ...(plan.savedByIds || []),
@@ -45,17 +38,13 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
   ];
   const uniqueIds = [...new Set(allIds)];
 
+  // Ensure profiles are fetched and cached
   useEffect(() => {
-    if (uniqueIds.length > 0) {
-      ensureUsers(uniqueIds);
-    }
+    if (uniqueIds.length > 0) ensureUsers(uniqueIds);
   }, [uniqueIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!loaded) return null;
-
+  // Sort: friends first, then others
   const followingSet = new Set(followingIds);
-
-  // Sort IDs: friends first, then others
   const sortByFriends = (ids: string[]) => {
     const friends = ids.filter((id) => followingSet.has(id));
     const others = ids.filter((id) => !followingSet.has(id));
@@ -66,7 +55,7 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
   const saveIds = sortByFriends(plan.savedByIds || []);
   const likeIds = sortByFriends(plan.likedByIds || []);
 
-  // Build slots following strict priority: proof > save > like
+  // Fill slots: proof > save > like priority, max 3
   const slots: AvatarSlot[] = [];
   const usedIds = new Set<string>();
 
@@ -74,7 +63,7 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
     for (const id of ids) {
       if (slots.length >= MAX_SLOTS) break;
       if (usedIds.has(id)) continue;
-      const user = getUser(id);
+      const user = userCache[id]; // Direct cache access — reactive
       if (!user) continue;
       slots.push({ user, type });
       usedIds.add(id);
@@ -85,99 +74,123 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
   fillSlots(saveIds, 'save');
   fillSlots(likeIds, 'like');
 
-  // Animate in
-  useEffect(() => {
-    if (slots.length > 0) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [slots.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
-
   if (slots.length === 0) return null;
 
+  // Container height: first avatar full + remaining avatars minus overlap
+  const containerHeight = AVATAR_OUTER + (slots.length - 1) * (AVATAR_OUTER - OVERLAP);
+
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-      {/* Render in reverse so index 0 (highest priority) is on top (highest zIndex) */}
+    <View style={[styles.container, { height: containerHeight }]}>
+      {/* Render lowest priority first → highest priority last = on top in z-order */}
       {[...slots].reverse().map((slot, reverseIdx) => {
-        const i = slots.length - 1 - reverseIdx;
-        const pos = POSITIONS[i];
+        const i = slots.length - 1 - reverseIdx; // original index
+        const bottomOffset = i * (AVATAR_OUTER - OVERLAP);
+
         return (
           <TouchableOpacity
             key={slot.user.id}
-            style={[styles.avatarWrap, { bottom: pos.bottom, right: pos.right, zIndex: MAX_SLOTS - i }]}
+            style={[styles.slotWrap, { bottom: bottomOffset, zIndex: i + 1 }]}
             activeOpacity={0.8}
             onPress={() => onProfilePress?.(slot.user.id)}
           >
-            <View style={styles.avatarOuter}>
-              <Avatar
-                initials={slot.user.initials}
-                bg={slot.user.avatarBg}
-                color={slot.user.avatarColor}
-                size="S"
-                avatarUrl={slot.user.avatarUrl ?? undefined}
-                borderColor="#FFF"
-              />
+            {/* Avatar photo */}
+            <View style={styles.avatarShadow}>
+              <View style={[styles.avatarCircle, { backgroundColor: slot.user.avatarBg }]}>
+                {slot.user.avatarUrl ? (
+                  <Image source={{ uri: slot.user.avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={[styles.initials, { color: slot.user.avatarColor }]}>
+                    {slot.user.initials}
+                  </Text>
+                )}
+              </View>
             </View>
+
             {/* Interaction badge */}
-            <View style={[
-              styles.badge,
-              slot.type === 'proof'
-                ? { backgroundColor: '#C8571A' }
-                : { backgroundColor: '#1A1410' },
-            ]}>
-              {slot.type === 'proof' ? (
-                <Text style={styles.badgeCheck}>✓</Text>
-              ) : slot.type === 'save' ? (
-                <Ionicons name="bookmark" size={8} color="#FFF" />
-              ) : (
-                <Ionicons name="heart" size={8} color="#FFF" />
-              )}
-            </View>
+            {slot.type === 'proof' ? (
+              <View style={styles.proofBadge}>
+                <MiniStampIcon type="proof" size={12} />
+              </View>
+            ) : (
+              <View style={styles.badge}>
+                <Ionicons
+                  name={slot.type === 'save' ? 'bookmark' : 'heart'}
+                  size={8}
+                  color="#FFF"
+                />
+              </View>
+            )}
           </TouchableOpacity>
         );
       })}
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 10,
+    bottom: 12,
     right: 12,
-    width: AVATAR_SIZE + 44,
-    height: AVATAR_SIZE + 48,
+    width: AVATAR_OUTER + 4, // slight extra for badge overhang
     zIndex: 10,
   },
-  avatarWrap: {
+  slotWrap: {
     position: 'absolute',
+    right: 0,
   },
-  avatarOuter: {
+  avatarShadow: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     elevation: 6,
   },
-  badge: {
+  avatarCircle: {
+    width: AVATAR_OUTER,
+    height: AVATAR_OUTER,
+    borderRadius: AVATAR_OUTER / 2,
+    borderWidth: BORDER_W,
+    borderColor: '#FFF',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImage: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+  },
+  initials: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  proofBadge: {
     position: 'absolute',
     bottom: -1,
     right: -1,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#1C1917',
     borderWidth: 1.5,
     borderColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
   },
-  badgeCheck: {
-    color: '#FFF',
-    fontSize: 8,
-    fontWeight: '800',
-    lineHeight: 10,
+  badge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
+    backgroundColor: '#1A1410',
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
   },
 });

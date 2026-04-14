@@ -173,8 +173,13 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       if (plan) analytics.planLiked(planId, plan.title, plan.authorId);
     }
 
-    const updateLikes = (p: Plan) =>
-      p.id === planId ? { ...p, likesCount: p.likesCount + (isLiked ? -1 : 1) } : p;
+    const updateLikes = (p: Plan) => {
+      if (p.id !== planId) return p;
+      const newLikedByIds = isLiked
+        ? (p.likedByIds || []).filter((id) => id !== uid)
+        : [...(p.likedByIds || []), uid];
+      return { ...p, likesCount: p.likesCount + (isLiked ? -1 : 1), likedByIds: newLikedByIds };
+    };
 
     set({
       likedPlanIds: newLiked,
@@ -195,6 +200,8 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const plan = plans.find((p) => p.id === planId) || friendsPlans.find((p) => p.id === planId);
     const savesStore = useSavesStore.getState();
 
+    let isSaving = false;
+
     if (newSaved.has(planId)) {
       // Block unsave if user already submitted a proof for this plan
       const savedEntry = savesStore.savedPlans.find((sp) => sp.planId === planId);
@@ -206,6 +213,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       // Persist to Firestore
       unsavePlanFS(uid, planId).catch(console.error);
     } else {
+      isSaving = true;
       newSaved.add(planId);
       if (plan) {
         analytics.planSaved(planId, plan.title);
@@ -218,6 +226,21 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       }
     }
 
-    set({ savedPlanIds: newSaved });
+    // Update savedByIds optimistically so FloatingAvatars react immediately
+    const updateSavedBy = (p: Plan) => {
+      if (p.id !== planId) return p;
+      return {
+        ...p,
+        savedByIds: isSaving
+          ? [...(p.savedByIds || []), uid]
+          : (p.savedByIds || []).filter((id) => id !== uid),
+      };
+    };
+
+    set({
+      savedPlanIds: newSaved,
+      plans: plans.map(updateSavedBy),
+      friendsPlans: friendsPlans.map(updateSavedBy),
+    });
   },
 }));
