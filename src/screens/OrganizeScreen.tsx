@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
@@ -26,6 +26,7 @@ import { useCity } from '../hooks/useCity';
 import { useAuthStore } from '../store/authStore';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { useSavedPlacesStore } from '../store/savedPlacesStore';
+import { useDraftStore, DraftItem } from '../store/draftStore';
 import { CategoryTag, Place, Plan, DoItNowTransport } from '../types';
 import { TransportChooser } from '../components/TransportChooser';
 import {
@@ -61,6 +62,10 @@ export const OrganizeScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTransport, setShowTransport] = useState(false);
   const [tempPlan, setTempPlan] = useState<Plan | null>(null);
+
+  // Pickup draft
+  const [pickupDraft, setPickupDraft] = useState<DraftItem | null>(null);
+  const pickupSheetSlide = useRef(new Animated.Value(300)).current;
 
   // Place picker
   const [showPlacePicker, setShowPlacePicker] = useState(false);
@@ -158,6 +163,52 @@ export const OrganizeScreen: React.FC = () => {
     });
     dragHandlersMap.current[placeId] = handler;
     return handler;
+  };
+
+  // ── Show "Pick up where you left off?" when screen opens with empty form ──
+  useFocusEffect(
+    useCallback(() => {
+      // Don't show if form already has content
+      if (title.length > 0 || places.length > 0 || selectedTags.length > 0) return;
+
+      const { drafts, dismissedPickupIds } = useDraftStore.getState();
+      const allDrafts = drafts
+        .filter((d) => !d.id.startsWith('edit-') && !d.id.endsWith('-fresh'))
+        .filter((d) => d.title.length > 0 || d.places.length > 0)
+        .filter((d) => !dismissedPickupIds.includes(d.id))
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+
+      if (allDrafts.length === 0) return;
+
+      const latest = allDrafts[0];
+      setPickupDraft(latest);
+      pickupSheetSlide.setValue(300);
+      Animated.spring(pickupSheetSlide, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }).start();
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const handlePickupResume = () => {
+    if (!pickupDraft) return;
+    useDraftStore.getState().dismissPickup(pickupDraft.id);
+    Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
+    // Load draft data into OrganizeScreen form
+    setTitle(pickupDraft.title);
+    setSelectedTags(pickupDraft.selectedTags as CategoryTag[]);
+    const loadedPlaces: PlaceEntry[] = pickupDraft.places.map((p) => ({
+      id: p.id,
+      googlePlaceId: p.googlePlaceId || p.id,
+      name: p.name,
+      type: p.type,
+      address: p.address || '',
+    }));
+    setPlaces(loadedPlaces);
+  };
+
+  const handlePickupNew = () => {
+    if (pickupDraft) {
+      useDraftStore.getState().dismissPickup(pickupDraft.id);
+    }
+    Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
   };
 
   // ── Handlers ──
@@ -572,6 +623,27 @@ export const OrganizeScreen: React.FC = () => {
             />
           </View>
         </Modal>
+
+        {/* ── Pick up draft bottom sheet (non-blocking) ── */}
+        {pickupDraft && (
+          <Animated.View style={[styles.pickupSheet, { backgroundColor: C.white, transform: [{ translateY: pickupSheetSlide }] }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: C.gray400 }]} />
+            <Text style={[styles.pickupTitle, { color: C.black }]}>Pick up where you left off?</Text>
+            <Text style={[styles.pickupSubtitle, { color: C.gray600 }]}>
+              {pickupDraft.title
+                ? pickupDraft.title
+                : `Untitled plan · ${pickupDraft.places.length} place${pickupDraft.places.length !== 1 ? 's' : ''} added`}
+            </Text>
+            <View style={styles.sheetButtons}>
+              <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: C.gray500 }]} onPress={handlePickupNew} activeOpacity={0.7}>
+                <Text style={[styles.sheetBtnOutlineText, { color: C.gray700 }]}>New plan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={handlePickupResume} activeOpacity={0.7}>
+                <Text style={styles.sheetBtnFillText}>Resume draft</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -726,4 +798,20 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingTop: 40, gap: 12 },
   emptyText: { fontSize: 14, fontFamily: Fonts.serif, textAlign: 'center' },
   savedSectionLabel: { fontSize: 12, fontFamily: Fonts.serifBold, letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+
+  // Pickup draft sheet (non-blocking — no overlay)
+  pickupSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 900,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 20, paddingBottom: 34,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 12,
+  },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 16 },
+  pickupTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.serifBold, marginBottom: 4 },
+  pickupSubtitle: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 14 },
+  sheetButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  sheetBtnOutline: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
+  sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  sheetBtnFill: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
 });
