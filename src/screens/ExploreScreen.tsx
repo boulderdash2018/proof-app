@@ -22,7 +22,9 @@ import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuthStore, useTrendingStore } from '../store';
+import { useGuestStore } from '../store/guestStore';
 import { fetchPublicPlansByTags, fetchPublicPlansNearby } from '../services/plansService';
+import { FriendsMapView } from './FriendsMapView';
 import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
@@ -56,6 +58,8 @@ export const ExploreScreen: React.FC = () => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
   const trendingCategories = useTrendingStore((s) => s.categories);
   const trendingLoading = useTrendingStore((s) => s.isLoading);
   const fetchTrending = useTrendingStore((s) => s.fetchTrending);
@@ -75,6 +79,7 @@ export const ExploreScreen: React.FC = () => {
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [contentMode, setContentMode] = useState<'tous' | 'plans' | 'lieux'>('tous');
+  const [showMap, setShowMap] = useState(false);
 
   // Advanced filters (null = off, number = active threshold)
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -249,6 +254,14 @@ export const ExploreScreen: React.FC = () => {
     setMinLikes(null);
     setMinProofs(null);
     setContentMode('tous');
+  };
+
+  const handleMapOpen = () => {
+    if (!isAuthenticated) {
+      setShowAccountPrompt(true);
+      return;
+    }
+    setShowMap(true);
   };
 
   const formatDuration = (mins: number): string =>
@@ -523,14 +536,23 @@ export const ExploreScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       <View style={styles.headerRow}>
         <Text style={[styles.pageTitle, { color: C.black }]}>{t.explore_title}</Text>
-        <TouchableOpacity
-          style={[styles.filterBtn, hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: C.gray200 }]}
-          onPress={() => setShowFiltersModal(true)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="options-outline" size={18} color={hasAdvancedFilters ? '#FFF' : C.gray700} />
-          {hasAdvancedFilters && <View style={styles.filterBtnDot} />}
-        </TouchableOpacity>
+        <View style={styles.headerBtns}>
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: C.gray200 }]}
+            onPress={handleMapOpen}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="map-outline" size={17} color={C.gray700} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: C.gray200 }]}
+            onPress={() => setShowFiltersModal(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="options-outline" size={18} color={hasAdvancedFilters ? '#FFF' : C.gray700} />
+            {hasAdvancedFilters && <View style={styles.filterBtnDot} />}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search bar — tapping opens dedicated SearchScreen */}
@@ -715,6 +737,9 @@ export const ExploreScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Friends Map overlay */}
+      <FriendsMapView visible={showMap} onClose={() => setShowMap(false)} />
     </View>
   );
 };
@@ -722,6 +747,7 @@ export const ExploreScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
+  headerBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
   filterBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   filterBtnDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold },

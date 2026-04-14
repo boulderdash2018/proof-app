@@ -502,6 +502,54 @@ export const searchPublicPlans = async (queryStr: string, city?: string): Promis
   }
 };
 
+// ==================== FRIENDS MAP ====================
+
+/** Fetch plans authored by or proof'd by given user IDs, filtered by city.
+ *  Batches queries to respect Firestore's 10-item limit for 'in' / 'array-contains-any'. */
+export const fetchFriendsMapPlans = async (friendIds: string[], city: string): Promise<Plan[]> => {
+  if (friendIds.length === 0) return [];
+  try {
+    const allPlans = new Map<string, Plan>();
+    const batches: string[][] = [];
+    for (let i = 0; i < friendIds.length; i += 10) {
+      batches.push(friendIds.slice(i, i + 10));
+    }
+
+    // 1. Plans authored by friends
+    for (const batch of batches) {
+      const q = query(collection(db, PLANS), where('authorId', 'in', batch));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        if (allPlans.has(d.id)) continue;
+        const data = d.data() as Plan;
+        const plan = { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
+        if (!(plan as any).archived && planMatchesCity(plan, city)) {
+          allPlans.set(d.id, plan);
+        }
+      }
+    }
+
+    // 2. Plans proof'd by friends (recreatedByIds)
+    for (const batch of batches) {
+      const q = query(collection(db, PLANS), where('recreatedByIds', 'array-contains-any', batch));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        if (allPlans.has(d.id)) continue;
+        const data = d.data() as Plan;
+        const plan = { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
+        if (!(plan as any).archived && planMatchesCity(plan, city)) {
+          allPlans.set(d.id, plan);
+        }
+      }
+    }
+
+    return Array.from(allPlans.values());
+  } catch (err) {
+    console.error('[plansService] fetchFriendsMapPlans error:', err);
+    return [];
+  }
+};
+
 // ==================== COMMENTS ====================
 
 const COMMENTS = 'comments';
