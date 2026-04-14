@@ -1793,7 +1793,7 @@ export const CreateScreen: React.FC = () => {
           {/* Row 1: Par personne */}
           <Text style={[styles.filterRowLabel, { color: C.gray500 }]}>Par personne</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
-            {PERSON_FILTERS.map((p) => {
+            {PERSON_FILTERS.filter(p => p.key !== 'around-you').map((p) => {
               const isSelected = selectedTags.includes(p.label);
               return (
                 <TouchableOpacity
@@ -1811,7 +1811,7 @@ export const CreateScreen: React.FC = () => {
           {/* Row 2: Par thème + Voir + */}
           <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 8 }]}>Par thème</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
-            {EXPLORE_GROUPS.filter(g => g.key !== 'trending').map((group) => {
+            {EXPLORE_GROUPS.filter(g => g.key !== 'trending' && g.key !== 'nearby').map((group) => {
               const isActive = showSubcategories
                 ? selectedGroup === group.key
                 : selectedTags.includes(group.label);
