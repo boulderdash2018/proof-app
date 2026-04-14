@@ -28,6 +28,8 @@ interface DraftTravel {
   transport: string;
 }
 
+export type DraftType = 'publish' | 'organize';
+
 export interface DraftItem {
   id: string;
   title: string;
@@ -36,6 +38,7 @@ export interface DraftItem {
   places: DraftPlace[];
   travels: DraftTravel[];
   updatedAt: number;
+  type?: DraftType;
 }
 
 interface DraftStore {

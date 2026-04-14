@@ -99,6 +99,7 @@ export const ProfileScreen: React.FC = () => {
 
   // Profile tabs
   const [profileTab, setProfileTab] = useState<'plans' | 'drafts' | 'badges'>('plans');
+  const [draftCategory, setDraftCategory] = useState<'publish' | 'organize' | null>(null);
 
   // Compute real stats from fetched plans
   const realPlanCount = userPlans.length;
@@ -280,7 +281,7 @@ export const ProfileScreen: React.FC = () => {
             };
             const icon = iconMap[tab];
             return (
-              <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: C.primary }]} onPress={() => setProfileTab(tab)} activeOpacity={0.7}>
+              <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: C.primary }]} onPress={() => { setProfileTab(tab); if (tab !== 'drafts') setDraftCategory(null); }} activeOpacity={0.7}>
                 <Ionicons name={(isActive ? icon.active : icon.inactive) as any} size={22} color={isActive ? C.primary : C.gray600} />
               </TouchableOpacity>
             );
@@ -337,80 +338,148 @@ export const ProfileScreen: React.FC = () => {
 
         {profileTab === 'drafts' && (
           <>
-            {drafts.length > 0 ? (
-              <View style={styles.section}>
-                <View style={styles.plansGrid}>
-                  {[...drafts].sort((a, b) => b.updatedAt - a.updatedAt).map((d) => {
-                    // Resolve photo: explicit cover first, then first place's custom photo
-                    const draftPhoto = d.coverPhotos?.[0]
-                      || d.places?.find((p) => p.customPhoto)?.customPhoto
-                      || null;
-                    const hasPhoto = !!draftPhoto;
-                    const timeAgo = (() => {
-                      const mins = Math.floor((Date.now() - d.updatedAt) / 60000);
-                      if (mins < 1) return 'just now';
-                      if (mins < 60) return `${mins}min ago`;
-                      const hrs = Math.floor(mins / 60);
-                      if (hrs < 24) return `${hrs}h ago`;
-                      return `${Math.floor(hrs / 24)}d ago`;
-                    })();
-                    return (
-                      <TouchableOpacity
-                        key={d.id}
-                        activeOpacity={0.85}
-                        onPress={() => navigation.navigate('CreateTab', { screen: 'Create', params: { draftId: d.id } })}
-                      >
-                        <View style={styles.miniCard}>
-                          {hasPhoto ? (
-                            <Image source={{ uri: draftPhoto! }} style={styles.miniCardImage} />
-                          ) : (
-                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
-                          )}
-                          <LinearGradient
-                            colors={hasPhoto ? ['transparent', 'rgba(0,0,0,0.6)'] : ['transparent', 'rgba(0,0,0,0.25)']}
-                            style={styles.miniCardOverlay}
-                          />
-                          <Text
-                            style={[styles.miniCardTitle, !hasPhoto && styles.draftCardTitleNoPhoto]}
-                            numberOfLines={1}
-                          >
-                            {d.title || 'Untitled plan'}
-                          </Text>
-                          <Text style={[styles.draftMeta, !hasPhoto && { color: C.gray600 }]}>
-                            {d.places.length} {d.places.length === 1 ? 'place' : 'places'} · {timeAgo}
-                          </Text>
-                          {/* Draft badge */}
-                          <View style={styles.draftBadge}>
-                            <Text style={styles.draftBadgeText}>Draft</Text>
-                          </View>
-                          <TouchableOpacity
-                            style={styles.draftDeleteBtn}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            onPress={(e) => {
-                              e.stopPropagation?.();
-                              if (Platform.OS === 'web') {
-                                if (window.confirm('Delete draft?')) deleteDraft(d.id);
-                              } else {
-                                Alert.alert('Delete draft?', '', [
-                                  { text: 'Cancel', style: 'cancel' },
-                                  { text: 'Delete', style: 'destructive', onPress: () => deleteDraft(d.id) },
-                                ]);
-                              }
-                            }}
-                          >
-                            <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.5)" />
-                          </TouchableOpacity>
+            {draftCategory === null ? (
+              /* ── Category picker ── */
+              (() => {
+                const publishDrafts = drafts.filter((d) => d.type !== 'organize' && !d.id.startsWith('edit-') && !d.id.endsWith('-fresh'));
+                const organizeDrafts = drafts.filter((d) => d.type === 'organize');
+                const publishPhoto = publishDrafts.sort((a, b) => b.updatedAt - a.updatedAt).find((d) => d.coverPhotos?.[0] || d.places?.find((p) => p.customPhoto))?.coverPhotos?.[0] || null;
+                const organizePhoto = organizeDrafts.sort((a, b) => b.updatedAt - a.updatedAt).find((d) => d.coverPhotos?.[0] || d.places?.find((p) => p.customPhoto))?.coverPhotos?.[0] || null;
+                return drafts.filter((d) => !d.id.startsWith('edit-') && !d.id.endsWith('-fresh')).length > 0 ? (
+                  <View style={styles.draftCategoryRow}>
+                    {/* Publier un plan */}
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => setDraftCategory('publish')}>
+                      <View style={styles.instaCell}>
+                        {publishPhoto ? (
+                          <Image source={{ uri: publishPhoto }} style={styles.instaCellImage} />
+                        ) : (
+                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
+                        )}
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <View style={styles.instaCellBottom}>
+                          <Ionicons name="create-outline" size={16} color="#FFF" />
+                          <Text style={styles.instaCellTitle}>Publier un plan</Text>
+                          <Text style={styles.draftCategoryCount}>{publishDrafts.length} brouillon{publishDrafts.length !== 1 ? 's' : ''}</Text>
                         </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
+                      </View>
+                    </TouchableOpacity>
+                    {/* Organiser une journée */}
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => setDraftCategory('organize')}>
+                      <View style={styles.instaCell}>
+                        {organizePhoto ? (
+                          <Image source={{ uri: organizePhoto }} style={styles.instaCellImage} />
+                        ) : (
+                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
+                        )}
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <View style={styles.instaCellBottom}>
+                          <Ionicons name="calendar-outline" size={16} color="#FFF" />
+                          <Text style={styles.instaCellTitle}>Organiser une journée</Text>
+                          <Text style={styles.draftCategoryCount}>{organizeDrafts.length} brouillon{organizeDrafts.length !== 1 ? 's' : ''}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.emptyTab}>
+                    <Ionicons name="document-text-outline" size={36} color={C.gray500} />
+                    <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun brouillon</Text>
+                  </View>
+                );
+              })()
             ) : (
-              <View style={styles.emptyTab}>
-                <Ionicons name="document-text-outline" size={36} color={C.gray500} />
-                <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun brouillon</Text>
-              </View>
+              /* ── Filtered drafts grid (same style as published plans) ── */
+              (() => {
+                const filtered = [...drafts]
+                  .filter((d) => !d.id.startsWith('edit-') && !d.id.endsWith('-fresh'))
+                  .filter((d) => draftCategory === 'organize' ? d.type === 'organize' : d.type !== 'organize')
+                  .sort((a, b) => b.updatedAt - a.updatedAt);
+                return (
+                  <>
+                    {/* Back row */}
+                    <TouchableOpacity style={styles.draftBackRow} onPress={() => setDraftCategory(null)} activeOpacity={0.7}>
+                      <Ionicons name="chevron-back" size={18} color={C.primary} />
+                      <Text style={[styles.draftBackText, { color: C.primary }]}>
+                        {draftCategory === 'organize' ? 'Organiser une journée' : 'Publier un plan'}
+                      </Text>
+                    </TouchableOpacity>
+                    {filtered.length > 0 ? (
+                      <View style={styles.instaGrid}>
+                        {filtered.map((d) => {
+                          const draftPhoto = d.coverPhotos?.[0]
+                            || d.places?.find((p) => p.customPhoto)?.customPhoto
+                            || null;
+                          const hasPhoto = !!draftPhoto;
+                          const timeAgo = (() => {
+                            const mins = Math.floor((Date.now() - d.updatedAt) / 60000);
+                            if (mins < 1) return 'now';
+                            if (mins < 60) return `${mins}min`;
+                            const hrs = Math.floor(mins / 60);
+                            if (hrs < 24) return `${hrs}h`;
+                            return `${Math.floor(hrs / 24)}d`;
+                          })();
+                          return (
+                            <TouchableOpacity
+                              key={d.id}
+                              activeOpacity={0.85}
+                              onPress={() => {
+                                if (draftCategory === 'organize') {
+                                  navigation.navigate('CreateTab', { screen: 'Organize', params: { draftId: d.id } });
+                                } else {
+                                  navigation.navigate('CreateTab', { screen: 'Create', params: { draftId: d.id } });
+                                }
+                              }}
+                            >
+                              <View style={styles.instaCell}>
+                                {hasPhoto ? (
+                                  <Image source={{ uri: draftPhoto! }} style={styles.instaCellImage} />
+                                ) : (
+                                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
+                                )}
+                                <LinearGradient
+                                  colors={hasPhoto ? ['transparent', 'rgba(0,0,0,0.65)'] : ['transparent', 'rgba(0,0,0,0.25)']}
+                                  style={styles.instaCellOverlay}
+                                />
+                                {/* Draft badge */}
+                                <View style={styles.draftBadge}>
+                                  <Text style={styles.draftBadgeText}>{timeAgo}</Text>
+                                </View>
+                                {/* Delete icon */}
+                                <TouchableOpacity
+                                  style={styles.draftDeleteBtn}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  onPress={(e) => {
+                                    e.stopPropagation?.();
+                                    if (Platform.OS === 'web') {
+                                      if (window.confirm('Delete draft?')) deleteDraft(d.id);
+                                    } else {
+                                      Alert.alert('Delete draft?', '', [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        { text: 'Delete', style: 'destructive', onPress: () => deleteDraft(d.id) },
+                                      ]);
+                                    }
+                                  }}
+                                >
+                                  <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.5)" />
+                                </TouchableOpacity>
+                                <View style={styles.instaCellBottom}>
+                                  <Text style={[styles.instaCellTitle, !hasPhoto && { color: Colors.gray700 }]} numberOfLines={2}>{d.title || 'Untitled plan'}</Text>
+                                  <Text style={styles.draftCellMeta}>{d.places.length} {d.places.length === 1 ? 'place' : 'places'}</Text>
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.emptyTab}>
+                        <Ionicons name="document-text-outline" size={36} color={C.gray500} />
+                        <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun brouillon</Text>
+                      </View>
+                    )}
+                  </>
+                );
+              })()
             )}
           </>
         )}
@@ -466,11 +535,14 @@ const styles = StyleSheet.create({
   doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
   doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   // Drafts
-  draftCardTitleNoPhoto: { color: Colors.gray700, fontStyle: 'italic', textShadowColor: 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 0 },
-  draftMeta: { fontSize: 9, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
-  draftBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  draftBadgeText: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.3 },
-  draftDeleteBtn: { position: 'absolute', top: 4, right: 4 },
+  draftCategoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  draftCategoryCount: { fontSize: 10, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  draftBackRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Layout.screenPadding, paddingVertical: 10 },
+  draftBackText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  draftBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, zIndex: 2 },
+  draftBadgeText: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.85)', letterSpacing: 0.3 },
+  draftDeleteBtn: { position: 'absolute', top: 4, right: 4, zIndex: 3 },
+  draftCellMeta: { fontSize: 10, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
   // Instagram-style grid
   instaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
   instaCell: { width: GRID_CELL, height: GRID_CELL, overflow: 'hidden' },

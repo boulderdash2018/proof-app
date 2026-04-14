@@ -22,7 +22,7 @@ export type ExploreStackParamList = {
 
 export type CreateStackParamList = {
   Create: { draftId?: string; editPlanId?: string; resumeDraft?: boolean } | undefined;
-  Organize: undefined;
+  Organize: { draftId?: string } | undefined;
 };
 
 export type SavesStackParamList = {

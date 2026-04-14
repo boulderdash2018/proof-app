@@ -17,7 +17,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
@@ -47,6 +47,7 @@ interface PlaceEntry {
 export const OrganizeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const C = useColors();
   const cityConfig = useCity();
   const CITY_CENTER = cityConfig.coordinates;
@@ -62,6 +63,9 @@ export const OrganizeScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTransport, setShowTransport] = useState(false);
   const [tempPlan, setTempPlan] = useState<Plan | null>(null);
+
+  // ── Draft persistence ──
+  const draftIdRef = useRef<string>(route.params?.draftId || 'organize-' + Date.now());
 
   // Pickup draft
   const [pickupDraft, setPickupDraft] = useState<DraftItem | null>(null);
@@ -210,6 +214,34 @@ export const OrganizeScreen: React.FC = () => {
     }
     Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
   };
+
+  // ── Load draft from params ──
+  useEffect(() => {
+    const id = route.params?.draftId;
+    if (!id) return;
+    draftIdRef.current = id;
+    const saved = useDraftStore.getState().getDraft(id);
+    if (!saved) return;
+    setTitle(saved.title);
+    setSelectedTags(saved.selectedTags as CategoryTag[]);
+    setPlaces(saved.places.map((p) => ({ id: p.id, googlePlaceId: p.googlePlaceId || p.id, name: p.name, type: p.type, address: p.address || '' })));
+  }, [route.params?.draftId]);
+
+  // ── Save on blur ──
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0;
+      if (hasContent) {
+        useDraftStore.getState().saveDraft(draftIdRef.current, {
+          title, coverPhotos: [], selectedTags, places: places.map((p) => ({
+            id: p.id, googlePlaceId: p.googlePlaceId, name: p.name, type: p.type, address: p.address,
+            priceRangeIndex: 0, exactPrice: '', price: '', duration: '',
+          })), travels: [], type: 'organize',
+        });
+      }
+    });
+    return unsubscribe;
+  }, [navigation, title, places, selectedTags]);
 
   // ── Handlers ──
   const toggleTag = (tag: CategoryTag) => {
