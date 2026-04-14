@@ -614,9 +614,11 @@ export const CreateScreen: React.FC = () => {
       const { title: t, places: p, selectedTags: st, coverPhotos: cp } = formRef.current;
       if (t.length > 0 || p.length > 0 || st.length > 0 || cp.length > 0) return;
 
-      const allDrafts = useDraftStore.getState().drafts
+      const { drafts, dismissedPickupIds } = useDraftStore.getState();
+      const allDrafts = drafts
         .filter((d) => !d.id.startsWith('edit-') && !d.id.endsWith('-fresh'))
         .filter((d) => d.title.length > 0 || d.places.length > 0)
+        .filter((d) => !dismissedPickupIds.includes(d.id))
         .sort((a, b) => b.updatedAt - a.updatedAt);
 
       if (allDrafts.length === 0) return;
@@ -631,6 +633,8 @@ export const CreateScreen: React.FC = () => {
 
   const handlePickupResume = () => {
     if (!pickupDraft) return;
+    // Mark this draft as dismissed so the sheet never re-appears for it
+    useDraftStore.getState().dismissPickup(pickupDraft.id);
     Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
     // Switch to the draft's ID so future saves go to the right slot
     draftIdRef.current = pickupDraft.id;
@@ -639,8 +643,13 @@ export const CreateScreen: React.FC = () => {
   };
 
   const handlePickupNew = () => {
+    if (pickupDraft) {
+      // Mark this draft as dismissed so the sheet never re-appears for it
+      useDraftStore.getState().dismissPickup(pickupDraft.id);
+    }
     Animated.timing(pickupSheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setPickupDraft(null));
     // Keep the fresh draftId — user starts a brand-new plan
+    // The old draft remains saved in Drafts for manual retrieval from the profile
   };
 
   const discardDraft = () => {

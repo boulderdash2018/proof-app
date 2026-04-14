@@ -40,16 +40,19 @@ export interface DraftItem {
 
 interface DraftStore {
   drafts: DraftItem[];
+  dismissedPickupIds: string[];
   saveDraft: (id: string, data: Omit<DraftItem, 'id' | 'updatedAt'>) => void;
   deleteDraft: (id: string) => void;
   getDraft: (id: string) => DraftItem | undefined;
   hasDrafts: () => boolean;
+  dismissPickup: (id: string) => void;
 }
 
 export const useDraftStore = create<DraftStore>()(
   persist(
     (set, get) => ({
       drafts: [],
+      dismissedPickupIds: [],
       saveDraft: (id, data) => set((state) => {
         const idx = state.drafts.findIndex((d) => d.id === id);
         const item: DraftItem = { ...data, id, updatedAt: Date.now() };
@@ -62,14 +65,20 @@ export const useDraftStore = create<DraftStore>()(
       }),
       deleteDraft: (id) => set((state) => ({
         drafts: state.drafts.filter((d) => d.id !== id),
+        dismissedPickupIds: state.dismissedPickupIds.filter((did) => did !== id),
       })),
       getDraft: (id) => get().drafts.find((d) => d.id === id),
       hasDrafts: () => get().drafts.length > 0,
+      dismissPickup: (id) => set((state) => ({
+        dismissedPickupIds: state.dismissedPickupIds.includes(id)
+          ? state.dismissedPickupIds
+          : [...state.dismissedPickupIds, id],
+      })),
     }),
     {
       name: 'proof-create-draft',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted: any, version: number) => {
         // Migrate from v0/v1 single-draft format to v2 multi-draft
         if (version < 2 && persisted) {
@@ -87,8 +96,12 @@ export const useDraftStore = create<DraftStore>()(
                 updatedAt: old.savedAt || Date.now(),
               });
             }
-            return { drafts };
+            return { drafts, dismissedPickupIds: [] };
           }
+        }
+        // v2 → v3: add dismissedPickupIds
+        if (version < 3 && persisted) {
+          return { ...persisted, dismissedPickupIds: (persisted as any).dismissedPickupIds || [] };
         }
         return persisted as DraftStore;
       },
