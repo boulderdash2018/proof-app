@@ -174,6 +174,10 @@ export const FeedScreen: React.FC = () => {
         if (requireAuth()) return;
         setSharePlan(item);
       }}
+      onProfilePress={(userId) => {
+        if (requireAuth()) return;
+        navigation.navigate('OtherProfile', { userId });
+      }}
     />
   );
 

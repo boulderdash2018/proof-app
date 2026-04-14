@@ -17,3 +17,4 @@ export { FounderBadge } from './FounderBadge';
 export { AccountPromptModal } from './AccountPromptModal';
 export { PlanMapModal } from './PlanMapModal';
 export { SharePlanSheet } from './SharePlanSheet';
+export { FloatingAvatars } from './FloatingAvatars';

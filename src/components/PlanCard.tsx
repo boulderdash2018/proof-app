@@ -25,6 +25,7 @@ import { FounderBadge } from './FounderBadge';
 import { Chip } from './Chip';
 import { MiniStampIcon } from './MiniStampIcon';
 import { FriendActivity } from './FriendActivity';
+import { FloatingAvatars } from './FloatingAvatars';
 import * as Haptics from 'expo-haptics';
 
 export function parseGradient(gradient: string): string[] {
@@ -58,6 +59,7 @@ interface PlanCardProps {
   onComment: () => void;
   onAuthorPress: () => void;
   onShare?: () => void;
+  onProfilePress?: (userId: string) => void;
 }
 
 export const PlanCard: React.FC<PlanCardProps> = ({
@@ -71,6 +73,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   onComment,
   onAuthorPress,
   onShare,
+  onProfilePress,
 }) => {
   const C = useColors();
   const topTrendingTags = useTrendingStore((s) => s.topTags);
@@ -271,6 +274,8 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         >
           <Ionicons name="heart" size={70} color={Colors.primary} />
         </Animated.View>
+        {/* Floating avatar heads */}
+        <FloatingAvatars plan={plan} onProfilePress={onProfilePress} />
       </TouchableOpacity>
 
       <TouchableOpacity activeOpacity={0.92} onPress={onPress} onPressIn={onCardPressIn} onPressOut={onCardPressOut} style={styles.contentArea}>
