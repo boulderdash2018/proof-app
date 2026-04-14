@@ -19,10 +19,10 @@ import { User } from '../types';
 
 const QUICK_MESSAGES = [
   'Regarde ce plan !',
-  'On fait \u00e7a ?',
+  'On fait ça ?',
   'Parfait pour nous',
   'Tu connais ?',
-  'Faut qu\u2019on teste',
+  'Faut qu\'on teste',
 ];
 
 interface FriendItem {
@@ -193,7 +193,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
           <ActivityIndicator size="small" color={C.primary} />
         ) : isSent ? (
           <View style={[styles.sentBadge, { backgroundColor: C.primary + '15' }]}>
-            <Text style={[styles.sentText, { color: C.primary }]}>Envoy\u00e9</Text>
+            <Text style={[styles.sentText, { color: C.primary }]}>Envoyé</Text>
           </View>
         ) : (
           <View style={[styles.sendBtn, { backgroundColor: C.primary }]}>
@@ -217,7 +217,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
         <View style={[styles.sheet, { backgroundColor: C.white }]}>
           <View style={styles.handle} />
 
-          <Text style={[styles.title, { color: C.black }]}>Envoyer \u00e0 un ami</Text>
+          <Text style={[styles.title, { color: C.black }]}>Envoyer à un ami</Text>
 
           {/* ── Message composer ── */}
           <View style={styles.messageSection}>
@@ -247,7 +247,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
               <TextInput
                 ref={messageInputRef}
                 style={[styles.messageInput, { color: C.black }]}
-                placeholder="\u00c9crire un message..."
+                placeholder="Écrire un message..."
                 placeholderTextColor={C.gray600}
                 value={message}
                 onChangeText={setMessage}
@@ -290,7 +290,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Text style={[styles.emptyText, { color: C.gray600 }]}>
-                    {search ? 'Aucun r\u00e9sultat' : 'Aucun ami mutuel'}
+                    {search ? 'Aucun résultat' : 'Aucun ami mutuel'}
                   </Text>
                 </View>
               }
