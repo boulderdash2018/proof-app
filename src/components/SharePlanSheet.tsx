@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  Modal, TouchableWithoutFeedback, ActivityIndicator,
+  Modal, TouchableWithoutFeedback, ActivityIndicator, ScrollView,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,14 @@ import { ConversationParticipant, getOrCreateConversation, sendPlanMessage } fro
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 import { User } from '../types';
+
+const QUICK_MESSAGES = [
+  'Regarde ce plan !',
+  'On fait \u00e7a ?',
+  'Parfait pour nous',
+  'Tu connais ?',
+  'Faut qu\u2019on teste',
+];
 
 interface FriendItem {
   id: string;
@@ -40,6 +49,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
 }) => {
   const C = useColors();
   const user = useAuthStore((s) => s.user);
+  const messageInputRef = useRef<TextInput>(null);
 
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [filtered, setFiltered] = useState<FriendItem[]>([]);
@@ -47,12 +57,14 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [sendingTo, setSendingTo] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (visible && user?.id) {
       loadFriends();
       setSentTo(new Set());
       setSearch('');
+      setMessage('');
     }
   }, [visible, user?.id]);
 
@@ -139,7 +151,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
         title: planTitle,
         coverPhoto: planCover,
         authorName: planAuthorName,
-      });
+      }, message || undefined);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSentTo((prev) => new Set(prev).add(friend.id));
@@ -148,7 +160,12 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
     } finally {
       setSendingTo(null);
     }
-  }, [user, planId, planTitle, planCover, planAuthorName, sendingTo]);
+  }, [user, planId, planTitle, planCover, planAuthorName, sendingTo, message]);
+
+  const selectQuickMessage = (msg: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setMessage((prev) => prev === msg ? '' : msg);
+  };
 
   const renderItem = ({ item }: { item: FriendItem }) => {
     const isSent = sentTo.has(item.id);
@@ -176,7 +193,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
           <ActivityIndicator size="small" color={C.primary} />
         ) : isSent ? (
           <View style={[styles.sentBadge, { backgroundColor: C.primary + '15' }]}>
-            <Text style={[styles.sentText, { color: C.primary }]}>Envoyé</Text>
+            <Text style={[styles.sentText, { color: C.primary }]}>Envoy\u00e9</Text>
           </View>
         ) : (
           <View style={[styles.sendBtn, { backgroundColor: C.primary }]}>
@@ -192,60 +209,113 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay} />
       </TouchableWithoutFeedback>
-      <View style={[styles.sheet, { backgroundColor: C.white }]}>
-        <View style={styles.handle} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.sheetWrap}
+        pointerEvents="box-none"
+      >
+        <View style={[styles.sheet, { backgroundColor: C.white }]}>
+          <View style={styles.handle} />
 
-        <Text style={[styles.title, { color: C.black }]}>Envoyer à un ami</Text>
+          <Text style={[styles.title, { color: C.black }]}>Envoyer \u00e0 un ami</Text>
 
-        {/* Search */}
-        <View style={[styles.searchRow, { backgroundColor: C.gray200 }]}>
-          <Ionicons name="search-outline" size={16} color={C.gray600} />
-          <TextInput
-            style={[styles.searchInput, { color: C.black }]}
-            placeholder="Rechercher..."
-            placeholderTextColor={C.gray600}
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-
-        {/* List */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={C.primary} />
+          {/* ── Message composer ── */}
+          <View style={styles.messageSection}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickRow}
+            >
+              {QUICK_MESSAGES.map((msg) => {
+                const isSelected = message === msg;
+                return (
+                  <TouchableOpacity
+                    key={msg}
+                    style={[
+                      styles.quickChip,
+                      { borderColor: isSelected ? C.primary : C.borderLight, backgroundColor: isSelected ? C.primary + '15' : C.gray200 },
+                    ]}
+                    onPress={() => selectQuickMessage(msg)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.quickChipText, { color: isSelected ? C.primary : C.gray700 }]}>{msg}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <View style={[styles.messageInputRow, { backgroundColor: C.gray200, borderColor: message.length > 0 ? C.primary + '50' : C.borderLight }]}>
+              <TextInput
+                ref={messageInputRef}
+                style={[styles.messageInput, { color: C.black }]}
+                placeholder="\u00c9crire un message..."
+                placeholderTextColor={C.gray600}
+                value={message}
+                onChangeText={setMessage}
+                maxLength={200}
+                multiline={false}
+              />
+              {message.length > 0 && (
+                <TouchableOpacity onPress={() => setMessage('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={16} color={C.gray500} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        ) : (
-          <FlatList
-            data={filtered}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: C.gray600 }]}>
-                  {search ? 'Aucun résultat' : 'Aucun ami mutuel'}
-                </Text>
-              </View>
-            }
-          />
-        )}
-      </View>
+
+          {/* ── Search ── */}
+          <View style={[styles.searchRow, { backgroundColor: C.gray200 }]}>
+            <Ionicons name="search-outline" size={16} color={C.gray600} />
+            <TextInput
+              style={[styles.searchInput, { color: C.black }]}
+              placeholder="Rechercher..."
+              placeholderTextColor={C.gray600}
+              value={search}
+              onChangeText={setSearch}
+            />
+          </View>
+
+          {/* ── Friends list ── */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={C.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={filtered}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={[styles.emptyText, { color: C.gray600 }]}>
+                    {search ? 'Aucun r\u00e9sultat' : 'Aucun ami mutuel'}
+                  </Text>
+                </View>
+              }
+            />
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
+  sheetWrap: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    maxHeight: '80%',
+  },
+  sheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '70%',
     paddingBottom: 34,
+    maxHeight: '100%',
   },
   handle: {
     width: 36,
@@ -261,8 +331,45 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: Fonts.serifBold,
     textAlign: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
+
+  // Message composer
+  messageSection: {
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  quickRow: {
+    gap: 8,
+    paddingBottom: 10,
+  },
+  quickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1.5,
+  },
+  quickChipText: {
+    fontSize: 13,
+    fontFamily: Fonts.serifSemiBold,
+  },
+  messageInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    gap: 8,
+  },
+  messageInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: Fonts.serif,
+    paddingVertical: 0,
+  },
+
+  // Search
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -279,6 +386,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     paddingVertical: 0,
   },
+
+  // List
   loadingContainer: { paddingVertical: 40, alignItems: 'center' },
   list: { paddingBottom: 10 },
   row: {

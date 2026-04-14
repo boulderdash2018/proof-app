@@ -199,6 +199,7 @@ export const sendPlanMessage = async (
   conversationId: string,
   senderId: string,
   plan: { id: string; title: string; coverPhoto?: string; authorName: string },
+  attachedMessage?: string,
 ): Promise<string> => {
   const msgRef = await addDoc(
     collection(db, CONVERSATIONS, conversationId, MESSAGES),
@@ -206,7 +207,7 @@ export const sendPlanMessage = async (
       conversationId,
       senderId,
       type: 'plan',
-      content: '',
+      content: attachedMessage?.trim() || '',
       planId: plan.id,
       planTitle: plan.title,
       planCover: plan.coverPhoto || null,
@@ -226,7 +227,7 @@ export const sendPlanMessage = async (
       if (uid !== senderId) newUnread[uid] = (newUnread[uid] || 0) + 1;
     });
     await updateDoc(convRef, {
-      lastMessage: `📍 ${plan.title}`,
+      lastMessage: attachedMessage?.trim() ? attachedMessage.trim() : `📍 ${plan.title}`,
       lastMessageType: 'plan',
       lastMessageSenderId: senderId,
       lastMessageAt: serverTimestamp(),
