@@ -8,6 +8,7 @@ import {
   Image,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -18,6 +19,11 @@ import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { fetchArchivedPlans, unarchivePlan } from '../services/plansService';
 import { Plan } from '../types';
+
+const { width } = Dimensions.get('window');
+const GRID_GAP = 2;
+const GRID_COLS = 3;
+const GRID_CELL = (width - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
 const parseGradient = (g: string): string[] => {
   const m = g.match(/#[A-Fa-f0-9]{6}/g);
@@ -32,6 +38,13 @@ const getPlanPhoto = (plan: Plan): string | null => {
   return null;
 };
 
+const MONTH_SHORT = ['janv.', 'fev.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'aout', 'sept.', 'oct.', 'nov.', 'dec.'];
+
+const formatDateBadge = (iso: string): { day: string; month: string } => {
+  const d = new Date(iso);
+  return { day: String(d.getDate()), month: MONTH_SHORT[d.getMonth()] };
+};
+
 export const ArchivesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -44,7 +57,7 @@ export const ArchivesScreen: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     fetchArchivedPlans(user.id).then((p) => {
-      setPlans(p);
+      setPlans(p.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setLoading(false);
     });
   }, [user?.id]);
@@ -69,10 +82,13 @@ export const ArchivesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <View style={[styles.header, { borderBottomColor: C.border }]}>
-        <Text style={[styles.back, { color: C.primary }]} onPress={() => navigation.goBack()}>Retour</Text>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="arrow-back" size={22} color={C.black} />
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: C.black }]}>Archives</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 22 }} />
       </View>
 
       {loading ? (
@@ -82,37 +98,47 @@ export const ArchivesScreen: React.FC = () => {
       ) : plans.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="archive-outline" size={48} color={C.gray400} />
-          <Text style={[styles.emptyText, { color: C.gray600 }]}>Aucun plan archivé</Text>
+          <Text style={[styles.emptyText, { color: C.gray600 }]}>Aucun plan archiv\u00e9</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
           {plans.map((plan) => {
             const colors = parseGradient(plan.gradient);
             const photo = getPlanPhoto(plan);
+            const date = formatDateBadge(plan.createdAt);
             return (
-              <View key={plan.id} style={[styles.card, { borderColor: C.borderLight }]}>
-                <TouchableOpacity
-                  style={styles.cardContent}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
-                >
-                  <View style={styles.cardImage}>
-                    {photo ? (
-                      <Image source={{ uri: photo }} style={StyleSheet.absoluteFill} />
-                    ) : (
-                      <LinearGradient colors={colors as [string, string, ...string[]]} style={StyleSheet.absoluteFill} />
-                    )}
+              <TouchableOpacity
+                key={plan.id}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
+                onLongPress={() => handleRepublish(plan.id)}
+              >
+                <View style={styles.cell}>
+                  {photo ? (
+                    <Image source={{ uri: photo }} style={styles.cellImage} />
+                  ) : (
+                    <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                  )}
+                  {/* Bottom gradient for title readability */}
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.cellOverlay} />
+
+                  {/* Date badge — top left like Instagram archives */}
+                  <View style={styles.dateBadge}>
+                    <Text style={styles.dateBadgeDay}>{date.day}</Text>
+                    <Text style={styles.dateBadgeMonth}>{date.month}</Text>
                   </View>
-                  <View style={styles.cardInfo}>
-                    <Text style={[styles.cardTitle, { color: C.black }]} numberOfLines={2}>{plan.title}</Text>
-                    <Text style={[styles.cardMeta, { color: C.gray600 }]}>{plan.places.length} lieux · {plan.price}</Text>
+
+                  {/* Republish icon — top right */}
+                  <TouchableOpacity style={styles.republishBadge} onPress={() => handleRepublish(plan.id)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="arrow-undo" size={12} color="#FFF" />
+                  </TouchableOpacity>
+
+                  {/* Title — bottom */}
+                  <View style={styles.cellBottom}>
+                    <Text style={styles.cellTitle} numberOfLines={2}>{plan.title}</Text>
                   </View>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.republishBtn, { backgroundColor: C.primary }]} onPress={() => handleRepublish(plan.id)}>
-                  <Ionicons name="arrow-undo-outline" size={16} color="#FFF" />
-                  <Text style={styles.republishText}>Republier</Text>
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             );
           })}
         </ScrollView>
@@ -131,39 +157,63 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  back: { fontSize: 15, fontFamily: Fonts.serifSemiBold, width: 60 },
   headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14, fontFamily: Fonts.serif },
-  scroll: { padding: Layout.screenPadding, gap: 14 },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
+
+  // Grid — same as profile published plans
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  cell: { width: GRID_CELL, height: GRID_CELL, overflow: 'hidden' },
+  cellImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
+  cellOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%' },
+  cellBottom: { position: 'absolute', bottom: 8, left: 8, right: 8 },
+  cellTitle: {
+    color: '#FFF',
+    fontSize: 12,
+    fontFamily: Fonts.serifBold,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  cardContent: {
-    flexDirection: 'row',
+
+  // Date badge — Instagram archive style (top-left)
+  dateBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
     alignItems: 'center',
-    padding: 12,
-    gap: 12,
+    zIndex: 2,
   },
-  cardImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-    overflow: 'hidden',
+  dateBadgeDay: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 18,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  cardInfo: { flex: 1 },
-  cardTitle: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 4 },
-  cardMeta: { fontSize: 12, fontFamily: Fonts.serif },
-  republishBtn: {
-    flexDirection: 'row',
+  dateBadgeMonth: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'lowercase',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+
+  // Republish icon badge — top-right
+  republishBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
+    zIndex: 2,
   },
-  republishText: { color: '#FFF', fontSize: 13, fontFamily: Fonts.serifBold },
 });
