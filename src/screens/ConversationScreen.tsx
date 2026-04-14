@@ -32,9 +32,9 @@ const GROUP_GAP = 4;
 const NORMAL_GAP = 12;
 
 // ── Reaction overlay ──
-const REACTION_OVERLAP = 12;
+const REACTION_OVERLAP = 16;
 const REACTION_CHIP_H = 22;
-const REACTION_EXTRA = REACTION_CHIP_H - REACTION_OVERLAP; // 10px
+const REACTION_EXTRA = REACTION_CHIP_H - REACTION_OVERLAP; // 6px
 
 // ── Gradient fade ──
 const FADE_H = 30;
