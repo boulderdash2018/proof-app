@@ -18,6 +18,15 @@ interface FloatingAvatarsProps {
 }
 
 const MAX_SLOTS = 3;
+const AVATAR_SIZE = 32;
+
+// Triangle positions — bottom-right to top-left diagonal (like Instagram Reels)
+// Index 0 = bottom-right (highest priority), 1 = middle, 2 = top-left
+const POSITIONS = [
+  { bottom: 0, right: 0 },
+  { bottom: 22, right: 20 },
+  { bottom: 44, right: 40 },
+];
 
 export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfilePress }) => {
   const followingIds = useSocialProofStore((s) => s.followingIds);
@@ -88,43 +97,47 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
 
   if (slots.length === 0) return null;
 
-  // Render bottom-to-top: slot 0 = bottom (highest priority)
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-      {slots.map((slot, i) => (
-        <TouchableOpacity
-          key={slot.user.id}
-          style={[styles.avatarWrap, i > 0 && { marginBottom: -6 }]}
-          activeOpacity={0.8}
-          onPress={() => onProfilePress?.(slot.user.id)}
-        >
-          <View style={styles.avatarOuter}>
-            <Avatar
-              initials={slot.user.initials}
-              bg={slot.user.avatarBg}
-              color={slot.user.avatarColor}
-              size="S"
-              avatarUrl={slot.user.avatarUrl ?? undefined}
-              borderColor="#FFF"
-            />
-          </View>
-          {/* Interaction badge */}
-          <View style={[
-            styles.badge,
-            slot.type === 'proof'
-              ? { backgroundColor: '#C8571A' }
-              : { backgroundColor: '#1A1410' },
-          ]}>
-            {slot.type === 'proof' ? (
-              <Text style={styles.badgeCheck}>✓</Text>
-            ) : slot.type === 'save' ? (
-              <Ionicons name="bookmark" size={8} color="#FFF" />
-            ) : (
-              <Ionicons name="heart" size={8} color="#FFF" />
-            )}
-          </View>
-        </TouchableOpacity>
-      )).reverse()}
+      {/* Render in reverse so index 0 (highest priority) is on top (highest zIndex) */}
+      {[...slots].reverse().map((slot, reverseIdx) => {
+        const i = slots.length - 1 - reverseIdx;
+        const pos = POSITIONS[i];
+        return (
+          <TouchableOpacity
+            key={slot.user.id}
+            style={[styles.avatarWrap, { bottom: pos.bottom, right: pos.right, zIndex: MAX_SLOTS - i }]}
+            activeOpacity={0.8}
+            onPress={() => onProfilePress?.(slot.user.id)}
+          >
+            <View style={styles.avatarOuter}>
+              <Avatar
+                initials={slot.user.initials}
+                bg={slot.user.avatarBg}
+                color={slot.user.avatarColor}
+                size="S"
+                avatarUrl={slot.user.avatarUrl ?? undefined}
+                borderColor="#FFF"
+              />
+            </View>
+            {/* Interaction badge */}
+            <View style={[
+              styles.badge,
+              slot.type === 'proof'
+                ? { backgroundColor: '#C8571A' }
+                : { backgroundColor: '#1A1410' },
+            ]}>
+              {slot.type === 'proof' ? (
+                <Text style={styles.badgeCheck}>✓</Text>
+              ) : slot.type === 'save' ? (
+                <Ionicons name="bookmark" size={8} color="#FFF" />
+              ) : (
+                <Ionicons name="heart" size={8} color="#FFF" />
+              )}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </Animated.View>
   );
 };
@@ -134,12 +147,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     right: 12,
-    alignItems: 'center',
+    width: AVATAR_SIZE + 44,
+    height: AVATAR_SIZE + 48,
     zIndex: 10,
   },
   avatarWrap: {
-    alignItems: 'center',
-    position: 'relative',
+    position: 'absolute',
   },
   avatarOuter: {
     shadowColor: '#000',
