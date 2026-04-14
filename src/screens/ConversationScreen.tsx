@@ -881,8 +881,8 @@ const styles = StyleSheet.create({
   reactionEmoji: { fontSize: 13 },
 
   // Plan in message
-  planCover: { width: '100%', height: 140, borderRadius: 12, marginBottom: 8 },
-  planCoverPlaceholder: { width: '100%', height: 80, borderRadius: 12, marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
+  planCover: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 8, resizeMode: 'cover' },
+  planCoverPlaceholder: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
   planInfo: { gap: 2 },
   planLabel: { fontSize: 10, fontFamily: Fonts.serifSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
   planTitle: { fontSize: 14, fontFamily: Fonts.serifBold, lineHeight: 18 },
