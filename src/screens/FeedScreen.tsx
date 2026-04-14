@@ -307,7 +307,7 @@ export const FeedScreen: React.FC = () => {
           onClose={() => setSharePlan(null)}
           planId={sharePlan.id}
           planTitle={sharePlan.title}
-          planCover={sharePlan.coverPhotos?.[0]}
+          planCover={sharePlan.coverPhotos?.[0] || sharePlan.places?.find(p => p.photoUrls?.length)?.photoUrls?.[0]}
           planAuthorName={sharePlan.author.displayName}
         />
       )}

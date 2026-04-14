@@ -383,7 +383,9 @@ const MessageRow = React.memo<MessageRowProps>(({
                     )}
                   </View>
                   {!!item.content && (
-                    <Text style={[styles.planAttachedMsg, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
+                    <View style={[styles.planAttachedWrap, { borderTopColor: isMine ? 'rgba(255,255,255,0.2)' : C.borderLight }]}>
+                      <Text style={[styles.planAttachedMsg, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
+                    </View>
                   )}
                 </TouchableOpacity>
               ) : (
@@ -879,13 +881,14 @@ const styles = StyleSheet.create({
   reactionEmoji: { fontSize: 13 },
 
   // Plan in message
-  planCover: { width: '100%', height: 120, borderRadius: 12, marginBottom: 8 },
+  planCover: { width: '100%', height: 140, borderRadius: 12, marginBottom: 8 },
   planCoverPlaceholder: { width: '100%', height: 80, borderRadius: 12, marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
   planInfo: { gap: 2 },
   planLabel: { fontSize: 10, fontFamily: Fonts.serifSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
   planTitle: { fontSize: 14, fontFamily: Fonts.serifBold, lineHeight: 18 },
   planAuthor: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
-  planAttachedMsg: { fontSize: 13, fontFamily: Fonts.serif, marginTop: 8, lineHeight: 18 },
+  planAttachedWrap: { borderTopWidth: 1, marginTop: 10, paddingTop: 8 },
+  planAttachedMsg: { fontSize: 14, fontFamily: Fonts.serifSemiBold, lineHeight: 18 },
 
   // Quoted reply in bubble
   quotedReply: {

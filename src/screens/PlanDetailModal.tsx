@@ -1039,7 +1039,7 @@ export const PlanDetailModal: React.FC = () => {
           onClose={() => setShowShareSheet(false)}
           planId={plan.id}
           planTitle={plan.title}
-          planCover={plan.coverPhotos?.[0]}
+          planCover={plan.coverPhotos?.[0] || plan.places?.find(p => p.photoUrls?.length)?.photoUrls?.[0]}
           planAuthorName={plan.author.displayName}
         />
       )}
