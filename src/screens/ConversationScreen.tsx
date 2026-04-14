@@ -353,7 +353,7 @@ const MessageRow = React.memo<MessageRowProps>(({
                   {item.replyToSenderId === userId ? 'Toi' : otherUser.displayName}
                 </Text>
                 <Text style={[styles.quotedText, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]} numberOfLines={1}>
-                  {item.replyToType === 'plan' ? 'Plan partag\u00e9 \u2726' : item.replyToContent}
+                  {item.replyToType === 'plan' ? 'Plan partagé ✦' : item.replyToContent}
                 </Text>
               </TouchableOpacity>
             )}
@@ -376,12 +376,15 @@ const MessageRow = React.memo<MessageRowProps>(({
                     </View>
                   )}
                   <View style={styles.planInfo}>
-                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,255,255,0.7)' : C.gray600 }]}>Plan partag\u00e9</Text>
+                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,255,255,0.7)' : C.gray600 }]}>PLAN PARTAGÉ</Text>
                     <Text style={[styles.planTitle, { color: isMine ? '#FFF' : C.black }]} numberOfLines={2}>{item.planTitle}</Text>
                     {item.planAuthorName && (
                       <Text style={[styles.planAuthor, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>par {item.planAuthorName}</Text>
                     )}
                   </View>
+                  {!!item.content && (
+                    <Text style={[styles.planAttachedMsg, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
+                  )}
                 </TouchableOpacity>
               ) : (
                 <Text style={[styles.msgText, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
@@ -425,7 +428,7 @@ const MessageRow = React.memo<MessageRowProps>(({
                     <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Vu</Text>
                   </View>
                 ) : (
-                  <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Envoy\u00e9</Text>
+                  <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Envoyé</Text>
                 )}
               </View>
             )}
@@ -781,7 +784,7 @@ export const ConversationScreen: React.FC = () => {
                 {replyTo.senderId === user?.id ? 'Toi' : otherUser.displayName}
               </Text>
               <Text style={[styles.replyBarText, { color: C.gray600 }]} numberOfLines={1}>
-                {replyTo.type === 'plan' ? 'Plan partag\u00e9 \u2726' : replyTo.content}
+                {replyTo.type === 'plan' ? 'Plan partagé ✦' : replyTo.content}
               </Text>
             </View>
             <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -882,6 +885,7 @@ const styles = StyleSheet.create({
   planLabel: { fontSize: 10, fontFamily: Fonts.serifSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
   planTitle: { fontSize: 14, fontFamily: Fonts.serifBold, lineHeight: 18 },
   planAuthor: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  planAttachedMsg: { fontSize: 13, fontFamily: Fonts.serif, marginTop: 8, lineHeight: 18 },
 
   // Quoted reply in bubble
   quotedReply: {

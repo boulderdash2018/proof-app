@@ -76,7 +76,7 @@ export const SavedPlacesScreen: React.FC = () => {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <EmptyState icon="📍" title="Aucun lieu sauvegard\u00e9" subtitle="Sauvegarde des lieux depuis Explorer avec \u2b50" />
+          <EmptyState icon="📍" title="Aucun lieu sauvegardé" subtitle="Sauvegarde des lieux depuis Explorer avec ⭐" />
         }
       />
     </View>

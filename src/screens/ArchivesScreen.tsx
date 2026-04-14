@@ -98,7 +98,7 @@ export const ArchivesScreen: React.FC = () => {
       ) : plans.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="archive-outline" size={48} color={C.gray400} />
-          <Text style={[styles.emptyText, { color: C.gray600 }]}>Aucun plan archiv\u00e9</Text>
+          <Text style={[styles.emptyText, { color: C.gray600 }]}>Aucun plan archivé</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>

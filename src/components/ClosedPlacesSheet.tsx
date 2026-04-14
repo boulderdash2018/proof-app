@@ -58,10 +58,10 @@ export const ClosedPlacesSheet: React.FC<Props> = ({
                   <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
                   <Text style={[styles.placeStatus, { color: place.isPermanentlyClosed ? Colors.primary : C.gray600 }]}>
                     {place.isPermanentlyClosed
-                      ? 'Ferm\u00e9 d\u00e9finitivement'
+                      ? 'Fermé définitivement'
                       : place.nextOpenTime
-                        ? `Ferm\u00e9 en ce moment \u2014 ouvre \u00e0 ${place.nextOpenTime}`
-                        : 'Ferm\u00e9 en ce moment'}
+                        ? `Fermé en ce moment — ouvre à ${place.nextOpenTime}`
+                        : 'Fermé en ce moment'}
                   </Text>
                 </View>
               </View>
