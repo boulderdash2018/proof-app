@@ -806,6 +806,9 @@ export const ConversationScreen: React.FC = () => {
               onChangeText={handleTextChange}
               multiline
               maxLength={2000}
+              submitBehavior="submit"
+              onSubmitEditing={text.trim().length > 0 ? handleSend : undefined}
+              blurOnSubmit={false}
             />
             {text.trim().length > 0 && (
               <TouchableOpacity onPress={handleSend} style={[styles.sendBtn, { backgroundColor: C.primary }]}>
