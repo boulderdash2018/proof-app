@@ -806,9 +806,14 @@ export const ConversationScreen: React.FC = () => {
               onChangeText={handleTextChange}
               multiline
               maxLength={2000}
-              submitBehavior="submit"
-              onSubmitEditing={text.trim().length > 0 ? handleSend : undefined}
               blurOnSubmit={false}
+              onKeyPress={(e: any) => {
+                const key = e.nativeEvent?.key ?? (e as any).key;
+                if (key === 'Enter' && !(e.nativeEvent?.shiftKey ?? (e as any).shiftKey)) {
+                  e.preventDefault?.();
+                  if (text.trim().length > 0) handleSend();
+                }
+              }}
             />
             {text.trim().length > 0 && (
               <TouchableOpacity onPress={handleSend} style={[styles.sendBtn, { backgroundColor: C.primary }]}>
