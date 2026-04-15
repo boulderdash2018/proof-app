@@ -7,18 +7,15 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  Image,
   StatusBar,
   ViewToken,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Fonts, getRankForProofs } from '../constants';
-import { FloatingAvatars } from '../components/FloatingAvatars';
-import { RankBadge } from '../components/RankBadge';
+import { Colors, Fonts } from '../constants';
+import { ImmersiveCard } from '../components/ImmersiveCard';
 import { LoadingSkeleton, EmptyState } from '../components';
 import { SharePlanSheet } from '../components/SharePlanSheet';
 import {
@@ -32,9 +29,6 @@ import { Plan } from '../types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 type FeedTab = 'reco' | 'friends';
-
-const CARD_RADIUS = 22;
-const CARD_H_PAD = 14;
 
 /* ================================================================
    IMMERSIVE FEED — Creme-style rounded card, horizontal swipe
@@ -67,6 +61,7 @@ export const FeedScreen: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [friendsFetched, setFriendsFetched] = useState(false);
   const [sharePlan, setSharePlan] = useState<Plan | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const flatListRef = useRef<FlatList<Plan>>(null);
 
   // ── Animations ─────────────────────────────────────────────────
@@ -167,169 +162,31 @@ export const FeedScreen: React.FC = () => {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════
-  //  RENDER FRAME — rounded card + below-card info
+  //  RENDER ITEM — ImmersiveCard with swipe-to-reveal detail
   // ═══════════════════════════════════════════════════════════════
-  const renderFrame = useCallback(
-    ({ item }: { item: Plan; index: number }) => {
-      const coverUrl = getCoverPhoto(item);
-      const rank = getRankForProofs(item.author?.total_proof_validations || 0);
-
-      return (
-        <View style={[styles.frame, { width: SCREEN_W, height: listH }]}>
-          {/* ── Rounded card ── */}
-          <View style={styles.card}>
-            {/* Full-bleed photo inside card */}
-            {coverUrl ? (
-              <Image
-                source={{ uri: coverUrl }}
-                style={StyleSheet.absoluteFillObject}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1C1917' }]} />
-            )}
-
-            {/* Subtle top vignette for icon contrast */}
-            <LinearGradient
-              colors={['rgba(0,0,0,0.35)', 'transparent']}
-              style={styles.cardTopGrad}
-            />
-
-            {/* Bottom gradient for text legibility */}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0.92)']}
-              locations={[0.35, 0.6, 1]}
-              style={styles.cardBottomGrad}
-            />
-
-            {/* ── Like + Save — inline top-right ── */}
-            <View style={styles.cardActions}>
-              <TouchableOpacity
-                onPress={() => handleLike(item.id)}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={likedPlanIds.has(item.id) ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={likedPlanIds.has(item.id) ? '#FF4D67' : '#FFF'}
-                  style={styles.iconShadow}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleSave(item.id)}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={savedPlanIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
-                  size={22}
-                  color={savedPlanIds.has(item.id) ? Colors.primary : '#FFF'}
-                  style={styles.iconShadow}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* ── Bottom info inside card ── */}
-            <View style={styles.cardInfo}>
-              {/* Social-proof avatars */}
-              <FloatingAvatars
-                plan={item}
-                onProfilePress={(userId) => {
-                  if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
-                }}
-                containerStyle={styles.avatarsInline}
-              />
-
-              {/* Category tag line */}
-              {item.tags?.length > 0 && (
-                <Text style={styles.categoryLabel} numberOfLines={1}>
-                  {item.tags[0].toUpperCase()}
-                </Text>
-              )}
-
-              {/* Plan title — tappable for detail */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
-              >
-                <Text style={styles.planTitle} numberOfLines={2}>
-                  {item.title}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Author row */}
-              <TouchableOpacity
-                style={styles.authorRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  if (!requireAuth())
-                    navigation.navigate('OtherProfile', { userId: item.authorId });
-                }}
-              >
-                <View
-                  style={[
-                    styles.authorAvatar,
-                    { backgroundColor: item.author?.avatarBg || '#444' },
-                  ]}
-                >
-                  {item.author?.avatarUrl ? (
-                    <Image
-                      source={{ uri: item.author.avatarUrl }}
-                      style={styles.authorAvatarImg}
-                    />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.authorInitials,
-                        { color: item.author?.avatarColor || '#FFF' },
-                      ]}
-                    >
-                      {item.author?.initials || '?'}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.authorName} numberOfLines={1}>
-                  {item.author?.displayName || 'Inconnu'}
-                </Text>
-                {rank && <RankBadge rank={rank} small />}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* ── Below card: meta + tags ── */}
-          <View style={styles.belowCard}>
-            <View style={styles.metaRow}>
-              {item.price ? <Text style={styles.metaText}>{item.price}</Text> : null}
-              {item.price && item.duration ? <Text style={styles.metaDot}>·</Text> : null}
-              {item.duration ? <Text style={styles.metaText}>{item.duration}</Text> : null}
-              {(item.price || item.duration) && item.places?.length > 0 ? (
-                <Text style={styles.metaDot}>·</Text>
-              ) : null}
-              {item.places?.length > 0 ? (
-                <Text style={styles.metaText}>
-                  {item.places.length} lieu{item.places.length > 1 ? 'x' : ''}
-                </Text>
-              ) : null}
-            </View>
-
-            {item.tags && item.tags.length > 1 && (
-              <View style={styles.tagsRow}>
-                {item.tags.slice(0, 4).map((tag, i) => (
-                  <View key={i} style={styles.tagChip}>
-                    <Text style={styles.tagText}>{tag}</Text>
-                  </View>
-                ))}
-                {item.tags.length > 4 && (
-                  <Text style={styles.moreTagsText}>+{item.tags.length - 4}</Text>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      );
-    },
-    [listH, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave],
+  const renderItem = useCallback(
+    ({ item, index }: { item: Plan; index: number }) => (
+      <ImmersiveCard
+        plan={item}
+        width={SCREEN_W}
+        height={listH}
+        isActive={index === currentIndex}
+        isLiked={likedPlanIds.has(item.id)}
+        isSaved={savedPlanIds.has(item.id)}
+        onLike={() => handleLike(item.id)}
+        onSave={() => handleSave(item.id)}
+        onAuthorPress={() => {
+          if (!requireAuth())
+            navigation.navigate('OtherProfile', { userId: item.authorId });
+        }}
+        onProfilePress={(userId) => {
+          if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
+        }}
+        onDetailStateChange={setIsDetailOpen}
+        onPlanPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
+      />
+    ),
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -466,8 +323,9 @@ export const FeedScreen: React.FC = () => {
             ref={flatListRef}
             horizontal
             pagingEnabled
+            scrollEnabled={!isDetailOpen}
             data={currentPlans}
-            renderItem={renderFrame}
+            renderItem={renderItem}
             keyExtractor={(item) => item.id}
             showsHorizontalScrollIndicator={false}
             windowSize={3}
@@ -589,154 +447,6 @@ const styles = StyleSheet.create({
   // ── FlatList area ──────────────────────────────────────────
   listArea: {
     flex: 1,
-  },
-
-  // ── Frame (each FlatList item) ─────────────────────────────
-  frame: {
-    paddingHorizontal: CARD_H_PAD,
-    paddingTop: 6,
-    paddingBottom: 8,
-  },
-
-  // ── Rounded card ───────────────────────────────────────────
-  card: {
-    flex: 1,
-    borderRadius: CARD_RADIUS,
-    overflow: 'hidden',
-  },
-  cardTopGrad: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '25%',
-    zIndex: 2,
-  },
-  cardBottomGrad: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '55%',
-    zIndex: 2,
-  },
-
-  // ── Card actions: like + save top-right row ────────────────
-  cardActions: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    zIndex: 5,
-  } as any,
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
-
-  // ── Card info (bottom inside card) ─────────────────────────
-  cardInfo: {
-    position: 'absolute',
-    bottom: 18,
-    left: 18,
-    right: 18,
-    zIndex: 5,
-  },
-  avatarsInline: {
-    position: 'relative',
-    bottom: 0,
-    left: 0,
-    marginBottom: 8,
-  },
-  categoryLabel: {
-    fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 1.5,
-    marginBottom: 4,
-  },
-  planTitle: {
-    fontSize: 22,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
-    lineHeight: 28,
-    marginBottom: 6,
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  } as any,
-  authorAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  authorAvatarImg: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  authorInitials: {
-    fontSize: 8,
-    fontWeight: '700',
-  },
-  authorName: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
-  },
-
-  // ── Below card ─────────────────────────────────────────────
-  belowCard: {
-    paddingHorizontal: 4,
-    paddingTop: 10,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  } as any,
-  metaText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontFamily: Fonts.serif,
-  },
-  metaDot: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 12,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-  } as any,
-  tagChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  tagText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
-  },
-  moreTagsText: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 11,
-    fontFamily: Fonts.serif,
-    marginLeft: 2,
   },
 
   // ── Progress bar ───────────────────────────────────────────
