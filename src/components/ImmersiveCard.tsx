@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, getRankForProofs } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
-import { Plan } from '../types';
+import { Plan, TravelSegment, TransportMode } from '../types';
 
 /* ================================================================
    ImmersiveCard — pull-down to reveal plan detail
@@ -46,6 +46,18 @@ interface ImmersiveCardProps {
   onDetailStateChange: (isOpen: boolean) => void;
   onPlanPress: () => void;
 }
+
+// ── Transport helpers (same as PlanDetailModal) ─────────────
+const TRANSPORT_ICONS: Record<TransportMode, string> = {
+  'Métro': 'train-outline', 'Vélo': 'bicycle-outline', 'À pied': 'walk-outline',
+  'Voiture': 'car-outline', 'Trottinette': 'flash-outline',
+};
+const fmtMin = (m: number): string => {
+  if (m < 60) return `${m}min`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
+};
 
 // ── Layout ───────────────────────────────────────────────────
 const CARD_H_PAD = 14;
@@ -538,6 +550,16 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     </Text>
                   </View>
                 ) : null}
+                {plan.transport ? (
+                  <View style={styles.metaPill}>
+                    <Ionicons
+                      name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
+                      size={13}
+                      color="rgba(255,255,255,0.6)"
+                    />
+                    <Text style={styles.metaPillText}>{plan.transport}</Text>
+                  </View>
+                ) : null}
               </View>
             </Animated.View>
 
@@ -560,7 +582,29 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </Animated.View>
             )}
 
-            {/* 2 — "Do it now" CTA */}
+            {/* 2 — Creator's tip */}
+            {(() => {
+              const creatorTip = plan.places?.find((p) => p.comment)?.comment;
+              if (!creatorTip) return null;
+              return (
+                <Animated.View
+                  style={{
+                    opacity: d2.opacity,
+                    transform: [{ translateY: d2.translateY }],
+                  }}
+                >
+                  <View style={styles.tipWrap}>
+                    <View style={styles.tipBar} />
+                    <View style={styles.tipBody}>
+                      <Text style={styles.tipLabel}>Conseil du créateur</Text>
+                      <Text style={styles.tipText}>"{creatorTip}"</Text>
+                    </View>
+                  </View>
+                </Animated.View>
+              );
+            })()}
+
+            {/* 3 — "Do it now" CTA */}
             <Animated.View
               style={{
                 opacity: d2.opacity,
@@ -577,7 +621,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </TouchableOpacity>
             </Animated.View>
 
-            {/* 3 — Itinerary */}
+            {/* 4 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
             <Animated.View
               style={{
                 opacity: d3.opacity,
@@ -585,36 +629,149 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               }}
             >
               <Text style={styles.sectionTitle}>Itinéraire</Text>
-              {plan.places?.map((place, i) => (
-                <View key={place.id || i} style={styles.placeCard}>
-                  <View style={styles.placeIndex}>
-                    <Text style={styles.placeIndexText}>{i + 1}</Text>
-                  </View>
-                  <View style={styles.placeBody}>
-                    {place.photoUrls?.[0] && (
-                      <Image
-                        source={{ uri: place.photoUrls[0] }}
-                        style={styles.placePhoto}
-                        resizeMode="cover"
-                      />
-                    )}
-                    <View style={styles.placeInfo}>
-                      <Text style={styles.placeName}>{place.name}</Text>
-                      <Text style={styles.placeType}>{place.type}</Text>
-                      {place.address ? (
-                        <Text style={styles.placeAddress} numberOfLines={1}>
-                          {place.address}
-                        </Text>
-                      ) : null}
-                      {place.comment ? (
-                        <Text style={styles.placeComment} numberOfLines={2}>
-                          « {place.comment} »
-                        </Text>
-                      ) : null}
+              {plan.places?.map((place, i) => {
+                const isLast = i === (plan.places?.length ?? 0) - 1;
+                const placePhoto = place.customPhoto || place.photoUrls?.[0];
+
+                // Find travel segment to next place
+                const travelToNext: TravelSegment | undefined =
+                  plan.travelSegments?.find(
+                    (ts) => ts.fromPlaceId === place.id || ts.fromPlaceId === place.googlePlaceId,
+                  ) || (plan.travelSegments && plan.travelSegments[i]);
+
+                return (
+                  <View key={place.id || i}>
+                    {/* Place card */}
+                    <View style={styles.placeRow}>
+                      {/* Timeline column */}
+                      <View style={styles.tlCol}>
+                        <View style={[styles.tlLineTop, i === 0 && { backgroundColor: 'transparent' }]} />
+                        <View style={styles.tlCircle}>
+                          <Text style={styles.tlNum}>{i + 1}</Text>
+                        </View>
+                        <View style={[styles.tlLineBot, isLast && !travelToNext && { backgroundColor: 'transparent' }]} />
+                      </View>
+
+                      {/* Card body */}
+                      <View style={styles.placeBody}>
+                        {placePhoto && (
+                          <Image
+                            source={{ uri: placePhoto }}
+                            style={styles.placePhoto}
+                            resizeMode="cover"
+                          />
+                        )}
+                        <View style={styles.placeInfo}>
+                          {/* Name + reservation */}
+                          <Text style={styles.placeName}>
+                            {place.name}
+                            {place.reservationRecommended ? (
+                              <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
+                            ) : null}
+                          </Text>
+                          <Text style={styles.placeType}>{place.type}</Text>
+
+                          {/* Rating */}
+                          {place.rating > 0 && (
+                            <View style={styles.ratingRow}>
+                              <Ionicons name="star" size={11} color="#F5A623" style={{ marginRight: 3 }} />
+                              <Text style={styles.ratingNum}>{place.rating}</Text>
+                              {place.reviewCount > 0 && (
+                                <Text style={styles.ratingCnt}>({place.reviewCount} avis)</Text>
+                              )}
+                            </View>
+                          )}
+
+                          {/* Price / Duration pills */}
+                          {(place.placePrice != null || place.placeDuration != null) && (
+                            <View style={styles.placeMetaRow}>
+                              {place.placePrice != null && place.placePrice > 0 && (
+                                <View style={styles.placeMetaPill}>
+                                  <Text style={styles.placeMetaText}>{place.placePrice}€</Text>
+                                </View>
+                              )}
+                              {place.placeDuration != null && place.placeDuration > 0 && (
+                                <View style={styles.placeMetaPill}>
+                                  <Text style={styles.placeMetaText}>{fmtMin(place.placeDuration)}</Text>
+                                </View>
+                              )}
+                            </View>
+                          )}
+
+                          {/* Address */}
+                          {place.address ? (
+                            <View style={styles.inlineAddr}>
+                              <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.4)" />
+                              <Text style={styles.placeAddress} numberOfLines={1}>
+                                {place.address.split(',')[0]}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {/* Creator's comment */}
+                          {place.comment ? (
+                            <View style={styles.inlineQuote}>
+                              <Text style={styles.placeComment} numberOfLines={2}>
+                                "{place.comment}"
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {/* Q&A answers */}
+                          {(place.questions && place.questions.length > 0
+                            ? place.questions
+                            : place.questionAnswer && place.question
+                              ? [{ question: place.question, answer: place.questionAnswer }]
+                              : []
+                          ).map((qa, qIdx) => (
+                            <View key={qIdx} style={styles.inlineQa}>
+                              <Text style={styles.inlineQaLabel}>{qa.question}</Text>
+                              <Text style={styles.inlineQaAnswer} numberOfLines={2}>{qa.answer}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
                     </View>
+
+                    {/* Travel segment to next place */}
+                    {!isLast && (
+                      <View style={styles.travelRow}>
+                        <View style={styles.tlCol}>
+                          <View style={styles.tlLineFull} />
+                        </View>
+                        <View style={styles.travelBubble}>
+                          {travelToNext ? (
+                            <>
+                              <Ionicons
+                                name={(TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any}
+                                size={13}
+                                color={Colors.primary}
+                              />
+                              <Text style={styles.travelText}>{travelToNext.transport}</Text>
+                              <View style={styles.travelDot} />
+                              <Text style={styles.travelText}>{fmtMin(travelToNext.duration)}</Text>
+                            </>
+                          ) : (
+                            <>
+                              <Ionicons
+                                name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
+                                size={13}
+                                color="rgba(255,255,255,0.3)"
+                              />
+                              <Text style={[styles.travelText, { color: 'rgba(255,255,255,0.25)' }]}>{plan.transport || 'À pied'}</Text>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    )}
                   </View>
-                </View>
-              ))}
+                );
+              })}
+
+              {/* Reservation legend */}
+              {plan.places?.some((p) => p.reservationRecommended) && (
+                <Text style={styles.reservationLegend}>﹡ Réservation recommandée</Text>
+              )}
             </Animated.View>
 
             {/* 4 — Author */}
@@ -924,44 +1081,99 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  // ── Place card ─────────────────────────────────────────────
-  placeCard: {
+  // ── Creator's tip ───────────────────────────────────────────
+  tipWrap: {
     flexDirection: 'row',
-    marginBottom: 16,
-    gap: 12,
-  } as any,
-  placeIndex: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 20,
+  },
+  tipBar: {
+    width: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.primary,
+    marginRight: 12,
+  },
+  tipBody: { flex: 1 },
+  tipLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 4,
+  },
+  tipText: {
+    fontSize: 13,
+    fontFamily: Fonts.serif,
+    fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 19,
+  },
+
+  // ── Timeline ──────────────────────────────────────────────
+  tlCol: {
+    width: 36,
+    alignItems: 'center',
+  },
+  tlLineTop: {
+    width: 2,
+    height: 14,
+    backgroundColor: Colors.primary + '40',
+  },
+  tlLineBot: {
+    width: 2,
+    flex: 1,
+    backgroundColor: Colors.primary + '40',
+  },
+  tlLineFull: {
+    width: 2,
+    flex: 1,
+    minHeight: 18,
+    backgroundColor: Colors.primary + '40',
+  },
+  tlCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
   },
-  placeIndexText: {
+  tlNum: {
     fontSize: 12,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#FFF',
+  },
+
+  // ── Place card (timeline layout) ──────────────────────────
+  placeRow: {
+    flexDirection: 'row',
   },
   placeBody: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 14,
     overflow: 'hidden',
+    marginLeft: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   placePhoto: {
     width: '100%',
-    height: 140,
+    height: 130,
   },
   placeInfo: {
-    padding: 14,
+    padding: 12,
   },
   placeName: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: Fonts.serifBold,
     color: '#FFF',
     marginBottom: 2,
+  },
+  reservationAsterisk: {
+    fontSize: 10,
+    color: '#C8571A',
   },
   placeType: {
     fontSize: 11,
@@ -970,18 +1182,129 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     marginBottom: 4,
   },
-  placeAddress: {
-    fontSize: 12,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.45)',
+
+  // Rating
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  placeComment: {
-    fontSize: 12,
+  ratingNum: {
+    fontSize: 11,
+    fontFamily: Fonts.serifSemiBold,
+    color: '#FFF',
+    marginRight: 4,
+  },
+  ratingCnt: {
+    fontSize: 10,
     fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.55)',
-    fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.4)',
+  },
+
+  // Price / Duration pills
+  placeMetaRow: {
+    flexDirection: 'row',
+    gap: 6,
     marginTop: 4,
+    marginBottom: 4,
+  } as any,
+  placeMetaPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  placeMetaText: {
+    fontSize: 10,
+    fontFamily: Fonts.serifSemiBold,
+    color: 'rgba(255,255,255,0.55)',
+  },
+
+  // Inline address
+  inlineAddr: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  } as any,
+  placeAddress: {
+    fontSize: 11,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.4)',
+    flex: 1,
+  },
+
+  // Inline quote (creator's comment on place)
+  inlineQuote: {
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+    paddingLeft: 8,
+    marginTop: 6,
+  },
+  placeComment: {
+    fontSize: 11,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.6)',
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
+
+  // Inline Q&A
+  inlineQa: {
+    marginTop: 6,
+    borderRadius: 8,
+    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  inlineQaLabel: {
+    fontSize: 9,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.35)',
+    marginBottom: 2,
+  },
+  inlineQaAnswer: {
+    fontSize: 11,
+    fontFamily: Fonts.serifSemiBold,
+    color: 'rgba(255,255,255,0.65)',
+    lineHeight: 16,
+  },
+
+  // Reservation legend
+  reservationLegend: {
+    fontSize: 10,
+    fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+
+  // ── Travel segment ────────────────────────────────────────
+  travelRow: {
+    flexDirection: 'row',
+    paddingVertical: 2,
+  },
+  travelBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  } as any,
+  travelText: {
+    fontSize: 11,
+    fontFamily: Fonts.serifSemiBold,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  travelDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
 
   // ── Author card ────────────────────────────────────────────
