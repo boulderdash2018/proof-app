@@ -15,6 +15,7 @@ interface AvatarSlot {
 interface FloatingAvatarsProps {
   plan: Plan;
   onProfilePress?: (userId: string) => void;
+  containerStyle?: any;
 }
 
 const MAX_SLOTS = 3;
@@ -24,7 +25,7 @@ const AVATAR_OUTER = AVATAR_SIZE + BORDER_W * 2; // 39px total
 const OVERLAP = 10;
 const BADGE_SIZE = 14;
 
-export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfilePress }) => {
+export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfilePress, containerStyle }) => {
   const followingIds = useSocialProofStore((s) => s.followingIds);
   // Subscribe to userCache OBJECT — re-renders when profiles arrive
   const userCache = useSocialProofStore((s) => s.userCache);
@@ -80,7 +81,7 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
   const containerHeight = AVATAR_OUTER + (slots.length - 1) * (AVATAR_OUTER - OVERLAP);
 
   return (
-    <View style={[styles.container, { height: containerHeight }]}>
+    <View style={[styles.container, { height: containerHeight }, containerStyle]}>
       {/* Render lowest priority first → highest priority last = on top in z-order */}
       {[...slots].reverse().map((slot, reverseIdx) => {
         const i = slots.length - 1 - reverseIdx; // original index
