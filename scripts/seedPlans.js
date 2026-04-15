@@ -747,8 +747,8 @@ async function main() {
   // Build author object — strip all undefined values (Firestore rejects them)
   const authorRaw = {
     id: proofUser.id,
-    username: proofUser.username || 'proof',
-    displayName: proofUser.displayName || 'Proof',
+    username: proofUser.username || 'proof.',
+    displayName: proofUser.displayName || 'Proof.',
     initials: proofUser.initials || 'P',
     avatarUrl: proofUser.avatarUrl || null,
     avatarBg: proofUser.avatarBg || '#FF6B35',
