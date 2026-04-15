@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Proof",
+    "name": "Proof.",
     "slug": "proof-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -37,8 +37,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Proof needs your location to guide you through plans.",
-          "locationWhenInUsePermission": "Proof needs your location to guide you through plans."
+          "locationAlwaysAndWhenInUsePermission": "Proof. needs your location to guide you through plans.",
+          "locationWhenInUsePermission": "Proof. needs your location to guide you through plans."
         }
       ]
     ]

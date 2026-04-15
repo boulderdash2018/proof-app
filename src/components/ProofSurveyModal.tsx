@@ -312,7 +312,7 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
                   activeOpacity={0.8}
                   disabled={stampType !== 'none'}
                 >
-                  <Text style={styles.btnProofText}>Proof it ✓</Text>
+                  <Text style={styles.btnProofText}>Proof. it ✓</Text>
                 </TouchableOpacity>
               </View>
 

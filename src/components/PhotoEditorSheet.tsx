@@ -30,7 +30,7 @@ interface FilterDef {
 }
 
 const FILTERS: FilterDef[] = [
-  { name: 'Proof Warm', css: 'sepia(0.25) saturate(1.4) brightness(1.05) hue-rotate(-10deg)', overlay: 'rgba(255,140,50,0.15)' },
+  { name: 'Proof. Warm', css: 'sepia(0.25) saturate(1.4) brightness(1.05) hue-rotate(-10deg)', overlay: 'rgba(255,140,50,0.15)' },
   { name: 'Golden', css: 'sepia(0.4) brightness(1.12) saturate(1.1) hue-rotate(-15deg)', overlay: 'rgba(255,200,50,0.18)' },
   { name: 'Chill', css: 'saturate(0.7) brightness(0.95) hue-rotate(15deg) contrast(1.05)', overlay: 'rgba(80,130,210,0.15)' },
   { name: 'Fade', css: 'contrast(0.85) brightness(1.15) saturate(0.75) sepia(0.1)', overlay: 'rgba(255,255,255,0.12)' },

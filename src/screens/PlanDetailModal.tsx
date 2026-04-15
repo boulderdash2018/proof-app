@@ -655,7 +655,7 @@ export const PlanDetailModal: React.FC = () => {
               color: isDone ? (savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.success) : C.primary,
             }]}>
               {isDone
-                ? savedPlan?.proofStatus === 'validated' ? 'Proof ✓' : t.plan_already_done
+                ? savedPlan?.proofStatus === 'validated' ? 'Proof. ✓' : t.plan_already_done
                 : t.plan_mark_done}
             </Text>
           </TouchableOpacity>
@@ -790,7 +790,7 @@ export const PlanDetailModal: React.FC = () => {
           <View style={[st.socialProof, { backgroundColor: C.gray200, borderColor: C.border }]}>
             <MiniStampIcon type="proof" size={18} />
             <Text style={[st.socialProofText, { color: C.gray800 }]}>
-              {plan.proofCount ?? 0} {(plan.proofCount ?? 0) === 1 ? 'personne' : 'personnes'} l'ont Proof'd
+              {plan.proofCount ?? 0} {(plan.proofCount ?? 0) === 1 ? 'personne l\'a' : 'personnes l\'ont'} vérifié sur Proof.
             </Text>
             {(plan.declinedCount ?? 0) > 0 && (
               <>

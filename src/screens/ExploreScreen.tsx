@@ -722,7 +722,7 @@ export const ExploreScreen: React.FC = () => {
                 (n, isLast) => isLast ? `${formatDuration(n)}+` : formatDuration(n))}
               {renderStepRow('Likes minimum', 'heart-outline', LIKES_STEPS, minLikes, setMinLikes,
                 (n, isLast) => isLast ? `${n}+` : `${n}`)}
-              {renderStepRow('Proof it minimum', 'checkmark-circle-outline', PROOFS_STEPS, minProofs, setMinProofs,
+              {renderStepRow('Proof. it minimum', 'checkmark-circle-outline', PROOFS_STEPS, minProofs, setMinProofs,
                 (n, isLast) => isLast ? `${n}+` : `${n}`)}
             </ScrollView>
 

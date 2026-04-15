@@ -37,7 +37,7 @@ export const AccountPromptModal: React.FC = () => {
                 <Ionicons name="person-add-outline" size={28} color={C.primary} />
               </View>
 
-              <Text style={[styles.title, { color: C.black }]}>Rejoins Proof</Text>
+              <Text style={[styles.title, { color: C.black }]}>Rejoins Proof.</Text>
               <Text style={[styles.body, { color: C.gray700 }]}>
                 Pour profiter de toutes les fonctionnalités — liker, commenter, sauvegarder, explorer — connecte-toi ou crée un compte.
               </Text>

@@ -50,8 +50,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first_love', name: 'First Love', nameEn: 'First Love', emoji: '❤️', description: 'Reçois ton premier like', descriptionEn: 'Receive your first like', category: 'social' },
   { id: 'fan_club', name: 'Fan Club', nameEn: 'Fan Club', emoji: '🙌', description: 'Reçois 50 likes au total', descriptionEn: 'Receive 50 total likes', category: 'social' },
   { id: 'viral', name: 'Viral', nameEn: 'Viral', emoji: '🚀', description: '1 plan avec 100+ likes', descriptionEn: '1 plan with 100+ likes', category: 'social' },
-  { id: 'proof_it', name: 'Proof It', nameEn: 'Proof It', emoji: '✅', description: 'Reçois ta première validation Proof', descriptionEn: 'Receive your first Proof validation', category: 'social' },
-  { id: 'trusted', name: 'Trusted', nameEn: 'Trusted', emoji: '🛡️', description: 'Reçois 10 validations Proof', descriptionEn: 'Receive 10 Proof validations', category: 'social' },
+  { id: 'proof_it', name: 'Proof. It', nameEn: 'Proof. It', emoji: '✅', description: 'Reçois ta première validation Proof.', descriptionEn: 'Receive your first Proof. validation', category: 'social' },
+  { id: 'trusted', name: 'Trusted', nameEn: 'Trusted', emoji: '🛡️', description: 'Reçois 10 validations Proof.', descriptionEn: 'Receive 10 Proof. validations', category: 'social' },
   { id: 'first_comment', name: 'First Comment', nameEn: 'First Comment', emoji: '💬', description: 'Poste ton premier commentaire', descriptionEn: 'Post your first comment', category: 'social' },
   { id: 'critic', name: 'Critic', nameEn: 'Critic', emoji: '📝', description: 'Poste 10 commentaires', descriptionEn: 'Post 10 comments', category: 'social' },
   { id: 'saved_badge', name: 'Saved', nameEn: 'Saved', emoji: '🔖', description: '1 plan sauvegardé 10+ fois', descriptionEn: '1 plan saved 10+ times', category: 'social' },
@@ -69,7 +69,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'hidden_gem', name: 'Hidden Gem', nameEn: 'Hidden Gem', emoji: '💎', description: '1 lieu avec moins de 100 avis Google', descriptionEn: '1 place with fewer than 100 Google reviews', category: 'places' },
 
   // ─── SPECIAL ───
-  { id: 'proof_pioneer', name: 'Proof Pioneer', nameEn: 'Proof Pioneer', emoji: '🏴', description: 'Parmi les 500 premiers inscrits', descriptionEn: 'Among the first 500 users', category: 'special' },
+  { id: 'proof_pioneer', name: 'Proof. Pioneer', nameEn: 'Proof. Pioneer', emoji: '🏴', description: 'Parmi les 500 premiers inscrits', descriptionEn: 'Among the first 500 users', category: 'special' },
   { id: 'early_adopter', name: 'Early Adopter', nameEn: 'Early Adopter', emoji: '🌅', description: 'Inscrit avant le lancement public', descriptionEn: 'Signed up before public launch', category: 'special' },
   { id: 'night_owl', name: 'Night Owl', nameEn: 'Night Owl', emoji: '🦉', description: '1 plan créé entre 00h et 05h', descriptionEn: '1 plan created between midnight and 5am', category: 'special' },
   { id: 'comeback_kid', name: 'Comeback Kid', nameEn: 'Comeback Kid', emoji: '🔙', description: 'Retour après 30 jours inactif + plan posté', descriptionEn: 'Return after 30 days inactive + plan posted', category: 'special' },

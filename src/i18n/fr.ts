@@ -188,8 +188,8 @@ export const fr = {
   plan_comment_just_now: "à l'instant",
 
   // Place detail
-  place_reviews_proof: 'avis Proof',
-  place_community_reviews: 'AVIS DE LA COMMUNAUTÉ PROOF',
+  place_reviews_proof: 'avis Proof.',
+  place_community_reviews: 'AVIS DE LA COMMUNAUTÉ PROOF.',
   place_rate: '📍 Noter ce lieu',
   place_rate_condition: 'Valide uniquement si tu as fait le plan',
 
@@ -316,7 +316,7 @@ export const fr = {
   proof_survey_title: 'Tu as fait ce plan ?',
   proof_survey_subtitle: 'Donne ton avis pour aider la communauté',
   proof_survey_hint: 'Ton avis aide les autres à choisir leurs sorties',
-  proof_validated: 'Proof ✓',
+  proof_validated: 'Proof. ✓',
   proof_declined: 'Passé',
 
   // Place rating (ProofSurvey step 2)
@@ -327,10 +327,10 @@ export const fr = {
   proof_rate_skip: 'Passer',
 
   // Place detail — Proof section
-  place_proof_rating: 'Note Proof',
-  place_proof_reviews: 'AVIS DE LA COMMUNAUTÉ PROOF',
-  place_proof_reviews_count: 'avis Proof',
-  place_no_proof_reviews: 'Aucun avis Proof pour le moment',
+  place_proof_rating: 'Note Proof.',
+  place_proof_reviews: 'AVIS DE LA COMMUNAUTÉ PROOF.',
+  place_proof_reviews_count: 'avis Proof.',
+  place_no_proof_reviews: 'Aucun avis Proof. pour le moment',
   place_no_proof_reviews_sub: 'Fais un plan avec ce lieu pour donner ton avis !',
   place_related_plans: 'PLANS AVEC CE LIEU',
 };

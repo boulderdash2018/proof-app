@@ -39,11 +39,11 @@ export const RankProgressBar: React.FC<Props> = ({ totalProofs }) => {
       </View>
       {next ? (
         <Text style={[styles.progressText, { color: C.gray600 }]}>
-          {totalProofs} / {next.minProofs} proof validations
+          {totalProofs} / {next.minProofs} Proof. validations
         </Text>
       ) : (
         <Text style={[styles.progressText, { color: current.color }]}>
-          {totalProofs} proof validations
+          {totalProofs} Proof. validations
         </Text>
       )}
     </View>

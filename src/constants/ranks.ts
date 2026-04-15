@@ -18,7 +18,7 @@ export const RANKS: RankDef[] = [
   { id: 'explorer', name: 'Explorer', emoji: '🧭', color: '#D4845A', bgColor: '#2D2118', borderColor: '#3D2E22', minProofs: 15 },
   { id: 'curator', name: 'Curator', emoji: '✨', color: '#B07888', bgColor: '#2D1F25', borderColor: '#3D2D30', minProofs: 35 },
   { id: 'tastemaker', name: 'Tastemaker', emoji: '👑', color: '#8B7BA0', bgColor: '#2A2530', borderColor: '#3D3050', minProofs: 75 },
-  { id: 'proof_icon', name: 'Proof Icon', emoji: '🏆', color: '#C9A84C', bgColor: '#2D2510', borderColor: '#3D3318', minProofs: 150 },
+  { id: 'proof_icon', name: 'Proof. Icon', emoji: '🏆', color: '#C9A84C', bgColor: '#2D2510', borderColor: '#3D3318', minProofs: 150 },
   { id: 'top_creator', name: 'Top Creator', emoji: '💎', color: '#D4845A', bgColor: '#2D2118', borderColor: '#3D2E22', minProofs: 300, shimmer: true },
 ];
 

@@ -190,8 +190,8 @@ export const en: Record<TranslationKeys, string> = {
   plan_comment_just_now: 'just now',
 
   // Place detail
-  place_reviews_proof: 'Proof reviews',
-  place_community_reviews: 'PROOF COMMUNITY REVIEWS',
+  place_reviews_proof: 'Proof. reviews',
+  place_community_reviews: 'PROOF. COMMUNITY REVIEWS',
   place_rate: '📍 Rate this place',
   place_rate_condition: 'Only valid if you completed the plan',
 
@@ -318,7 +318,7 @@ export const en: Record<TranslationKeys, string> = {
   proof_survey_title: 'You did this plan?',
   proof_survey_subtitle: 'Share your opinion to help the community',
   proof_survey_hint: 'Your feedback helps others choose their outings',
-  proof_validated: 'Proof ✓',
+  proof_validated: 'Proof. ✓',
   proof_declined: 'Passed',
 
   // Place rating (ProofSurvey step 2)
@@ -329,10 +329,10 @@ export const en: Record<TranslationKeys, string> = {
   proof_rate_skip: 'Skip',
 
   // Place detail — Proof section
-  place_proof_rating: 'Proof rating',
-  place_proof_reviews: 'PROOF COMMUNITY REVIEWS',
-  place_proof_reviews_count: 'Proof reviews',
-  place_no_proof_reviews: 'No Proof reviews yet',
+  place_proof_rating: 'Proof. rating',
+  place_proof_reviews: 'PROOF. COMMUNITY REVIEWS',
+  place_proof_reviews_count: 'Proof. reviews',
+  place_no_proof_reviews: 'No Proof. reviews yet',
   place_no_proof_reviews_sub: 'Complete a plan with this place to leave a review!',
   place_related_plans: 'PLANS WITH THIS PLACE',
 };

@@ -188,7 +188,7 @@ export const notifyProofIt = async (sender: User, plan: Plan): Promise<void> => 
     recipientId: plan.author.id,
     sender,
     type: 'new_proof_it',
-    content: `${sender.username} Proof it'd your plan ${plan.title} \u2713`,
+    content: `${sender.username} a vérifié ton plan ${plan.title} sur Proof. ✓`,
     planId: plan.id,
     planTitle: plan.title,
     planCover: plan.coverPhotos?.[0] ?? null,
