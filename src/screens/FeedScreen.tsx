@@ -184,6 +184,7 @@ export const FeedScreen: React.FC = () => {
         }}
         onDetailStateChange={setIsDetailOpen}
         onPlanPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
+        onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: item.id })}
       />
     ),
     [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave],

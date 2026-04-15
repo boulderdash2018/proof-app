@@ -45,6 +45,7 @@ interface ImmersiveCardProps {
   onProfilePress: (userId: string) => void;
   onDetailStateChange: (isOpen: boolean) => void;
   onPlanPress: () => void;
+  onPlacePress: (placeId: string) => void;
 }
 
 // ── Transport helpers (same as PlanDetailModal) ─────────────
@@ -83,6 +84,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onProfilePress,
   onDetailStateChange,
   onPlanPress,
+  onPlacePress,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
   const cardH = Math.max(1, height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H);
@@ -652,8 +654,12 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                         <View style={[styles.tlLineBot, isLast && !travelToNext && { backgroundColor: 'transparent' }]} />
                       </View>
 
-                      {/* Card body */}
-                      <View style={styles.placeBody}>
+                      {/* Card body — tappable */}
+                      <TouchableOpacity
+                        style={styles.placeBody}
+                        activeOpacity={0.7}
+                        onPress={() => onPlacePress(place.id)}
+                      >
                         {placePhoto && (
                           <Image
                             source={{ uri: placePhoto }}
@@ -662,14 +668,19 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                           />
                         )}
                         <View style={styles.placeInfo}>
-                          {/* Name + reservation */}
-                          <Text style={styles.placeName}>
-                            {place.name}
-                            {place.reservationRecommended ? (
-                              <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
-                            ) : null}
-                          </Text>
-                          <Text style={styles.placeType}>{place.type}</Text>
+                          {/* Name + reservation + chevron */}
+                          <View style={styles.placeHead}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.placeName}>
+                                {place.name}
+                                {place.reservationRecommended ? (
+                                  <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
+                                ) : null}
+                              </Text>
+                              <Text style={styles.placeType}>{place.type}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.25)" />
+                          </View>
 
                           {/* Rating */}
                           {place.rating > 0 && (
@@ -730,7 +741,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                             </View>
                           ))}
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     </View>
 
                     {/* Travel segment to next place */}
@@ -1164,6 +1175,11 @@ const styles = StyleSheet.create({
   },
   placeInfo: {
     padding: 12,
+  },
+  placeHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   placeName: {
     fontSize: 14,
