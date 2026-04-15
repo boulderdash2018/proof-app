@@ -1,10 +1,11 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Easing,
   FlatList,
   Image,
   Dimensions,
@@ -120,6 +121,30 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   const saveLabelOpacity = useRef(new Animated.Value(0)).current;
   const [showSaveLabel, setShowSaveLabel] = useState(false);
 
+  // ── Peek hint — subtle lift on first cards to signal tappable detail ──
+  const peekY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (index >= 4) return; // teach with first 4 cards only
+    const delay = index < 6 ? (index * 60 + 400 + 350) : 400;
+    const timer = setTimeout(() => {
+      Animated.sequence([
+        Animated.timing(peekY, {
+          toValue: -4,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(peekY, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Emil: snappy spring — fast attack (high tension), quick settle (high friction)
   const animateBounce = (scale: Animated.Value) => {
     Animated.sequence([
@@ -203,6 +228,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />
       </TouchableOpacity>
 
+      <Animated.View style={{ transform: [{ translateY: peekY }] }}>
       <TouchableOpacity style={styles.bannerWrap} activeOpacity={1} onPressIn={handleBannerPressIn} onPress={handleDoubleTap}>
         {/* Background: photo carousel or gradient */}
         {allPhotos.length > 0 ? (
@@ -331,6 +357,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         {/* Floating avatar heads — above the title */}
         <FloatingAvatars plan={plan} onProfilePress={onProfilePress} />
       </TouchableOpacity>
+      </Animated.View>
 
       <View style={styles.actionBar}>
         <View style={styles.actionRow}>
