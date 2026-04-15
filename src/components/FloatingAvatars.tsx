@@ -130,14 +130,14 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
+    bottom: 6,
+    left: 12,
     width: AVATAR_OUTER + 4, // slight extra for badge overhang
     zIndex: 10,
   },
   slotWrap: {
     position: 'absolute',
-    right: 0,
+    left: 0,
   },
   avatarShadow: {
     shadowColor: '#000',

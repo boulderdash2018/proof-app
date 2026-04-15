@@ -22,7 +22,6 @@ import { useTrendingStore } from '../store/trendingStore';
 import { Avatar } from './Avatar';
 import { RankBadge } from './RankBadge';
 import { FounderBadge } from './FounderBadge';
-import { Chip } from './Chip';
 import { MiniStampIcon } from './MiniStampIcon';
 import { FriendActivity } from './FriendActivity';
 import { FloatingAvatars } from './FloatingAvatars';
@@ -205,60 +204,100 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.bannerWrap} activeOpacity={1} onPressIn={handleBannerPressIn} onPress={handleDoubleTap}>
+        {/* Background: photo carousel or gradient */}
         {allPhotos.length > 0 ? (
-          <>
-            <FlatList
-              data={allPhotos}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={handlePhotoScroll}
-              scrollEventThrottle={16}
-              keyExtractor={(_, i) => String(i)}
-              style={styles.photoBanner}
-              nestedScrollEnabled
-              renderItem={({ item }) => (
-                <View style={[styles.photoSlide, { width: bannerWidth }]}>
-                  <Image source={{ uri: item }} style={styles.photoImage} />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.55)']}
-                    style={styles.photoOverlay}
-                  />
-                </View>
-              )}
-            />
-            <View style={styles.photoTitleWrap} pointerEvents="none">
-              <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
-            </View>
-            {isNew && (
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>New</Text>
+          <FlatList
+            data={allPhotos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handlePhotoScroll}
+            scrollEventThrottle={16}
+            keyExtractor={(_, i) => String(i)}
+            style={styles.photoBanner}
+            nestedScrollEnabled
+            renderItem={({ item }) => (
+              <View style={[styles.photoSlide, { width: bannerWidth }]}>
+                <Image source={{ uri: item }} style={styles.photoImage} />
               </View>
             )}
-            {allPhotos.length > 1 && (
-              <View style={styles.photoDots} pointerEvents="none">
-                {allPhotos.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.photoDot,
-                      { backgroundColor: i === activePhotoIndex ? '#FFF' : 'rgba(255,255,255,0.4)' },
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
-          </>
+          />
         ) : (
-          <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-            <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
-            {isNew && (
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>New</Text>
+          <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner} />
+        )}
+
+        {/* Gradient overlay — stronger at bottom for readability */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.72)']}
+          locations={[0, 0.5, 1]}
+          style={styles.bannerGradient}
+          pointerEvents="none"
+        />
+
+        {/* Title — bottom left */}
+        <View style={styles.photoTitleWrap} pointerEvents="none">
+          <Text style={styles.bannerTitle} numberOfLines={2}>{plan.title}</Text>
+        </View>
+
+        {/* Category pills — right side, above metadata */}
+        {plan.tags.length > 0 && (
+          <View style={styles.overlayTags} pointerEvents="none">
+            {isTrending && (
+              <View style={styles.overlayTrending}>
+                <Text style={styles.overlayTrendingText}>🔥</Text>
               </View>
             )}
-          </LinearGradient>
+            {plan.tags.slice(0, 2).map((tag) => (
+              <View key={tag} style={styles.overlayTagPill}>
+                <Text style={styles.overlayTagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
         )}
+
+        {/* Metadata — bottom right, single compact pill */}
+        <View style={styles.overlayMeta} pointerEvents="none">
+          {plan.price.includes('Free') ? (
+            <Text style={[styles.overlayMetaText, { fontWeight: '700' }]}>Free ✦</Text>
+          ) : (
+            <>
+              <Ionicons name="cash-outline" size={10} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.overlayMetaText}>{plan.price}</Text>
+            </>
+          )}
+          <Text style={styles.overlayMetaDot}>·</Text>
+          <Ionicons name="hourglass-outline" size={10} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.overlayMetaText}>{plan.duration}</Text>
+          <Text style={styles.overlayMetaDot}>·</Text>
+          <Ionicons name={getTransportIcon(plan.transport) as any} size={10} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.overlayMetaText}>{plan.transport}</Text>
+          <Text style={styles.overlayMetaDot}>·</Text>
+          <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.overlayMetaText}>{plan.places.length} étapes</Text>
+        </View>
+
+        {/* New badge — top right */}
+        {isNew && (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>New</Text>
+          </View>
+        )}
+
+        {/* Photo dots */}
+        {allPhotos.length > 1 && (
+          <View style={styles.photoDots} pointerEvents="none">
+            {allPhotos.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.photoDot,
+                  { backgroundColor: i === activePhotoIndex ? '#FFF' : 'rgba(255,255,255,0.4)' },
+                ]}
+              />
+            ))}
+          </View>
+        )}
+
         {/* Double-tap heart overlay */}
         <Animated.View
           pointerEvents="none"
@@ -274,27 +313,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         >
           <Ionicons name="heart" size={70} color={Colors.primary} />
         </Animated.View>
+
         {/* Floating avatar heads */}
         <FloatingAvatars plan={plan} onProfilePress={onProfilePress} />
       </TouchableOpacity>
 
       <TouchableOpacity activeOpacity={0.92} onPress={onPress} onPressIn={onCardPressIn} onPressOut={onCardPressOut} style={styles.contentArea}>
-        {plan.tags.length > 0 && (
-          <View style={styles.tagsRow}>
-            {isTrending && (
-              <View style={styles.trendingBadge}>
-                <Text style={styles.trendingBadgeText}>🔥 Trending</Text>
-              </View>
-            )}
-            {plan.tags.slice(0, 3).map((tag, index) => (
-              <Chip key={tag} label={tag} variant={index === 0 ? 'filled-black' : 'filled-gray'} small />
-            ))}
-            {plan.places.some((p) => p.reservationRecommended) && (
-              <Text style={styles.resvHint}>﹡ Réservation conseillée</Text>
-            )}
-          </View>
-        )}
-
         {(plan.proofCount ?? 0) > 0 && (
           <View style={styles.proofRow}>
             <MiniStampIcon type="proof" size={16} />
@@ -326,30 +350,6 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </View>
         )}
 
-        <View style={styles.metaRow}>
-          {plan.price.includes('Free') ? (
-            <View style={[styles.metaPill, { backgroundColor: '#16a34a18' }]}>
-              <Text style={[styles.metaItem, { color: '#16a34a', fontWeight: '700' }]}>Free ✦</Text>
-            </View>
-          ) : (
-            <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-              <Ionicons name="cash-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
-              <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.price}</Text>
-            </View>
-          )}
-          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-            <Ionicons name="hourglass-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
-            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.duration}</Text>
-          </View>
-          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-            <Ionicons name={getTransportIcon(plan.transport) as any} size={13} color={C.gold} style={{ marginRight: 4 }} />
-            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.transport}</Text>
-          </View>
-          <View style={[styles.metaPill, { backgroundColor: C.gray300 }]}>
-            <Ionicons name="location-outline" size={13} color={C.gold} style={{ marginRight: 4 }} />
-            <Text style={[styles.metaItem, { color: C.gray800 }]}>{plan.places.length} étapes</Text>
-          </View>
-        </View>
       </TouchableOpacity>
 
       <View style={styles.actionBar}>
@@ -403,21 +403,28 @@ const styles = StyleSheet.create({
   contentArea: { overflow: 'hidden' },
   bannerWrap: { overflow: 'hidden', position: 'relative' } as any,
   doubleTapHeart: { position: 'absolute', width: 70, height: 70, alignItems: 'center', justifyContent: 'center' },
-  banner: { height: BANNER_HEIGHT, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 18 },
-  bannerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
+  banner: { height: BANNER_HEIGHT },
+  bannerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 10 },
   photoBanner: { height: BANNER_HEIGHT },
   photoSlide: { height: BANNER_HEIGHT },
   photoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  photoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
-  photoTitleWrap: { position: 'absolute', bottom: 16, left: 16, right: 16 },
-  photoDots: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', gap: 5 },
+  bannerGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '58%' } as any,
+  photoTitleWrap: { position: 'absolute', bottom: 46, left: 16, right: 110 },
+  photoDots: { position: 'absolute', bottom: 6, alignSelf: 'center', flexDirection: 'row', gap: 5 },
   photoDot: { width: 6, height: 6, borderRadius: 3 },
+  // Overlay — category pills
+  overlayTags: { position: 'absolute', bottom: 48, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5 } as any,
+  overlayTagPill: { backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8 },
+  overlayTagText: { color: 'rgba(255,255,255,0.92)', fontSize: 10, fontFamily: Fonts.serifSemiBold },
+  overlayTrending: { backgroundColor: 'rgba(255,107,53,0.3)', paddingHorizontal: 6, paddingVertical: 3.5, borderRadius: 8 },
+  overlayTrendingText: { fontSize: 10 },
+  // Overlay — metadata pill
+  overlayMeta: { position: 'absolute', bottom: 16, right: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, gap: 4 } as any,
+  overlayMetaText: { color: 'rgba(255,255,255,0.92)', fontSize: 10, fontFamily: Fonts.serifMedium },
+  overlayMetaDot: { color: 'rgba(255,255,255,0.4)', fontSize: 8, marginHorizontal: 1 },
   newBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   newBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FFF', letterSpacing: 0.5 },
-  trendingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B3520', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 6, marginBottom: 4 },
-  trendingBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FF6B35' },
-  resvHint: { fontSize: 10, fontFamily: Fonts.serifMedium, color: '#C0392B', marginLeft: 4, alignSelf: 'center' },
-  tagsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, overflow: 'hidden' },
+  // (tags + trending moved to photo overlay)
   placesList: { paddingHorizontal: 14, paddingTop: 10 },
   placeSeparator: { height: 1, marginVertical: 6, marginLeft: 36 },
   placeRow: { flexDirection: 'row', alignItems: 'center' },
@@ -426,9 +433,7 @@ const styles = StyleSheet.create({
   placeInfo: { flex: 1 },
   placeName: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
   placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, gap: 8 },
-  metaPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  metaItem: { fontSize: 11, fontFamily: Fonts.serifMedium },
+  // (metadata moved to photo overlay)
   actionBar: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
