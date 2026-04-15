@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Easing,
+  PanResponder,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -20,13 +21,20 @@ import { RankBadge } from './RankBadge';
 import { Plan } from '../types';
 
 /* ================================================================
-   ImmersiveCard — swipe-down to reveal plan detail
+   ImmersiveCard — pull-down to reveal plan detail
    ================================================================
-   Architecture:
-   - Image layer behind everything (parallax via scrollY)
-   - Animated.ScrollView on top (transparent spacer + detail)
-   - Card UI (title, author, gradient) inside the spacer
-   - All animations native-driven via scrollY interpolations
+   Two-mode card with rubber-band drag physics:
+
+   Feed mode:
+   - PanResponder captures vertical downward drags
+   - Rubber-band resistance: visual offset lags behind finger
+   - Micro-animations: image scale, overlay, title parallax
+   - Commit / bounce with spring physics
+
+   Detail mode:
+   - Choreographed panel entrance (550 ms, staggered elements)
+   - ScrollView for detail content + "Do it now" CTA
+   - Overscroll-to-return gesture (400 ms snappy exit)
    ================================================================ */
 
 interface ImmersiveCardProps {
@@ -44,14 +52,34 @@ interface ImmersiveCardProps {
   onPlanPress: () => void;
 }
 
+// ── Layout ───────────────────────────────────────────────────
 const CARD_H_PAD = 14;
 const CARD_RADIUS = 22;
 const CARD_V_TOP = 6;
 const CARD_V_BOTTOM = 8;
 const BELOW_CARD_H = 64;
-const COMMIT_THRESHOLD = 120;
-const VEL_THRESHOLD = 0.4;
-const IMAGE_HEADER_RATIO = 0.35;
+
+// ── Gesture thresholds ───────────────────────────────────────
+const DRAG_DEAD_ZONE = 12;
+const DIRECTION_RATIO = 1.8;
+const COMMIT_RATIO = 0.25;
+const VEL_THRESHOLD = 0.5;
+const RETURN_OVERSCROLL = -60;
+
+// ── Easing curves ────────────────────────────────────────────
+const commitEasing = Easing.bezier(0.34, 1.56, 0.64, 1);
+const staggerEasing = Easing.bezier(0.22, 1, 0.36, 1);
+const returnEasing = Easing.bezier(0.32, 0.72, 0, 1);
+
+// ── Timing (ms) ──────────────────────────────────────────────
+const COMMIT_DURATION = 550;
+const RETURN_DURATION = 400;
+const STAGGER_DELAY = 200;
+const STAGGER_INTERVAL = 60;
+const ELEMENT_DURATION = 300;
+const NUM_SECTIONS = 5;
+
+type ViewMode = 'feed' | 'detail';
 
 export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   plan,
@@ -67,39 +95,57 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onDetailStateChange,
   onPlanPress,
 }) => {
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const isCommitting = useRef(false);
-  const isDetailRef = useRef(false);
+  // ── Dimensions ─────────────────────────────────────────────
+  const cardH = Math.max(1, height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H);
+  const cardHRef = useRef(cardH);
+  useEffect(() => {
+    cardHRef.current = cardH;
+  }, [cardH]);
 
-  // Card dimensions
-  const cardH = height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H;
-  const DETAIL_SNAP = cardH * (1 - IMAGE_HEADER_RATIO);
+  // ── State & refs ───────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<ViewMode>('feed');
+  const viewModeRef = useRef<ViewMode>('feed');
+  const isAnimatingRef = useRef(false);
+  const detailScrollRef = useRef<ScrollView>(null);
+  const isTouchingDetailRef = useRef(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
-  // Cover photo + rank
+  // ── Animated values ────────────────────────────────────────
+  const progress = useRef(new Animated.Value(0)).current;
+
+  const detailAnims = useRef(
+    Array.from({ length: NUM_SECTIONS }, () => ({
+      opacity: new Animated.Value(0),
+      translateY: new Animated.Value(24),
+    })),
+  ).current;
+
+  const chevronBounce = useRef(new Animated.Value(0)).current;
+  const chevronTextOpacity = useRef(new Animated.Value(1)).current;
+
+  // ── Cover photo & rank ─────────────────────────────────────
   const coverUrl =
     plan.coverPhotos?.[0] ||
     plan.places?.find((p) => p.photoUrls?.length)?.photoUrls?.[0];
   const rank = getRankForProofs(plan.author?.total_proof_validations || 0);
 
-  // ── Chevron pulse ──────────────────────────────────────────
-  const chevronBounce = useRef(new Animated.Value(0)).current;
-  const [hasScrolled, setHasScrolled] = useState(false);
-
+  // ── Chevron pulse (2.5 s loop, feed mode only) ─────────────
   useEffect(() => {
-    if (hasScrolled || !isActive) return;
+    if (viewMode !== 'feed' || !isActive) {
+      chevronBounce.setValue(0);
+      return;
+    }
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(chevronBounce, {
-          toValue: 6,
-          duration: 1000,
+          toValue: 8,
+          duration: 1250,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(chevronBounce, {
           toValue: 0,
-          duration: 1000,
+          duration: 1250,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
@@ -107,197 +153,302 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     );
     pulse.start();
     return () => pulse.stop();
-  }, [hasScrolled, isActive]);
+  }, [viewMode, isActive]);
 
-  // ── Scroll-driven interpolations (native thread) ───────────
+  // ══════════════════════════════════════════════════════════════
+  //  COMMIT / BOUNCE / RETURN
+  // ══════════════════════════════════════════════════════════════
 
-  // Image parallax
-  const imageTranslateY = scrollY.interpolate({
-    inputRange: [-100, 0, DETAIL_SNAP],
-    outputRange: [25, 0, -70],
+  const commitToDetail = useCallback(() => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onDetailStateChange(true);
+
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: COMMIT_DURATION,
+      easing: commitEasing,
+      useNativeDriver: true,
+    }).start(() => {
+      viewModeRef.current = 'detail';
+      setViewMode('detail');
+    });
+
+    setTimeout(() => {
+      Animated.stagger(
+        STAGGER_INTERVAL,
+        detailAnims.map((a) =>
+          Animated.parallel([
+            Animated.timing(a.opacity, {
+              toValue: 1,
+              duration: ELEMENT_DURATION,
+              easing: staggerEasing,
+              useNativeDriver: true,
+            }),
+            Animated.timing(a.translateY, {
+              toValue: 0,
+              duration: ELEMENT_DURATION,
+              easing: staggerEasing,
+              useNativeDriver: true,
+            }),
+          ]),
+        ),
+      ).start(() => {
+        isAnimatingRef.current = false;
+      });
+    }, STAGGER_DELAY);
+  }, [onDetailStateChange]);
+
+  const bounceBack = useCallback(() => {
+    isAnimatingRef.current = true;
+    Animated.spring(progress, {
+      toValue: 0,
+      stiffness: 400,
+      damping: 30,
+      mass: 1,
+      useNativeDriver: true,
+    }).start(() => {
+      viewModeRef.current = 'feed';
+      isAnimatingRef.current = false;
+    });
+    Animated.sequence([
+      Animated.delay(300),
+      Animated.timing(chevronTextOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const returnToFeed = useCallback(() => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onDetailStateChange(false);
+
+    detailAnims.forEach((a) => {
+      a.opacity.setValue(0);
+      a.translateY.setValue(24);
+    });
+
+    Animated.timing(progress, {
+      toValue: 0,
+      duration: RETURN_DURATION,
+      easing: returnEasing,
+      useNativeDriver: true,
+    }).start(() => {
+      viewModeRef.current = 'feed';
+      setViewMode('feed');
+      isAnimatingRef.current = false;
+      detailScrollRef.current?.scrollTo({ y: 0, animated: false });
+      chevronTextOpacity.setValue(1);
+    });
+  }, [onDetailStateChange]);
+
+  // Store latest refs for PanResponder closures
+  const commitRef = useRef(commitToDetail);
+  const bounceRef = useRef(bounceBack);
+  useEffect(() => {
+    commitRef.current = commitToDetail;
+  }, [commitToDetail]);
+  useEffect(() => {
+    bounceRef.current = bounceBack;
+  }, [bounceBack]);
+
+  // ══════════════════════════════════════════════════════════════
+  //  PAN RESPONDER — rubber-band drag
+  // ══════════════════════════════════════════════════════════════
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gs) => {
+          if (viewModeRef.current !== 'feed') return false;
+          if (isAnimatingRef.current) return false;
+          return (
+            gs.dy > DRAG_DEAD_ZONE &&
+            Math.abs(gs.dy) > Math.abs(gs.dx) * DIRECTION_RATIO
+          );
+        },
+        onPanResponderGrant: () => {
+          setHasInteracted(true);
+          Animated.timing(chevronTextOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderMove: (_, gs) => {
+          const raw = Math.max(0, gs.dy);
+          const maxD = cardHRef.current;
+          const resisted = raw * (1 - raw / (maxD * 2));
+          const p = Math.min(resisted / (maxD * 0.625), 0.4);
+          progress.setValue(p);
+        },
+        onPanResponderRelease: (_, gs) => {
+          const raw = Math.max(0, gs.dy);
+          const threshold = cardHRef.current * COMMIT_RATIO;
+          if (raw > threshold || gs.vy > VEL_THRESHOLD) {
+            commitRef.current();
+          } else {
+            bounceRef.current();
+          }
+        },
+        onPanResponderTerminate: () => {
+          bounceRef.current();
+        },
+      }),
+    [],
+  );
+
+  // ══════════════════════════════════════════════════════════════
+  //  DETAIL SCROLL HANDLERS (overscroll → return)
+  // ══════════════════════════════════════════════════════════════
+
+  const handleDetailScrollBeginDrag = useCallback(() => {
+    isTouchingDetailRef.current = true;
+  }, []);
+  const handleDetailScrollEndDrag = useCallback(() => {
+    isTouchingDetailRef.current = false;
+  }, []);
+  const handleDetailScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = e.nativeEvent.contentOffset.y;
+      if (
+        isTouchingDetailRef.current &&
+        y < RETURN_OVERSCROLL &&
+        viewModeRef.current === 'detail' &&
+        !isAnimatingRef.current
+      ) {
+        returnToFeed();
+      }
+    },
+    [returnToFeed],
+  );
+
+  // ── Reset when card becomes inactive ───────────────────────
+  useEffect(() => {
+    if (!isActive) {
+      progress.setValue(0);
+      detailAnims.forEach((a) => {
+        a.opacity.setValue(0);
+        a.translateY.setValue(24);
+      });
+      if (viewModeRef.current !== 'feed') {
+        viewModeRef.current = 'feed';
+        setViewMode('feed');
+        onDetailStateChange(false);
+      }
+      isAnimatingRef.current = false;
+      chevronTextOpacity.setValue(1);
+      detailScrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [isActive]);
+
+  // ══════════════════════════════════════════════════════════════
+  //  INTERPOLATIONS — all driven by `progress` (0 → 1)
+  // ══════════════════════════════════════════════════════════════
+
+  // Image parallax + scale
+  const imageScale = progress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [1, 0.92, 0.82],
     extrapolate: 'clamp',
   });
-  const imageScale = scrollY.interpolate({
-    inputRange: [-50, 0, DETAIL_SNAP],
-    outputRange: [1.04, 1, 0.92],
-    extrapolate: 'clamp',
-  });
-  const imageDimOpacity = scrollY.interpolate({
-    inputRange: [0, DETAIL_SNAP],
-    outputRange: [0, 0.45],
+  const imageTranslateY = progress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, -20, -60],
     extrapolate: 'clamp',
   });
 
-  // Card gradient
-  const gradientOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
+  // Dark overlay on image
+  const overlayOpacity = progress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 0.3, 0.55],
+    extrapolate: 'clamp',
+  });
+
+  // Card UI layer (title, author, gradient, actions)
+  const cardUIOpacity = progress.interpolate({
+    inputRange: [0, 0.25],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const titleTranslateY = progress.interpolate({
+    inputRange: [0, 0.4],
+    outputRange: [0, -50],
+    extrapolate: 'clamp',
+  });
+  const titleScale = progress.interpolate({
+    inputRange: [0, 0.4],
+    outputRange: [1, 0.9],
+    extrapolate: 'clamp',
+  });
+
+  // Actions (like / save)
+  const actionsOpacity = progress.interpolate({
+    inputRange: [0, 0.15],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
-  // Title + author parallax (counteract 40% of scroll → moves at 0.6×)
-  const titleCounterY = scrollY.interpolate({
-    inputRange: [0, DETAIL_SNAP],
-    outputRange: [0, DETAIL_SNAP * 0.35],
-    extrapolate: 'clamp',
-  });
-  const titleOpacity = scrollY.interpolate({
-    inputRange: [0, 160],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  // Actions (like/save) — stay in place then fade
-  const actionsCounterY = scrollY.interpolate({
-    inputRange: [0, 150],
-    outputRange: [0, 150],
-    extrapolate: 'clamp',
-  });
-  const actionsOpacity = scrollY.interpolate({
-    inputRange: [0, 80],
+  // Bottom gradient
+  const gradientOpacity = progress.interpolate({
+    inputRange: [0, 0.2],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
   // Chevron
-  const chevronOpacity = scrollY.interpolate({
-    inputRange: [0, 60],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-  const chevronRotation = scrollY.interpolate({
-    inputRange: [0, COMMIT_THRESHOLD],
-    outputRange: ['0deg', '180deg'],
-    extrapolate: 'clamp',
-  });
-
-  // Below-card (meta + tags)
-  const belowCardOpacity = scrollY.interpolate({
-    inputRange: [0, 60],
+  const chevronOpacity = progress.interpolate({
+    inputRange: [0, 0.1],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
-  // Detail content entrance (stagger via different ranges)
-  const makeDetailAnim = (order: number) => {
-    const start = DETAIL_SNAP * 0.5 + order * DETAIL_SNAP * 0.06;
-    const end = start + DETAIL_SNAP * 0.2;
-    return {
-      opacity: scrollY.interpolate({
-        inputRange: [start, end],
-        outputRange: [0, 1],
-        extrapolate: 'clamp',
-      }),
-      translateY: scrollY.interpolate({
-        inputRange: [start, end],
-        outputRange: [30, 0],
-        extrapolate: 'clamp',
-      }),
-    };
-  };
+  // Below-card meta
+  const belowCardOpacity = progress.interpolate({
+    inputRange: [0, 0.15],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
-  // ── Scroll handlers ────────────────────────────────────────
-
-  const handleScrollEndDrag = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (isDetailRef.current || isCommitting.current) return;
-      const y = e.nativeEvent.contentOffset.y;
-      const vy = e.nativeEvent.velocity?.y ?? 0;
-
-      if (y > COMMIT_THRESHOLD || vy > VEL_THRESHOLD) {
-        commitToDetail();
-      } else if (y > 0) {
-        bounceBack();
-      }
-    },
-    [cardH],
-  );
-
-  const handleMomentumEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (isDetailRef.current || isCommitting.current) return;
-      const y = e.nativeEvent.contentOffset.y;
-      if (y > COMMIT_THRESHOLD) {
-        commitToDetail();
-      } else if (y > 0) {
-        bounceBack();
-      }
-    },
-    [cardH],
-  );
-
-  const handleScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      // Return to feed on overscroll at top while in detail
-      if (isDetailRef.current && y < -75 && !isCommitting.current) {
-        returnToFeed();
-      }
-    },
-    [],
-  );
-
-  const commitToDetail = () => {
-    if (isCommitting.current) return;
-    isCommitting.current = true;
-    setIsDetailOpen(true);
-    isDetailRef.current = true;
-    setHasScrolled(true);
-    onDetailStateChange(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    (scrollRef.current as any)?.scrollTo({ y: DETAIL_SNAP, animated: true });
-    setTimeout(() => {
-      isCommitting.current = false;
-    }, 500);
-  };
-
-  const bounceBack = () => {
-    (scrollRef.current as any)?.scrollTo({ y: 0, animated: true });
-  };
-
-  const returnToFeed = () => {
-    if (isCommitting.current) return;
-    isCommitting.current = true;
-    setIsDetailOpen(false);
-    isDetailRef.current = false;
-    onDetailStateChange(false);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    (scrollRef.current as any)?.scrollTo({ y: 0, animated: true });
-    setTimeout(() => {
-      isCommitting.current = false;
-    }, 500);
-  };
-
-  // Reset when card becomes inactive
-  useEffect(() => {
-    if (!isActive && isDetailRef.current) {
-      setIsDetailOpen(false);
-      isDetailRef.current = false;
-      onDetailStateChange(false);
-      (scrollRef.current as any)?.scrollTo({ y: 0, animated: false });
-    }
-  }, [isActive]);
+  // Detail panel — stays off-screen during drag, slides up on commit
+  const detailTranslateY = progress.interpolate({
+    inputRange: [0, 0.35, 1, 1.15],
+    outputRange: [cardH, cardH, 0, -15],
+    extrapolate: 'clamp',
+  });
+  const detailOpacity = progress.interpolate({
+    inputRange: [0, 0.35, 0.5],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
 
   // ══════════════════════════════════════════════════════════════
   //  RENDER
   // ══════════════════════════════════════════════════════════════
-  const d1 = makeDetailAnim(0);
-  const d2 = makeDetailAnim(1);
-  const d3 = makeDetailAnim(2);
-  const d4 = makeDetailAnim(3);
+  const d = detailAnims;
 
   return (
     <View style={[styles.frame, { width, height }]}>
-      {/* ── Card container (rounded, clips everything) ── */}
-      <View style={styles.card}>
-        {/* ─── Image layer (behind scroll, parallax) ─── */}
+      {/* ── Card container ── */}
+      <View
+        style={styles.card}
+        {...(viewMode === 'feed' ? panResponder.panHandlers : {})}
+      >
+        {/* ─── Image layer (parallax + scale + dim) ─── */}
         <Animated.View
           style={[
             styles.imageWrap,
             {
-              transform: [{ translateY: imageTranslateY }, { scale: imageScale }],
+              transform: [
+                { translateY: imageTranslateY },
+                { scale: imageScale },
+              ],
             },
           ]}
         >
@@ -312,178 +463,178 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1C1917' }]}
             />
           )}
-          {/* Dim overlay */}
-          <Animated.View style={[styles.imageDim, { opacity: imageDimOpacity }]} />
+          <Animated.View style={[styles.imageDim, { opacity: overlayOpacity }]} />
         </Animated.View>
 
-        {/* ─── Scrollable content ─── */}
-        <Animated.ScrollView
-          ref={scrollRef as any}
-          style={StyleSheet.absoluteFillObject}
-          contentContainerStyle={{ minHeight: cardH * 2.5 }}
-          showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          bounces
-          scrollEnabled={isActive}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true, listener: handleScroll },
-          )}
-          onScrollEndDrag={handleScrollEndDrag}
-          onMomentumScrollEnd={handleMomentumEnd}
+        {/* ─── Card UI layer (feed-mode content) ─── */}
+        <Animated.View
+          style={[StyleSheet.absoluteFillObject, { opacity: cardUIOpacity }]}
+          pointerEvents={viewMode === 'feed' ? 'auto' : 'none'}
         >
-          {/* ── Spacer (transparent — image shows through) ── */}
-          <View style={{ height: cardH }}>
-            {/* Bottom gradient */}
-            <Animated.View
-              style={[styles.gradientWrap, { opacity: gradientOpacity }]}
+          {/* Top vignette */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.35)', 'transparent']}
+            style={styles.topGradient}
+          />
+
+          {/* Bottom gradient */}
+          <Animated.View
+            style={[styles.bottomGradientWrap, { opacity: gradientOpacity }]}
+          >
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.94)']}
+              locations={[0.3, 0.6, 1]}
+              style={StyleSheet.absoluteFillObject}
+            />
+          </Animated.View>
+
+          {/* Actions (like / save) top-right */}
+          <Animated.View style={[styles.cardActions, { opacity: actionsOpacity }]}>
+            <TouchableOpacity
+              onPress={onLike}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.94)']}
-                locations={[0.3, 0.6, 1]}
-                style={StyleSheet.absoluteFillObject}
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={24}
+                color={isLiked ? '#FF4D67' : '#FFF'}
+                style={styles.iconShadow}
               />
-            </Animated.View>
-
-            {/* Card info (title, author) — parallax */}
-            <Animated.View
-              style={[
-                styles.cardInfo,
-                {
-                  transform: [{ translateY: titleCounterY }],
-                  opacity: titleOpacity,
-                },
-              ]}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onSave}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <FloatingAvatars
-                plan={plan}
-                onProfilePress={onProfilePress}
-                containerStyle={styles.avatarsInline}
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={22}
+                color={isSaved ? Colors.primary : '#FFF'}
+                style={styles.iconShadow}
               />
+            </TouchableOpacity>
+          </Animated.View>
 
-              {plan.tags?.length > 0 && (
-                <Text style={styles.categoryLabel}>
-                  {plan.tags[0].toUpperCase()}
-                </Text>
-              )}
+          {/* Card info (bottom — title, author, avatars) */}
+          <Animated.View
+            style={[
+              styles.cardInfo,
+              {
+                transform: [
+                  { translateY: titleTranslateY },
+                  { scale: titleScale },
+                ],
+              },
+            ]}
+          >
+            <FloatingAvatars
+              plan={plan}
+              onProfilePress={onProfilePress}
+              containerStyle={styles.avatarsInline}
+            />
 
-              <TouchableOpacity activeOpacity={0.85} onPress={onPlanPress}>
-                <Text style={styles.planTitle} numberOfLines={2}>
-                  {plan.title}
-                </Text>
-              </TouchableOpacity>
+            {plan.tags?.length > 0 && (
+              <Text style={styles.categoryLabel}>
+                {plan.tags[0].toUpperCase()}
+              </Text>
+            )}
 
-              <TouchableOpacity
-                style={styles.authorRow}
-                activeOpacity={0.7}
-                onPress={onAuthorPress}
+            {/* Title — NOT tappable (swipe is the only entry) */}
+            <Text style={styles.planTitle} numberOfLines={2}>
+              {plan.title}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.authorRow}
+              activeOpacity={0.7}
+              onPress={onAuthorPress}
+            >
+              <View
+                style={[
+                  styles.authorAvatar,
+                  { backgroundColor: plan.author?.avatarBg || '#444' },
+                ]}
               >
-                <View
-                  style={[
-                    styles.authorAvatar,
-                    { backgroundColor: plan.author?.avatarBg || '#444' },
-                  ]}
-                >
-                  {plan.author?.avatarUrl ? (
-                    <Image
-                      source={{ uri: plan.author.avatarUrl }}
-                      style={styles.authorAvatarImg}
-                    />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.authorInitials,
-                        { color: plan.author?.avatarColor || '#FFF' },
-                      ]}
-                    >
-                      {plan.author?.initials || '?'}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.authorName} numberOfLines={1}>
-                  {plan.author?.displayName || 'Inconnu'}
-                </Text>
-                {rank && <RankBadge rank={rank} small />}
-              </TouchableOpacity>
-            </Animated.View>
+                {plan.author?.avatarUrl ? (
+                  <Image
+                    source={{ uri: plan.author.avatarUrl }}
+                    style={styles.authorAvatarImg}
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.authorInitials,
+                      { color: plan.author?.avatarColor || '#FFF' },
+                    ]}
+                  >
+                    {plan.author?.initials || '?'}
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.authorName} numberOfLines={1}>
+                {plan.author?.displayName || 'Inconnu'}
+              </Text>
+              {rank && <RankBadge rank={rank} small />}
+            </TouchableOpacity>
+          </Animated.View>
 
-            {/* Chevron hint */}
-            <Animated.View
-              style={[
-                styles.chevronWrap,
-                {
-                  opacity: chevronOpacity,
-                  transform: [
-                    { translateY: chevronBounce },
-                    { rotate: chevronRotation },
-                  ],
-                },
-              ]}
-            >
+          {/* Chevron hint + text */}
+          <Animated.View style={[styles.chevronWrap, { opacity: chevronOpacity }]}>
+            <Animated.View style={{ transform: [{ translateY: chevronBounce }] }}>
               <Ionicons
                 name="chevron-down"
                 size={18}
                 color="rgba(255,255,255,0.55)"
               />
             </Animated.View>
-
-            {/* Actions (like/save) — counteract scroll to stay in place */}
-            <Animated.View
-              style={[
-                styles.cardActions,
-                {
-                  transform: [{ translateY: actionsCounterY }],
-                  opacity: actionsOpacity,
-                },
-              ]}
-              pointerEvents={isDetailOpen ? 'none' : 'auto'}
+            <Animated.Text
+              style={[styles.chevronText, { opacity: chevronTextOpacity }]}
             >
-              <TouchableOpacity
-                onPress={onLike}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={isLiked ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={isLiked ? '#FF4D67' : '#FFF'}
-                  style={styles.iconShadow}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={onSave}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                  size={22}
-                  color={isSaved ? Colors.primary : '#FFF'}
-                  style={styles.iconShadow}
-                />
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
+              Glisse pour voir le plan
+            </Animated.Text>
+          </Animated.View>
+        </Animated.View>
 
-          {/* ══ DETAIL CONTENT (below fold) ══ */}
-          <View style={styles.detail}>
+        {/* ─── Detail panel (slides up from bottom) ─── */}
+        <Animated.View
+          style={[
+            styles.detailPanel,
+            {
+              height: cardH,
+              transform: [{ translateY: detailTranslateY }],
+              opacity: detailOpacity,
+            },
+          ]}
+          pointerEvents={viewMode === 'detail' ? 'auto' : 'none'}
+        >
+          <ScrollView
+            ref={detailScrollRef}
+            style={styles.detailScroll}
+            contentContainerStyle={styles.detailScrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces
+            scrollEnabled={viewMode === 'detail'}
+            scrollEventThrottle={16}
+            onScroll={handleDetailScroll}
+            onScrollBeginDrag={handleDetailScrollBeginDrag}
+            onScrollEndDrag={handleDetailScrollEndDrag}
+          >
             {/* Return indicator */}
-            {isDetailOpen && (
-              <View style={styles.returnHint}>
-                <Ionicons
-                  name="chevron-up"
-                  size={16}
-                  color="rgba(255,255,255,0.4)"
-                />
-                <Text style={styles.returnText}>Tirer pour revenir</Text>
-              </View>
-            )}
+            <View style={styles.returnHint}>
+              <Ionicons
+                name="chevron-up"
+                size={16}
+                color="rgba(255,255,255,0.4)"
+              />
+              <Text style={styles.returnText}>Tirer pour revenir</Text>
+            </View>
 
-            {/* Detail header */}
+            {/* 0 — Title & meta */}
             <Animated.View
               style={{
-                opacity: d1.opacity,
-                transform: [{ translateY: d1.translateY }],
+                opacity: d[0].opacity,
+                transform: [{ translateY: d[0].translateY }],
               }}
             >
               <Text style={styles.detailTitle}>{plan.title}</Text>
@@ -524,14 +675,14 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </View>
             </Animated.View>
 
-            {/* Tags */}
+            {/* 1 — Tags */}
             {plan.tags?.length > 0 && (
               <Animated.View
                 style={[
                   styles.detailTags,
                   {
-                    opacity: d2.opacity,
-                    transform: [{ translateY: d2.translateY }],
+                    opacity: d[1].opacity,
+                    transform: [{ translateY: d[1].translateY }],
                   },
                 ]}
               >
@@ -543,11 +694,28 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </Animated.View>
             )}
 
-            {/* Itinerary */}
+            {/* 2 — "Do it now" CTA */}
             <Animated.View
               style={{
-                opacity: d3.opacity,
-                transform: [{ translateY: d3.translateY }],
+                opacity: d[2].opacity,
+                transform: [{ translateY: d[2].translateY }],
+              }}
+            >
+              <TouchableOpacity
+                style={styles.doItNowBtn}
+                activeOpacity={0.8}
+                onPress={onPlanPress}
+              >
+                <Text style={styles.doItNowText}>Do it now</Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFF" />
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* 3 — Itinerary */}
+            <Animated.View
+              style={{
+                opacity: d[3].opacity,
+                transform: [{ translateY: d[3].translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Itinéraire</Text>
@@ -583,11 +751,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               ))}
             </Animated.View>
 
-            {/* Author section */}
+            {/* 4 — Author */}
             <Animated.View
               style={{
-                opacity: d4.opacity,
-                transform: [{ translateY: d4.translateY }],
+                opacity: d[4].opacity,
+                transform: [{ translateY: d[4].translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Publié par</Text>
@@ -636,13 +804,12 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Bottom safe padding */}
             <View style={{ height: 120 }} />
-          </View>
-        </Animated.ScrollView>
+          </ScrollView>
+        </Animated.View>
       </View>
 
-      {/* ── Below card (meta + tags, fades on scroll) ── */}
+      {/* ── Below card (meta + tags — fades during drag) ── */}
       <Animated.View style={[styles.belowCard, { opacity: belowCardOpacity }]}>
         <View style={styles.belowMeta}>
           {plan.price ? (
@@ -709,20 +876,44 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
 
-  // ── Card gradient ──────────────────────────────────────────
-  gradientWrap: {
+  // ── Gradients ──────────────────────────────────────────────
+  topGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '25%',
+    zIndex: 1,
+  },
+  bottomGradientWrap: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     height: '55%',
-    zIndex: 2,
+    zIndex: 1,
   },
 
-  // ── Card info ──────────────────────────────────────────────
+  // ── Card actions (like / save) ─────────────────────────────
+  cardActions: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    zIndex: 5,
+  } as any,
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+
+  // ── Card info (bottom) ─────────────────────────────────────
   cardInfo: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 56,
     left: 18,
     right: 18,
     zIndex: 3,
@@ -768,40 +959,47 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serifSemiBold,
   },
 
-  // ── Chevron ────────────────────────────────────────────────
+  // ── Chevron hint ───────────────────────────────────────────
   chevronWrap: {
     position: 'absolute',
-    bottom: 14,
+    bottom: 16,
     alignSelf: 'center',
     alignItems: 'center',
     zIndex: 3,
   },
-
-  // ── Card actions (like/save) ───────────────────────────────
-  cardActions: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    zIndex: 5,
-  } as any,
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+  chevronText: {
+    fontSize: 12,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
   },
 
-  // ── Detail content ─────────────────────────────────────────
-  detail: {
-    backgroundColor: '#0D0D0D',
+  // ── Detail panel ───────────────────────────────────────────
+  detailPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    minHeight: 400,
+    backgroundColor: '#0D0D0D',
+    overflow: 'hidden',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 30,
+    elevation: 20,
   },
+  detailScroll: {
+    flex: 1,
+  },
+  detailScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+
+  // ── Return hint ────────────────────────────────────────────
   returnHint: {
     alignItems: 'center',
     marginBottom: 16,
@@ -812,6 +1010,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.35)',
     marginTop: 2,
   },
+
+  // ── Detail content ─────────────────────────────────────────
   detailTitle: {
     fontSize: 24,
     fontFamily: Fonts.serifBold,
@@ -843,7 +1043,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 24,
+    marginBottom: 20,
   } as any,
   detailTagChip: {
     paddingHorizontal: 12,
@@ -858,6 +1058,25 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serifSemiBold,
     color: 'rgba(255,255,255,0.6)',
   },
+
+  // ── Do-it-now CTA ──────────────────────────────────────────
+  doItNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+  } as any,
+  doItNowText: {
+    fontSize: 16,
+    fontFamily: Fonts.serifBold,
+    color: '#FFF',
+  },
+
+  // ── Section titles ─────────────────────────────────────────
   sectionTitle: {
     fontSize: 17,
     fontFamily: Fonts.serifBold,
