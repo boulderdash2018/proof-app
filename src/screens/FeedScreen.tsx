@@ -227,6 +227,7 @@ export const FeedScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={currentPlans}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
@@ -406,6 +407,6 @@ const styles = StyleSheet.create({
   },
 
   // Collapsing header
-  safeAreaFill: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200 },
-  floatingHeader: { position: 'absolute', left: 0, right: 0, zIndex: 100 },
+  safeAreaFill: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200, elevation: 20 },
+  floatingHeader: { position: 'absolute', left: 0, right: 0, zIndex: 100, elevation: 10 },
 });
