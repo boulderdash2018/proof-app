@@ -79,7 +79,15 @@ export const DoItNowScreen: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [planRouteCoords, setPlanRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  // Progressive segment polyline state
+  const [segmentCoords, setSegmentCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [prevSegmentCoords, setPrevSegmentCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [segmentAlpha, setSegmentAlpha] = useState(1);
+  const [prevSegmentAlpha, setPrevSegmentAlpha] = useState(0);
+  const [characterPosition, setCharacterPosition] = useState<{ latitude: number; longitude: number } | null>(null);
+  const prevIndexRef = useRef(0);
+  const characterPosRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const segmentCoordsRef = useRef<{ latitude: number; longitude: number }[]>([]);
   const [placeMode, setPlaceMode] = useState<PlaceModeState | null>(null);
   const [loading, setLoading] = useState(true);
   const [arrivedMessage, setArrivedMessage] = useState<string | null>(null);
@@ -116,27 +124,135 @@ export const DoItNowScreen: React.FC = () => {
     };
   }, []);
 
-  // Fetch plan route polyline (static — connects all places in order)
+  // Fetch initial segment directions + initialize proof character
   useEffect(() => {
-    const validPlaces = plan.places.filter(p => p.latitude && p.longitude);
-    if (validPlaces.length < 2) return;
-    // Build a straight-line path through all places; upgrade to Directions API if needed
-    const origin = { lat: validPlaces[0].latitude!, lng: validPlaces[0].longitude! };
-    const dest = { lat: validPlaces[validPlaces.length - 1].latitude!, lng: validPlaces[validPlaces.length - 1].longitude! };
-    const waypoints = validPlaces.slice(1, -1).map(p => ({ lat: p.latitude!, lng: p.longitude! }));
+    const places = plan.places.filter(p => p.latitude && p.longitude);
+    if (places.length < 2) return;
 
-    // Try getting walking directions for the full plan route
-    getDirections(origin, dest, 'walking').then((result) => {
+    // Initialize proof character at first place
+    const startPos = { latitude: places[0].latitude!, longitude: places[0].longitude! };
+    setCharacterPosition(startPos);
+    characterPosRef.current = startPos;
+
+    // Fetch directions for first segment (place[0] → place[1])
+    const from = { lat: places[0].latitude!, lng: places[0].longitude! };
+    const to = { lat: places[1].latitude!, lng: places[1].longitude! };
+
+    getDirections(from, to, 'walking').then((result) => {
       if (result?.overviewPolyline) {
-        setPlanRouteCoords(decodePolyline(result.overviewPolyline));
+        const coords = decodePolyline(result.overviewPolyline);
+        setSegmentCoords(coords);
+        segmentCoordsRef.current = coords;
       } else {
-        // Fallback: straight lines
-        setPlanRouteCoords(validPlaces.map(p => ({ latitude: p.latitude!, longitude: p.longitude! })));
+        const coords = [startPos, { latitude: places[1].latitude!, longitude: places[1].longitude! }];
+        setSegmentCoords(coords);
+        segmentCoordsRef.current = coords;
       }
+      setSegmentAlpha(1);
     }).catch(() => {
-      setPlanRouteCoords(validPlaces.map(p => ({ latitude: p.latitude!, longitude: p.longitude! })));
+      const coords = [startPos, { latitude: places[1].latitude!, longitude: places[1].longitude! }];
+      setSegmentCoords(coords);
+      segmentCoordsRef.current = coords;
+      setSegmentAlpha(1);
     });
+
+    prevIndexRef.current = 0;
   }, []);
+
+  // Animate segment transition when currentIndex advances
+  useEffect(() => {
+    const prev = prevIndexRef.current;
+    if (currentIndex === prev) return;
+
+    const places = plan.places.filter(p => p.latitude && p.longitude);
+
+    // Move current segment → prev segment (to fade out)
+    setPrevSegmentCoords(segmentCoordsRef.current);
+    setPrevSegmentAlpha(1);
+    setSegmentAlpha(0);
+
+    // Character animation: from place[prev] to place[currentIndex]
+    const fromPos = characterPosRef.current || {
+      latitude: places[prev]?.latitude || 0,
+      longitude: places[prev]?.longitude || 0,
+    };
+    const toPos = {
+      latitude: places[currentIndex]?.latitude || 0,
+      longitude: places[currentIndex]?.longitude || 0,
+    };
+
+    // 10 discrete steps over 300ms with ease-out quadratic
+    const steps = 10;
+    const stepDuration = 30;
+
+    for (let i = 1; i <= steps; i++) {
+      setTimeout(() => {
+        const t = i / steps;
+        const ease = 1 - (1 - t) * (1 - t); // ease-out quadratic
+
+        setPrevSegmentAlpha(1 - ease);
+        setSegmentAlpha(ease);
+
+        // Interpolate character position
+        const lat = fromPos.latitude + (toPos.latitude - fromPos.latitude) * ease;
+        const lng = fromPos.longitude + (toPos.longitude - fromPos.longitude) * ease;
+        setCharacterPosition({ latitude: lat, longitude: lng });
+
+        if (i === steps) {
+          characterPosRef.current = toPos;
+          setPrevSegmentCoords([]);
+          setPrevSegmentAlpha(0);
+        }
+      }, i * stepDuration);
+    }
+
+    // Fetch new segment route (currentIndex → currentIndex + 1)
+    if (currentIndex < places.length - 1) {
+      const from = { lat: places[currentIndex].latitude!, lng: places[currentIndex].longitude! };
+      const to = { lat: places[currentIndex + 1].latitude!, lng: places[currentIndex + 1].longitude! };
+
+      getDirections(from, to, 'walking').then((result) => {
+        if (result?.overviewPolyline) {
+          const coords = decodePolyline(result.overviewPolyline);
+          segmentCoordsRef.current = coords;
+          setSegmentCoords(coords);
+        } else {
+          const coords = [
+            { latitude: places[currentIndex].latitude!, longitude: places[currentIndex].longitude! },
+            { latitude: places[currentIndex + 1].latitude!, longitude: places[currentIndex + 1].longitude! },
+          ];
+          segmentCoordsRef.current = coords;
+          setSegmentCoords(coords);
+        }
+      }).catch(() => {
+        const coords = [
+          { latitude: places[currentIndex].latitude!, longitude: places[currentIndex].longitude! },
+          { latitude: places[currentIndex + 1].latitude!, longitude: places[currentIndex + 1].longitude! },
+        ];
+        segmentCoordsRef.current = coords;
+        setSegmentCoords(coords);
+      });
+    } else {
+      // Last place — clear segment
+      setSegmentCoords([]);
+      segmentCoordsRef.current = [];
+    }
+
+    // Recenter map on new segment after animation completes
+    if (currentIndex < places.length - 1) {
+      setTimeout(() => {
+        mapRef.current?.fitToCoordinates(
+          [
+            { latitude: places[currentIndex].latitude!, longitude: places[currentIndex].longitude! },
+            { latitude: places[currentIndex + 1].latitude!, longitude: places[currentIndex + 1].longitude! },
+          ],
+          { edgePadding: { top: 120, right: 60, bottom: 250, left: 60 }, animated: true }
+        );
+      }, 350);
+    }
+
+    prevIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
   // Fetch directions when user location or destination changes
   useEffect(() => {
@@ -254,16 +370,22 @@ export const DoItNowScreen: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fit map to show user + destination
+  // Fit map to show user + current segment endpoints
   useEffect(() => {
     if (!userLocation || !currentPlace?.latitude || placeMode) return;
-    mapRef.current?.fitToCoordinates(
-      [
-        userLocation,
-        { latitude: currentPlace.latitude!, longitude: currentPlace.longitude! },
-      ],
-      { edgePadding: { top: 120, right: 60, bottom: 250, left: 60 }, animated: true }
-    );
+    const coords = [
+      userLocation,
+      { latitude: currentPlace.latitude!, longitude: currentPlace.longitude! },
+    ];
+    // Include next place in segment for better framing
+    const nextPlace = plan.places[currentIndex + 1];
+    if (nextPlace?.latitude && nextPlace?.longitude) {
+      coords.push({ latitude: nextPlace.latitude, longitude: nextPlace.longitude });
+    }
+    mapRef.current?.fitToCoordinates(coords, {
+      edgePadding: { top: 120, right: 60, bottom: 250, left: 60 },
+      animated: true,
+    });
   }, [userLocation, currentIndex, placeMode]);
 
   if (loading) {
@@ -355,17 +477,27 @@ export const DoItNowScreen: React.FC = () => {
             );
           })}
 
-          {/* Plan route polyline (static — all places connected) */}
-          {planRouteCoords.length > 0 && (
+          {/* Previous segment (fading out during transition) */}
+          {prevSegmentCoords.length > 0 && prevSegmentAlpha > 0 && (
             <Polyline
-              coordinates={planRouteCoords}
-              strokeColor="#C8571A"
+              coordinates={prevSegmentCoords}
+              strokeColor={`rgba(200,87,26,${prevSegmentAlpha})`}
               strokeWidth={4}
               lineDashPattern={[0]}
             />
           )}
 
-          {/* User-to-destination route polyline (dynamic) */}
+          {/* Current active segment */}
+          {segmentCoords.length > 0 && segmentAlpha > 0 && (
+            <Polyline
+              coordinates={segmentCoords}
+              strokeColor={`rgba(200,87,26,${segmentAlpha})`}
+              strokeWidth={4}
+              lineDashPattern={[0]}
+            />
+          )}
+
+          {/* User-to-destination route polyline (dashed) */}
           {routeCoords.length > 0 && (
             <Polyline
               coordinates={routeCoords}
@@ -373,6 +505,19 @@ export const DoItNowScreen: React.FC = () => {
               strokeWidth={3}
               lineDashPattern={[8, 6]}
             />
+          )}
+
+          {/* Proof character — animated walker on plan route */}
+          {characterPosition && !placeMode && (
+            <Marker
+              coordinate={characterPosition}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges
+            >
+              <View style={styles.proofCharacter}>
+                <Ionicons name="walk" size={16} color="#FFF" />
+              </View>
+            </Marker>
           )}
       </MapView>
 
@@ -591,6 +736,7 @@ const styles = StyleSheet.create({
   // Markers
   marker: { borderWidth: 2.5, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
   markerText: { color: '#FFF', fontWeight: '800' },
+  proofCharacter: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#C8571A', borderWidth: 2.5, borderColor: '#FFF', alignItems: 'center' as const, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 },
 
   // Place mode
   placeModeContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30, gap: 16 },
