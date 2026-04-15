@@ -318,9 +318,9 @@ export const BottomTabNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.white,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    backgroundColor: '#000',
+    borderTopWidth: 0,
+    elevation: 0,
     paddingTop: 6,
     height: 80,
   },
