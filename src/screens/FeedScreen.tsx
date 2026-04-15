@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Animated,
   Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -78,6 +80,12 @@ export const FeedScreen: React.FC = () => {
 
   const [greeting, setGreeting] = useState(getGreeting);
   const greetingOpacity = useRef(new Animated.Value(1)).current;
+
+  // ── Collapsing header (Instagram-style) ──
+  const [headerH, setHeaderH] = useState(100);
+  const headerY = useRef(new Animated.Value(0)).current;
+  const lastScrollYRef = useRef(0);
+  const headerShown = useRef(true);
 
   useEffect(() => {
     // Recalculate greeting every minute
@@ -153,6 +161,31 @@ export const FeedScreen: React.FC = () => {
     toggleSave(planId);
   };
 
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const dy = y - lastScrollYRef.current;
+    lastScrollYRef.current = y;
+
+    // Near top or pull-to-refresh — always show
+    if (y <= 5) {
+      if (!headerShown.current) {
+        headerShown.current = true;
+        Animated.spring(headerY, { toValue: 0, useNativeDriver: true, friction: 20, tension: 200 }).start();
+      }
+      return;
+    }
+
+    if (dy > 3 && headerShown.current) {
+      // Scrolling down → hide
+      headerShown.current = false;
+      Animated.timing(headerY, { toValue: -headerH, duration: 280, useNativeDriver: true }).start();
+    } else if (dy < -1 && !headerShown.current) {
+      // Scrolling up → show immediately
+      headerShown.current = true;
+      Animated.spring(headerY, { toValue: 0, useNativeDriver: true, friction: 20, tension: 200 }).start();
+    }
+  }, [headerH]);
+
   const renderItem = ({ item, index }: { item: Plan; index: number }) => (
     <PlanCard
       plan={item}
@@ -186,86 +219,21 @@ export const FeedScreen: React.FC = () => {
   const currentRefreshing = activeTab === 'reco' ? isRefreshing : isFriendsRefreshing;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.logo, { color: C.black }]}>
-            proof<Text style={{ color: C.primary }}>.</Text>
-          </Text>
-          <Animated.Text style={[styles.greeting, { color: C.gray600, opacity: greetingOpacity }]} numberOfLines={1}>
-            {greeting}
-          </Animated.Text>
-        </View>
-        <View style={styles.headerRight}>
-          {isGuest ? (
-            <TouchableOpacity
-              style={[styles.bellBtn, { backgroundColor: C.primary }]}
-              onPress={() => setShowAccountPrompt(true)}
-            >
-              <Ionicons name="person-add-outline" size={16} color="#FFF" />
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
-                onPress={() => navigation.navigate('ChatList')}
-              >
-                <Ionicons name={chatUnread > 0 ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={17} color={chatUnread > 0 ? C.primary : C.gray800} />
-                {chatUnread > 0 && (
-                  <View style={styles.bellBadge}>
-                    <Text style={styles.bellBadgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
-                onPress={() => navigation.navigate('Notifications')}
-              >
-                <Animated.View style={{ transform: [{ scale: bellPulse }] }}>
-                  <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={18} color={unreadCount > 0 ? C.primary : C.gray800} />
-                </Animated.View>
-                {unreadCount > 0 && (
-                  <View style={styles.bellBadge}>
-                    <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-
-      {/* Tabs */}
-      <View style={[styles.tabBar, { borderBottomColor: C.borderLight }]}>
-        <TouchableOpacity style={styles.tab} onPress={() => switchTab('reco')} activeOpacity={0.7}>
-          <Text style={[styles.tabText, activeTab === 'reco' ? { color: C.black, fontFamily: Fonts.serifBold } : { color: C.gray600, fontFamily: Fonts.serifSemiBold }]}>
-            Recommandations
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => switchTab('friends')} activeOpacity={0.7}>
-          <Text style={[styles.tabText, activeTab === 'friends' ? { color: C.black, fontFamily: Fonts.serifBold } : { color: C.gray600, fontFamily: Fonts.serifSemiBold }]}>
-            Amis
-          </Text>
-        </TouchableOpacity>
-        <Animated.View
-          style={[
-            styles.tabIndicator,
-            { backgroundColor: C.primary, transform: [{ translateX: indicatorX }] },
-          ]}
-        />
-      </View>
-
+    <View style={[styles.container, { backgroundColor: C.white }]}>
       {/* Content */}
       {currentLoading && currentPlans.length === 0 ? (
-        <LoadingSkeleton count={3} />
+        <View style={{ flex: 1, paddingTop: insets.top + headerH }}>
+          <LoadingSkeleton count={3} />
+        </View>
       ) : (
         <FlatList
           data={currentPlans}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={{ paddingBottom: 20, paddingTop: insets.top + headerH }}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={currentRefreshing}
@@ -277,6 +245,7 @@ export const FeedScreen: React.FC = () => {
                 }
               }}
               tintColor={C.primary}
+              progressViewOffset={insets.top + headerH}
             />
           }
           ListEmptyComponent={
@@ -303,6 +272,82 @@ export const FeedScreen: React.FC = () => {
           }
         />
       )}
+
+      {/* Safe area background — always visible above header */}
+      <View style={[styles.safeAreaFill, { height: insets.top, backgroundColor: C.white }]} />
+
+      {/* Collapsible header + tabs */}
+      <Animated.View
+        onLayout={(e: any) => setHeaderH(e.nativeEvent.layout.height)}
+        style={[styles.floatingHeader, { top: insets.top, backgroundColor: C.white, transform: [{ translateY: headerY }] }]}
+      >
+        <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
+          <View style={styles.headerLeft}>
+            <Text style={[styles.logo, { color: C.black }]}>
+              proof<Text style={{ color: C.primary }}>.</Text>
+            </Text>
+            <Animated.Text style={[styles.greeting, { color: C.gray600, opacity: greetingOpacity }]} numberOfLines={1}>
+              {greeting}
+            </Animated.Text>
+          </View>
+          <View style={styles.headerRight}>
+            {isGuest ? (
+              <TouchableOpacity
+                style={[styles.bellBtn, { backgroundColor: C.primary }]}
+                onPress={() => setShowAccountPrompt(true)}
+              >
+                <Ionicons name="person-add-outline" size={16} color="#FFF" />
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+                  onPress={() => navigation.navigate('ChatList')}
+                >
+                  <Ionicons name={chatUnread > 0 ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={17} color={chatUnread > 0 ? C.primary : C.gray800} />
+                  {chatUnread > 0 && (
+                    <View style={styles.bellBadge}>
+                      <Text style={styles.bellBadgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+                  onPress={() => navigation.navigate('Notifications')}
+                >
+                  <Animated.View style={{ transform: [{ scale: bellPulse }] }}>
+                    <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={18} color={unreadCount > 0 ? C.primary : C.gray800} />
+                  </Animated.View>
+                  {unreadCount > 0 && (
+                    <View style={styles.bellBadge}>
+                      <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+
+        <View style={[styles.tabBar, { borderBottomColor: C.borderLight }]}>
+          <TouchableOpacity style={styles.tab} onPress={() => switchTab('reco')} activeOpacity={0.7}>
+            <Text style={[styles.tabText, activeTab === 'reco' ? { color: C.black, fontFamily: Fonts.serifBold } : { color: C.gray600, fontFamily: Fonts.serifSemiBold }]}>
+              Recommandations
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tab} onPress={() => switchTab('friends')} activeOpacity={0.7}>
+            <Text style={[styles.tabText, activeTab === 'friends' ? { color: C.black, fontFamily: Fonts.serifBold } : { color: C.gray600, fontFamily: Fonts.serifSemiBold }]}>
+              Amis
+            </Text>
+          </TouchableOpacity>
+          <Animated.View
+            style={[
+              styles.tabIndicator,
+              { backgroundColor: C.primary, transform: [{ translateX: indicatorX }] },
+            ]}
+          />
+        </View>
+      </Animated.View>
 
       {/* Share plan sheet */}
       {sharePlan && (
@@ -360,5 +405,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  list: { paddingBottom: 20 },
+  // Collapsing header
+  safeAreaFill: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200 },
+  floatingHeader: { position: 'absolute', left: 0, right: 0, zIndex: 100 },
 });

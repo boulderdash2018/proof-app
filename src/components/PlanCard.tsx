@@ -393,6 +393,26 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         </View>
         <FriendActivity plan={plan} />
       </View>
+
+      {/* Places preview */}
+      {plan.places.length > 0 && (
+        <TouchableOpacity style={styles.placesPreview} activeOpacity={0.85} onPress={onPress}>
+          {plan.places.slice(0, 3).map((place, idx) => (
+            <View key={place.id} style={styles.placeRow}>
+              <View style={[styles.placeIdx, { backgroundColor: C.primary + '15' }]}>
+                <Text style={[styles.placeIdxText, { color: C.primary }]}>{idx + 1}</Text>
+              </View>
+              <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
+              <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
+            </View>
+          ))}
+          {plan.places.length > 3 && (
+            <Text style={[styles.placeMore, { color: C.gray600 }]}>
+              +{plan.places.length - 3} lieux
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
     </View>
     </ReAnimated.View>
   );
@@ -438,4 +458,12 @@ const styles = StyleSheet.create({
   saveLabel: { fontSize: 12, fontFamily: Fonts.serifBold, marginLeft: 4 },
   actionCount: { fontSize: 14, fontFamily: Fonts.serifSemiBold, marginLeft: 6 },
   actionSpacer: { flex: 1 },
+  // Places preview
+  placesPreview: { paddingHorizontal: 14, paddingBottom: 12 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4.5 },
+  placeIdx: { width: 20, height: 20, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  placeIdxText: { fontSize: 10, fontWeight: '700' },
+  placeName: { flex: 1, fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  placeType: { fontSize: 11, fontFamily: Fonts.serif, marginLeft: 8 },
+  placeMore: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 30, marginTop: 2, paddingBottom: 2 },
 });
