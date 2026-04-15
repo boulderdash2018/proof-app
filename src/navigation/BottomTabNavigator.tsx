@@ -31,11 +31,10 @@ import { OtherProfileScreen } from '../screens/OtherProfileScreen';
 import { FriendRequestsScreen } from '../screens/FriendRequestsScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useLanguageStore, useAuthStore } from '../store';
+import { useAuthStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { activeCreateSession } from '../store/draftStore';
 import { Colors, Fonts } from '../constants';
-import { fr, en } from '../i18n';
 
 // Feed Stack
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
@@ -102,22 +101,11 @@ const TAB_ICONS: Record<string, [string, string]> = {
 
 const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused }) => {
   const color = focused ? Colors.primary : Colors.gray600;
-  const language = useLanguageStore((s) => s.language);
-  const t = language === 'fr' ? fr : en;
-
   const [outline, filled] = TAB_ICONS[label] || ['ellipse-outline', 'ellipse'];
-
-  const labels: Record<string, string> = {
-    FeedTab: t.tab_feed,
-    ExploreTab: t.tab_explore,
-    SavesTab: t.tab_saves,
-    ProfileTab: t.tab_profile,
-  };
 
   return (
     <View style={styles.tabIconContainer}>
       <Ionicons name={(focused ? filled : outline) as any} size={22} color={color} />
-      <Text style={[styles.tabLabel, { color }]}>{labels[label]}</Text>
     </View>
   );
 };
@@ -342,11 +330,6 @@ const styles = StyleSheet.create({
   },
   tabIcon: {
     fontSize: 22,
-  },
-  tabLabel: {
-    fontSize: 10,
-    marginTop: 2,
-    fontFamily: Fonts.serifSemiBold,
   },
   createButtonWrapper: {
     flex: 1,

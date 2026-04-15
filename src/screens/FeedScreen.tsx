@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   Animated,
-  Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -24,8 +23,6 @@ import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan } from '../types';
-
-const TAB_WIDTH = Dimensions.get('window').width / 2;
 
 type FeedTab = 'reco' | 'friends';
 
@@ -54,7 +51,11 @@ export const FeedScreen: React.FC = () => {
   const { totalUnread: chatUnread, subscribe: subscribeChat } = useChatStore();
 
   const [activeTab, setActiveTab] = useState<FeedTab>('reco');
-  const indicatorX = useRef(new Animated.Value(0)).current;
+  const tabIndicatorLeft = useRef(new Animated.Value(0)).current;
+  const tabIndicatorWidth = useRef(new Animated.Value(0)).current;
+  const contentSlideX = useRef(new Animated.Value(0)).current;
+  const recoLayout = useRef({ x: 0, width: 0 });
+  const friendsLayout = useRef({ x: 0, width: 0 });
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
   const [friendsFetched, setFriendsFetched] = useState(false);
@@ -125,23 +126,30 @@ export const FeedScreen: React.FC = () => {
   }, [unreadCount]);
 
   const switchTab = (tab: FeedTab) => {
+    if (tab === activeTab) return;
     if (tab === 'friends' && isGuest) {
       setShowAccountPrompt(true);
       return;
     }
-    setActiveTab(tab);
-    Animated.spring(indicatorX, {
-      toValue: tab === 'reco' ? 0 : TAB_WIDTH,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 80,
-    }).start();
 
-    // Lazy-load friends feed on first switch
-    if (tab === 'friends' && !friendsFetched) {
-      fetchFriendsFeed(cityConfig.name);
-      setFriendsFetched(true);
-    }
+    // Animate tab indicator immediately
+    const target = tab === 'reco' ? recoLayout.current : friendsLayout.current;
+    Animated.parallel([
+      Animated.spring(tabIndicatorLeft, { toValue: target.x, useNativeDriver: false, friction: 8, tension: 80 }),
+      Animated.spring(tabIndicatorWidth, { toValue: target.width, useNativeDriver: false, friction: 8, tension: 80 }),
+    ]).start();
+
+    // Slide content out → swap → slide content in
+    const goingRight = tab === 'friends';
+    Animated.timing(contentSlideX, { toValue: goingRight ? -40 : 40, duration: 140, useNativeDriver: true }).start(() => {
+      setActiveTab(tab);
+      if (tab === 'friends' && !friendsFetched) {
+        fetchFriendsFeed(cityConfig.name);
+        setFriendsFetched(true);
+      }
+      contentSlideX.setValue(goingRight ? 40 : -40);
+      Animated.spring(contentSlideX, { toValue: 0, useNativeDriver: true, friction: 12, tension: 100 }).start();
+    });
   };
 
   const requireAuth = (): boolean => {
@@ -220,7 +228,8 @@ export const FeedScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: C.white }]}>
-      {/* Content */}
+      {/* Content — slide animation on tab switch */}
+      <Animated.View style={{ flex: 1, transform: [{ translateX: contentSlideX }] }}>
       {currentLoading && currentPlans.length === 0 ? (
         <View style={{ flex: 1, paddingTop: insets.top + headerH }}>
           <LoadingSkeleton count={3} />
@@ -273,6 +282,7 @@ export const FeedScreen: React.FC = () => {
           }
         />
       )}
+      </Animated.View>
 
       {/* Safe area background — always visible above header */}
       <View style={[styles.safeAreaFill, { height: insets.top, backgroundColor: C.white }]} />
@@ -302,10 +312,10 @@ export const FeedScreen: React.FC = () => {
             ) : (
               <>
                 <TouchableOpacity
-                  style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+                  style={styles.bellBtn}
                   onPress={() => navigation.navigate('ChatList')}
                 >
-                  <Ionicons name={chatUnread > 0 ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={17} color={chatUnread > 0 ? C.primary : C.gray800} />
+                  <Ionicons name={chatUnread > 0 ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={18} color={C.gray800} />
                   {chatUnread > 0 && (
                     <View style={styles.bellBadge}>
                       <Text style={styles.bellBadgeText}>{chatUnread > 9 ? '9+' : chatUnread}</Text>
@@ -313,11 +323,11 @@ export const FeedScreen: React.FC = () => {
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.bellBtn, { backgroundColor: C.gray200 }]}
+                  style={styles.bellBtn}
                   onPress={() => navigation.navigate('Notifications')}
                 >
                   <Animated.View style={{ transform: [{ scale: bellPulse }] }}>
-                    <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={18} color={unreadCount > 0 ? C.primary : C.gray800} />
+                    <Ionicons name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} size={19} color={C.gray800} />
                   </Animated.View>
                   {unreadCount > 0 && (
                     <View style={styles.bellBadge}>
@@ -330,23 +340,41 @@ export const FeedScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={[styles.tabBar, { borderBottomColor: C.borderLight }]}>
-          <TouchableOpacity style={styles.tab} onPress={() => switchTab('reco')} activeOpacity={0.7}>
-            <Text style={[styles.tabText, activeTab === 'reco' ? { color: C.black, fontFamily: Fonts.serifBold } : { color: C.gray600, fontFamily: Fonts.serifSemiBold }]}>
-              Recommandations
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tab} onPress={() => switchTab('friends')} activeOpacity={0.7}>
-            <Text style={[styles.tabText, activeTab === 'friends' ? { color: C.black, fontFamily: Fonts.serifBold } : { color: C.gray600, fontFamily: Fonts.serifSemiBold }]}>
-              Amis
-            </Text>
-          </TouchableOpacity>
-          <Animated.View
-            style={[
-              styles.tabIndicator,
-              { backgroundColor: C.primary, transform: [{ translateX: indicatorX }] },
-            ]}
-          />
+        <View style={styles.tabBar}>
+          <View style={styles.tabRow}>
+            <TouchableOpacity
+              onLayout={(e: any) => {
+                const { x, width } = e.nativeEvent.layout;
+                recoLayout.current = { x, width };
+                if (activeTab === 'reco') { tabIndicatorLeft.setValue(x); tabIndicatorWidth.setValue(width); }
+              }}
+              onPress={() => switchTab('reco')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, { color: C.black, fontFamily: Fonts.serifBold, opacity: activeTab === 'reco' ? 1 : 0.4 }]}>
+                Recommandations
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onLayout={(e: any) => {
+                const { x, width } = e.nativeEvent.layout;
+                friendsLayout.current = { x, width };
+                if (activeTab === 'friends') { tabIndicatorLeft.setValue(x); tabIndicatorWidth.setValue(width); }
+              }}
+              onPress={() => switchTab('friends')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, { color: C.black, fontFamily: Fonts.serifBold, opacity: activeTab === 'friends' ? 1 : 0.4 }]}>
+                Amis
+              </Text>
+            </TouchableOpacity>
+            <Animated.View
+              style={[
+                styles.tabIndicator,
+                { backgroundColor: C.primary, left: tabIndicatorLeft, width: tabIndicatorWidth },
+              ]}
+            />
+          </View>
         </View>
       </Animated.View>
 
@@ -379,29 +407,27 @@ const styles = StyleSheet.create({
   headerLeft: { flex: 1 },
   greeting: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  bellBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  bellBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   bellBadge: { position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#E85D5D', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   bellBadgeText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 
-  // Tabs
+  // Tabs — TikTok style
   tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    position: 'relative',
-  },
-  tab: {
-    width: TAB_WIDTH,
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
+  tabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+    paddingBottom: 8,
+  } as any,
   tabText: {
-    fontSize: 14,
+    fontSize: 15,
   },
   tabIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    width: TAB_WIDTH,
     height: 2.5,
     borderRadius: 2,
   },
