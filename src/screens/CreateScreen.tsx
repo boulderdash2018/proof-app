@@ -309,21 +309,24 @@ export const CreateScreen: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // ========== 3-STEP WIZARD (1: cover+title, 2: categories, 3: places) ==========
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const canProceedFromStep = (s: 1 | 2 | 3): boolean => {
+  // ========== 4-STEP WIZARD (1: title, 2: cover, 3: categories, 4: places) ==========
+  type Step = 1 | 2 | 3 | 4;
+  const TOTAL_STEPS: 4 = 4;
+  const [step, setStep] = useState<Step>(1);
+  const canProceedFromStep = (s: Step): boolean => {
     if (s === 1) return title.trim().length > 0;
-    if (s === 2) return selectedTags.length > 0;
-    if (s === 3) return places.length >= 2;
+    if (s === 2) return true; // photo optional — can skip
+    if (s === 3) return selectedTags.length > 0;
+    if (s === 4) return places.length >= 2;
     return false;
   };
   const goToNextStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step < 3) setStep((step + 1) as 1 | 2 | 3);
+    if (step < TOTAL_STEPS) setStep((step + 1) as Step);
   };
   const goToPrevStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step > 1) setStep((step - 1) as 1 | 2 | 3);
+    if (step > 1) setStep((step - 1) as Step);
   };
 
   // ========== DRAFT / EDIT ==========
@@ -1737,19 +1740,26 @@ export const CreateScreen: React.FC = () => {
             <View style={styles.wizardHeaderSide} />
           )}
           <View style={styles.wizardHeaderCenter}>
-            <Text style={[styles.wizardStepLabel, { color: Colors.textTertiary }]}>ÉTAPE {step} SUR 3</Text>
+            <Text style={[styles.wizardStepLabel, { color: Colors.textTertiary }]}>ÉTAPE {step} SUR {TOTAL_STEPS}</Text>
             <Text style={[styles.wizardStepTitle, { color: Colors.textPrimary }]}>
-              {step === 1 ? 'Une photo, un titre' : step === 2 ? 'Choisis les catégories' : 'Ajoute les lieux'}
+              {step === 1
+                ? 'Commence par le titre'
+                : step === 2
+                  ? 'La photo qui claque'
+                  : step === 3
+                    ? 'Choisis les catégories'
+                    : 'Ajoute les lieux'}
             </Text>
           </View>
           <View style={styles.wizardHeaderSide} />
         </View>
 
-        {/* Step progress bar (3 segments) */}
+        {/* Step progress bar (4 segments) */}
         <View style={styles.wizardProgress}>
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 1 ? Colors.primary : Colors.borderSubtle }]} />
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 2 ? Colors.primary : Colors.borderSubtle }]} />
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 3 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 4 ? Colors.primary : Colors.borderSubtle }]} />
         </View>
 
         <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
@@ -1788,8 +1798,62 @@ export const CreateScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
-          {/* ═══════ STEP 1: Cover photo + title — editorial hero layout ═══════ */}
+          {/* ═══════ STEP 1: Title only — editorial composer ═══════ */}
           {step === 1 && (
+            <View style={styles.s0Container}>
+              <Text style={styles.s0Prompt}>Qu'est-ce que tu proposes ?</Text>
+              <Text style={styles.s0Helper}>
+                Un titre court et précis vaut mieux qu'un long descriptif.
+              </Text>
+
+              <View style={styles.s0InputWrap}>
+                <RNTextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Meilleur sushi de Passy"
+                  placeholderTextColor={Colors.textTertiary}
+                  style={styles.s0Input}
+                  multiline
+                  maxLength={80}
+                  autoFocus
+                  returnKeyType="done"
+                  blurOnSubmit
+                />
+                <View style={styles.s0InputUnderline} />
+              </View>
+
+              <View style={styles.s0MetaRow}>
+                {errors.title ? (
+                  <Text style={styles.s0Error}>{errors.title}</Text>
+                ) : (
+                  <Text style={styles.s0Hint}>Tu pourras le modifier à tout moment</Text>
+                )}
+                <Text style={styles.s0Counter}>{title.length}/80</Text>
+              </View>
+
+              {/* Inspiration suggestions */}
+              <View style={styles.s0Inspirations}>
+                <Text style={styles.s0InspirationLabel}>QUELQUES IDÉES</Text>
+                {['Dimanche parfait à Belleville', 'Soirée intimiste dans le 11e', 'Brunch & shopping au Marais'].map((idea) => (
+                  <TouchableOpacity
+                    key={idea}
+                    style={styles.s0InspirationChip}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setTitle(idea);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="sparkles-outline" size={14} color={Colors.terracotta600} />
+                    <Text style={styles.s0InspirationText}>{idea}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ═══════ STEP 2: Cover photo — editorial hero layout ═══════ */}
+          {step === 2 && (
             <View style={styles.s1Container}>
               {/* ── HERO PHOTO (big, centered, 4:5) ── */}
               <TouchableOpacity
@@ -1888,34 +1952,18 @@ export const CreateScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* ── TITLE — big editorial input, minimal chrome ── */}
-              <View style={styles.s1TitleWrap}>
-                <Text style={styles.s1TitleLabel}>LE TITRE DE TON PLAN</Text>
-                <RNTextInput
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Meilleur sushi de Passy"
-                  placeholderTextColor={Colors.textTertiary}
-                  style={styles.s1TitleInput}
-                  multiline
-                  maxLength={80}
-                  returnKeyType="done"
-                  blurOnSubmit
-                />
-                <View style={styles.s1TitleMetaRow}>
-                  {errors.title ? (
-                    <Text style={styles.s1TitleError}>{errors.title}</Text>
-                  ) : (
-                    <Text style={styles.s1TitleHint}>Court, précis, qui donne envie</Text>
-                  )}
-                  <Text style={styles.s1TitleCounter}>{title.length}/80</Text>
-                </View>
+              {/* Small recap of the title from step 1 (read-only here) */}
+              <View style={styles.s1TitleRecap}>
+                <Text style={styles.s1TitleRecapLabel}>TITRE</Text>
+                <Text style={styles.s1TitleRecapText} numberOfLines={2}>
+                  {title || '—'}
+                </Text>
               </View>
             </View>
           )}
 
-          {/* ═══════ STEP 2: Categories ═══════ */}
-          {step === 2 && (
+          {/* ═══════ STEP 3: Categories ═══════ */}
+          {step === 3 && (
           <>
           <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
             Sélectionne les catégories qui décrivent le mieux ton plan. Tu peux en choisir plusieurs.
@@ -2014,8 +2062,8 @@ export const CreateScreen: React.FC = () => {
           </>
           )}
 
-          {/* ═══════ STEP 3: Places ═══════ */}
-          {step === 3 && (
+          {/* ═══════ STEP 4: Places ═══════ */}
+          {step === 4 && (
           <>
           <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
             Au moins 2 lieux. Ajoute-les dans l'ordre où tu les enchaînes. Tape sur un lieu pour personnaliser (prix, durée, photo, note).
@@ -2095,7 +2143,7 @@ export const CreateScreen: React.FC = () => {
 
         {/* ═══════ Wizard footer — dynamic action per step ═══════ */}
         <View style={[styles.wizardFooter, { paddingBottom: insets.bottom + 12, borderTopColor: Colors.borderSubtle, backgroundColor: Colors.bgPrimary }]}>
-          {step < 3 ? (
+          {step < TOTAL_STEPS ? (
             <TouchableOpacity
               style={[
                 styles.wizardPrimaryBtn,
@@ -2108,7 +2156,11 @@ export const CreateScreen: React.FC = () => {
               activeOpacity={0.85}
             >
               <Text style={[styles.wizardPrimaryBtnText, { color: canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary }]}>
-                {step === 1 ? 'Suivant — choisir les catégories' : 'Suivant — ajouter les lieux'}
+                {step === 1
+                  ? 'Suivant — la photo'
+                  : step === 2
+                    ? 'Suivant — les catégories'
+                    : 'Suivant — les lieux'}
               </Text>
               <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
             </TouchableOpacity>
@@ -2656,7 +2708,117 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 20,
   },
-  // ── STEP 1: editorial hero layout ──
+  // ── STEP 1 (pre-step): Title composer ──
+  s0Container: {
+    paddingTop: 40,
+    paddingBottom: 40,
+  },
+  s0Prompt: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.6,
+    marginBottom: 10,
+  },
+  s0Helper: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginBottom: 36,
+  },
+  s0InputWrap: {
+    marginBottom: 12,
+  },
+  s0Input: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+    paddingTop: 0,
+    paddingBottom: 12,
+    minHeight: 80,
+  },
+  s0InputUnderline: {
+    height: 2,
+    backgroundColor: Colors.borderMedium,
+    borderRadius: 1,
+  },
+  s0MetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 40,
+  },
+  s0Hint: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+  },
+  s0Error: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.error,
+  },
+  s0Counter: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+  },
+  s0Inspirations: {
+    gap: 10,
+  } as any,
+  s0InspirationLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    marginBottom: 4,
+  },
+  s0InspirationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderColor: Colors.terracotta100,
+  } as any,
+  s0InspirationText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.terracotta700,
+    flex: 1,
+  },
+
+  // Title recap inside the photo step (below thumbnails)
+  s1TitleRecap: {
+    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: Colors.bgTertiary,
+  },
+  s1TitleRecapLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    marginBottom: 6,
+  },
+  s1TitleRecapText: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+
+  // ── STEP 2: editorial hero layout ──
   s1Container: {
     paddingTop: 6,
     paddingBottom: 20,
