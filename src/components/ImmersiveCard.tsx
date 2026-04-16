@@ -365,9 +365,9 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d4 = makeDetailAnim(4);
 
   return (
-    <View style={[styles.frame, { width, height }]}>
+    <View style={[styles.frame, { width, height: height + ACTION_BAR_H }]}>
       {/* ── Card container ── */}
-      <View style={styles.card}>
+      <View style={[styles.card, { flex: 0, height: cardH }]}>
         {/* ─── Image layer (parallax + scale + dim) ─── */}
         <Animated.View
           style={[
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
   // ── Action bar (inside frame, outside card overflow) ──────
   actionBar: {
     position: 'absolute',
-    bottom: 0,
+    bottom: ACTION_BAR_H,
     left: CARD_H_PAD,
     right: CARD_H_PAD,
     height: BELOW_CARD_H + CARD_V_BOTTOM,
