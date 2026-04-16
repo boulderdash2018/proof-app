@@ -699,6 +699,52 @@ export const CreateScreen: React.FC = () => {
     return getDownloadURL(storageRef);
   };
 
+  // Single-photo picker — replaces the unique cover photo (step 2 UX)
+  const pickSingleCoverPhoto = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async () => {
+        const files = input.files;
+        if (!files || files.length === 0) return;
+        setIsUploadingPhotos(true);
+        try {
+          const dataUrl = await readFileAsDataUrl(files[0]);
+          const url = await uploadPhoto(dataUrl);
+          setCoverPhotos([url]);
+        } catch (err) {
+          console.error('Photo upload error:', err);
+          Alert.alert('Erreur', "Impossible d'uploader la photo.");
+        } finally {
+          setIsUploadingPhotos(false);
+        }
+      };
+      input.click();
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets || !result.assets[0]) return;
+
+    setIsUploadingPhotos(true);
+    try {
+      const asset = result.assets[0];
+      const dataUrl = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+      const url = await uploadPhoto(dataUrl);
+      setCoverPhotos([url]);
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      Alert.alert('Erreur', "Impossible d'uploader la photo.");
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+
   const pickPhotos = async () => {
     if (Platform.OS === 'web') {
       // On web, create and click a hidden file input
@@ -1813,11 +1859,9 @@ export const CreateScreen: React.FC = () => {
                   placeholder="Meilleur sushi de Passy"
                   placeholderTextColor={Colors.textTertiary}
                   style={styles.s0Input}
-                  multiline
                   maxLength={80}
                   autoFocus
                   returnKeyType="done"
-                  blurOnSubmit
                 />
                 <View style={styles.s0InputUnderline} />
               </View>
@@ -1852,13 +1896,13 @@ export const CreateScreen: React.FC = () => {
             </View>
           )}
 
-          {/* ═══════ STEP 2: Cover photo — editorial hero layout ═══════ */}
+          {/* ═══════ STEP 2: Cover photo — editorial hero (single photo, fills space) ═══════ */}
           {step === 2 && (
             <View style={styles.s1Container}>
-              {/* ── HERO PHOTO (big, centered, 4:5) ── */}
+              {/* ── HERO PHOTO (single, takes ALL available space) ── */}
               <TouchableOpacity
                 style={styles.s1Hero}
-                onPress={coverPhotos.length === 0 ? pickPhotos : () => setEditingPhotoIdx(0)}
+                onPress={coverPhotos.length === 0 ? pickSingleCoverPhoto : () => setEditingPhotoIdx(0)}
                 activeOpacity={coverPhotos.length === 0 ? 0.85 : 0.9}
                 disabled={isUploadingPhotos && coverPhotos.length === 0}
               >
@@ -1912,53 +1956,6 @@ export const CreateScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              {/* ── Additional photos row (only if main photo chosen) ── */}
-              {coverPhotos.length > 0 && (
-                <View style={styles.s1Thumbs}>
-                  {coverPhotos.slice(1).map((uri, i) => {
-                    const idx = i + 1;
-                    return (
-                      <TouchableOpacity
-                        key={idx}
-                        style={styles.s1Thumb}
-                        onPress={() => setEditingPhotoIdx(idx)}
-                        activeOpacity={0.85}
-                      >
-                        <Image source={{ uri }} style={styles.s1ThumbImg} />
-                        <TouchableOpacity
-                          style={styles.s1ThumbRemove}
-                          onPress={() => removePhoto(idx)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Ionicons name="close-circle" size={20} color={Colors.textPrimary} />
-                        </TouchableOpacity>
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {coverPhotos.length < 7 && (
-                    <TouchableOpacity
-                      style={styles.s1ThumbAdd}
-                      onPress={pickPhotos}
-                      activeOpacity={0.7}
-                      disabled={isUploadingPhotos}
-                    >
-                      {isUploadingPhotos ? (
-                        <ActivityIndicator size="small" color={Colors.primary} />
-                      ) : (
-                        <Ionicons name="add" size={22} color={Colors.textSecondary} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-
-              {/* Small recap of the title from step 1 (read-only here) */}
-              <View style={styles.s1TitleRecap}>
-                <Text style={styles.s1TitleRecapLabel}>TITRE</Text>
-                <Text style={styles.s1TitleRecapText} numberOfLines={2}>
-                  {title || '—'}
-                </Text>
-              </View>
             </View>
           )}
 
@@ -2748,14 +2745,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   s0Input: {
-    fontSize: 28,
-    lineHeight: 36,
+    fontSize: 26,
     fontFamily: Fonts.displaySemiBold,
     color: Colors.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
     paddingTop: 0,
-    paddingBottom: 12,
-    minHeight: 80,
+    paddingBottom: 10,
+    // Single-line only — no minHeight so it sits naturally at line height
   },
   s0InputUnderline: {
     height: 2,
@@ -2834,17 +2830,16 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  // ── STEP 2: editorial hero layout ──
+  // ── STEP 2: editorial hero — single photo takes ALL available space ──
   s1Container: {
     flex: 1,
-    paddingTop: 6,
-    paddingBottom: 20,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   s1Hero: {
-    // Flex-sized so it adapts to available vertical space (no-scroll fit)
+    // Flex-sized so the single photo fills ALL available vertical space
     flex: 1,
     width: '100%',
-    maxHeight: 440,
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: Colors.bgTertiary,
@@ -2853,7 +2848,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 28,
     elevation: 10,
-    marginBottom: 16,
     alignSelf: 'center',
   },
   s1HeroEmpty: {
