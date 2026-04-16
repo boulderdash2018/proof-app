@@ -309,6 +309,23 @@ export const CreateScreen: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ========== 3-STEP WIZARD (1: cover+title, 2: categories, 3: places) ==========
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const canProceedFromStep = (s: 1 | 2 | 3): boolean => {
+    if (s === 1) return title.trim().length > 0;
+    if (s === 2) return selectedTags.length > 0;
+    if (s === 3) return places.length >= 2;
+    return false;
+  };
+  const goToNextStep = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step < 3) setStep((step + 1) as 1 | 2 | 3);
+  };
+  const goToPrevStep = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step > 1) setStep((step - 1) as 1 | 2 | 3);
+  };
+
   // ========== DRAFT / EDIT ==========
   const draftIdRef = useRef<string>(route.params?.draftId || 'draft-' + Date.now());
   const editPlanIdRef = useRef<string | undefined>(route.params?.editPlanId);
@@ -1711,8 +1728,28 @@ export const CreateScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-        <View style={[styles.header, { borderBottomColor: C.border }]}>
-          <Text style={[styles.headerTitle, { color: C.black }]}>{t.create_title}</Text>
+        <View style={[styles.wizardHeader, { borderBottomColor: C.borderLight }]}>
+          {step > 1 ? (
+            <TouchableOpacity onPress={goToPrevStep} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.wizardHeaderSide}>
+              <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.wizardHeaderSide} />
+          )}
+          <View style={styles.wizardHeaderCenter}>
+            <Text style={[styles.wizardStepLabel, { color: Colors.textTertiary }]}>ÉTAPE {step} SUR 3</Text>
+            <Text style={[styles.wizardStepTitle, { color: Colors.textPrimary }]}>
+              {step === 1 ? 'Une photo, un titre' : step === 2 ? 'Choisis les catégories' : 'Ajoute les lieux'}
+            </Text>
+          </View>
+          <View style={styles.wizardHeaderSide} />
+        </View>
+
+        {/* Step progress bar (3 segments) */}
+        <View style={styles.wizardProgress}>
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 1 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 2 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 3 ? Colors.primary : Colors.borderSubtle }]} />
         </View>
 
         <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
@@ -1751,43 +1788,61 @@ export const CreateScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
-          <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
+          {/* ═══════ STEP 1: Cover photo + title ═══════ */}
+          {step === 1 && (
+            <>
+              <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
+                Donne l'envie dès le premier coup d'œil. Une photo qui claque, un titre qui marque.
+              </Text>
 
-          {/* Cover Photos */}
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Photos de couverture</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosPickerScroll} contentContainerStyle={styles.photosPickerContainer}>
-            {coverPhotos.map((uri, i) => (
-              <View key={i} style={styles.photoThumbWrap}>
-                <Image source={{ uri }} style={styles.photoThumb} />
-                <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(i)}>
-                  <Ionicons name="close-circle" size={22} color="#FFF" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.photoEditBtn} onPress={() => setEditingPhotoIdx(i)} activeOpacity={0.7}>
-                  <Ionicons name="options-outline" size={13} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            {coverPhotos.length < 7 && (
-              <TouchableOpacity
-                style={[styles.photoAddBtn, { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-                onPress={pickPhotos}
-                disabled={isUploadingPhotos}
-              >
-                {isUploadingPhotos ? (
-                  <ActivityIndicator size="small" color={C.primary} />
-                ) : (
-                  <>
-                    <Ionicons name="camera-outline" size={24} color={C.gray600} />
-                    <Text style={[styles.photoAddText, { color: C.gray600 }]}>Ajouter</Text>
-                  </>
+              {/* Cover photos first (visual anchor) */}
+              <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Photos de couverture</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosPickerScroll} contentContainerStyle={styles.photosPickerContainer}>
+                {coverPhotos.map((uri, i) => (
+                  <View key={i} style={styles.photoThumbWrap}>
+                    <Image source={{ uri }} style={styles.photoThumb} />
+                    <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(i)}>
+                      <Ionicons name="close-circle" size={22} color="#FFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.photoEditBtn} onPress={() => setEditingPhotoIdx(i)} activeOpacity={0.7}>
+                      <Ionicons name="options-outline" size={13} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {coverPhotos.length < 7 && (
+                  <TouchableOpacity
+                    style={[styles.photoAddBtn, { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+                    onPress={pickPhotos}
+                    disabled={isUploadingPhotos}
+                  >
+                    {isUploadingPhotos ? (
+                      <ActivityIndicator size="small" color={C.primary} />
+                    ) : (
+                      <>
+                        <Ionicons name="camera-outline" size={24} color={C.gray600} />
+                        <Text style={[styles.photoAddText, { color: C.gray600 }]}>Ajouter</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            )}
-          </ScrollView>
-          <Text style={[styles.photoHint, { color: C.gray500 }]}>
-            {coverPhotos.length === 0 ? 'Optionnel · Les photos des lieux seront utilisées par défaut' : `${coverPhotos.length}/7 photos`}
-          </Text>
+              </ScrollView>
+              <Text style={[styles.photoHint, { color: C.gray500 }]}>
+                {coverPhotos.length === 0 ? 'Optionnel · Les photos des lieux seront utilisées par défaut' : `${coverPhotos.length}/7 photos`}
+              </Text>
 
+              {/* Title */}
+              <View style={{ marginTop: 24 }}>
+                <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
+              </View>
+            </>
+          )}
+
+          {/* ═══════ STEP 2: Categories ═══════ */}
+          {step === 2 && (
+          <>
+          <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
+            Sélectionne les catégories qui décrivent le mieux ton plan. Tu peux en choisir plusieurs.
+          </Text>
           <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_category}</Text>
 
           {/* Row 1: Par personne */}
@@ -1879,7 +1934,15 @@ export const CreateScreen: React.FC = () => {
             </View>
           )}
           {errors.tags && <Text style={styles.errorText}>{errors.tags}</Text>}
+          </>
+          )}
 
+          {/* ═══════ STEP 3: Places ═══════ */}
+          {step === 3 && (
+          <>
+          <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
+            Au moins 2 lieux. Ajoute-les dans l'ordre où tu les enchaînes. Tape sur un lieu pour personnaliser (prix, durée, photo, note).
+          </Text>
           <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_places}</Text>
           {places.length > 0 && (
             <Text style={[styles.placesCount, { color: C.gray600 }]}>
@@ -1937,29 +2000,48 @@ export const CreateScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={styles.publishSection}>
-            {canPublish && (
-              <TouchableOpacity
-                style={[styles.previewBtn, { borderColor: C.primary }]}
-                onPress={() => setShowPreview(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="eye-outline" size={16} color={C.primary} />
-                <Text style={[styles.previewBtnText, { color: C.primary }]}>Preview</Text>
-              </TouchableOpacity>
-            )}
-            {!canPublish && (
-              <Text style={[styles.publishHint, { color: C.gray500 }]}>Ajoute un titre et au moins 2 lieux pour publier</Text>
-            )}
-            {canPublish && qualityScore < 80 && (
-              <Text style={[styles.publishHint, { color: C.gray500 }]}>Ajoute des détails pour améliorer ton plan</Text>
-            )}
+          {/* Preview button (only on step 3, when publishable) */}
+          {canPublish && (
+            <TouchableOpacity
+              style={[styles.previewBtn, { borderColor: C.primary, marginTop: 8 }]}
+              onPress={() => setShowPreview(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="eye-outline" size={16} color={C.primary} />
+              <Text style={[styles.previewBtnText, { color: C.primary }]}>Preview</Text>
+            </TouchableOpacity>
+          )}
+          </>
+          )}
+        </ScrollView>
+        </Animated.View>
+
+        {/* ═══════ Wizard footer — dynamic action per step ═══════ */}
+        <View style={[styles.wizardFooter, { paddingBottom: insets.bottom + 12, borderTopColor: Colors.borderSubtle, backgroundColor: Colors.bgPrimary }]}>
+          {step < 3 ? (
             <TouchableOpacity
               style={[
-                styles.publishBtn,
-                !canPublish && { backgroundColor: C.gray400, borderColor: C.gray400 },
-                canPublish && qualityScore < 80 && { backgroundColor: 'transparent', borderColor: Colors.primary },
-                canPublish && qualityScore >= 80 && { backgroundColor: Colors.primary, borderColor: Colors.primary },
+                styles.wizardPrimaryBtn,
+                canProceedFromStep(step)
+                  ? { backgroundColor: Colors.primary }
+                  : { backgroundColor: Colors.gray300 },
+              ]}
+              onPress={goToNextStep}
+              disabled={!canProceedFromStep(step)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.wizardPrimaryBtnText, { color: canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary }]}>
+                {step === 1 ? 'Suivant — choisir les catégories' : 'Suivant — ajouter les lieux'}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.wizardPrimaryBtn,
+                !canPublish && { backgroundColor: Colors.gray300 },
+                canPublish && qualityScore < 80 && { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Colors.primary },
+                canPublish && qualityScore >= 80 && { backgroundColor: Colors.primary },
               ]}
               onPress={() => {
                 if (canPublish && qualityScore < 100 && missingCriteria.length > 0) {
@@ -1969,26 +2051,32 @@ export const CreateScreen: React.FC = () => {
                 }
               }}
               disabled={!canPublish || isPublishing}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {isPublishing ? (
                 <ActivityIndicator size="small" color={Colors.textOnAccent} />
               ) : (
-                <View style={styles.publishBtnInner}>
-                  <Text style={[
-                    styles.publishBtnText,
-                    !canPublish && { color: Colors.textOnAccent },
-                    canPublish && qualityScore < 80 && { color: Colors.primary },
-                    canPublish && qualityScore >= 80 && { color: Colors.textOnAccent },
-                  ]}>
-                    {qualityScore >= 100 ? 'Publier le plan \u2726' : t.create_publish}
+                <>
+                  <Ionicons
+                    name="send"
+                    size={16}
+                    color={canPublish && qualityScore < 80 ? Colors.primary : Colors.textOnAccent}
+                  />
+                  <Text
+                    style={[
+                      styles.wizardPrimaryBtnText,
+                      !canPublish && { color: Colors.textTertiary },
+                      canPublish && qualityScore < 80 && { color: Colors.primary },
+                      canPublish && qualityScore >= 80 && { color: Colors.textOnAccent },
+                    ]}
+                  >
+                    {qualityScore >= 100 ? 'Publier le plan ✦' : t.create_publish}
                   </Text>
-                </View>
+                </>
               )}
             </TouchableOpacity>
-          </View>
-        </ScrollView>
-        </Animated.View>
+          )}
+        </View>
 
         {/* ========== PLACE PICKER MODAL ========== */}
         <Modal visible={showPlacePicker} animationType="slide" presentationStyle="pageSheet">
@@ -2444,6 +2532,71 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
   headerTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
+  // ── Wizard header + progress + footer (3-step flow) ──
+  wizardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Layout.screenPadding,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  wizardHeaderSide: {
+    width: 32,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  wizardHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  wizardStepLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 1.2,
+    marginBottom: 3,
+  },
+  wizardStepTitle: {
+    fontSize: 16,
+    fontFamily: Fonts.displaySemiBold,
+    letterSpacing: -0.2,
+  },
+  wizardProgress: {
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 10,
+    paddingBottom: 4,
+  } as any,
+  wizardProgressSeg: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+  },
+  stepIntro: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: Fonts.body,
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  wizardFooter: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  wizardPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 54,
+    borderRadius: 16,
+  } as any,
+  wizardPrimaryBtnText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 0.15,
+  },
   costPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   costText: { fontSize: 11, fontWeight: '700' },
   scroll: { flex: 1 },
