@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Line, G, Defs, ClipPath } from 'react-native-svg';
 
-const STAMP_PROOF = '#C8571A';
+const STAMP_PROOF = '#C4704B';
 const STAMP_DECLINE = '#6B7A8D';
 
 interface Props {

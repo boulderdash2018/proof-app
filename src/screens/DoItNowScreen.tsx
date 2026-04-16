@@ -25,25 +25,25 @@ import { useCity } from '../hooks/useCity';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Enegry by Schloesser David — dark mode, gold labels
+// Light cream/terracotta map style
 const MAP_STYLE = [
-  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#ffa600"},{"lightness":40}]},
-  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"lightness":16},{"hue":"#ff0000"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#6B5D52"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#FAF7F2"},{"weight":2}]},
   {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":17},{"weight":1.2}]},
+  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#EDE5D8"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#A09181"},{"weight":1.2}]},
   {"featureType":"administrative.locality","elementType":"all","stylers":[{"visibility":"off"}]},
   {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":21}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#F5F0E8"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":17}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":29},{"weight":0.2}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":18}]},
-  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":16}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":19}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#EDE5D8"},{"weight":0.5}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"transit.line","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":17}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4C9BB"}]},
 ];
 
 const ARRIVAL_THRESHOLD = 50; // meters
@@ -416,7 +416,7 @@ export const DoItNowScreen: React.FC = () => {
                     width: isCur ? 12 : 8,
                     height: isCur ? 12 : 8,
                     borderRadius: isCur ? 6 : 4,
-                    backgroundColor: isCur ? Colors.gold : isDone ? Colors.gold : 'rgba(255,255,255,0.25)',
+                    backgroundColor: isCur ? Colors.primary : isDone ? Colors.primary : Colors.borderMedium,
                     opacity: isCur ? 1 : isDone ? 0.55 : 1,
                   }}
                 />
@@ -425,7 +425,7 @@ export const DoItNowScreen: React.FC = () => {
           </View>
         </View>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
-          <Ionicons name="close" size={20} color={C.gray600} />
+          <Ionicons name="close" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -464,8 +464,8 @@ export const DoItNowScreen: React.FC = () => {
                 <View style={[
                   styles.marker,
                   {
-                    backgroundColor: isCurrent ? '#C8571A' : isVisited ? '#A06840' : '#D4845A',
-                    borderColor: '#FFF',
+                    backgroundColor: isCurrent ? Colors.primary : isVisited ? Colors.primaryDeep : Colors.terracotta400,
+                    borderColor: Colors.white,
                     width: isCurrent ? 32 : 26,
                     height: isCurrent ? 32 : 26,
                     borderRadius: isCurrent ? 16 : 13,
@@ -481,7 +481,7 @@ export const DoItNowScreen: React.FC = () => {
           {prevSegmentCoords.length > 0 && prevSegmentAlpha > 0 && (
             <Polyline
               coordinates={prevSegmentCoords}
-              strokeColor={`rgba(200,87,26,${prevSegmentAlpha})`}
+              strokeColor={`rgba(196,112,75,${prevSegmentAlpha})`}
               strokeWidth={4}
               lineDashPattern={[0]}
             />
@@ -491,7 +491,7 @@ export const DoItNowScreen: React.FC = () => {
           {segmentCoords.length > 0 && segmentAlpha > 0 && (
             <Polyline
               coordinates={segmentCoords}
-              strokeColor={`rgba(200,87,26,${segmentAlpha})`}
+              strokeColor={`rgba(196,112,75,${segmentAlpha})`}
               strokeWidth={4}
               lineDashPattern={[0]}
             />
@@ -515,7 +515,7 @@ export const DoItNowScreen: React.FC = () => {
               tracksViewChanges
             >
               <View style={styles.proofCharacter}>
-                <Ionicons name="walk" size={16} color="#FFF" />
+                <Ionicons name="walk" size={16} color={Colors.textOnAccent} />
               </View>
             </Marker>
           )}
@@ -570,7 +570,7 @@ export const DoItNowScreen: React.FC = () => {
                         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlaceTime(preset); setTimeMode('manual'); }}
                         activeOpacity={0.7}
                       >
-                        <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{label}</Text>
+                        <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -635,7 +635,7 @@ export const DoItNowScreen: React.FC = () => {
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlacePrice(chip.value); }}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{chip.label}</Text>
+                      <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{chip.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -694,7 +694,7 @@ export const DoItNowScreen: React.FC = () => {
               onPress={openMapsNavigation}
               activeOpacity={0.7}
             >
-              <Ionicons name="navigate" size={16} color="#FFF" />
+              <Ionicons name="navigate" size={16} color={Colors.textOnAccent} />
               <Text style={styles.navBtnText}>Itinéraire</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -716,73 +716,73 @@ export const DoItNowScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { fontSize: 14, fontFamily: Fonts.serif },
+  loadingText: { fontSize: 14, fontFamily: Fonts.body },
 
   // Progress bar
-  progressBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 10, gap: 10, backgroundColor: 'rgba(28,25,23,0.85)' },
-  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  progressBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 10, gap: 10, backgroundColor: 'rgba(245,240,232,0.92)' },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(44,36,32,0.08)', alignItems: 'center', justifyContent: 'center' },
   progressInfo: { flex: 1, gap: 4 },
-  progressText: { fontSize: 13, fontFamily: Fonts.serifBold, textAlign: 'center' },
+  progressText: { fontSize: 13, fontFamily: Fonts.displaySemiBold, textAlign: 'center' },
   progressDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
 
   // Arrived banner
   arrivedBanner: { position: 'absolute', top: 100, left: 20, right: 20, zIndex: 20, paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
-  arrivedText: { color: '#FFF', fontSize: 15, fontFamily: Fonts.serifBold },
+  arrivedText: { color: Colors.textOnAccent, fontSize: 15, fontFamily: Fonts.displaySemiBold },
 
   // Map
   map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as any,
   mapHidden: { position: 'absolute', width: 1, height: 1, opacity: 0 } as any,
 
   // Markers
-  marker: { borderWidth: 2.5, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
-  markerText: { color: '#FFF', fontWeight: '800' },
-  proofCharacter: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#C8571A', borderWidth: 2.5, borderColor: '#FFF', alignItems: 'center' as const, justifyContent: 'center' as const, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 },
+  marker: { borderWidth: 2.5, borderColor: Colors.white, alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+  markerText: { color: Colors.textOnAccent, fontWeight: '800' },
+  proofCharacter: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary, borderWidth: 2.5, borderColor: Colors.white, alignItems: 'center' as const, justifyContent: 'center' as const, shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 },
 
   // Place mode
   placeModeContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30, gap: 16 },
   placeModeIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  placeModeName: { fontSize: 22, fontFamily: Fonts.serifBold, textAlign: 'center' },
-  placeModeType: { fontSize: 14, fontFamily: Fonts.serif },
+  placeModeName: { fontSize: 22, fontFamily: Fonts.displaySemiBold, textAlign: 'center' },
+  placeModeType: { fontSize: 14, fontFamily: Fonts.body },
   timeSection: { width: '100%', marginTop: 8 },
-  timeLabel: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 8, textAlign: 'center' },
+  timeLabel: { fontSize: 11, fontFamily: Fonts.body, marginBottom: 8, textAlign: 'center' },
   timeBtnRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
   timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 14, borderWidth: 1.5 },
-  timeBtnText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  timeBtnText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   timeInputBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 46 },
-  timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
-  timeUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.displaySemiBold, textAlign: 'center', paddingVertical: 0 },
+  timeUnit: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   ratingRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   commentInput: {
     width: '100%', marginTop: 10, borderRadius: 12, borderWidth: 1,
     paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, fontFamily: Fonts.serif, maxHeight: 80, minHeight: 40,
+    fontSize: 14, fontFamily: Fonts.body, maxHeight: 80, minHeight: 40,
   },
   durationChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   durationChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   durationChipText: { fontSize: 12, fontWeight: '600' },
   priceSection: { width: '100%', marginTop: 12, gap: 6 },
-  priceLabel: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center' },
+  priceLabel: { fontSize: 11, fontFamily: Fonts.body, textAlign: 'center' },
   nextBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 16 },
-  nextBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  nextBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displaySemiBold },
 
   // Bottom card
-  bottomCard: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
+  bottomCard: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24, shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
   bottomCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   bottomCardIndex: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  bottomCardIndexText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+  bottomCardIndexText: { color: Colors.textOnAccent, fontSize: 14, fontWeight: '800' },
   bottomCardInfo: { flex: 1 },
-  bottomCardName: { fontSize: 16, fontFamily: Fonts.serifBold },
-  bottomCardType: { fontSize: 12, fontFamily: Fonts.serif },
+  bottomCardName: { fontSize: 16, fontFamily: Fonts.displaySemiBold },
+  bottomCardType: { fontSize: 12, fontFamily: Fonts.body },
   routeSection: { marginBottom: 12, gap: 8 },
   bottomCardRoute: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  bottomCardRouteText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  bottomCardRouteText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   nextStepBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
-  nextStepText: { flex: 1, fontSize: 12, fontFamily: Fonts.serif },
-  nextStepDist: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  nextStepText: { flex: 1, fontSize: 12, fontFamily: Fonts.body },
+  nextStepDist: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
   navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12 },
-  navBtnText: { color: '#FFF', fontSize: 14, fontFamily: Fonts.serifBold },
+  navBtnText: { color: Colors.textOnAccent, fontSize: 14, fontFamily: Fonts.displaySemiBold },
   arrivedBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  arrivedBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
-  quoteText: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center', fontStyle: 'italic' },
+  arrivedBtnText: { fontSize: 14, fontFamily: Fonts.displaySemiBold },
+  quoteText: { fontSize: 11, fontFamily: Fonts.displayItalic, textAlign: 'center' },
 });

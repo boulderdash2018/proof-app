@@ -108,24 +108,24 @@ export const ClosedPlacesSheet: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(44,36,32,0.4)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 10, maxHeight: '70%' },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#999', alignSelf: 'center', marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.serifBold, paddingHorizontal: 20, marginBottom: 16 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.gray400, alignSelf: 'center', marginBottom: 16 },
+  title: { fontSize: 20, fontWeight: '800', fontFamily: Fonts.displaySemiBold, paddingHorizontal: 20, marginBottom: 16 },
 
   listWrap: { paddingHorizontal: 20, maxHeight: 220 },
   placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, gap: 12 },
   iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   placeInfo: { flex: 1 },
-  placeName: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 2 },
-  placeStatus: { fontSize: 12, fontFamily: Fonts.serif },
+  placeName: { fontSize: 14, fontFamily: Fonts.bodySemiBold, marginBottom: 2 },
+  placeStatus: { fontSize: 12, fontFamily: Fonts.body },
 
-  allClosedMsg: { fontSize: 12, fontFamily: Fonts.serif, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },
+  allClosedMsg: { fontSize: 12, fontFamily: Fonts.body, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },
 
   actions: { paddingHorizontal: 20, paddingTop: 16, gap: 10 },
   actionBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  actionBtnTextPrimary: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
-  actionBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  actionBtnTextPrimary: { fontSize: 14, fontFamily: Fonts.bodySemiBold, color: Colors.textOnAccent },
+  actionBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   cancelBtn: { alignItems: 'center', paddingVertical: 10 },
-  cancelText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  cancelText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 });

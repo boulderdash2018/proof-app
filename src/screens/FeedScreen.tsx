@@ -119,8 +119,8 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
 
-  // ── Status bar — light on dark ────────────────────────────────
-  useFocusEffect(useCallback(() => { StatusBar.setBarStyle('light-content'); }, []));
+  // ── Status bar — dark on light ────────────────────────────────
+  useFocusEffect(useCallback(() => { StatusBar.setBarStyle('dark-content'); }, []));
 
   // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
@@ -326,7 +326,7 @@ export const FeedScreen: React.FC = () => {
   // ══════════════════════════════════════════════════════════════
   return (
     <View style={styles.container}>
-      {/* ─── Header (normal flow on black bg) ─── */}
+      {/* ─── Header (normal flow on cream bg) ─── */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
           <Text style={styles.logo}>
@@ -338,7 +338,7 @@ export const FeedScreen: React.FC = () => {
                 style={styles.headerIconBtn}
                 onPress={() => setShowAccountPrompt(true)}
               >
-                <Ionicons name="person-add-outline" size={18} color="#FFF" />
+                <Ionicons name="person-add-outline" size={18} color={Colors.textPrimary} />
               </TouchableOpacity>
             ) : (
               <>
@@ -349,7 +349,7 @@ export const FeedScreen: React.FC = () => {
                   <Ionicons
                     name={chatUnread > 0 ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
                     size={18}
-                    color="#FFF"
+                    color={Colors.textPrimary}
                   />
                   {chatUnread > 0 && (
                     <View style={styles.headerBadge}>
@@ -367,7 +367,7 @@ export const FeedScreen: React.FC = () => {
                     <Ionicons
                       name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
                       size={19}
-                      color="#FFF"
+                      color={Colors.textPrimary}
                     />
                   </Animated.View>
                   {unreadCount > 0 && (
@@ -549,7 +549,7 @@ export const FeedScreen: React.FC = () => {
                       <RNTextInput
                         style={styles.commentInput}
                         placeholder="Ajouter un commentaire..."
-                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        placeholderTextColor={Colors.textTertiary}
                         value={commentText}
                         onChangeText={setCommentText}
                         multiline
@@ -635,12 +635,13 @@ export const FeedScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: Colors.bgPrimary,
   },
 
   // ── Header (normal flow) ───────────────────────────────────
   header: {
     paddingBottom: 4,
+    backgroundColor: Colors.bgPrimary,
   },
   headerRow: {
     flexDirection: 'row',
@@ -651,8 +652,8 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: 26,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
     letterSpacing: -1,
   },
   headerIcons: {
@@ -673,7 +674,7 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#E85D5D',
+    backgroundColor: Colors.error,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -681,7 +682,7 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#FFF',
+    color: Colors.textOnAccent,
   },
 
   // ── Tabs ───────────────────────────────────────────────────
@@ -695,15 +696,15 @@ const styles = StyleSheet.create({
   } as any,
   tabText: {
     fontSize: 15,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
   },
   tabIndicator: {
     position: 'absolute',
     bottom: 0,
     height: 2.5,
     borderRadius: 2,
-    backgroundColor: '#FFF',
+    backgroundColor: Colors.primary,
   },
 
   // ── FlatList area ──────────────────────────────────────────
@@ -721,13 +722,13 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(44, 36, 32, 0.15)',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: 'rgba(44, 36, 32, 0.5)',
   },
 
   // ── Loading / Empty ────────────────────────────────────────
@@ -750,7 +751,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 16,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: Colors.bgSecondary,
   },
   sheetHandle: {
     width: 36,
@@ -759,12 +760,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(44, 36, 32, 0.15)',
   },
   sheetTitle: {
     fontSize: 16,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     marginBottom: 12,
   },
   sheetScroll: {
@@ -777,20 +778,20 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.6)',
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
   },
   emptySub: {
     fontSize: 12,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
     marginTop: 4,
   },
   commentRow: {
     flexDirection: 'row',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: Colors.borderSubtle,
   },
   commentBody: {
     flex: 1,
@@ -804,18 +805,19 @@ const styles = StyleSheet.create({
   },
   commentAuthor: {
     fontSize: 13,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
   },
   commentTime: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
   },
   commentText: {
     fontSize: 13,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     lineHeight: 18,
-    color: 'rgba(255,255,255,0.8)',
+    color: Colors.textSecondary,
   },
   commentInputRow: {
     flexDirection: 'row',
@@ -825,19 +827,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     minHeight: 38,
     marginTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Colors.bgTertiary,
   },
   commentPlaceholder: {
     fontSize: 13,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
   },
   commentInput: {
     flex: 1,
     fontSize: 13,
+    fontFamily: Fonts.body,
     maxHeight: 60,
     paddingVertical: 0,
-    color: '#FFF',
+    color: Colors.textPrimary,
   },
   sendBtn: {
     marginLeft: 8,

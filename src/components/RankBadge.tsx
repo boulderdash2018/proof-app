@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   emojiSmall: { fontSize: 9 },
   label: {
     fontSize: 10,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
     letterSpacing: 0.2,
   },
   labelSmall: {

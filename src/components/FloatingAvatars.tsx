@@ -117,7 +117,7 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
                 <Ionicons
                   name={slot.type === 'save' ? 'bookmark' : 'heart'}
                   size={8}
-                  color="#FFF"
+                  color="#FFF8F0"
                 />
               </View>
             )}
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     left: 0,
   },
   avatarShadow: {
-    shadowColor: '#000',
+    shadowColor: '#2C2420',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     height: AVATAR_OUTER,
     borderRadius: AVATAR_OUTER / 2,
     borderWidth: BORDER_W,
-    borderColor: '#FFF',
+    borderColor: '#FAF7F2',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -173,9 +173,9 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#1C1917',
+    backgroundColor: '#2C2420',
     borderWidth: 1.5,
-    borderColor: '#FFF',
+    borderColor: '#FAF7F2',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
@@ -187,9 +187,9 @@ const styles = StyleSheet.create({
     width: BADGE_SIZE,
     height: BADGE_SIZE,
     borderRadius: BADGE_SIZE / 2,
-    backgroundColor: '#1A1410',
+    backgroundColor: '#2C2420',
     borderWidth: 1.5,
-    borderColor: '#FFF',
+    borderColor: '#FAF7F2',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,

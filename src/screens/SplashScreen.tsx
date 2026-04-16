@@ -35,14 +35,14 @@ export const SplashScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.bgPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
     ...Typography.logo,
     fontSize: 38,
-    color: Colors.black,
+    color: Colors.textPrimary,
   },
   dot: {
     color: Colors.primary,

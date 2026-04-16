@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, EmptyState, LoadingSkeleton } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -32,23 +32,24 @@ export const FollowingScreen: React.FC = () => {
 
   const renderItem = ({ item }: { item: User }) => (
     <TouchableOpacity
-      style={[styles.row, { borderBottomColor: C.borderLight }]}
+      style={[styles.row, { borderBottomColor: C.borderSubtle }]}
       onPress={() => navigation.push('OtherProfile', { userId: item.id })}
       activeOpacity={0.7}
     >
       <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl} />
       <View style={styles.info}>
-        <Text style={[styles.name, { color: C.black }]}>{item.displayName}</Text>
-        <Text style={[styles.username, { color: C.gray700 }]}>@{item.username}</Text>
+        <Text style={[styles.name, { color: C.textPrimary }]}>{item.displayName}</Text>
+        <Text style={[styles.username, { color: C.textSecondary }]}>@{item.username}</Text>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <View style={[styles.header, { borderBottomColor: C.border }]}>
-        <Text style={[styles.back, { color: C.black }]} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={[styles.headerTitle, { color: C.black }]}>{t.profile_following}</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.bgPrimary }]}>
+      <StatusBar barStyle="dark-content" />
+      <View style={[styles.header, { borderBottomColor: C.borderMedium }]}>
+        <Text style={[styles.back, { color: C.textPrimary }]} onPress={() => navigation.goBack()}>‹</Text>
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>{t.profile_following}</Text>
         <View style={{ width: 30 }} />
       </View>
       {loading ? (
@@ -71,11 +72,11 @@ export const FollowingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
-  back: { fontSize: 24, fontWeight: '600', width: 30 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  back: { fontSize: 24, fontFamily: Fonts.bodySemiBold, width: 30 },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
   list: { paddingBottom: 20 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
   info: { flex: 1 },
-  name: { fontSize: 14, fontWeight: '700' },
-  username: { fontSize: 12, marginTop: 1 },
+  name: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  username: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
 });

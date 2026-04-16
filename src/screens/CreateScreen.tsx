@@ -160,21 +160,21 @@ const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t })
             )}
           />
           <View style={{ position: 'absolute', bottom: 16, left: 18, right: 18 }} pointerEvents="none">
-            <Text style={{ fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>{plan.title}</Text>
-            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontFamily: Fonts.serif, marginTop: 2 }}>par {plan.author.displayName}</Text>
+            <Text style={{ fontSize: 22, fontFamily: Fonts.displaySemiBold, color: Colors.textOnAccent, textShadowColor: 'rgba(44,36,32,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>{plan.title}</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255,248,240,0.8)', fontFamily: Fonts.body, marginTop: 2 }}>par {plan.author.displayName}</Text>
           </View>
           {allPhotos.length > 1 && (
             <View style={{ position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5 }} pointerEvents="none">
               {allPhotos.map((_, i) => (
-                <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === activeIdx ? '#FFF' : 'rgba(255,255,255,0.4)' }} />
+                <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === activeIdx ? Colors.textOnAccent : 'rgba(255,248,240,0.4)' }} />
               ))}
             </View>
           )}
         </View>
       ) : (
         <LinearGradient colors={gradientColors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: 220, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 16 }}>
-          <Text style={{ fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFF' }}>{plan.title}</Text>
-          <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontFamily: Fonts.serif, marginTop: 2 }}>par {plan.author.displayName}</Text>
+          <Text style={{ fontSize: 22, fontFamily: Fonts.displaySemiBold, color: Colors.textOnAccent }}>{plan.title}</Text>
+          <Text style={{ fontSize: 12, color: 'rgba(255,248,240,0.8)', fontFamily: Fonts.body, marginTop: 2 }}>par {plan.author.displayName}</Text>
         </LinearGradient>
       )}
 
@@ -206,7 +206,7 @@ const PreviewDetail: React.FC<{ plan: Plan; C: any; t: any }> = ({ plan, C, t })
             <View style={{ flexDirection: 'row', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, ...(!isLast && !travelToNext ? { borderBottomWidth: 1, borderBottomColor: C.borderLight } : {}) }}>
               <View style={{ width: 30, alignItems: 'center', marginRight: 12 }}>
                 <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFF' }}>{index + 1}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.textOnAccent }}>{index + 1}</Text>
                 </View>
               </View>
               <View style={{ flex: 1 }}>
@@ -1148,7 +1148,7 @@ export const CreateScreen: React.FC = () => {
     return {
       id: 'preview',
       authorId: user?.id ?? '',
-      author: user ?? { id: '', username: '', displayName: 'Toi', initials: '?', avatarBg: '#C8571A', avatarColor: '#FFF', badgeType: 'none' as any, isPrivate: false, xpPoints: 0, coins: 0, level: 1, xpForNextLevel: 100, rank: 'Explorateur', planCount: 0, followersCount: 0, followingCount: 0, likesReceived: 0, unlockedBadges: [], createdAt: new Date().toISOString() },
+      author: user ?? { id: '', username: '', displayName: 'Toi', initials: '?', avatarBg: Colors.primary, avatarColor: Colors.textOnAccent, badgeType: 'none' as any, isPrivate: false, xpPoints: 0, coins: 0, level: 1, xpForNextLevel: 100, rank: 'Explorateur', planCount: 0, followersCount: 0, followingCount: 0, likesReceived: 0, unlockedBadges: [], createdAt: new Date().toISOString() },
       title: title || 'Mon plan',
       gradient: 'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
       tags: selectedTags,
@@ -1204,7 +1204,7 @@ export const CreateScreen: React.FC = () => {
   const screenWidth = Dimensions.get('window').width - Layout.screenPadding * 2;
 
   const qualityLabel = qualityScore >= 100 ? 'Perfect plan' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
-  const labelColor = qualityScore >= 100 ? '#C8571A' : qualityScore >= 80 ? '#A04010' : qualityScore >= 56 ? '#C8571A' : qualityScore >= 31 ? '#D4784A' : '#8A8078';
+  const labelColor = qualityScore >= 100 ? Colors.primary : qualityScore >= 80 ? Colors.primaryDeep : qualityScore >= 56 ? Colors.primary : qualityScore >= 31 ? '#D4784A' : '#8A8078';
   const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2;
 
   useEffect(() => {
@@ -1518,7 +1518,7 @@ export const CreateScreen: React.FC = () => {
             { backgroundColor: C.white, borderColor: C.borderLight },
             { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
             draggingId === place.id && {
-              shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
+              shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
               shadowRadius: 8, elevation: 8, borderColor: C.primary,
             },
             { zIndex: draggingId === place.id ? 100 : 1 },
@@ -1539,7 +1539,7 @@ export const CreateScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.reservationLabel, { color: place.reservationRecommended ? '#8B5E3C' : C.gray500 }]}>Book in advance</Text>
-                <View style={[styles.reservationToggle, { backgroundColor: place.reservationRecommended ? '#C8571A' : C.gray400 }]}>
+                <View style={[styles.reservationToggle, { backgroundColor: place.reservationRecommended ? Colors.primary : C.gray400 }]}>
                   <View style={[styles.reservationThumb, place.reservationRecommended && styles.reservationThumbOn]} />
                 </View>
               </TouchableOpacity>
@@ -1563,7 +1563,7 @@ export const CreateScreen: React.FC = () => {
                     onPress={() => updatePlacePriceRange(place.id, ri)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>
+                    <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>
                       {label}
                     </Text>
                   </TouchableOpacity>
@@ -1614,7 +1614,7 @@ export const CreateScreen: React.FC = () => {
                     onPress={() => updatePlaceDuration(place.id, preset)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>
+                    <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>
                       {formatDurationLabel(preset)}
                     </Text>
                   </TouchableOpacity>
@@ -1693,7 +1693,7 @@ export const CreateScreen: React.FC = () => {
                   <Text style={styles.transportMiniEmoji}>{TRANSPORT_EMOJIS[opt]}</Text>
                   <Text style={[
                     styles.transportMiniText,
-                    { color: travel.transport === opt ? '#FFFFFF' : C.gray800 },
+                    { color: travel.transport === opt ? Colors.textOnAccent : C.gray800 },
                   ]}>
                     {getTransportLabel(opt)}
                   </Text>
@@ -1720,7 +1720,7 @@ export const CreateScreen: React.FC = () => {
         <Animated.View style={[styles.qualityBarWrap, { transform: [{ scaleY: barScale }] }]}>
           <View style={styles.qualityBarBg}>
             <Animated.View style={[styles.qualityBarFill, { width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }) }]}>
-              <LinearGradient colors={['#F5C4A0', '#D4784A', '#C8571A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['#F5C4A0', '#D4784A', Colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
               {/* Shimmer overlay at 100% */}
               <Animated.View style={[styles.qualityShimmer, { transform: [{ translateX: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-screenWidth, screenWidth] }) }], opacity: shimmerAnim.interpolate({ inputRange: [0, 0.3, 0.7, 1], outputRange: [0, 0.6, 0.6, 0] }) }]} />
             </Animated.View>
@@ -1732,7 +1732,7 @@ export const CreateScreen: React.FC = () => {
                 {qualityLabel}
               </Text>
               {qualityScore >= 100 && (
-                <Animated.Text style={[styles.qualityCheck, { color: '#C8571A', transform: [{ scale: checkScale }] }]}> ✓</Animated.Text>
+                <Animated.Text style={[styles.qualityCheck, { color: Colors.primary, transform: [{ scale: checkScale }] }]}> ✓</Animated.Text>
               )}
             </Animated.View>
           </Animated.View>
@@ -1802,7 +1802,7 @@ export const CreateScreen: React.FC = () => {
                   onPress={() => toggleTag(p.label)}
                 >
                   <Text style={styles.groupChipEmoji}>{p.emoji}</Text>
-                  <Text style={[styles.groupChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{p.label}</Text>
+                  <Text style={[styles.groupChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{p.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1828,7 +1828,7 @@ export const CreateScreen: React.FC = () => {
                   }}
                 >
                   <Text style={styles.groupChipEmoji}>{group.emoji}</Text>
-                  <Text style={[styles.groupChipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.label}</Text>
+                  <Text style={[styles.groupChipText, { color: isActive ? Colors.textOnAccent : C.gray800 }]}>{group.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1836,8 +1836,8 @@ export const CreateScreen: React.FC = () => {
               style={[styles.groupChip, { backgroundColor: showSubcategories ? Colors.gold : C.gray200, borderColor: showSubcategories ? Colors.gold : C.borderLight }]}
               onPress={() => setShowSubcategories(!showSubcategories)}
             >
-              <Text style={[styles.groupChipText, { color: showSubcategories ? '#FFF' : C.gray800, fontWeight: '700' }]}>Voir +</Text>
-              <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray800} />
+              <Text style={[styles.groupChipText, { color: showSubcategories ? Colors.textOnAccent : C.gray800, fontWeight: '700' }]}>Voir +</Text>
+              <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? Colors.textOnAccent : C.gray800} />
             </TouchableOpacity>
           </ScrollView>
 
@@ -1958,8 +1958,8 @@ export const CreateScreen: React.FC = () => {
               style={[
                 styles.publishBtn,
                 !canPublish && { backgroundColor: C.gray400, borderColor: C.gray400 },
-                canPublish && qualityScore < 80 && { backgroundColor: 'transparent', borderColor: '#C8571A' },
-                canPublish && qualityScore >= 80 && { backgroundColor: '#C8571A', borderColor: '#C8571A' },
+                canPublish && qualityScore < 80 && { backgroundColor: 'transparent', borderColor: Colors.primary },
+                canPublish && qualityScore >= 80 && { backgroundColor: Colors.primary, borderColor: Colors.primary },
               ]}
               onPress={() => {
                 if (canPublish && qualityScore < 100 && missingCriteria.length > 0) {
@@ -1972,14 +1972,14 @@ export const CreateScreen: React.FC = () => {
               activeOpacity={0.8}
             >
               {isPublishing ? (
-                <ActivityIndicator size="small" color="#FFF" />
+                <ActivityIndicator size="small" color={Colors.textOnAccent} />
               ) : (
                 <View style={styles.publishBtnInner}>
                   <Text style={[
                     styles.publishBtnText,
-                    !canPublish && { color: '#FFF' },
-                    canPublish && qualityScore < 80 && { color: '#C8571A' },
-                    canPublish && qualityScore >= 80 && { color: '#FFF' },
+                    !canPublish && { color: Colors.textOnAccent },
+                    canPublish && qualityScore < 80 && { color: Colors.primary },
+                    canPublish && qualityScore >= 80 && { color: Colors.textOnAccent },
                   ]}>
                     {qualityScore >= 100 ? 'Publier le plan \u2726' : t.create_publish}
                   </Text>
@@ -2128,7 +2128,7 @@ export const CreateScreen: React.FC = () => {
                   onPress={() => setIsReordering(!isReordering)}
                   style={[styles.reorderToggle, { backgroundColor: isReordering ? C.primary : C.gray200 }]}
                 >
-                  <Ionicons name={isReordering ? 'checkmark' : 'reorder-three'} size={16} color={isReordering ? '#FFF' : C.gray700} />
+                  <Ionicons name={isReordering ? 'checkmark' : 'reorder-three'} size={16} color={isReordering ? Colors.textOnAccent : C.gray700} />
                 </TouchableOpacity>
               </View>
 
@@ -2298,7 +2298,7 @@ export const CreateScreen: React.FC = () => {
                 onPress={confirmPlace}
                 activeOpacity={0.8}
               >
-                <Ionicons name={editingPlaceIndex !== null ? 'checkmark' : 'add'} size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Ionicons name={editingPlaceIndex !== null ? 'checkmark' : 'add'} size={18} color={Colors.textOnAccent} style={{ marginRight: 6 }} />
                 <Text style={styles.customizeConfirmText}>{editingPlaceIndex !== null ? 'Enregistrer' : 'Ajouter ce lieu'}</Text>
               </TouchableOpacity>
             </View>
@@ -2361,10 +2361,10 @@ export const CreateScreen: React.FC = () => {
                   </View>
                 ))}
                 <View style={styles.sheetButtons}>
-                  <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: '#C8571A' }]} onPress={closePublishSheet} activeOpacity={0.7}>
-                    <Text style={[styles.sheetBtnOutlineText, { color: '#C8571A' }]}>Continuer</Text>
+                  <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: Colors.primary }]} onPress={closePublishSheet} activeOpacity={0.7}>
+                    <Text style={[styles.sheetBtnOutlineText, { color: Colors.primary }]}>Continuer</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={() => { setShowPublishSheet(false); handlePublish(); }} activeOpacity={0.7}>
+                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: Colors.primary }]} onPress={() => { setShowPublishSheet(false); handlePublish(); }} activeOpacity={0.7}>
                     <Text style={styles.sheetBtnFillText}>Publier quand même</Text>
                   </TouchableOpacity>
                 </View>
@@ -2384,7 +2384,7 @@ export const CreateScreen: React.FC = () => {
                   <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: C.gray500 }]} onPress={handleDiscardResume} activeOpacity={0.7}>
                     <Text style={[styles.sheetBtnOutlineText, { color: C.gray700 }]}>Annuler les modifications</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={handleResumeDraft} activeOpacity={0.7}>
+                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: Colors.primary }]} onPress={handleResumeDraft} activeOpacity={0.7}>
                     <Text style={styles.sheetBtnFillText}>Reprendre</Text>
                   </TouchableOpacity>
                 </View>
@@ -2407,7 +2407,7 @@ export const CreateScreen: React.FC = () => {
               <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: C.gray500 }]} onPress={handlePickupNew} activeOpacity={0.7}>
                 <Text style={[styles.sheetBtnOutlineText, { color: C.gray700 }]}>New plan</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={handlePickupResume} activeOpacity={0.7}>
+              <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: Colors.primary }]} onPress={handlePickupResume} activeOpacity={0.7}>
                 <Text style={styles.sheetBtnFillText}>Resume draft</Text>
               </TouchableOpacity>
             </View>
@@ -2443,7 +2443,7 @@ export const CreateScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  headerTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   costPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   costText: { fontSize: 11, fontWeight: '700' },
   scroll: { flex: 1 },
@@ -2451,10 +2451,10 @@ const styles = StyleSheet.create({
   // Draft banner
   draftBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
   draftBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  draftBannerText: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.serif },
+  draftBannerText: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.body },
   draftBannerDiscard: { fontSize: 12, fontWeight: '600' },
   // Draft toast
-  draftToast: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EDE8E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
+  draftToast: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EDE8E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
   draftToastText: { fontSize: 11, fontWeight: '600', color: '#8B7B6B', letterSpacing: 0.3 },
   fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 6 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
@@ -2465,7 +2465,7 @@ const styles = StyleSheet.create({
   placeCard: { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 0 },
   placeCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   placeNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  placeNumberText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  placeNumberText: { fontSize: 12, fontWeight: '700', color: Colors.textOnAccent },
   placeCardInfo: { flex: 1 },
   placeName: { fontSize: 13, fontWeight: '700' },
   placeType: { fontSize: 11, marginTop: 1 },
@@ -2517,18 +2517,18 @@ const styles = StyleSheet.create({
   addPlaceBtn: { paddingVertical: 14, marginTop: 8, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center' },
   addPlaceText: { fontSize: 13, fontWeight: '700' },
   previewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, marginBottom: 10 },
-  previewBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  previewBtnText: { fontSize: 14, fontFamily: Fonts.displaySemiBold },
   previewModal: { flex: 1 },
   previewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
-  previewTitle: { fontSize: 20, fontFamily: Fonts.serifBold },
-  previewBackText: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
-  previewSubtitle: { fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 16, fontFamily: Fonts.serif },
+  previewTitle: { fontSize: 20, fontFamily: Fonts.displaySemiBold },
+  previewBackText: { fontSize: 15, fontFamily: Fonts.bodySemiBold },
+  previewSubtitle: { fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 16, fontFamily: Fonts.body },
   previewScroll: { paddingBottom: 40 },
   publishSection: { marginTop: 20, marginBottom: 10 },
   publishBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
   publishBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  publishBtnText: { fontSize: 15, fontFamily: Fonts.serifBold },
-  publishHint: { fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: Fonts.serif },
+  publishBtnText: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
+  publishHint: { fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: Fonts.body },
   costNote: { fontSize: 12, textAlign: 'center', marginTop: 10 },
 
   // Quality progress bar
@@ -2538,32 +2538,32 @@ const styles = StyleSheet.create({
   qualityShimmer: { position: 'absolute', top: 0, bottom: 0, width: 60, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 20 },
   qualityLabelTrack: { marginTop: 5, alignItems: 'flex-end' },
   qualityLabelInner: { flexDirection: 'row', alignItems: 'center' },
-  qualityLabel: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.serifSemiBold },
-  qualityCheck: { fontSize: 13, fontWeight: '800', fontFamily: Fonts.serifBold },
+  qualityLabel: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.bodySemiBold },
+  qualityCheck: { fontSize: 13, fontWeight: '800', fontFamily: Fonts.displaySemiBold },
 
   // Publish bottom sheet
   sheetOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end', zIndex: 999 },
   sheetContainer: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 34 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 16 },
-  sheetTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.serifBold, marginBottom: 4 },
-  sheetSubtitle: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 14 },
+  sheetTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.displaySemiBold, marginBottom: 4 },
+  sheetSubtitle: { fontSize: 13, fontFamily: Fonts.body, marginBottom: 14 },
   sheetCriterion: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
   sheetCriterionIcon: { fontSize: 16, marginRight: 10 },
-  sheetCriterionText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  sheetCriterionText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   sheetButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
   sheetBtnOutline: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.displaySemiBold },
   sheetBtnFill: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
+  sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.displaySemiBold, color: Colors.textOnAccent },
   // Pickup draft sheet (non-blocking — no overlay)
   pickupSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 900,
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingHorizontal: 20, paddingBottom: 34,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 12,
+    shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 12,
   },
-  pickupTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.serifBold, marginBottom: 4 },
-  pickupSubtitle: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 14 },
+  pickupTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.displaySemiBold, marginBottom: 4 },
+  pickupSubtitle: { fontSize: 13, fontFamily: Fonts.body, marginBottom: 14 },
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   successEmoji: { fontSize: 56, marginBottom: 16 },
   successTitle: { fontSize: 20, fontWeight: '800', marginBottom: 8 },
@@ -2597,8 +2597,8 @@ const styles = StyleSheet.create({
   photoRemoveBtn: { position: 'absolute', top: -6, right: -6 },
   photoEditBtn: { position: 'absolute', bottom: 4, right: 4, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   photoAddBtn: { width: 90, height: 90, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  photoAddText: { fontSize: 10, fontFamily: Fonts.serifSemiBold, marginTop: 4 },
-  photoHint: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 12 },
+  photoAddText: { fontSize: 10, fontFamily: Fonts.bodySemiBold, marginTop: 4 },
+  photoHint: { fontSize: 11, fontFamily: Fonts.body, marginBottom: 12 },
 
   // Category group chips
   filterRowLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
@@ -2606,53 +2606,53 @@ const styles = StyleSheet.create({
   groupChipsContainer: { gap: 8 },
   groupChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   groupChipEmoji: { fontSize: 13, marginRight: 5 },
-  groupChipText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  groupChipText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 
   // Category sections & cards
   categorySectionWrap: { marginBottom: 12 },
-  categorySectionTitle: { fontSize: 10, fontFamily: Fonts.serifSemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  categorySectionTitle: { fontSize: 10, fontFamily: Fonts.bodySemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
   flatSubcatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   flatSubcatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
   flatSubcatTextCol: { flex: 1 },
-  flatSubcatName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  flatSubcatName: { fontSize: 15, fontFamily: Fonts.bodySemiBold },
   flatSubcatSub: { fontSize: 11, marginTop: 2 },
 
   // Selected tags
   selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },
   selectedTagChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
-  selectedTagText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  selectedTagText: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
 
   // ========== PLACE CUSTOMIZATION MODAL ==========
   customizeContainer: { flex: 1 },
   customizeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 14, borderBottomWidth: 1 },
-  customizeTitle: { fontSize: 16, fontFamily: Fonts.serifBold, flex: 1, textAlign: 'center' },
+  customizeTitle: { fontSize: 16, fontFamily: Fonts.displaySemiBold, flex: 1, textAlign: 'center' },
   customizeScroll: { paddingBottom: 40 },
   customizeBanner: { height: 200, position: 'relative' },
   customizeBannerImg: { width: '100%', height: '100%', resizeMode: 'cover' },
   customizeBannerPlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   customizeBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
   customizeBannerInfo: { position: 'absolute', bottom: 16, left: 16, right: 16 },
-  customizeBannerName: { fontSize: 20, fontFamily: Fonts.serifBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  customizeBannerType: { fontSize: 12, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  customizeBannerName: { fontSize: 20, fontFamily: Fonts.displaySemiBold, color: Colors.textOnAccent, textShadowColor: 'rgba(44,36,32,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  customizeBannerType: { fontSize: 12, fontFamily: Fonts.body, color: 'rgba(255,248,240,0.8)', marginTop: 2 },
   customizeSectionTitle: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: Layout.screenPadding, paddingTop: 20, paddingBottom: 12 },
   customizeBlock: { marginHorizontal: Layout.screenPadding, marginBottom: 14, borderRadius: 14, borderWidth: 1, padding: 14 },
   customizeBlockHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   customizeBlockIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  customizeBlockTitle: { fontSize: 14, fontFamily: Fonts.serifSemiBold, flex: 1 },
-  customizeBlockHint: { fontSize: 13, fontStyle: 'italic', fontFamily: Fonts.serif },
+  customizeBlockTitle: { fontSize: 14, fontFamily: Fonts.bodySemiBold, flex: 1 },
+  customizeBlockHint: { fontSize: 13, fontFamily: Fonts.displayItalic },
   customizePhotoPreview: { width: '100%', height: 140, borderRadius: 10, resizeMode: 'cover', marginTop: 4 },
-  customizeInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontFamily: Fonts.serif, minHeight: 60, textAlignVertical: 'top' },
-  customizeQuestion: { fontSize: 13, fontStyle: 'italic', fontFamily: Fonts.serif, marginBottom: 8 },
+  customizeInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontFamily: Fonts.body, minHeight: 60, textAlignVertical: 'top' },
+  customizeQuestion: { fontSize: 13, fontFamily: Fonts.displayItalic, marginBottom: 8 },
   questionPicker: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  questionPickerText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, flex: 1, marginRight: 8 },
+  questionPickerText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, flex: 1, marginRight: 8 },
   questionDropdown: { borderRadius: 10, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   questionOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1 },
-  questionOptionText: { fontSize: 13, fontFamily: Fonts.serif, flex: 1, marginRight: 8 },
+  questionOptionText: { fontSize: 13, fontFamily: Fonts.body, flex: 1, marginRight: 8 },
   addQuestionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed' },
-  addQuestionText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  addQuestionText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   customizeFooter: { borderTopWidth: 1, paddingHorizontal: Layout.screenPadding, paddingVertical: 14 },
   customizeConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
-  customizeConfirmText: { fontSize: 15, fontFamily: Fonts.serifBold, color: '#FFF' },
+  customizeConfirmText: { fontSize: 15, fontFamily: Fonts.displaySemiBold, color: Colors.textOnAccent },
 
   // Reorder UI
   customizeSectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: Layout.screenPadding },

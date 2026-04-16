@@ -92,7 +92,7 @@ export const OnboardingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.bgPrimary,
   },
   slidesContainer: {
     flex: 1,
@@ -109,14 +109,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontFamily: Fonts.serifBold,
-    color: Colors.black,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 14,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
     width: 20,
   },
   dotInactive: {
-    backgroundColor: Colors.gray500,
+    backgroundColor: Colors.gray400,
   },
   buttons: {
     minHeight: 90,
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
   loginLink: {
     color: Colors.primary,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: Fonts.bodySemiBold,
     textAlign: 'center',
   },
 });

@@ -117,11 +117,11 @@ export const TransportChooser: React.FC<Props> = ({
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <ActivityIndicator color="#FFF" size="small" />
+                  <ActivityIndicator color={Colors.textOnAccent} size="small" />
                 ) : (
                   <>
                     <Text style={styles.goBtnText}>C'est parti !</Text>
-                    <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                    <Ionicons name="arrow-forward" size={18} color={Colors.textOnAccent} />
                   </>
                 )}
               </TouchableOpacity>
@@ -134,13 +134,13 @@ export const TransportChooser: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(44,36,32,0.5)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.gray400, alignSelf: 'center', marginBottom: 20 },
-  title: { fontSize: 20, fontFamily: Fonts.serifBold, textAlign: 'center', marginBottom: 6 },
-  subtitle: { fontSize: 13, fontFamily: Fonts.serif, textAlign: 'center', marginBottom: 20 },
+  title: { fontSize: 20, fontFamily: Fonts.displaySemiBold, textAlign: 'center', marginBottom: 6 },
+  subtitle: { fontSize: 13, fontFamily: Fonts.body, textAlign: 'center', marginBottom: 20 },
   adviceBanner: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, marginBottom: 16, alignSelf: 'center' },
-  adviceText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  adviceText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   option: {
     flex: 1,
@@ -152,9 +152,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   optionEmoji: { fontSize: 28, marginBottom: 6 },
-  optionLabel: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  optionLabel: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   recommendedBadge: { position: 'absolute', top: 6, right: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  recommendedText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
+  recommendedText: { color: Colors.textOnAccent, fontSize: 9, fontWeight: '700' },
   goBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 14 },
-  goBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  goBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.bodySemiBold },
 });

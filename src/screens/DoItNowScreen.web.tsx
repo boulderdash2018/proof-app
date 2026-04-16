@@ -32,25 +32,25 @@ function getUrlTravelMode(mode: string): string {
   }
 }
 
-// Enegry by Schloesser David — dark mode, gold labels
+// Light cream/terracotta map style
 const MAP_STYLE = [
-  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#ffa600"},{"lightness":40}]},
-  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"lightness":16},{"hue":"#ff0000"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#6B5D52"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#FAF7F2"},{"weight":2}]},
   {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":17},{"weight":1.2}]},
+  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#EDE5D8"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#A09181"},{"weight":1.2}]},
   {"featureType":"administrative.locality","elementType":"all","stylers":[{"visibility":"off"}]},
   {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":21}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#F5F0E8"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":17}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":29},{"weight":0.2}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":18}]},
-  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":16}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":19}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#EDE5D8"},{"weight":0.5}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"transit.line","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":17}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4C9BB"}]},
 ];
 
 let gmLoaded = false;
@@ -105,8 +105,8 @@ function createUserOverlayClass(gm: any) {
       this.div_.style.pointerEvents = 'none';
       this.div_.innerHTML =
         '<div style="position:relative;width:44px;height:44px;margin:-22px 0 0 -22px;">' +
-          '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(200,87,26,0.3);animation:proofPulse 2s ease-out infinite;"></div>' +
-          '<div style="position:absolute;top:6px;left:6px;width:32px;height:32px;border-radius:50%;background:#C8571A;border:2.5px solid white;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,0.35);z-index:1;">🚶</div>' +
+          '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(196,112,75,0.3);animation:proofPulse 2s ease-out infinite;"></div>' +
+          '<div style="position:absolute;top:6px;left:6px;width:32px;height:32px;border-radius:50%;background:#C4704B;border:2.5px solid #FAF7F2;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(44,36,32,0.35);z-index:1;">🚶</div>' +
         '</div>';
       const panes = this.getPanes();
       panes.overlayMouseTarget.appendChild(this.div_);
@@ -193,7 +193,7 @@ export const DoItNowScreen: React.FC = () => {
         disableDefaultUI: true,
         zoomControl: true,
         gestureHandling: 'greedy',
-        backgroundColor: '#E8DDD0',
+        backgroundColor: '#F5F0E8',
         center: { lat: cityConfig.coordinates.lat, lng: cityConfig.coordinates.lng },
         zoom: 13,
       });
@@ -205,7 +205,7 @@ export const DoItNowScreen: React.FC = () => {
         if (!p.latitude || !p.longitude) return;
         const isCurrent = i === currentIndex;
         const size = isCurrent ? 32 : 26;
-        const svg = buildPinSVG(i, size, isCurrent ? '#C8571A' : '#D4845A');
+        const svg = buildPinSVG(i, size, isCurrent ? '#C4704B' : '#D4845A');
         const marker = new gm.Marker({
           position: { lat: p.latitude, lng: p.longitude },
           map,
@@ -233,13 +233,13 @@ export const DoItNowScreen: React.FC = () => {
           if (status === 'OK' && result) {
             result.routes[0].legs.forEach((leg: any) => {
               const path = leg.steps.reduce((acc: any[], step: any) => acc.concat(step.path), []);
-              new gm.Polyline({ path, strokeColor: '#C8571A', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50 });
+              new gm.Polyline({ path, strokeColor: '#C4704B', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50 });
             });
           } else {
             // Fallback: straight lines
             new gm.Polyline({
               path: validPlaces.map((p: any) => ({ lat: p.latitude, lng: p.longitude })),
-              strokeColor: '#C8571A', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50,
+              strokeColor: '#C4704B', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50,
             });
           }
         });
@@ -351,7 +351,7 @@ export const DoItNowScreen: React.FC = () => {
       const isCurrent = i === currentIndex;
       const isVisited = i < currentIndex;
       const size = isCurrent ? 32 : 26;
-      const fill = isCurrent ? '#C8571A' : isVisited ? '#A06840' : '#D4845A';
+      const fill = isCurrent ? '#C4704B' : isVisited ? '#A85A38' : '#D4845A';
       const svg = buildPinSVG(i, size, fill);
       markersRef.current[i].setIcon({
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
@@ -440,7 +440,7 @@ export const DoItNowScreen: React.FC = () => {
                     width: isCur ? 12 : 8,
                     height: isCur ? 12 : 8,
                     borderRadius: isCur ? 6 : 4,
-                    backgroundColor: isCur ? Colors.gold : isDone ? Colors.gold : 'rgba(255,255,255,0.25)',
+                    backgroundColor: isCur ? Colors.primary : isDone ? Colors.primary : Colors.borderMedium,
                     opacity: isCur ? 1 : isDone ? 0.55 : 1,
                   }}
                 />
@@ -514,7 +514,7 @@ export const DoItNowScreen: React.FC = () => {
                         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlaceTime(preset); setTimeMode('manual'); }}
                         activeOpacity={0.7}
                       >
-                        <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{label}</Text>
+                        <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -566,7 +566,7 @@ export const DoItNowScreen: React.FC = () => {
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlacePrice(chip.value); }}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.durationChipText, { color: isSelected ? '#FFF' : C.gray800 }]}>{chip.label}</Text>
+                      <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{chip.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -614,7 +614,7 @@ export const DoItNowScreen: React.FC = () => {
               onPress={openGoogleMapsNav}
               activeOpacity={0.7}
             >
-              <Ionicons name="navigate" size={16} color="#FFF" />
+              <Ionicons name="navigate" size={16} color={Colors.textOnAccent} />
               <Text style={styles.navBtnText}>Itinéraire</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -634,56 +634,56 @@ export const DoItNowScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  progressBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 10, gap: 10, backgroundColor: 'rgba(28,25,23,0.85)' },
-  iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  progressBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 10, gap: 10, backgroundColor: 'rgba(245,240,232,0.92)' },
+  iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(44,36,32,0.08)', alignItems: 'center', justifyContent: 'center' },
   progressInfo: { flex: 1, gap: 4 },
-  progressText: { fontSize: 13, fontFamily: Fonts.serifBold, textAlign: 'center' },
+  progressText: { fontSize: 13, fontFamily: Fonts.displaySemiBold, textAlign: 'center' },
   progressDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   arrivedBanner: { position: 'absolute', top: 100, left: 20, right: 20, zIndex: 20, paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
-  arrivedText: { color: '#FFF', fontSize: 15, fontFamily: Fonts.serifBold },
+  arrivedText: { color: Colors.textOnAccent, fontSize: 15, fontFamily: Fonts.displaySemiBold },
   mapContainer: { flex: 1 },
   mapLoading: { position: 'absolute', top: '50%', left: '50%', zIndex: 5 },
   placeModeContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30, gap: 16 },
   placeModeIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  placeModeName: { fontSize: 22, fontFamily: Fonts.serifBold, textAlign: 'center' },
-  placeModeType: { fontSize: 14, fontFamily: Fonts.serif },
+  placeModeName: { fontSize: 22, fontFamily: Fonts.displaySemiBold, textAlign: 'center' },
+  placeModeType: { fontSize: 14, fontFamily: Fonts.body },
   timeSection: { width: '100%', marginTop: 8 },
-  timeLabel: { fontSize: 11, fontFamily: Fonts.serif, marginBottom: 8, textAlign: 'center' },
+  timeLabel: { fontSize: 11, fontFamily: Fonts.body, marginBottom: 8, textAlign: 'center' },
   timeBtnRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
   timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 14, borderWidth: 1.5 },
-  timeBtnText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  timeBtnText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   timeInputBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 46 },
-  timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.serifBold, textAlign: 'center', paddingVertical: 0 },
-  timeUnit: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  timeInput: { flex: 1, fontSize: 20, fontFamily: Fonts.displaySemiBold, textAlign: 'center', paddingVertical: 0 },
+  timeUnit: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   ratingRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   commentInput: {
     width: '100%', marginTop: 10, borderRadius: 12, borderWidth: 1,
     paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, fontFamily: Fonts.serif, maxHeight: 80, minHeight: 40,
+    fontSize: 14, fontFamily: Fonts.body, maxHeight: 80, minHeight: 40,
   },
   durationChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   durationChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   durationChipText: { fontSize: 12, fontWeight: '600' },
   priceSection: { width: '100%', marginTop: 12, gap: 6 },
-  priceLabel: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center' },
+  priceLabel: { fontSize: 11, fontFamily: Fonts.body, textAlign: 'center' },
   nextBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 16 },
-  nextBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  nextBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displaySemiBold },
   bottomCard: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, borderTopWidth: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   bottomHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   bottomIndex: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  bottomIndexText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
-  bottomName: { fontSize: 16, fontFamily: Fonts.serifBold },
-  bottomType: { fontSize: 12, fontFamily: Fonts.serif },
+  bottomIndexText: { color: Colors.textOnAccent, fontSize: 14, fontWeight: '800' },
+  bottomName: { fontSize: 16, fontFamily: Fonts.displaySemiBold },
+  bottomType: { fontSize: 12, fontFamily: Fonts.body },
   routeSection: { marginBottom: 12, gap: 8 },
   routeInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  routeText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  routeText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   nextStepBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
-  nextStepText: { flex: 1, fontSize: 12, fontFamily: Fonts.serif },
-  nextStepDist: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  nextStepText: { flex: 1, fontSize: 12, fontFamily: Fonts.body },
+  nextStepDist: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
   navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12 },
-  navBtnText: { color: '#FFF', fontSize: 14, fontFamily: Fonts.serifBold },
+  navBtnText: { color: Colors.textOnAccent, fontSize: 14, fontFamily: Fonts.displaySemiBold },
   arrivedBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  arrivedBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
-  quote: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'center', fontStyle: 'italic' },
+  arrivedBtnText: { fontSize: 14, fontFamily: Fonts.displaySemiBold },
+  quote: { fontSize: 11, fontFamily: Fonts.displayItalic, textAlign: 'center' },
 });

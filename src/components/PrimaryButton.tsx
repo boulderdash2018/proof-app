@@ -33,7 +33,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     activeOpacity={0.8}
   >
     {loading ? (
-      <ActivityIndicator color="#FFFFFF" size="small" />
+      <ActivityIndicator color={Colors.textOnAccent} size="small" />
     ) : (
       <Text style={[styles.label, small && styles.labelSmall]}>{label}</Text>
     )}
@@ -57,9 +57,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   label: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 15,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   labelSmall: {
     fontSize: 13,

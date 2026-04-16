@@ -248,7 +248,7 @@ export const SetupProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.bgPrimary,
     paddingHorizontal: Layout.screenPadding,
   },
   progressBar: {
@@ -266,15 +266,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   progressEmpty: {
-    backgroundColor: Colors.gray400,
+    backgroundColor: Colors.gray300,
   },
   stepContent: {
     flex: 1,
   },
   stepTitle: {
     fontSize: 22,
-    fontFamily: Fonts.serifBold,
-    color: Colors.black,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
     marginBottom: 20,
   },
   usernameRow: {
@@ -284,8 +284,8 @@ const styles = StyleSheet.create({
   },
   atPrefix: {
     fontSize: 16,
-    fontWeight: '700',
-    color: Colors.black,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textPrimary,
     marginBottom: 14,
   },
   usernameInput: {
@@ -293,6 +293,7 @@ const styles = StyleSheet.create({
   },
   availabilityText: {
     fontSize: 13,
+    fontFamily: Fonts.body,
     marginTop: -6,
     marginBottom: 8,
     marginLeft: 2,
@@ -305,14 +306,16 @@ const styles = StyleSheet.create({
   },
   checkingText: {
     fontSize: 13,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     marginTop: -6,
     marginBottom: 8,
     marginLeft: 2,
   },
   usernameHint: {
     fontSize: 11,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     marginTop: 2,
     marginLeft: 2,
   },
@@ -330,12 +333,13 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.gray700,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
   },
   selectionCount: {
     fontSize: 13,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     marginBottom: 16,
   },
   chipGrid: {

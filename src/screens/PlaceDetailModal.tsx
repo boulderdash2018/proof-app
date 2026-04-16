@@ -14,7 +14,7 @@ import { fetchPublicPlansWithPlace } from '../services/plansService';
 import { Avatar, LoadingSkeleton } from '../components';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const STAMP_PROOF = '#C8571A';
+const STAMP_PROOF = Colors.primary;
 
 const getReviewTimeAgo = (dateStr: string): string => {
   const now = Date.now();
@@ -215,9 +215,9 @@ export const PlaceDetailModal: React.FC = () => {
                   <View style={styles.relatedMeta}>
                     <Text style={styles.relatedAuthor}>{plan.author.displayName}</Text>
                     <View style={styles.relatedMetaRow}>
-                      <Ionicons name="heart" size={10} color="rgba(255,255,255,0.7)" />
+                      <Ionicons name="heart" size={10} color="rgba(255,248,240,0.7)" />
                       <Text style={styles.relatedMetaText}>{plan.likesCount}</Text>
-                      <Ionicons name="hourglass-outline" size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 6 }} />
+                      <Ionicons name="hourglass-outline" size={10} color="rgba(255,248,240,0.7)" style={{ marginLeft: 6 }} />
                       <Text style={styles.relatedMetaText}>{plan.duration}</Text>
                     </View>
                   </View>
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1,
   },
   backBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 15, fontFamily: Fonts.serifBold, textAlign: 'center', marginHorizontal: 10 },
+  headerTitle: { flex: 1, fontSize: 15, fontFamily: Fonts.displaySemiBold, textAlign: 'center', marginHorizontal: 10 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 120 },
@@ -484,57 +484,57 @@ const styles = StyleSheet.create({
   // Rating
   ratingBlock: { flexDirection: 'row', padding: 18, borderBottomWidth: 1 },
   ratingLeft: { flex: 1, marginRight: 16 },
-  ratingBig: { fontSize: 48, fontFamily: Fonts.serifBold, lineHeight: 52, marginBottom: 4 },
-  reviewCountText: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 4 },
+  ratingBig: { fontSize: 48, fontFamily: Fonts.displaySemiBold, lineHeight: 52, marginBottom: 4 },
+  reviewCountText: { fontSize: 12, fontFamily: Fonts.body, marginTop: 4 },
   typePriceRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  typeLabel: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
-  priceLabel: { fontSize: 13, fontFamily: Fonts.serif },
+  typeLabel: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  priceLabel: { fontSize: 13, fontFamily: Fonts.body },
   ratingRight: { justifyContent: 'center', gap: 4 },
   histogramRow: { flexDirection: 'row', alignItems: 'center' },
-  histogramLabel: { fontSize: 11, fontFamily: Fonts.serifSemiBold, width: 14, textAlign: 'right', marginRight: 6 },
+  histogramLabel: { fontSize: 11, fontFamily: Fonts.bodySemiBold, width: 14, textAlign: 'right', marginRight: 6 },
   histogramTrack: { width: 120, height: 8, borderRadius: 4, overflow: 'hidden' },
   histogramBar: { height: 8, borderRadius: 4 },
 
   // Proof rating comparison
   proofCompare: { padding: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
   proofCompareLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  proofCompareBig: { fontSize: 28, fontFamily: Fonts.serifBold, lineHeight: 32 },
-  proofCompareCount: { fontSize: 10, fontFamily: Fonts.serif, marginTop: 2 },
+  proofCompareBig: { fontSize: 28, fontFamily: Fonts.displaySemiBold, lineHeight: 32 },
+  proofCompareCount: { fontSize: 10, fontFamily: Fonts.body, marginTop: 2 },
 
   // Proof rating badge (legacy view)
   proofRatingBlock: { paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1 },
   proofRatingPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, alignSelf: 'flex-start' },
-  proofRatingValue: { fontSize: 16, fontFamily: Fonts.serifBold },
-  proofRatingCount: { fontSize: 11, fontFamily: Fonts.serif, marginLeft: 4 },
+  proofRatingValue: { fontSize: 16, fontFamily: Fonts.displaySemiBold },
+  proofRatingCount: { fontSize: 11, fontFamily: Fonts.body, marginLeft: 4 },
 
   // Info section
   infoSection: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  infoText: { fontSize: 13, fontFamily: Fonts.serif, flex: 1 },
-  addressText: { fontSize: 12, fontFamily: Fonts.serif, flex: 1, lineHeight: 16 },
+  infoText: { fontSize: 13, fontFamily: Fonts.body, flex: 1 },
+  addressText: { fontSize: 12, fontFamily: Fonts.body, flex: 1, lineHeight: 16 },
 
   // Hours
   hoursSection: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1 },
   hoursTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  hoursTitle: { fontSize: 14, fontFamily: Fonts.serifBold },
-  hoursLine: { fontSize: 12, fontFamily: Fonts.serif, lineHeight: 20, paddingLeft: 28 },
+  hoursTitle: { fontSize: 14, fontFamily: Fonts.displaySemiBold },
+  hoursLine: { fontSize: 12, fontFamily: Fonts.body, lineHeight: 20, paddingLeft: 28 },
 
   // Reviews
   reviewsSection: { paddingTop: 18 },
-  sectionLabel: { fontSize: 14, fontFamily: Fonts.serifBold, letterSpacing: 0.5, paddingHorizontal: 18, marginBottom: 14 },
+  sectionLabel: { fontSize: 14, fontFamily: Fonts.displaySemiBold, letterSpacing: 0.5, paddingHorizontal: 18, marginBottom: 14 },
   reviewCard: { paddingHorizontal: 18, paddingBottom: 14, marginBottom: 14, borderBottomWidth: 1 },
   reviewHeader: { flexDirection: 'row', alignItems: 'flex-start' },
   reviewAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   reviewContent: { flex: 1, marginLeft: 10 },
   reviewTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
-  reviewAuthorName: { fontSize: 13, fontFamily: Fonts.serifBold },
-  reviewTime: { fontSize: 11, fontFamily: Fonts.serif },
-  reviewText: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18, marginTop: 6 },
+  reviewAuthorName: { fontSize: 13, fontFamily: Fonts.displaySemiBold },
+  reviewTime: { fontSize: 11, fontFamily: Fonts.body },
+  reviewText: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18, marginTop: 6 },
 
   // Empty proof state
   emptyProof: { alignItems: 'center', paddingVertical: 16, paddingHorizontal: 18 },
-  emptyProofText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
-  emptyProofSub: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 4, textAlign: 'center' },
+  emptyProofText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  emptyProofSub: { fontSize: 12, fontFamily: Fonts.body, marginTop: 4, textAlign: 'center' },
 
   // Related plans
   relatedSection: { paddingTop: 18, paddingBottom: 8 },
@@ -542,9 +542,9 @@ const styles = StyleSheet.create({
   relatedCard: { width: 160, borderRadius: 14, overflow: 'hidden' },
   relatedGradient: { height: 110, padding: 12, justifyContent: 'flex-end', overflow: 'hidden' },
   relatedOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  relatedTitle: { color: '#FFFFFF', fontSize: 13, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  relatedTitle: { color: Colors.textOnAccent, fontSize: 13, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(44,36,32,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   relatedMeta: { marginTop: 6 },
-  relatedAuthor: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontFamily: Fonts.serifSemiBold },
+  relatedAuthor: { color: 'rgba(255,248,240,0.7)', fontSize: 10, fontFamily: Fonts.bodySemiBold },
   relatedMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  relatedMetaText: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
+  relatedMetaText: { color: 'rgba(255,248,240,0.7)', fontSize: 10 },
 });

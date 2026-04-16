@@ -195,7 +195,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     extrapolate: 'clamp',
   });
 
-  // Title + author — parallax at 0.65× speed + scale down
+  // Title + author — parallax at 0.65x speed + scale down
   const titleCounterY = scrollY.interpolate({
     inputRange: [0, DETAIL_SNAP],
     outputRange: [0, DETAIL_SNAP * 0.35],
@@ -548,7 +548,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 <Ionicons
                   name="chevron-up"
                   size={16}
-                  color="rgba(255,255,255,0.4)"
+                  color={Colors.textTertiary}
                 />
                 <Text style={styles.returnText}>Tirer pour revenir</Text>
               </View>
@@ -573,7 +573,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name="wallet-outline"
                       size={13}
-                      color="rgba(255,255,255,0.6)"
+                      color={Colors.textTertiary}
                     />
                     <Text style={styles.metaPillText}>{plan.price}</Text>
                   </View>
@@ -583,7 +583,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name="time-outline"
                       size={13}
-                      color="rgba(255,255,255,0.6)"
+                      color={Colors.textTertiary}
                     />
                     <Text style={styles.metaPillText}>{plan.duration}</Text>
                   </View>
@@ -593,7 +593,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name="location-outline"
                       size={13}
-                      color="rgba(255,255,255,0.6)"
+                      color={Colors.textTertiary}
                     />
                     <Text style={styles.metaPillText}>
                       {plan.places.length} lieu
@@ -606,7 +606,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
                       size={13}
-                      color="rgba(255,255,255,0.6)"
+                      color={Colors.textTertiary}
                     />
                     <Text style={styles.metaPillText}>{plan.transport}</Text>
                   </View>
@@ -673,7 +673,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 activeOpacity={0.8}
                 onPress={onDoItNow}
               >
-                <Ionicons name="navigate" size={18} color="#FFF" />
+                <Ionicons name="navigate" size={18} color={Colors.textOnAccent} />
                 <Text style={styles.doItNowText}>Do it now</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -734,7 +734,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                               </Text>
                               <Text style={styles.placeType}>{place.type}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.25)" />
+                            <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
                           </View>
 
                           {/* Rating */}
@@ -767,7 +767,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                           {/* Address */}
                           {place.address ? (
                             <View style={styles.inlineAddr}>
-                              <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.4)" />
+                              <Ionicons name="location-outline" size={12} color={Colors.textTertiary} />
                               <Text style={styles.placeAddress} numberOfLines={1}>
                                 {place.address.split(',')[0]}
                               </Text>
@@ -822,9 +822,9 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                               <Ionicons
                                 name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
                                 size={13}
-                                color="rgba(255,255,255,0.3)"
+                                color={Colors.textTertiary}
                               />
-                              <Text style={[styles.travelText, { color: 'rgba(255,255,255,0.25)' }]}>{plan.transport || 'À pied'}</Text>
+                              <Text style={[styles.travelText, { color: Colors.textTertiary }]}>{plan.transport || 'À pied'}</Text>
                             </>
                           )}
                         </View>
@@ -888,7 +888,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 <Ionicons
                   name="chevron-forward"
                   size={18}
-                  color="rgba(255,255,255,0.3)"
+                  color={Colors.textTertiary}
                 />
               </TouchableOpacity>
             </Animated.View>
@@ -1154,7 +1154,7 @@ const styles = StyleSheet.create({
 
   // ── Detail content ─────────────────────────────────────────
   detail: {
-    backgroundColor: '#0D0D0D',
+    backgroundColor: Colors.bgSecondary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
@@ -1167,8 +1167,8 @@ const styles = StyleSheet.create({
   },
   returnText: {
     fontSize: 11,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.35)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
     marginTop: 2,
   },
   detailTitleRow: {
@@ -1180,15 +1180,15 @@ const styles = StyleSheet.create({
   detailTitle: {
     flex: 1,
     fontSize: 24,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     lineHeight: 30,
     marginBottom: 12,
   },
   detailTimeAgo: {
     fontSize: 12,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
     marginTop: 6,
   },
   detailMeta: {
@@ -1204,12 +1204,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Colors.bgTertiary,
   } as any,
   metaPillText: {
     fontSize: 12,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.65)',
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
   },
   mapPill: {
     flexDirection: 'row',
@@ -1222,7 +1222,7 @@ const styles = StyleSheet.create({
   } as any,
   mapPillText: {
     fontSize: 12,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,
   },
   detailTags: {
@@ -1235,14 +1235,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: Colors.terracotta100,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: Colors.terracotta200,
   },
   detailTagText: {
     fontSize: 12,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.6)',
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta700,
   },
 
   // ── Do-it-now CTA ──────────────────────────────────────────
@@ -1258,15 +1258,15 @@ const styles = StyleSheet.create({
   } as any,
   doItNowText: {
     fontSize: 16,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
   },
 
   // ── Section titles ─────────────────────────────────────────
   sectionTitle: {
     fontSize: 17,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     marginBottom: 14,
     marginTop: 8,
   },
@@ -1285,17 +1285,17 @@ const styles = StyleSheet.create({
   tipBody: { flex: 1 },
   tipLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: Fonts.bodySemiBold,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.4)',
+    color: Colors.textTertiary,
     marginBottom: 4,
   },
   tipText: {
     fontSize: 13,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.displayItalic,
     fontStyle: 'italic',
-    color: 'rgba(255,255,255,0.7)',
+    color: Colors.textSecondary,
     lineHeight: 19,
   },
 
@@ -1307,18 +1307,18 @@ const styles = StyleSheet.create({
   tlLineTop: {
     width: 2,
     height: 14,
-    backgroundColor: Colors.primary + '40',
+    backgroundColor: Colors.borderMedium,
   },
   tlLineBot: {
     width: 2,
     flex: 1,
-    backgroundColor: Colors.primary + '40',
+    backgroundColor: Colors.borderMedium,
   },
   tlLineFull: {
     width: 2,
     flex: 1,
     minHeight: 18,
-    backgroundColor: Colors.primary + '40',
+    backgroundColor: Colors.borderMedium,
   },
   tlCircle: {
     width: 28,
@@ -1331,7 +1331,7 @@ const styles = StyleSheet.create({
   tlNum: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFF',
+    color: Colors.textOnAccent,
   },
 
   // ── Place card (timeline layout) ──────────────────────────
@@ -1340,13 +1340,13 @@ const styles = StyleSheet.create({
   },
   placeBody: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Colors.bgPrimary,
     borderRadius: 14,
     overflow: 'hidden',
     marginLeft: 8,
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: Colors.borderSubtle,
   },
   placePhoto: {
     width: '100%',
@@ -1362,8 +1362,8 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 14,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     marginBottom: 2,
   },
   reservationAsterisk: {
@@ -1372,8 +1372,8 @@ const styles = StyleSheet.create({
   },
   placeType: {
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
     textTransform: 'capitalize',
     marginBottom: 4,
   },
@@ -1386,14 +1386,14 @@ const styles = StyleSheet.create({
   },
   ratingNum: {
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
-    color: '#FFF',
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
     marginRight: 4,
   },
   ratingCnt: {
     fontSize: 10,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
   },
 
   // Price / Duration pills
@@ -1407,12 +1407,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Colors.bgTertiary,
   },
   placeMetaText: {
     fontSize: 10,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.55)',
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
   },
 
   // Inline address
@@ -1424,8 +1424,8 @@ const styles = StyleSheet.create({
   } as any,
   placeAddress: {
     fontSize: 11,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
     flex: 1,
   },
 
@@ -1438,8 +1438,8 @@ const styles = StyleSheet.create({
   },
   placeComment: {
     fontSize: 11,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.6)',
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textSecondary,
     fontStyle: 'italic',
     lineHeight: 16,
   },
@@ -1449,26 +1449,27 @@ const styles = StyleSheet.create({
     marginTop: 6,
     borderRadius: 8,
     padding: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(44, 36, 32, 0.04)',
   },
   inlineQaLabel: {
     fontSize: 9,
-    fontFamily: Fonts.serif,
-    color: 'rgba(255,255,255,0.35)',
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
     marginBottom: 2,
   },
   inlineQaAnswer: {
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.65)',
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     lineHeight: 16,
   },
 
   // Reservation legend
   reservationLegend: {
     fontSize: 10,
+    fontFamily: Fonts.body,
     fontStyle: 'italic',
-    color: 'rgba(255,255,255,0.35)',
+    color: Colors.textTertiary,
     marginTop: 6,
     marginBottom: 4,
   },
@@ -1486,20 +1487,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'rgba(44, 36, 32, 0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Colors.borderSubtle,
   } as any,
   travelText: {
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.5)',
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
   },
   travelDot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: Colors.textTertiary,
   },
 
   // ── Author card ────────────────────────────────────────────
@@ -1507,10 +1508,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Colors.bgTertiary,
     borderRadius: 14,
     padding: 14,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
   } as any,
   authorCardAvatar: {
     width: 44,
@@ -1524,8 +1527,8 @@ const styles = StyleSheet.create({
   authorCardInitials: { fontSize: 16, fontWeight: '700' },
   authorCardName: {
     fontSize: 15,
-    fontFamily: Fonts.serifBold,
-    color: '#FFF',
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
   },
 
   // ── Below card ─────────────────────────────────────────────
@@ -1540,12 +1543,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   } as any,
   belowMetaText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: Colors.textSecondary,
     fontSize: 12,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
   },
   belowDot: {
-    color: 'rgba(255,255,255,0.3)',
+    color: Colors.textTertiary,
     fontSize: 12,
   },
   belowTags: {
@@ -1558,14 +1561,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Colors.bgTertiary,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: Colors.borderMedium,
   },
   belowTagText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: Colors.textSecondary,
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
 
   // ── Action bar (inside frame, outside card overflow) ──────

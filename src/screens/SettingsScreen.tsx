@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Modal, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Layout, Fonts, CITIES } from '../constants';
+import { Layout, Fonts, Colors, CITIES } from '../constants';
 import { useAuthStore, useLanguageStore, useSettingsStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -194,7 +194,7 @@ export const SettingsScreen: React.FC = () => {
                     <Text style={[styles.cityName, { color: C.black }]}>{c.name}</Text>
                     {isSelected && (
                       <View style={[styles.cityCheck, { backgroundColor: C.primary }]}>
-                        <Ionicons name="checkmark" size={14} color="#FFF" />
+                        <Ionicons name="checkmark" size={14} color={Colors.textOnAccent} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -220,26 +220,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1 },
   back: { fontSize: 16, fontWeight: '600', width: 60 },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
   scroll: { paddingBottom: 40 },
   sectionTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, paddingHorizontal: Layout.screenPadding, paddingTop: 20, paddingBottom: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingVertical: 14, borderBottomWidth: 1 },
-  rowText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  rowText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   rowChevron: { fontSize: 18 },
   themeBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
   themeBadgeText: { fontSize: 12, fontWeight: '600' },
-  deletingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  deletingText: { marginTop: 16, fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  deletingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(44,36,32,0.7)', justifyContent: 'center', alignItems: 'center' },
+  deletingText: { marginTop: 16, fontSize: 15, fontFamily: Fonts.bodySemiBold },
   // City picker modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(44,36,32,0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: Layout.screenPadding, paddingTop: 20, paddingBottom: 36 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontSize: 20, fontFamily: Fonts.serifBold },
+  modalTitle: { fontSize: 20, fontFamily: Fonts.displaySemiBold },
   cityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 24 },
   cityCard: { width: (SCREEN_W - Layout.screenPadding * 2 - 24) / 3, paddingVertical: 20, borderRadius: 16, alignItems: 'center', borderWidth: 1.5, position: 'relative' as const },
   cityEmoji: { fontSize: 32, marginBottom: 8 },
-  cityName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  cityName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   cityCheck: { position: 'absolute' as const, top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: 'center' as const, justifyContent: 'center' as const },
   confirmBtn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center' as const },
-  confirmBtnText: { color: '#FFFFFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  confirmBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.bodySemiBold },
 });

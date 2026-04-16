@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   back: { fontSize: 24, fontWeight: '600', width: 30 },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingBottom: 30 },
 
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   stat: { alignItems: 'center' },
-  statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
+  statValue: { fontSize: 18, fontFamily: Fonts.displaySemiBold },
   statLabel: { fontSize: 11, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
 
   // Info section
@@ -343,9 +343,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding,
     paddingBottom: 10,
   },
-  displayName: { fontSize: 16, fontFamily: Fonts.serifBold, marginBottom: 3 },
+  displayName: { fontSize: 16, fontFamily: Fonts.displaySemiBold, marginBottom: 3 },
   badgeRow: { flexDirection: 'row', marginBottom: 4 },
-  bio: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18, marginTop: 2 },
+  bio: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18, marginTop: 2 },
 
   // Action buttons
   actionSection: {
@@ -358,14 +358,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontFamily: Fonts.serifBold },
+  primaryBtnText: { color: Colors.textOnAccent, fontSize: 14, fontFamily: Fonts.bodySemiBold },
   secondaryBtn: {
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
     marginTop: 4,
   },
-  secondaryBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  secondaryBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   outlineBtn: {
     borderWidth: 1,
     borderRadius: 10,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  outlineBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  outlineBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   buttonRow: {
     flexDirection: 'row',
     marginTop: 4,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   plansSection: {
     paddingHorizontal: Layout.screenPadding,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.borderSubtle,
     paddingTop: 16,
   },
   sectionLabel: {
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   planCardTitle: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   planCardMetaText: {
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,248,240,0.85)',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.borderSubtle,
     marginTop: 0,
   },
   emptyPlansText: {
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
     paddingHorizontal: 40,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.borderSubtle,
   },
   lockCircle: {
     width: 72,
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   lockIcon: { fontSize: 28 },
   privateTitle: {
     fontSize: 17,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     marginBottom: 8,
   },
   privateSubtitle: {
@@ -488,8 +488,8 @@ const styles = StyleSheet.create({
   instaCellImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' } as any,
   instaCellOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%' } as any,
   instaCellBottom: { position: 'absolute', bottom: 8, left: 8, right: 8 },
-  instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 } as any,
-  instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.serifSemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.bodySemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(44,36,32,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
 });

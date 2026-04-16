@@ -31,7 +31,7 @@ const Pulse: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const Box: React.FC<{ w?: number | string; h: number; r?: number; mb?: number; flex?: number }> = ({
   w, h, r = 8, mb = 0, flex,
 }) => (
-  <View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: Colors.gray300, marginBottom: mb, flex }} />
+  <View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: Colors.bgTertiary, marginBottom: mb, flex }} />
 );
 
 // ── Feed card skeleton (existing design) ──

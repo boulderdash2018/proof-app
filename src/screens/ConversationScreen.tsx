@@ -346,13 +346,13 @@ const MessageRow = React.memo<MessageRowProps>(({
             {hasReply && (
               <TouchableOpacity
                 onPress={() => item.replyToId && onScrollToQuote(item.replyToId)}
-                style={[styles.quotedReply, { backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : C.primary + '10', borderLeftColor: C.primary }]}
+                style={[styles.quotedReply, { backgroundColor: isMine ? 'rgba(255,248,240,0.15)' : C.primary + '10', borderLeftColor: C.primary }]}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.quotedName, { color: isMine ? 'rgba(255,255,255,0.8)' : C.primary }]} numberOfLines={1}>
+                <Text style={[styles.quotedName, { color: isMine ? 'rgba(255,248,240,0.8)' : C.primary }]} numberOfLines={1}>
                   {item.replyToSenderId === userId ? 'Toi' : otherUser.displayName}
                 </Text>
-                <Text style={[styles.quotedText, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]} numberOfLines={1}>
+                <Text style={[styles.quotedText, { color: isMine ? 'rgba(255,248,240,0.6)' : C.gray600 }]} numberOfLines={1}>
                   {item.replyToType === 'plan' ? 'Plan partagé ✦' : item.replyToContent}
                 </Text>
               </TouchableOpacity>
@@ -376,20 +376,20 @@ const MessageRow = React.memo<MessageRowProps>(({
                     </View>
                   )}
                   <View style={styles.planInfo}>
-                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,255,255,0.7)' : C.gray600 }]}>PLAN PARTAGÉ</Text>
-                    <Text style={[styles.planTitle, { color: isMine ? '#FFF' : C.black }]} numberOfLines={2}>{item.planTitle}</Text>
+                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,248,240,0.7)' : C.gray600 }]}>PLAN PARTAGÉ</Text>
+                    <Text style={[styles.planTitle, { color: isMine ? Colors.textOnAccent : C.black }]} numberOfLines={2}>{item.planTitle}</Text>
                     {item.planAuthorName && (
-                      <Text style={[styles.planAuthor, { color: isMine ? 'rgba(255,255,255,0.6)' : C.gray600 }]}>par {item.planAuthorName}</Text>
+                      <Text style={[styles.planAuthor, { color: isMine ? 'rgba(255,248,240,0.6)' : C.gray600 }]}>par {item.planAuthorName}</Text>
                     )}
                   </View>
                   {!!item.content && (
-                    <View style={[styles.planAttachedWrap, { borderTopColor: isMine ? 'rgba(255,255,255,0.2)' : C.borderLight }]}>
-                      <Text style={[styles.planAttachedMsg, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
+                    <View style={[styles.planAttachedWrap, { borderTopColor: isMine ? 'rgba(255,248,240,0.2)' : C.borderLight }]}>
+                      <Text style={[styles.planAttachedMsg, { color: isMine ? Colors.textOnAccent : C.black }]}>{item.content}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
               ) : (
-                <Text style={[styles.msgText, { color: isMine ? '#FFF' : C.black }]}>{item.content}</Text>
+                <Text style={[styles.msgText, { color: isMine ? Colors.textOnAccent : C.black }]}>{item.content}</Text>
               )}
             </View>
 
@@ -817,7 +817,7 @@ export const ConversationScreen: React.FC = () => {
             />
             {text.trim().length > 0 && (
               <TouchableOpacity onPress={handleSend} style={[styles.sendBtn, { backgroundColor: C.primary }]}>
-                <Ionicons name="arrow-up" size={18} color="#FFF" />
+                <Ionicons name="arrow-up" size={18} color={Colors.textOnAccent} />
               </TouchableOpacity>
             )}
           </View>
@@ -839,12 +839,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1,
   },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'center' },
-  headerName: { fontSize: 16, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  headerName: { fontSize: 16, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   messagesList: { paddingHorizontal: 12, paddingTop: 12 },
 
   // Date separator
   dateSeparator: { alignItems: 'center', marginVertical: 16 },
-  dateSeparatorText: { fontSize: 12, fontFamily: Fonts.serifSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dateSeparatorText: { fontSize: 12, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Message wrapper
   msgWrapper: { position: 'relative' },
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
 
   // Bubble
   bubble: { paddingHorizontal: 14, paddingVertical: 10, overflow: 'visible' },
-  msgText: { fontSize: 15, fontFamily: Fonts.serif, lineHeight: 20 },
+  msgText: { fontSize: 15, fontFamily: Fonts.body, lineHeight: 20 },
 
   // Reaction overlay — overlaps bottom of bubble
   reactionOverlay: {
@@ -892,31 +892,31 @@ const styles = StyleSheet.create({
   planCover: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 8, resizeMode: 'cover' },
   planCoverPlaceholder: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
   planInfo: { gap: 2 },
-  planLabel: { fontSize: 10, fontFamily: Fonts.serifSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  planTitle: { fontSize: 14, fontFamily: Fonts.serifBold, lineHeight: 18 },
-  planAuthor: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  planLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  planTitle: { fontSize: 14, fontFamily: Fonts.displaySemiBold, lineHeight: 18 },
+  planAuthor: { fontSize: 11, fontFamily: Fonts.body, marginTop: 2 },
   planAttachedWrap: { borderTopWidth: 1, marginTop: 10, paddingTop: 8 },
-  planAttachedMsg: { fontSize: 14, fontFamily: Fonts.serifSemiBold, lineHeight: 18 },
+  planAttachedMsg: { fontSize: 14, fontFamily: Fonts.bodySemiBold, lineHeight: 18 },
 
   // Quoted reply in bubble
   quotedReply: {
     borderLeftWidth: 3, borderRadius: 8, borderTopLeftRadius: 4,
     paddingHorizontal: 10, paddingVertical: 6, marginBottom: 2,
   },
-  quotedName: { fontSize: 11, fontFamily: Fonts.serifBold },
-  quotedText: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
+  quotedName: { fontSize: 11, fontFamily: Fonts.bodyBold },
+  quotedText: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
 
   // Read receipt
   readReceipt: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 3, paddingRight: 2 },
   readReceiptInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  readReceiptText: { fontSize: 10, fontFamily: Fonts.serif },
+  readReceiptText: { fontSize: 10, fontFamily: Fonts.body },
 
   // Reaction picker (long press)
   reactionPicker: {
     position: 'absolute', top: -48,
     flexDirection: 'row', borderRadius: 22,
     paddingHorizontal: 6, paddingVertical: 6,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5,
+    shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5,
     gap: 2,
   },
   reactionPickerLeft: { left: 26 },
@@ -930,7 +930,7 @@ const styles = StyleSheet.create({
     position: 'absolute', right: 4, top: 0, bottom: 0,
     justifyContent: 'center', alignItems: 'flex-end',
   },
-  revealTimeText: { fontSize: 11, fontFamily: Fonts.serif },
+  revealTimeText: { fontSize: 11, fontFamily: Fonts.body },
 
   // Reply bar above input
   replyBar: {
@@ -938,8 +938,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8, borderTopWidth: 1, gap: 12,
   },
   replyBarPreview: { flex: 1, borderLeftWidth: 3, paddingLeft: 10, paddingVertical: 2 },
-  replyBarName: { fontSize: 12, fontFamily: Fonts.serifBold },
-  replyBarText: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
+  replyBarName: { fontSize: 12, fontFamily: Fonts.bodyBold },
+  replyBarText: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
 
   // Typing indicator
   typingBubble: {
@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
   // Input bar
   inputBar: { paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1 },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8, gap: 8 },
-  input: { flex: 1, fontSize: 15, fontFamily: Fonts.serif, maxHeight: 100, paddingVertical: 0 },
+  input: { flex: 1, fontSize: 15, fontFamily: Fonts.body, maxHeight: 100, paddingVertical: 0 },
   sendBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 
   // Gradient fade overlays

@@ -328,7 +328,7 @@ const s = StyleSheet.create({
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, height: 44 },
   searchInput: { flex: 1, fontSize: 14 },
   cancelBtn: { paddingVertical: 6 },
-  cancelText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  cancelText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
 
   scrollContent: { paddingHorizontal: Layout.screenPadding },
   defaultWrap: { flex: 1 },
@@ -338,22 +338,22 @@ const s = StyleSheet.create({
   section: { marginTop: 18 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  clearText: { fontSize: 12, fontFamily: Fonts.serif },
+  clearText: { fontSize: 12, fontFamily: Fonts.body },
 
   // Recent searches
   recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1 },
-  recentText: { fontSize: 14, fontFamily: Fonts.serif },
+  recentText: { fontSize: 14, fontFamily: Fonts.body },
 
   // Trending (same as ExploreScreen)
   trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
   trendingEmoji: { fontSize: 28 },
-  trendingName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  trendingName: { fontSize: 15, fontFamily: Fonts.bodySemiBold },
   trendingCount: { fontSize: 12, marginTop: 2 },
 
   // Place results (compact rows)
   placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
   placeIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  placeName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  placeName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   placeType: { fontSize: 12, marginTop: 1 },
 
   // Plan results (reuse explore style)
@@ -361,7 +361,7 @@ const s = StyleSheet.create({
   compactBanner: { height: 90, justifyContent: 'flex-end', padding: 12, overflow: 'hidden' },
   compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' } as any,
   compactBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 } as any,
-  compactTitle: { color: '#FFFFFF', fontSize: 15, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  compactTitle: { color: '#FFFFFF', fontSize: 15, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   compactMeta: { flexDirection: 'row', padding: 10, gap: 14 },
   compactMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactMetaText: { fontSize: 12 },

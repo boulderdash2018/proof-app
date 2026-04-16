@@ -35,25 +35,25 @@ interface MapRegion {
   longitudeDelta: number;
 }
 
-// ── Dark map style (Enegry — same as PlanMapModal) ──
+// ── Warm cream map style — matches light terracotta theme ──
 const MAP_STYLE = [
-  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#ffa600"},{"lightness":40}]},
-  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"lightness":16},{"hue":"#ff0000"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#6B5D52"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#FAF7F2"},{"weight":2}]},
   {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":17},{"weight":1.2}]},
+  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#EDE5D8"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#DDD4C8"},{"weight":1.2}]},
   {"featureType":"administrative.locality","elementType":"all","stylers":[{"visibility":"off"}]},
   {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":21}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#F5F0E8"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":17}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":29},{"weight":0.2}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":18}]},
-  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":16}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":19}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#DDD4C8"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#C4B8AA"},{"weight":0.4}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#E8E0D6"}]},
+  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"transit.line","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":17}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4DEE6"}]},
 ];
 
 // ── Types ──
@@ -435,7 +435,7 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
           onPress={onClose}
           activeOpacity={0.8}
         >
-          <Ionicons name="close" size={18} color="#E8E0D6" />
+          <Ionicons name="close" size={18} color={Colors.textOnAccent} />
         </TouchableOpacity>
 
         {/* Loading overlay */}
@@ -538,7 +538,7 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
                             <Ionicons
                               name="map-outline"
                               size={14}
-                              color="#8B7B6B"
+                              color={Colors.textTertiary}
                             />
                           </View>
                         )}
@@ -573,9 +573,9 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
 
 const markerStyles = StyleSheet.create({
   single: {
-    shadowColor: '#000',
+    shadowColor: '#2C2420',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.15,
     shadowRadius: 5,
     elevation: 6,
   },
@@ -584,9 +584,9 @@ const markerStyles = StyleSheet.create({
     alignItems: 'center',
   },
   groupItem: {
-    shadowColor: '#000',
+    shadowColor: '#2C2420',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 5,
   },
@@ -599,18 +599,18 @@ const markerStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: Colors.bgSecondary,
     zIndex: 10,
   },
   countText: {
-    color: '#FFF',
+    color: Colors.textOnAccent,
     fontSize: 10,
     fontWeight: '800',
   },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: Colors.bgPrimary },
   map: { flex: 1 },
 
   closeBtn: {
@@ -619,12 +619,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(28, 25, 23, 0.85)',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
 
   loadingOverlay: {
@@ -641,18 +644,23 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   emptyCard: {
-    backgroundColor: 'rgba(28, 25, 23, 0.9)',
+    backgroundColor: Colors.bgSecondary,
     paddingHorizontal: 26,
     paddingVertical: 20,
     borderRadius: 16,
     maxWidth: 280,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: Colors.borderSubtle,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   emptyText: {
-    color: '#A09585',
+    color: Colors.textSecondary,
     fontSize: 14,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     textAlign: 'center',
     lineHeight: 21,
   },
@@ -668,21 +676,26 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1C1917',
+    backgroundColor: Colors.bgSecondary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 10,
     maxHeight: SCREEN_H * 0.45,
     zIndex: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: Colors.borderSubtle,
     borderBottomWidth: 0,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
   },
   sheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#3D352E',
+    backgroundColor: Colors.borderMedium,
     alignSelf: 'center',
     marginBottom: 14,
   },
@@ -695,8 +708,8 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 16,
-    fontFamily: Fonts.serifBold,
-    color: '#E8E0D6',
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     flex: 1,
   },
   sheetScroll: {
@@ -707,7 +720,7 @@ const styles = StyleSheet.create({
   },
   sheetFriendDivider: {
     borderBottomWidth: 1,
-    borderBottomColor: '#292421',
+    borderBottomColor: Colors.borderSubtle,
     marginBottom: 16,
   },
   sheetFriendRow: {
@@ -718,8 +731,8 @@ const styles = StyleSheet.create({
   },
   sheetFriendName: {
     fontSize: 14,
-    fontFamily: Fonts.serifSemiBold,
-    color: '#E8E0D6',
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
   },
   sheetPlanRow: {
     flexDirection: 'row',
@@ -735,15 +748,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sheetPlanThumbEmpty: {
-    backgroundColor: '#292421',
+    backgroundColor: Colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sheetPlanTitle: {
     flex: 1,
     fontSize: 13,
-    fontFamily: Fonts.serif,
-    color: '#C4B8AA',
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
   },
   sheetPlanBtn: {
     flexDirection: 'row',
@@ -756,7 +769,7 @@ const styles = StyleSheet.create({
   },
   sheetPlanBtnText: {
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,
   },
 });

@@ -24,7 +24,7 @@ import { useAuthStore } from '../store';
 import { submitPlaceReviews } from '../services/placeReviewService';
 import Svg, { Circle, Line, G, Defs, ClipPath } from 'react-native-svg';
 
-const STAMP_PROOF = '#C8571A';
+const STAMP_PROOF = '#C4704B';
 const STAMP_DECLINE = '#6B7A8D';
 const CARD_WIDTH = Dimensions.get('window').width - 64;
 const STAMP_SVG_SIZE = 146;
@@ -236,7 +236,7 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
                   />
                 )}
                 <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.6)']}
+                  colors={['transparent', 'rgba(44,36,32,0.6)']}
                   style={styles.cardOverlay}
                 />
                 <View style={styles.cardTitleWrap}>
@@ -389,7 +389,7 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(44,36,32,0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -406,12 +406,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 13,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     marginBottom: 20,
   },
 
@@ -442,9 +442,9 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowColor: 'rgba(44,36,32,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
     marginBottom: 6,
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   cardTagText: {
-    color: '#FFFFFF',
+    color: '#FFF8F0',
     fontSize: 10,
     fontWeight: '700',
   },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   cardMetaText: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.75)',
+    color: 'rgba(255,248,240,0.75)',
     fontWeight: '600',
   },
 
@@ -533,14 +533,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnProofText: {
-    color: '#FFFFFF',
+    color: '#FFF8F0',
     fontSize: 14,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
     letterSpacing: 0.3,
   },
   hint: {
     fontSize: 10,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     letterSpacing: 0.3,
   },
 
@@ -580,11 +580,11 @@ const styles = StyleSheet.create({
   },
   ratePlaceName: {
     fontSize: 13,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   ratePlaceType: {
     fontSize: 11,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     marginTop: 1,
   },
   starsRow: {
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     maxHeight: 80,
     minHeight: 36,
   },
@@ -614,6 +614,6 @@ const styles = StyleSheet.create({
   },
   btnSkipText: {
     fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
 });

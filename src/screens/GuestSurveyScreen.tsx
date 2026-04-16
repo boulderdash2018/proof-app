@@ -60,8 +60,8 @@ export const GuestSurveyScreen: React.FC = () => {
                   style={[
                     styles.cityCard,
                     {
-                      backgroundColor: isSelected ? C.primary + '12' : C.gray200,
-                      borderColor: isSelected ? C.primary : C.border,
+                      backgroundColor: isSelected ? C.primary + '12' : Colors.bgSecondary,
+                      borderColor: isSelected ? C.primary : Colors.borderSubtle,
                     },
                   ]}
                   onPress={() => city.available && setSelectedCity(city.name)}
@@ -76,7 +76,7 @@ export const GuestSurveyScreen: React.FC = () => {
                   )}
                   {isSelected && (
                     <View style={[styles.cityCheck, { backgroundColor: C.primary }]}>
-                      <Ionicons name="checkmark" size={14} color="#FFF" />
+                      <Ionicons name="checkmark" size={14} color={Colors.textOnAccent} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -95,7 +95,7 @@ export const GuestSurveyScreen: React.FC = () => {
             onPress={() => useGuestStore.getState().setWantsAuth(true)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.loginBtnText, { color: C.gray600 }]}>Déjà un compte ? <Text style={{ color: C.primary, fontWeight: '700' }}>Se connecter</Text></Text>
+            <Text style={[styles.loginBtnText, { color: C.gray600 }]}>Déjà un compte ? <Text style={{ color: C.primary, fontFamily: Fonts.bodyBold }}>Se connecter</Text></Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -118,8 +118,8 @@ export const GuestSurveyScreen: React.FC = () => {
                   style={[
                     styles.interestChip,
                     {
-                      backgroundColor: isSelected ? C.primary + '15' : C.gray200,
-                      borderColor: isSelected ? C.primary : C.border,
+                      backgroundColor: isSelected ? C.primary + '15' : Colors.bgSecondary,
+                      borderColor: isSelected ? C.primary : Colors.borderSubtle,
                     },
                   ]}
                   onPress={() => toggleInterest(cat.name)}
@@ -173,8 +173,8 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 30 },
   stepDot: { width: 28, height: 4, borderRadius: 2 },
   content: { flex: 1 },
-  title: { fontSize: 26, fontFamily: Fonts.serifBold, textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, fontFamily: Fonts.serif, textAlign: 'center', marginBottom: 30, lineHeight: 20 },
+  title: { fontSize: 26, fontFamily: Fonts.displayBold, textAlign: 'center', marginBottom: 8 },
+  subtitle: { fontSize: 14, fontFamily: Fonts.body, textAlign: 'center', marginBottom: 30, lineHeight: 20 },
 
   // City cards
   cityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 30 },
@@ -187,8 +187,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   cityEmoji: { fontSize: 32, marginBottom: 8 },
-  cityName: { fontSize: 16, fontFamily: Fonts.serifSemiBold },
-  cityBadge: { fontSize: 10, fontFamily: Fonts.serif, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.8 },
+  cityName: { fontSize: 16, fontFamily: Fonts.bodySemiBold },
+  cityBadge: { fontSize: 10, fontFamily: Fonts.body, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.8 },
   cityCheck: { position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
 
   // Interest chips
@@ -202,14 +202,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   interestEmoji: { fontSize: 18, marginRight: 8 },
-  interestLabel: { fontSize: 13, fontFamily: Fonts.serifSemiBold, textTransform: 'capitalize' },
+  interestLabel: { fontSize: 13, fontFamily: Fonts.bodySemiBold, textTransform: 'capitalize' },
 
   // Buttons
   btn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 'auto', marginBottom: 12 },
   loginBtn: { alignItems: 'center', marginBottom: 30 },
-  loginBtnText: { fontSize: 14, fontFamily: Fonts.serif },
+  loginBtnText: { fontSize: 14, fontFamily: Fonts.body },
   btnFlex: { flex: 1 },
-  btnText: { color: '#FFFFFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  btnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.bodySemiBold },
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 'auto', marginBottom: 30 },
-  backBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.gray200, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.bgTertiary, alignItems: 'center', justifyContent: 'center' },
 });

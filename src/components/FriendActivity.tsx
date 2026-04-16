@@ -51,10 +51,10 @@ export const FriendActivity: React.FC<Props> = ({ plan }) => {
 
   const actionStyle =
     level === 'recreated'
-      ? { fontWeight: '600' as const, color: '#C8571A' }
+      ? { fontWeight: '600' as const, color: '#C4704B' }
       : level === 'saved'
-      ? { fontWeight: '600' as const, color: '#6B6058' }
-      : { fontWeight: '400' as const, color: '#8A8078' };
+      ? { fontWeight: '600' as const, color: '#6B5D52' }
+      : { fontWeight: '400' as const, color: '#A09181' };
 
   const actionWord =
     level === 'recreated' ? 'recreated this' : level === 'saved' ? 'saved this' : 'liked this';
@@ -100,6 +100,6 @@ const s = StyleSheet.create({
     gap: 6,
   },
   avatars: { flexDirection: 'row', alignItems: 'center' },
-  text: { flex: 1, fontSize: 11, fontWeight: '500', color: '#8A8078' },
-  name: { fontWeight: '600', color: '#6B6058' },
+  text: { flex: 1, fontSize: 11, fontWeight: '500', color: '#A09181' },
+  name: { fontWeight: '600', color: '#6B5D52' },
 });

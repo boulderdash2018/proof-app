@@ -160,49 +160,49 @@ export const ProfileScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
-        <Text style={[styles.headerTitle, { color: C.black }]}>{t.profile_title}</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
+      <View style={[styles.header, { borderBottomColor: Colors.borderSubtle }]}>
+        <Text style={[styles.headerTitle, { color: Colors.textPrimary }]}>{t.profile_title}</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => navigation.navigate('FriendRequests')} style={styles.friendReqBtn}>
-            <Ionicons name="people-outline" size={22} color={C.gray800} />
+            <Ionicons name="people-outline" size={22} color={Colors.textPrimary} />
             {incomingRequests.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: C.primary }]}>
+              <View style={[styles.badge, { backgroundColor: Colors.primary }]}>
                 <Text style={styles.badgeText}>{incomingRequests.length}</Text>
               </View>
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Ionicons name="settings-outline" size={22} color={C.gray800} />
+            <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <View style={[styles.hero, { borderBottomColor: C.border }]}>
-          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
-          <Text style={[styles.displayName, { color: C.black }]}>{user.displayName}</Text>
+        <View style={[styles.hero, { borderBottomColor: Colors.borderSubtle }]}>
+          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={Colors.primary} />
+          <Text style={[styles.displayName, { color: Colors.textPrimary }]}>{user.displayName}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
             {user.isFounder && <FounderBadge />}
             <RankBadge rank={getRankForProofs(totalProofs)} />
           </View>
-          {user.bio ? <Text style={[styles.bio, { color: C.gray800 }]}>{user.bio}</Text> : null}
+          {user.bio ? <Text style={[styles.bio, { color: Colors.textSecondary }]}>{user.bio}</Text> : null}
         </View>
 
-        <View style={[styles.statsRow, { borderBottomColor: C.border }]}>
+        <View style={[styles.statsRow, { borderBottomColor: Colors.borderSubtle }]}>
           <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(realPlanCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_plans}</Text>
+            <Text style={[styles.statValue, { color: Colors.textPrimary }]}>{formatCount(realPlanCount)}</Text>
+            <Text style={[styles.statLabel, { color: Colors.textSecondary }]}>{t.profile_plans}</Text>
           </View>
-          <View style={[styles.statDivider, { backgroundColor: C.border }]} />
+          <View style={[styles.statDivider, { backgroundColor: Colors.borderSubtle }]} />
           <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Followers', { userId: user.id })}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followersCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_followers}</Text>
+            <Text style={[styles.statValue, { color: Colors.textPrimary }]}>{formatCount(followersCount)}</Text>
+            <Text style={[styles.statLabel, { color: Colors.textSecondary }]}>{t.profile_followers}</Text>
           </TouchableOpacity>
-          <View style={[styles.statDivider, { backgroundColor: C.border }]} />
+          <View style={[styles.statDivider, { backgroundColor: Colors.borderSubtle }]} />
           <TouchableOpacity style={styles.stat} onPress={() => navigation.navigate('Following', { userId: user.id })}>
-            <Text style={[styles.statValue, { color: C.black }]}>{formatCount(followingCount)}</Text>
-            <Text style={[styles.statLabel, { color: C.gray700 }]}>{t.profile_following}</Text>
+            <Text style={[styles.statValue, { color: Colors.textPrimary }]}>{formatCount(followingCount)}</Text>
+            <Text style={[styles.statLabel, { color: Colors.textSecondary }]}>{t.profile_following}</Text>
           </TouchableOpacity>
         </View>
 
@@ -215,7 +215,7 @@ export const ProfileScreen: React.FC = () => {
                 width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
               }]}>
                 <LinearGradient
-                  colors={['#FF9A60', '#C8571A', '#8B3A10']}
+                  colors={[Colors.terracotta300, Colors.primary, Colors.terracotta800]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFillObject}
@@ -229,7 +229,7 @@ export const ProfileScreen: React.FC = () => {
                 Profile complete ✦
               </Animated.Text>
             ) : (
-              <Text style={[styles.completionLabel, { color: C.gray700 }]}>Complete your profile</Text>
+              <Text style={[styles.completionLabel, { color: Colors.textSecondary }]}>Complete your profile</Text>
             )}
 
             {/* Checklist */}
@@ -240,9 +240,9 @@ export const ProfileScreen: React.FC = () => {
                 onPress={() => !hasAvatar && navigation.navigate('EditProfile')}
                 activeOpacity={hasAvatar ? 1 : 0.7}
               >
-                <Ionicons name={hasAvatar ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasAvatar ? Colors.primary : C.gray600} />
-                <Text style={[styles.checkText, hasAvatar && styles.checkTextDone, { color: hasAvatar ? C.gray600 : C.black }]}>Add a profile photo</Text>
-                {!hasAvatar && <Ionicons name="chevron-forward" size={14} color={C.gray600} />}
+                <Ionicons name={hasAvatar ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasAvatar ? Colors.primary : Colors.textTertiary} />
+                <Text style={[styles.checkText, hasAvatar && styles.checkTextDone, { color: hasAvatar ? Colors.textTertiary : Colors.textPrimary }]}>Add a profile photo</Text>
+                {!hasAvatar && <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />}
               </TouchableOpacity>
 
               {/* First plan */}
@@ -251,9 +251,9 @@ export const ProfileScreen: React.FC = () => {
                 onPress={() => !hasPublished && navigation.navigate('CreateTab', { screen: 'Create' })}
                 activeOpacity={hasPublished ? 1 : 0.7}
               >
-                <Ionicons name={hasPublished ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasPublished ? Colors.primary : C.gray600} />
-                <Text style={[styles.checkText, hasPublished && styles.checkTextDone, { color: hasPublished ? C.gray600 : C.black }]}>Post your first plan</Text>
-                {!hasPublished && <Ionicons name="chevron-forward" size={14} color={C.gray600} />}
+                <Ionicons name={hasPublished ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasPublished ? Colors.primary : Colors.textTertiary} />
+                <Text style={[styles.checkText, hasPublished && styles.checkTextDone, { color: hasPublished ? Colors.textTertiary : Colors.textPrimary }]}>Post your first plan</Text>
+                {!hasPublished && <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />}
               </TouchableOpacity>
 
               {/* Rate 3 places */}
@@ -262,16 +262,16 @@ export const ProfileScreen: React.FC = () => {
                 onPress={() => !hasRated3 && navigation.navigate('ExploreTab', { screen: 'Explore' })}
                 activeOpacity={hasRated3 ? 1 : 0.7}
               >
-                <Ionicons name={hasRated3 ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasRated3 ? Colors.primary : C.gray600} />
-                <Text style={[styles.checkText, hasRated3 && styles.checkTextDone, { color: hasRated3 ? C.gray600 : C.black }]}>Rate 3 places ({Math.min(placesRated, 3)}/3)</Text>
-                {!hasRated3 && <Ionicons name="chevron-forward" size={14} color={C.gray600} />}
+                <Ionicons name={hasRated3 ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={hasRated3 ? Colors.primary : Colors.textTertiary} />
+                <Text style={[styles.checkText, hasRated3 && styles.checkTextDone, { color: hasRated3 ? Colors.textTertiary : Colors.textPrimary }]}>Rate 3 places ({Math.min(placesRated, 3)}/3)</Text>
+                {!hasRated3 && <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />}
               </TouchableOpacity>
             </Animated.View>
           </View>
         )}
 
         {/* ═══ Tab bar ═══ */}
-        <View style={[styles.profileTabBar, { borderBottomColor: C.borderLight }]}>
+        <View style={[styles.profileTabBar, { borderBottomColor: Colors.borderSubtle }]}>
           {(['plans', 'drafts', 'badges'] as const).map((tab) => {
             const isActive = profileTab === tab;
             const iconMap: Record<string, { active: string; inactive: string }> = {
@@ -281,8 +281,8 @@ export const ProfileScreen: React.FC = () => {
             };
             const icon = iconMap[tab];
             return (
-              <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: C.primary }]} onPress={() => { setProfileTab(tab); if (tab !== 'drafts') setDraftCategory(null); }} activeOpacity={0.7}>
-                <Ionicons name={(isActive ? icon.active : icon.inactive) as any} size={22} color={isActive ? C.primary : C.gray600} />
+              <TouchableOpacity key={tab} style={[styles.profileTabItem, isActive && { borderBottomColor: Colors.primary }]} onPress={() => { setProfileTab(tab); if (tab !== 'drafts') setDraftCategory(null); }} activeOpacity={0.7}>
+                <Ionicons name={(isActive ? icon.active : icon.inactive) as any} size={22} color={isActive ? Colors.primary : Colors.textTertiary} />
               </TouchableOpacity>
             );
           })}
@@ -309,16 +309,16 @@ export const ProfileScreen: React.FC = () => {
                         ) : (
                           <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
                         )}
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <LinearGradient colors={['transparent', 'rgba(44,36,32,0.65)']} style={styles.instaCellOverlay} />
                         {isPinned && (
                           <View style={styles.pinBadge}>
-                            <Ionicons name="pin" size={12} color="#FFF" />
+                            <Ionicons name="pin" size={12} color={Colors.textOnAccent} />
                           </View>
                         )}
                         <View style={styles.instaCellBottom}>
                           <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
                           <View style={styles.instaCellLikes}>
-                            <Ionicons name="heart" size={11} color="#FFF" />
+                            <Ionicons name="heart" size={11} color={Colors.textOnAccent} />
                             <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
                           </View>
                         </View>
@@ -329,8 +329,8 @@ export const ProfileScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.emptyTab}>
-                <Ionicons name="map-outline" size={36} color={C.gray500} />
-                <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun plan pour le moment</Text>
+                <Ionicons name="map-outline" size={36} color={Colors.textTertiary} />
+                <Text style={[styles.emptyTabText, { color: Colors.textSecondary }]}>Aucun plan pour le moment</Text>
               </View>
             )}
           </>
@@ -353,11 +353,11 @@ export const ProfileScreen: React.FC = () => {
                         {publishPhoto ? (
                           <Image source={{ uri: publishPhoto }} style={styles.instaCellImage} />
                         ) : (
-                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
+                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: Colors.bgTertiary }]} />
                         )}
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <LinearGradient colors={['transparent', 'rgba(44,36,32,0.65)']} style={styles.instaCellOverlay} />
                         <View style={styles.instaCellBottom}>
-                          <Ionicons name="create-outline" size={16} color="#FFF" />
+                          <Ionicons name="create-outline" size={16} color={Colors.textOnAccent} />
                           <Text style={styles.instaCellTitle}>Publier un plan</Text>
                           <Text style={styles.draftCategoryCount}>{publishDrafts.length} brouillon{publishDrafts.length !== 1 ? 's' : ''}</Text>
                         </View>
@@ -369,11 +369,11 @@ export const ProfileScreen: React.FC = () => {
                         {organizePhoto ? (
                           <Image source={{ uri: organizePhoto }} style={styles.instaCellImage} />
                         ) : (
-                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
+                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: Colors.bgTertiary }]} />
                         )}
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <LinearGradient colors={['transparent', 'rgba(44,36,32,0.65)']} style={styles.instaCellOverlay} />
                         <View style={styles.instaCellBottom}>
-                          <Ionicons name="calendar-outline" size={16} color="#FFF" />
+                          <Ionicons name="calendar-outline" size={16} color={Colors.textOnAccent} />
                           <Text style={styles.instaCellTitle}>Organiser une journée</Text>
                           <Text style={styles.draftCategoryCount}>{organizeDrafts.length} brouillon{organizeDrafts.length !== 1 ? 's' : ''}</Text>
                         </View>
@@ -382,8 +382,8 @@ export const ProfileScreen: React.FC = () => {
                   </View>
                 ) : (
                   <View style={styles.emptyTab}>
-                    <Ionicons name="document-text-outline" size={36} color={C.gray500} />
-                    <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun brouillon</Text>
+                    <Ionicons name="document-text-outline" size={36} color={Colors.textTertiary} />
+                    <Text style={[styles.emptyTabText, { color: Colors.textSecondary }]}>Aucun brouillon</Text>
                   </View>
                 );
               })()
@@ -398,8 +398,8 @@ export const ProfileScreen: React.FC = () => {
                   <>
                     {/* Back row */}
                     <TouchableOpacity style={styles.draftBackRow} onPress={() => setDraftCategory(null)} activeOpacity={0.7}>
-                      <Ionicons name="chevron-back" size={18} color={C.primary} />
-                      <Text style={[styles.draftBackText, { color: C.primary }]}>
+                      <Ionicons name="chevron-back" size={18} color={Colors.primary} />
+                      <Text style={[styles.draftBackText, { color: Colors.primary }]}>
                         {draftCategory === 'organize' ? 'Organiser une journée' : 'Publier un plan'}
                       </Text>
                     </TouchableOpacity>
@@ -434,10 +434,10 @@ export const ProfileScreen: React.FC = () => {
                                 {hasPhoto ? (
                                   <Image source={{ uri: draftPhoto! }} style={styles.instaCellImage} />
                                 ) : (
-                                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.gray200 }]} />
+                                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: Colors.bgTertiary }]} />
                                 )}
                                 <LinearGradient
-                                  colors={hasPhoto ? ['transparent', 'rgba(0,0,0,0.65)'] : ['transparent', 'rgba(0,0,0,0.25)']}
+                                  colors={hasPhoto ? ['transparent', 'rgba(44,36,32,0.65)'] : ['transparent', 'rgba(44,36,32,0.25)']}
                                   style={styles.instaCellOverlay}
                                 />
                                 {/* Draft badge */}
@@ -460,10 +460,10 @@ export const ProfileScreen: React.FC = () => {
                                     }
                                   }}
                                 >
-                                  <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.5)" />
+                                  <Ionicons name="close-circle" size={18} color="rgba(44,36,32,0.5)" />
                                 </TouchableOpacity>
                                 <View style={styles.instaCellBottom}>
-                                  <Text style={[styles.instaCellTitle, !hasPhoto && { color: Colors.gray700 }]} numberOfLines={2}>{d.title || 'Untitled plan'}</Text>
+                                  <Text style={[styles.instaCellTitle, !hasPhoto && { color: Colors.textSecondary }]} numberOfLines={2}>{d.title || 'Untitled plan'}</Text>
                                   <Text style={styles.draftCellMeta}>{d.places.length} {d.places.length === 1 ? 'place' : 'places'}</Text>
                                 </View>
                               </View>
@@ -473,8 +473,8 @@ export const ProfileScreen: React.FC = () => {
                       </View>
                     ) : (
                       <View style={styles.emptyTab}>
-                        <Ionicons name="document-text-outline" size={36} color={C.gray500} />
-                        <Text style={[styles.emptyTabText, { color: C.gray600 }]}>Aucun brouillon</Text>
+                        <Ionicons name="document-text-outline" size={36} color={Colors.textTertiary} />
+                        <Text style={[styles.emptyTabText, { color: Colors.textSecondary }]}>Aucun brouillon</Text>
                       </View>
                     )}
                   </>
@@ -497,60 +497,60 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  headerTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   friendReqBtn: { marginRight: 16, position: 'relative' },
   friendReqIcon: { fontSize: 22 },
   badge: { position: 'absolute', top: -4, right: -6, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  badgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+  badgeText: { color: Colors.textOnAccent, fontSize: 9, fontWeight: '800' },
   settingsIcon: { fontSize: 22 },
   scroll: { paddingBottom: 30 },
   hero: { alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1 },
-  displayName: { fontSize: 20, fontFamily: Fonts.serifBold, marginTop: 10 },
-  bio: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
+  displayName: { fontSize: 20, fontFamily: Fonts.displaySemiBold, marginTop: 10 },
+  bio: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderBottomWidth: 1, marginHorizontal: Layout.screenPadding },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 18, fontFamily: Fonts.serifBold },
-  statLabel: { fontSize: 11, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
+  statValue: { fontSize: 18, fontFamily: Fonts.displaySemiBold },
+  statLabel: { fontSize: 11, fontFamily: Fonts.body, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
   statDivider: { width: 1, height: 28 },
   // Profile tabs
   profileTabBar: { flexDirection: 'row', borderBottomWidth: 1, marginTop: 4 },
   profileTabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
   emptyTab: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50, gap: 10 },
-  emptyTabText: { fontSize: 14, fontFamily: Fonts.serif },
+  emptyTabText: { fontSize: 14, fontFamily: Fonts.body },
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
-  sectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
+  sectionLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   completionSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 16, paddingBottom: 4 },
-  completionBarBg: { height: 5, borderRadius: 3, backgroundColor: '#EDE8E0', overflow: 'hidden' },
+  completionBarBg: { height: 5, borderRadius: 3, backgroundColor: Colors.bgTertiary, overflow: 'hidden' },
   completionBarFill: { height: '100%', borderRadius: 3, overflow: 'hidden' },
-  completionLabel: { fontSize: 11, fontWeight: '600', marginTop: 8, marginBottom: 8, letterSpacing: 0.3 },
+  completionLabel: { fontSize: 11, fontFamily: Fonts.bodySemiBold, marginTop: 8, marginBottom: 8, letterSpacing: 0.3 },
   checkItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
-  checkText: { flex: 1, fontSize: 13, fontWeight: '500' },
+  checkText: { flex: 1, fontSize: 13, fontFamily: Fonts.bodyMedium },
   checkTextDone: { textDecorationLine: 'line-through', opacity: 0.6 },
   plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   miniCard: { width: MINI_CARD_W, height: 76, borderRadius: 14, padding: 10, justifyContent: 'flex-end', overflow: 'hidden' },
   miniCardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
   miniCardOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 50 },
-  miniCardTitle: { color: '#FFFFFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  miniCardTitle: { color: Colors.textOnAccent, fontSize: 12, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(44,36,32,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   doneCheck: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
-  doneCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  doneCheckText: { color: Colors.textOnAccent, fontSize: 11, fontWeight: '800' },
   // Drafts
   draftCategoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
-  draftCategoryCount: { fontSize: 10, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  draftCategoryCount: { fontSize: 10, fontFamily: Fonts.body, color: 'rgba(255,248,240,0.7)', marginTop: 1 },
   draftBackRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Layout.screenPadding, paddingVertical: 10 },
-  draftBackText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  draftBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, zIndex: 2 },
-  draftBadgeText: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.85)', letterSpacing: 0.3 },
+  draftBackText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  draftBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(44,36,32,0.5)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, zIndex: 2 },
+  draftBadgeText: { fontSize: 9, fontFamily: Fonts.bodySemiBold, color: 'rgba(255,248,240,0.85)', letterSpacing: 0.3 },
   draftDeleteBtn: { position: 'absolute', top: 4, right: 4, zIndex: 3 },
-  draftCellMeta: { fontSize: 10, fontFamily: Fonts.serif, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  draftCellMeta: { fontSize: 10, fontFamily: Fonts.body, color: 'rgba(255,248,240,0.7)', marginTop: 1 },
   // Instagram-style grid
   instaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
   instaCell: { width: GRID_CELL, height: GRID_CELL, overflow: 'hidden' },
   instaCellImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
   instaCellOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%' },
   instaCellBottom: { position: 'absolute', bottom: 8, left: 8, right: 8 },
-  instaCellTitle: { color: '#FFF', fontSize: 12, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  instaCellTitle: { color: Colors.textOnAccent, fontSize: 12, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(44,36,32,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
-  instaCellLikesText: { color: '#FFF', fontSize: 10, fontFamily: Fonts.serifSemiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  instaCellLikesText: { color: Colors.textOnAccent, fontSize: 10, fontFamily: Fonts.bodySemiBold, textShadowColor: 'rgba(44,36,32,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(44,36,32,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
 });

@@ -77,7 +77,7 @@ export const SavesScreen: React.FC = () => {
           ]}>
             <Text style={[styles.statusText, {
               color: item.isDone
-                ? item.proofStatus === 'validated' ? '#C8571A' : C.success
+                ? item.proofStatus === 'validated' ? Colors.primary : C.success
                 : C.primary
             }]}>
               {item.isDone
@@ -166,22 +166,22 @@ export const SavesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
-  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  pageTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   starBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   tabBar: { flexDirection: 'row', marginHorizontal: Layout.screenPadding, borderRadius: 14, padding: 3, marginBottom: 14 },
   tab: { flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center' },
-  tabActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  tabActive: { shadowColor: 'rgba(44,36,32,0.15)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   list: { paddingHorizontal: Layout.screenPadding, paddingBottom: 20 },
-  saveItem: { borderRadius: 16, marginBottom: 12, borderWidth: 1, overflow: 'hidden', shadowColor: Colors.accentLine, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  saveItem: { borderRadius: 16, marginBottom: 12, borderWidth: 1, overflow: 'hidden', shadowColor: 'rgba(44,36,32,0.10)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   banner: { height: 100, justifyContent: 'flex-end', padding: 12, position: 'relative' },
   bannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
   bannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 70 },
-  bannerTitle: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  bannerTitle: { color: '#FFF', fontSize: 16, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   statusBadge: { position: 'absolute', top: 10, right: 10, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1 },
-  statusTodo: { backgroundColor: '#2D2118', borderColor: '#3D2E22' },
+  statusTodo: { backgroundColor: Colors.terracotta100, borderColor: Colors.borderMedium },
   statusDone: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },
-  statusProof: { backgroundColor: '#C8571A20', borderColor: '#C8571A' },
+  statusProof: { backgroundColor: Colors.primary + '20', borderColor: Colors.primary },
   statusText: { fontSize: 10, fontWeight: '700' },
   saveItemBody: { padding: 12 },
   saveItemMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 4 },

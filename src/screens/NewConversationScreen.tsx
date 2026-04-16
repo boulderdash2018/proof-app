@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     letterSpacing: -0.3,
   },
   searchRow: {
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     paddingVertical: 0,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -231,8 +231,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowText: { flex: 1 },
-  name: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  username: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
+  name: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  username: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
   emptyContainer: { paddingTop: 60, alignItems: 'center' },
-  emptyText: { fontSize: 14, fontFamily: Fonts.serif },
+  emptyText: { fontSize: 14, fontFamily: Fonts.body },
 });

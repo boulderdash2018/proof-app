@@ -18,7 +18,6 @@ import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../consta
 import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
 import { LoadingSkeleton } from '../components';
 import { Plan, Place } from '../types';
-import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuthStore, useTrendingStore } from '../store';
@@ -55,7 +54,6 @@ for (const group of EXPLORE_GROUPS) {
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -277,8 +275,8 @@ export const ExploreScreen: React.FC = () => {
   ) => (
     <View style={styles.filterField}>
       <View style={styles.filterFieldHeader}>
-        <Ionicons name={icon as any} size={16} color={C.gray600} />
-        <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>{label}</Text>
+        <Ionicons name={icon as any} size={16} color={Colors.textSecondary} />
+        <Text style={[styles.filterFieldLabel, { color: Colors.textPrimary }]}>{label}</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stepsRow}>
         {steps.map((step, i) => {
@@ -287,11 +285,11 @@ export const ExploreScreen: React.FC = () => {
           return (
             <TouchableOpacity
               key={step}
-              style={[styles.stepChip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
+              style={[styles.stepChip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderSubtle }]}
               onPress={() => setter(isActive ? null : step)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.stepChipText, { color: isActive ? '#FFF' : C.gray800 }]}>
+              <Text style={[styles.stepChipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>
                 {formatLabel(step, isLast)}
               </Text>
             </TouchableOpacity>
@@ -362,18 +360,18 @@ export const ExploreScreen: React.FC = () => {
   // ── Row 1: Person filters (single-select) ──
   const renderPersonRow = () => (
     <View style={styles.filterSection}>
-      <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par personne</Text>
+      <Text style={[styles.filterLabel, { color: Colors.textTertiary }]}>Par personne</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
         {FILTERED_PERSONS.map((p) => {
           const isActive = selectedFilters.includes(p.label);
           return (
             <TouchableOpacity
               key={p.key}
-              style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border }]}
+              style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderMedium }]}
               onPress={() => toggleFilter(p.label)}
               activeOpacity={0.8}
             >
-              <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray800 }]}>{p.emoji} {p.label}</Text>
+              <Text style={[styles.chipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{p.emoji} {p.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -384,18 +382,18 @@ export const ExploreScreen: React.FC = () => {
   // ── Row 2: Theme chips (always single-select filter mode) ──
   const renderThemeRow = () => (
     <View style={styles.filterSection}>
-      <Text style={[styles.filterLabel, { color: C.gray500 }]}>Par thème</Text>
+      <Text style={[styles.filterLabel, { color: Colors.textTertiary }]}>Par theme</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
         {THEME_GROUPS.map((group) => {
           const isActive = selectedFilters.includes(group.label);
           return (
             <TouchableOpacity
               key={group.key}
-              style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.border }]}
+              style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderMedium }]}
               onPress={() => group.key === 'nearby' ? handleNearbyFilter() : toggleFilter(group.label)}
               activeOpacity={0.8}
             >
-              <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray800 }]}>{group.emoji} {group.label}</Text>
+              <Text style={[styles.chipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{group.emoji} {group.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -410,20 +408,20 @@ export const ExploreScreen: React.FC = () => {
     return (
       <TouchableOpacity
         key={item.name}
-        style={[styles.flatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }, isSelected && { backgroundColor: Colors.primary + '10' }]}
+        style={[styles.flatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }, isSelected && { backgroundColor: Colors.terracotta50 }]}
         activeOpacity={0.7}
         onPress={() => toggleFilter(item.name)}
       >
         <Text style={styles.flatEmoji}>{item.emoji}</Text>
         <View style={styles.flatTextCol}>
-          <Text style={[styles.flatName, { color: C.black }]}>{item.name}</Text>
-          {item.subtitle ? <Text style={[styles.flatSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+          <Text style={[styles.flatName, { color: Colors.textPrimary }]}>{item.name}</Text>
+          {item.subtitle ? <Text style={[styles.flatSub, { color: Colors.textSecondary }]}>{item.subtitle}</Text> : null}
         </View>
         {isSelected ? (
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         ) : item.hot ? (
-          <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
-            <Text style={[styles.hotBadgeText, { color: C.primary }]}>🔥</Text>
+          <View style={[styles.hotBadge, { backgroundColor: Colors.terracotta100 }]}>
+            <Text style={[styles.hotBadgeText, { color: Colors.terracotta700 }]}>🔥</Text>
           </View>
         ) : null}
       </TouchableOpacity>
@@ -433,28 +431,28 @@ export const ExploreScreen: React.FC = () => {
   const renderRankedItem = (item: ExploreCategoryItem, rank: number) => {
     const isSelected = selectedFilters.includes(item.name);
     return (
-      <TouchableOpacity key={item.name} style={[styles.rankedRow, { borderBottomColor: C.border, backgroundColor: isSelected ? Colors.primary + '10' : 'transparent' }]} activeOpacity={0.7} onPress={() => toggleFilter(item.name)}>
-        <Text style={[styles.rankNumber, { color: C.primary }]}>{rank}</Text>
-        <View style={[styles.rankEmojiCircle, { backgroundColor: C.gray200 }]}>
+      <TouchableOpacity key={item.name} style={[styles.rankedRow, { borderBottomColor: Colors.borderMedium, backgroundColor: isSelected ? Colors.terracotta50 : 'transparent' }]} activeOpacity={0.7} onPress={() => toggleFilter(item.name)}>
+        <Text style={[styles.rankNumber, { color: Colors.primary }]}>{rank}</Text>
+        <View style={[styles.rankEmojiCircle, { backgroundColor: Colors.bgTertiary }]}>
           <Text style={styles.rankEmoji}>{item.emoji}</Text>
         </View>
         <View style={styles.rankTextCol}>
-          <Text style={[styles.rankName, { color: C.black }]}>{item.name}</Text>
-          {item.subtitle ? <Text style={[styles.rankSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+          <Text style={[styles.rankName, { color: Colors.textPrimary }]}>{item.name}</Text>
+          {item.subtitle ? <Text style={[styles.rankSub, { color: Colors.textSecondary }]}>{item.subtitle}</Text> : null}
         </View>
         {isSelected ? (
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         ) : item.badgeLabel ? (
-          <View style={[styles.hotBadge, { backgroundColor: item.hot ? C.primary + '18' : '#22C55E18' }]}>
-            <Text style={[styles.hotBadgeText, { color: item.hot ? C.primary : '#22C55E' }]}>{item.badgeLabel}</Text>
+          <View style={[styles.hotBadge, { backgroundColor: item.hot ? Colors.terracotta100 : '#22C55E18' }]}>
+            <Text style={[styles.hotBadgeText, { color: item.hot ? Colors.terracotta700 : '#22C55E' }]}>{item.badgeLabel}</Text>
           </View>
         ) : item.hot ? (
-          <View style={[styles.hotBadge, { backgroundColor: C.primary + '18' }]}>
-            <Text style={[styles.hotBadgeText, { color: C.primary }]}>🔥 Cette semaine</Text>
+          <View style={[styles.hotBadge, { backgroundColor: Colors.terracotta100 }]}>
+            <Text style={[styles.hotBadgeText, { color: Colors.terracotta700 }]}>🔥 Cette semaine</Text>
           </View>
         ) : item.planCount ? (
-          <View style={[styles.planCountBadge, { backgroundColor: C.gray200 }]}>
-            <Text style={[styles.planCountText, { color: C.gray700 }]}>{item.planCount} plans</Text>
+          <View style={[styles.planCountBadge, { backgroundColor: Colors.bgTertiary }]}>
+            <Text style={[styles.planCountText, { color: Colors.textSecondary }]}>{item.planCount} plans</Text>
           </View>
         ) : null}
       </TouchableOpacity>
@@ -463,7 +461,7 @@ export const ExploreScreen: React.FC = () => {
 
   const renderSection = (section: ExploreSection, idx: number, layout: ExploreLayout) => (
     <View key={`${section.title}-${idx}`} style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: C.gray600 }]}>{section.title}</Text>
+      <Text style={[styles.sectionTitle, { color: Colors.textSecondary }]}>{section.title}</Text>
       {layout === 'mood-list' ? (
         <View>{section.items.map((item, i) => renderCategoryItem(item, i, section.items.length))}</View>
       ) : layout === 'ranked-list' ? (
@@ -487,16 +485,16 @@ export const ExploreScreen: React.FC = () => {
     const colors = parseGradientColors(item.gradient);
     const photo = getPlanPhoto(item);
     return (
-      <TouchableOpacity style={[styles.compactCard, { borderBottomColor: C.border }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
+      <TouchableOpacity style={[styles.compactCard, { borderBottomColor: Colors.borderMedium }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
         <View style={styles.compactBanner}>
           {photo ? <Image source={{ uri: photo }} style={styles.compactBannerImage} /> : <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.compactBannerOverlay} />
+          <LinearGradient colors={['transparent', 'rgba(44,36,32,0.55)']} style={styles.compactBannerOverlay} />
           <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
         </View>
         <View style={styles.compactMeta}>
-          <View style={styles.compactMetaItem}><Ionicons name="cash-outline" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.price}</Text></View>
-          <View style={styles.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.duration}</Text></View>
-          <View style={styles.compactMetaItem}><Ionicons name="heart" size={13} color={C.gold} /><Text style={[styles.compactMetaText, { color: C.gray800 }]}>{item.likesCount}</Text></View>
+          <View style={styles.compactMetaItem}><Ionicons name="cash-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.price}</Text></View>
+          <View style={styles.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.duration}</Text></View>
+          <View style={styles.compactMetaItem}><Ionicons name="heart" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.likesCount}</Text></View>
         </View>
       </TouchableOpacity>
     );
@@ -507,25 +505,25 @@ export const ExploreScreen: React.FC = () => {
     return (
       <TouchableOpacity
         key={`${place.googlePlaceId || place.id}-${index}`}
-        style={[styles.placeRow, index < total - 1 && { borderBottomWidth: 1, borderBottomColor: C.borderLight }]}
+        style={[styles.placeRow, index < total - 1 && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }]}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('PlanDetail', { planId: place.planId })}
       >
         {photo ? (
           <Image source={{ uri: photo }} style={styles.placeThumb} />
         ) : (
-          <View style={[styles.placeThumb, { backgroundColor: C.gray300, alignItems: 'center', justifyContent: 'center' }]}>
-            <Ionicons name="location-outline" size={18} color={C.gray600} />
+          <View style={[styles.placeThumb, { backgroundColor: Colors.bgTertiary, alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="location-outline" size={18} color={Colors.textSecondary} />
           </View>
         )}
         <View style={styles.placeInfo}>
-          <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
-          <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type}</Text>
+          <Text style={[styles.placeName, { color: Colors.textPrimary }]} numberOfLines={1}>{place.name}</Text>
+          <Text style={[styles.placeType, { color: Colors.textSecondary }]} numberOfLines={1}>{place.type}</Text>
         </View>
         {place.rating > 0 && (
           <View style={styles.placeRating}>
             <Ionicons name="star" size={12} color={Colors.gold} />
-            <Text style={[styles.placeRatingText, { color: C.gray800 }]}>{place.rating.toFixed(1)}</Text>
+            <Text style={[styles.placeRatingText, { color: Colors.textPrimary }]}>{place.rating.toFixed(1)}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -533,23 +531,23 @@ export const ExploreScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
       <View style={styles.headerRow}>
-        <Text style={[styles.pageTitle, { color: C.black }]}>{t.explore_title}</Text>
+        <Text style={[styles.pageTitle, { color: Colors.textPrimary }]}>{t.explore_title}</Text>
         <View style={styles.headerBtns}>
           <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: C.gray200 }]}
+            style={[styles.filterBtn, { backgroundColor: Colors.bgTertiary }]}
             onPress={handleMapOpen}
             activeOpacity={0.7}
           >
-            <Ionicons name="map-outline" size={17} color={C.gray700} />
+            <Ionicons name="map-outline" size={17} color={Colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterBtn, hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: C.gray200 }]}
+            style={[styles.filterBtn, hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: Colors.bgTertiary }]}
             onPress={() => setShowFiltersModal(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="options-outline" size={18} color={hasAdvancedFilters ? '#FFF' : C.gray700} />
+            <Ionicons name="options-outline" size={18} color={hasAdvancedFilters ? Colors.textOnAccent : Colors.textSecondary} />
             {hasAdvancedFilters && <View style={styles.filterBtnDot} />}
           </TouchableOpacity>
         </View>
@@ -557,12 +555,12 @@ export const ExploreScreen: React.FC = () => {
 
       {/* Search bar — tapping opens dedicated SearchScreen */}
       <TouchableOpacity
-        style={[styles.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}
+        style={[styles.searchBar, { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderSubtle }]}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('ExploreSearch', { contentMode })}
       >
-        <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
-        <Text style={[styles.searchInput, { color: C.gray600 }]}>{t.explore_search_placeholder}</Text>
+        <Ionicons name="search-outline" size={16} color={Colors.textTertiary} style={{ marginRight: 8 }} />
+        <Text style={[styles.searchInput, { color: Colors.textTertiary }]}>{t.explore_search_placeholder}</Text>
       </TouchableOpacity>
 
       {/* Filter rows */}
@@ -573,12 +571,12 @@ export const ExploreScreen: React.FC = () => {
       {voirPlusMounted && (
         <Animated.View style={[styles.voirPlusRow, { opacity: voirPlusOpacity }]}>
           <TouchableOpacity
-            style={[styles.voirPlusBtn, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: C.gray200, borderColor: C.border }]}
+            style={[styles.voirPlusBtn, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderMedium }]}
             onPress={() => setShowSubcategories(!showSubcategories)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.voirPlusText, { color: showSubcategories ? '#FFF' : C.gray800 }]}>Voir +</Text>
-            <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={14} color={showSubcategories ? '#FFF' : C.gray800} />
+            <Text style={[styles.voirPlusText, { color: showSubcategories ? Colors.textOnAccent : Colors.textPrimary }]}>Voir +</Text>
+            <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={14} color={showSubcategories ? Colors.textOnAccent : Colors.textPrimary} />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -586,8 +584,8 @@ export const ExploreScreen: React.FC = () => {
       {/* Location denied message */}
       {locationDenied && (
         <View style={styles.locationDeniedRow}>
-          <Ionicons name="location-outline" size={14} color={C.gray600} />
-          <Text style={[styles.locationDeniedText, { color: C.gray600 }]}>Active ta localisation pour voir les plans près de toi</Text>
+          <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+          <Text style={[styles.locationDeniedText, { color: Colors.textSecondary }]}>Active ta localisation pour voir les plans pres de toi</Text>
         </View>
       )}
 
@@ -602,7 +600,7 @@ export const ExploreScreen: React.FC = () => {
             {/* Trending categories list — hidden when any filter is active */}
             {showTrending && !hasActiveFilters && (
               <Animated.View style={{ opacity: trendingOpacity }}>
-                <Text style={[styles.trendingLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
+                <Text style={[styles.trendingLabel, { color: Colors.textSecondary }]}>CATEGORIES EN TENDANCE</Text>
                 {trendingLoading ? (
                   <LoadingSkeleton variant="list" />
                 ) : (
@@ -613,14 +611,14 @@ export const ExploreScreen: React.FC = () => {
                       return (
                         <TouchableOpacity
                           key={cat.name}
-                          style={[styles.trendingRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }]}
+                          style={[styles.trendingRow, !isLast && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }]}
                           activeOpacity={0.7}
                           onPress={() => toggleFilter(cat.name)}
                         >
                           <Text style={styles.trendingEmoji}>{cat.emoji}</Text>
                           <View style={{ flex: 1 }}>
-                            <Text style={[styles.trendingName, { color: C.black }]}>{cat.name}</Text>
-                            <Text style={[styles.trendingCount, { color: C.gray600 }]}>{cat.planCount} plan{cat.planCount > 1 ? 's' : ''}</Text>
+                            <Text style={[styles.trendingName, { color: Colors.textPrimary }]}>{cat.name}</Text>
+                            <Text style={[styles.trendingCount, { color: Colors.textSecondary }]}>{cat.planCount} plan{cat.planCount > 1 ? 's' : ''}</Text>
                           </View>
                           {isSelected && <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />}
                         </TouchableOpacity>
@@ -636,14 +634,14 @@ export const ExploreScreen: React.FC = () => {
               <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
                 <View style={styles.activeFiltersRow}>
                   {selectedFilters.map((f) => (
-                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => f === NEARBY_LABEL ? handleNearbyFilter() : toggleFilter(f)}>
+                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }]} onPress={() => f === NEARBY_LABEL ? handleNearbyFilter() : toggleFilter(f)}>
                       <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
                       <Ionicons name="close" size={13} color={Colors.primary} />
                     </TouchableOpacity>
                   ))}
                   {selectedFilters.length > 1 && (
                     <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); setLocationDenied(false); setShowSubcategories(false); }}>
-                      <Text style={[styles.clearFiltersText, { color: C.gray600 }]}>Tout effacer</Text>
+                      <Text style={[styles.clearFiltersText, { color: Colors.textSecondary }]}>Tout effacer</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -654,21 +652,21 @@ export const ExploreScreen: React.FC = () => {
                     {/* Plans section */}
                     {contentMode !== 'lieux' && displayedPlans.length > 0 && (
                       <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
-                        <Text style={[styles.resultsSectionLabel, { color: C.gray700, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
+                        <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
                         {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
                       </View>
                     )}
                     {/* Lieux section */}
                     {contentMode !== 'plans' && displayedPlaces.length > 0 && (
                       <View style={{ marginTop: 12 }}>
-                        <Text style={[styles.resultsSectionLabel, { color: C.gray700 }]}>Lieux ({displayedPlaces.length})</Text>
+                        <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary }]}>Lieux ({displayedPlaces.length})</Text>
                         {displayedPlaces.map((place, i) => renderCompactPlace(place, i, displayedPlaces.length))}
                       </View>
                     )}
                     {/* Empty */}
                     {displayedPlans.length === 0 && displayedPlaces.length === 0 && (
                       <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                        <Text style={[styles.noResultText, { color: C.gray600 }]}>Aucun résultat pour ces filtres</Text>
+                        <Text style={[styles.noResultText, { color: Colors.textSecondary }]}>Aucun resultat pour ces filtres</Text>
                       </View>
                     )}
                   </>
@@ -681,11 +679,11 @@ export const ExploreScreen: React.FC = () => {
       {/* ── Filters Modal ── */}
       <Modal visible={showFiltersModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.filtersModal, { backgroundColor: C.white }]}>
-            <View style={[styles.filtersHeader, { borderBottomColor: C.borderLight }]}>
-              <Text style={[styles.filtersTitle, { color: C.black }]}>Filtres</Text>
+          <View style={[styles.filtersModal, { backgroundColor: Colors.bgSecondary }]}>
+            <View style={[styles.filtersHeader, { borderBottomColor: Colors.borderSubtle }]}>
+              <Text style={[styles.filtersTitle, { color: Colors.textPrimary }]}>Filtres</Text>
               <TouchableOpacity onPress={() => setShowFiltersModal(false)}>
-                <Ionicons name="close" size={22} color={C.gray700} />
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -693,21 +691,21 @@ export const ExploreScreen: React.FC = () => {
               {/* Content mode toggle */}
               <View style={styles.filterField}>
                 <View style={styles.filterFieldHeader}>
-                  <Ionicons name="layers-outline" size={16} color={C.gray600} />
-                  <Text style={[styles.filterFieldLabel, { color: C.gray800 }]}>Afficher</Text>
+                  <Ionicons name="layers-outline" size={16} color={Colors.textSecondary} />
+                  <Text style={[styles.filterFieldLabel, { color: Colors.textPrimary }]}>Afficher</Text>
                 </View>
-                <View style={[styles.modeRow, { backgroundColor: C.gray200 }]}>
+                <View style={[styles.modeRow, { backgroundColor: Colors.bgTertiary }]}>
                   {(['tous', 'plans', 'lieux'] as const).map((mode) => {
                     const active = contentMode === mode;
                     const label = mode === 'tous' ? 'Tous' : mode === 'plans' ? 'Plans' : 'Lieux';
                     return (
                       <TouchableOpacity
                         key={mode}
-                        style={[styles.modePill, active && { backgroundColor: C.white }]}
+                        style={[styles.modePill, active && { backgroundColor: Colors.bgSecondary }]}
                         onPress={() => setContentMode(mode)}
                         activeOpacity={0.7}
                       >
-                        <Text style={[styles.modePillText, { color: active ? C.black : C.gray600 }]}>
+                        <Text style={[styles.modePillText, { color: active ? Colors.textPrimary : Colors.textSecondary }]}>
                           {label}
                         </Text>
                       </TouchableOpacity>
@@ -726,11 +724,11 @@ export const ExploreScreen: React.FC = () => {
                 (n, isLast) => isLast ? `${n}+` : `${n}`)}
             </ScrollView>
 
-            <View style={[styles.filtersFooter, { borderTopColor: C.borderLight }]}>
-              <TouchableOpacity onPress={clearAdvancedFilters} style={[styles.filtersClearBtn, { borderColor: C.borderLight }]}>
-                <Text style={[styles.filtersClearText, { color: C.gray700 }]}>Réinitialiser</Text>
+            <View style={[styles.filtersFooter, { borderTopColor: Colors.borderSubtle }]}>
+              <TouchableOpacity onPress={clearAdvancedFilters} style={[styles.filtersClearBtn, { borderColor: Colors.borderMedium }]}>
+                <Text style={[styles.filtersClearText, { color: Colors.textSecondary }]}>Reinitialiser</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowFiltersModal(false)} style={[styles.filtersApplyBtn, { backgroundColor: C.primary }]}>
+              <TouchableOpacity onPress={() => setShowFiltersModal(false)} style={[styles.filtersApplyBtn, { backgroundColor: Colors.primary }]}>
                 <Text style={styles.filtersApplyText}>Appliquer</Text>
               </TouchableOpacity>
             </View>
@@ -745,112 +743,112 @@ export const ExploreScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: Colors.bgPrimary },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
   headerBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pageTitle: { fontSize: 22, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  pageTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   filterBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   filterBtnDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, marginHorizontal: Layout.screenPadding, paddingHorizontal: 14, height: 44, marginBottom: 8 },
-  searchInput: { flex: 1, fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: Fonts.body },
 
   // Content mode toggle
   modeRow: { flexDirection: 'row', borderRadius: 10, padding: 3, marginRight: 20 },
   modePill: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
-  modePillText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  modePillText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
   // Filter rows
   filterSection: { marginBottom: 4, paddingLeft: Layout.screenPadding },
-  filterLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  filterLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontFamily: Fonts.bodySemiBold },
   chipsContainer: { paddingRight: Layout.screenPadding, gap: 8, paddingBottom: 4 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  chipText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
   // "Voir +" standalone button
   voirPlusRow: { alignItems: 'flex-end', paddingHorizontal: Layout.screenPadding, paddingTop: 2, paddingBottom: 6 },
   voirPlusBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  voirPlusText: { fontSize: 13, fontFamily: Fonts.serifSemiBold, fontWeight: '700' },
+  voirPlusText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, fontWeight: '700' },
 
   // Location denied
   locationDeniedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Layout.screenPadding, paddingVertical: 8 },
-  locationDeniedText: { fontSize: 12, fontFamily: Fonts.serif },
+  locationDeniedText: { fontSize: 12, fontFamily: Fonts.body },
 
   // Trending section
-  trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6 },
+  trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6, fontFamily: Fonts.bodySemiBold },
   trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
   trendingEmoji: { fontSize: 28 },
-  trendingName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
-  trendingCount: { fontSize: 12, marginTop: 2 },
+  trendingName: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
+  trendingCount: { fontSize: 12, marginTop: 2, fontFamily: Fonts.body },
 
   // Category sections
   scrollContent: { paddingHorizontal: Layout.screenPadding },
   section: { marginTop: 18 },
-  sectionTitle: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
+  sectionTitle: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, fontFamily: Fonts.bodySemiBold },
   // Flat list items
   flatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   flatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
   flatTextCol: { flex: 1 },
-  flatName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
-  flatSub: { fontSize: 11, marginTop: 2 },
+  flatName: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
+  flatSub: { fontSize: 11, marginTop: 2, fontFamily: Fonts.body },
 
   // Results
-  resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 },
+  resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, fontFamily: Fonts.bodySemiBold },
   compactCard: { marginBottom: 0, borderBottomWidth: 1, overflow: 'hidden' },
   compactBanner: { height: 180, justifyContent: 'flex-end', padding: 14, overflow: 'hidden' },
   compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
   compactBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  compactTitle: { color: '#FFFFFF', fontSize: 16, fontFamily: Fonts.serifBold, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
+  compactTitle: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displayBold, textShadowColor: 'rgba(44,36,32,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5 },
   compactMeta: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, gap: 14 },
   compactMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  compactMetaText: { fontSize: 12 },
+  compactMetaText: { fontSize: 12, fontFamily: Fonts.body },
 
   // (mood-list now uses flatRow renderer)
 
   // Ranked
   rankedRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },
-  rankNumber: { fontSize: 20, fontFamily: Fonts.serifBold, width: 32 },
+  rankNumber: { fontSize: 20, fontFamily: Fonts.displayBold, width: 32 },
   rankEmojiCircle: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   rankEmoji: { fontSize: 24 },
   rankTextCol: { flex: 1 },
-  rankName: { fontSize: 14, fontFamily: Fonts.serifBold },
-  rankSub: { fontSize: 12, marginTop: 2 },
+  rankName: { fontSize: 14, fontFamily: Fonts.displayBold },
+  rankSub: { fontSize: 12, marginTop: 2, fontFamily: Fonts.body },
   hotBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 8 },
-  hotBadgeText: { fontSize: 12, fontWeight: '600' },
+  hotBadgeText: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.bodySemiBold },
   planCountBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 8 },
-  planCountText: { fontSize: 12, fontWeight: '500' },
+  planCountText: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.bodyMedium },
 
   // Active filters
   activeFiltersWrap: { marginTop: 14 },
   activeFiltersRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   activeFilterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
-  activeFilterText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
-  clearFiltersText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, marginLeft: 4 },
-  noResultText: { fontSize: 13, fontFamily: Fonts.serif },
+  activeFilterText: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
+  clearFiltersText: { fontSize: 11, fontFamily: Fonts.bodySemiBold, marginLeft: 4 },
+  noResultText: { fontSize: 13, fontFamily: Fonts.body },
 
   // Filters modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(44,36,32,0.4)', justifyContent: 'flex-end' },
   filtersModal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },
   filtersHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
-  filtersTitle: { fontSize: 18, fontFamily: Fonts.serifBold },
+  filtersTitle: { fontSize: 18, fontFamily: Fonts.displaySemiBold },
   filtersBody: { paddingVertical: 16, paddingLeft: 20 },
   filterField: { marginBottom: 18 },
   filterFieldHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  filterFieldLabel: { fontSize: 13, fontFamily: Fonts.serifBold },
+  filterFieldLabel: { fontSize: 13, fontFamily: Fonts.displayBold },
   stepsRow: { gap: 8, paddingRight: 20 },
   stepChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5 },
-  stepChipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  stepChipText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   filtersFooter: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1 },
   filtersClearBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
-  filtersClearText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  filtersClearText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   filtersApplyBtn: { flex: 2, alignItems: 'center', paddingVertical: 14, borderRadius: 12 },
-  filtersApplyText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
+  filtersApplyText: { fontSize: 14, fontFamily: Fonts.displayBold, color: Colors.textOnAccent },
 
   // Place list items
   placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
   placeThumb: { width: 48, height: 48, borderRadius: 10, overflow: 'hidden' },
   placeInfo: { flex: 1 },
-  placeName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  placeName: { fontSize: 14, fontFamily: Fonts.displaySemiBold },
+  placeType: { fontSize: 11, fontFamily: Fonts.body, marginTop: 2 },
   placeRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  placeRatingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  placeRatingText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 });

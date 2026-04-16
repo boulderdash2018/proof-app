@@ -263,7 +263,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
             onPress={handleGoHome}
             activeOpacity={0.8}
           >
-            <Ionicons name="home-outline" size={18} color="#FFF" />
+            <Ionicons name="home-outline" size={18} color={Colors.textOnAccent} />
             <Text style={styles.publishBtnText}>Retour au feed</Text>
           </TouchableOpacity>
         </View>
@@ -360,10 +360,10 @@ export const OrganizeCompleteScreen: React.FC = () => {
           disabled={isPublishing}
         >
           {isPublishing ? (
-            <ActivityIndicator color="#FFF" />
+            <ActivityIndicator color={Colors.textOnAccent} />
           ) : (
             <>
-              <Ionicons name="share-outline" size={18} color="#FFF" />
+              <Ionicons name="share-outline" size={18} color={Colors.textOnAccent} />
               <Text style={styles.publishBtnText}>Publier le plan</Text>
             </>
           )}
@@ -416,44 +416,44 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { padding: Layout.screenPadding, alignItems: 'center' },
   emoji: { fontSize: 56, marginTop: 20, marginBottom: 12 },
-  title: { fontSize: 26, fontFamily: Fonts.serifBold, marginBottom: 6 },
-  subtitle: { fontSize: 15, fontFamily: Fonts.serif, marginBottom: 20, textAlign: 'center' },
+  title: { fontSize: 26, fontFamily: Fonts.displaySemiBold, marginBottom: 6 },
+  subtitle: { fontSize: 15, fontFamily: Fonts.body, marginBottom: 20, textAlign: 'center' },
 
   // Success
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
   successEmoji: { fontSize: 64, marginBottom: 16 },
-  successTitle: { fontSize: 28, fontFamily: Fonts.serifBold, marginBottom: 8 },
-  successSubtitle: { fontSize: 15, fontFamily: Fonts.serif, textAlign: 'center' },
+  successTitle: { fontSize: 28, fontFamily: Fonts.displaySemiBold, marginBottom: 8 },
+  successSubtitle: { fontSize: 15, fontFamily: Fonts.body, textAlign: 'center' },
 
   statsRow: { flexDirection: 'row', gap: 10, marginVertical: 20, width: '100%' },
   statCard: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', gap: 6 },
-  statValue: { fontSize: 20, fontFamily: Fonts.serifBold },
-  statLabel: { fontSize: 11, fontFamily: Fonts.serif },
+  statValue: { fontSize: 20, fontFamily: Fonts.displaySemiBold },
+  statLabel: { fontSize: 11, fontFamily: Fonts.body },
 
-  sectionTitle: { fontSize: 12, fontFamily: Fonts.serifBold, letterSpacing: 1, alignSelf: 'flex-start', marginBottom: 12, marginTop: 8 },
+  sectionTitle: { fontSize: 12, fontFamily: Fonts.bodySemiBold, letterSpacing: 1, alignSelf: 'flex-start', marginBottom: 12, marginTop: 8 },
 
   recapItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, width: '100%' },
   recapIndex: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  recapIndexText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
+  recapIndexText: { color: Colors.textOnAccent, fontSize: 12, fontWeight: '800' },
   recapInfo: { flex: 1 },
-  recapName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  recapName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   recapMetaRow: { flexDirection: 'row', gap: 8, marginTop: 3 },
-  recapMeta: { fontSize: 12, fontFamily: Fonts.serif },
+  recapMeta: { fontSize: 12, fontFamily: Fonts.body },
   priceBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  priceBadgeText: { fontSize: 13, fontFamily: Fonts.serifBold },
-  freeText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  priceBadgeText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  freeText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 16, alignSelf: 'flex-start' },
   tag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  tagText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  tagText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 
   errorBox: { width: '100%', padding: 12, borderRadius: 10, marginTop: 16 },
-  errorText: { fontSize: 13, fontFamily: Fonts.serif, textAlign: 'center' },
+  errorText: { fontSize: 13, fontFamily: Fonts.body, textAlign: 'center' },
 
   publishBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', paddingVertical: 16, borderRadius: 14, marginTop: 28 },
-  publishBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  publishBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displaySemiBold },
   customizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', paddingVertical: 14, borderRadius: 14, marginTop: 10, borderWidth: 1.5 },
-  customizeBtnText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  customizeBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   closeBtn: { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 10, borderWidth: 1.5 },
-  closeBtnText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  closeBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
 });

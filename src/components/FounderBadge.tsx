@@ -20,12 +20,12 @@ export const FounderBadge: React.FC<Props> = ({ small }) => {
 
   const borderColor = shimmerAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: ['#333333', '#888888', '#333333'],
+    outputRange: ['#DDD4C8', '#C4B8AA', '#DDD4C8'],
   });
 
   const shadowOpacity = shimmerAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [0.2, 0.6, 0.2],
+    outputRange: [0.1, 0.3, 0.1],
   });
 
   return (
@@ -35,7 +35,7 @@ export const FounderBadge: React.FC<Props> = ({ small }) => {
         small && styles.badgeSmall,
         {
           borderColor,
-          shadowColor: '#FFFFFF',
+          shadowColor: '#D4AF37',
           shadowOffset: { width: 0, height: 0 },
           shadowRadius: 6,
           shadowOpacity,
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1.5,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: '#FAF7F2',
   },
   badgeSmall: {
     paddingHorizontal: 6,
@@ -67,8 +67,8 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1.8,
-    color: '#D4AF37',
-    fontFamily: Fonts.serifBold,
+    color: '#A08520',
+    fontFamily: Fonts.bodySemiBold,
   },
   labelSmall: {
     fontSize: 8,

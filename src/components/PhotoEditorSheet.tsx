@@ -240,7 +240,7 @@ export const PhotoEditorSheet: React.FC<Props> = ({ visible, photoUri, onApply, 
 
 // ==================== STYLES ====================
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(44,36,32,0.5)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingBottom: 34, maxHeight: '92%' },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 12 },
 
@@ -262,12 +262,12 @@ const s = StyleSheet.create({
   sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingHorizontal: 4 },
   sliderTrack: { width: SLIDER_W, height: 4, borderRadius: 2, position: 'relative' },
   sliderFill: { height: '100%', borderRadius: 2, backgroundColor: Colors.primary },
-  sliderThumb: { position: 'absolute', top: -8, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.primary, marginLeft: -10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 4 },
+  sliderThumb: { position: 'absolute', top: -8, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.primary, marginLeft: -10, shadowColor: '#2C2420', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 4 },
   sliderValue: { fontSize: 12, fontWeight: '700', width: 32, textAlign: 'right' },
 
   buttonRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, alignItems: 'center' },
   cancelText: { fontSize: 14, fontWeight: '700' },
   applyBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  applyText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  applyText: { color: Colors.textOnAccent, fontSize: 14, fontWeight: '700' },
 });

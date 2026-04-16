@@ -26,25 +26,24 @@ interface Props {
   title: string;
 }
 
-// Enegry by Schloesser David — dark mode, gold labels
+// Warm cream/terracotta — light mode, organic feel
 const MAP_STYLE = [
-  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"saturation":36},{"color":"#ffa600"},{"lightness":40}]},
-  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"visibility":"off"},{"lightness":16},{"hue":"#ff0000"}]},
+  {"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#6B5D52"}]},
+  {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#FAF7F2"},{"weight":2}]},
   {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":17},{"weight":1.2}]},
-  {"featureType":"administrative.locality","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative.neighborhood","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":20}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":21}]},
+  {"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#EDE5D8"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#DDD4C8"},{"weight":1.2}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#4A3F37"}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#F5F0E8"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"poi","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"},{"lightness":17}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#000000"},{"lightness":29},{"weight":0.2}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":18}]},
-  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":16}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":19}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#DDD4C8"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#C4B8AA"},{"weight":0.2}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
+  {"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#FAF7F2"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#EDE5D8"}]},
   {"featureType":"transit.line","elementType":"all","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"},{"lightness":17}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4DEE6"}]},
 ];
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -153,7 +152,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   closeBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 15, fontFamily: Fonts.serifBold, textAlign: 'center', marginHorizontal: 10 },
+  headerTitle: { flex: 1, fontSize: 15, fontFamily: Fonts.displaySemiBold, textAlign: 'center', marginHorizontal: 10 },
   map: { flex: 1 },
 
   // Markers
@@ -169,15 +168,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
+    borderColor: '#FAF7F2',
+    shadowColor: '#2C2420',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
   markerText: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -203,13 +202,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   legendDotText: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 11,
     fontWeight: '800',
   },
   legendName: {
     fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
     flex: 1,
   },
 });

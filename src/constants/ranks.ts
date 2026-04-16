@@ -12,14 +12,14 @@ export interface RankDef {
 }
 
 export const RANKS: RankDef[] = [
-  { id: 'ghost', name: 'Ghost', emoji: '👻', color: '#5A5249', bgColor: '#1E1B18', borderColor: '#332E29', minProofs: 0 },
-  { id: 'newcomer', name: 'Newcomer', emoji: '🌱', color: '#5B9A7B', bgColor: '#1E2A22', borderColor: '#2D3D30', minProofs: 1 },
-  { id: 'local', name: 'Local', emoji: '📍', color: '#C9A84C', bgColor: '#2D2510', borderColor: '#3D3318', minProofs: 5 },
-  { id: 'explorer', name: 'Explorer', emoji: '🧭', color: '#D4845A', bgColor: '#2D2118', borderColor: '#3D2E22', minProofs: 15 },
-  { id: 'curator', name: 'Curator', emoji: '✨', color: '#B07888', bgColor: '#2D1F25', borderColor: '#3D2D30', minProofs: 35 },
-  { id: 'tastemaker', name: 'Tastemaker', emoji: '👑', color: '#8B7BA0', bgColor: '#2A2530', borderColor: '#3D3050', minProofs: 75 },
-  { id: 'proof_icon', name: 'Proof. Icon', emoji: '🏆', color: '#C9A84C', bgColor: '#2D2510', borderColor: '#3D3318', minProofs: 150 },
-  { id: 'top_creator', name: 'Top Creator', emoji: '💎', color: '#D4845A', bgColor: '#2D2118', borderColor: '#3D2E22', minProofs: 300, shimmer: true },
+  { id: 'ghost', name: 'Ghost', emoji: '👻', color: '#A09181', bgColor: '#F5F0E8', borderColor: '#EDE5D8', minProofs: 0 },
+  { id: 'newcomer', name: 'Newcomer', emoji: '🌱', color: '#7B9971', bgColor: '#F0F5EE', borderColor: '#D4E0D0', minProofs: 1 },
+  { id: 'local', name: 'Local', emoji: '📍', color: '#D4A04A', bgColor: '#FDF6EC', borderColor: '#F0E0C4', minProofs: 5 },
+  { id: 'explorer', name: 'Explorer', emoji: '🧭', color: '#C4704B', bgColor: '#FDF5F0', borderColor: '#F9E8DD', minProofs: 15 },
+  { id: 'curator', name: 'Curator', emoji: '✨', color: '#B07888', bgColor: '#F6F0F2', borderColor: '#E8D8DE', minProofs: 35 },
+  { id: 'tastemaker', name: 'Tastemaker', emoji: '👑', color: '#8B7BA0', bgColor: '#F3F0F6', borderColor: '#DDD8E6', minProofs: 75 },
+  { id: 'proof_icon', name: 'Proof. Icon', emoji: '🏆', color: '#D4A04A', bgColor: '#FDF6EC', borderColor: '#F0E0C4', minProofs: 150 },
+  { id: 'top_creator', name: 'Top Creator', emoji: '💎', color: '#C4704B', bgColor: '#FDF5F0', borderColor: '#F9E8DD', minProofs: 300, shimmer: true },
 ];
 
 export const getRankForProofs = (proofs: number): RankDef => {

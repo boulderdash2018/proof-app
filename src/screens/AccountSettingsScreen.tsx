@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { PrimaryButton } from '../components';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -13,6 +13,7 @@ export const AccountSettingsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <Text style={styles.back} onPress={() => navigation.goBack()}>{t.back}</Text>
         <Text style={styles.headerTitle}>{t.account_title}</Text>
@@ -30,11 +31,11 @@ export const AccountSettingsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  back: { fontSize: 16, color: Colors.primary, fontWeight: '600', width: 60 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.black },
+  container: { flex: 1, backgroundColor: Colors.bgPrimary },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.borderMedium },
+  back: { fontSize: 16, color: Colors.primary, fontFamily: Fonts.bodySemiBold, width: 60 },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold, color: Colors.textPrimary },
   content: { padding: Layout.screenPadding },
-  label: { fontSize: 12, fontWeight: '600', color: Colors.gray700, marginBottom: 4 },
-  value: { fontSize: 15, color: Colors.black },
+  label: { fontSize: 12, fontFamily: Fonts.bodySemiBold, color: Colors.textSecondary, marginBottom: 4 },
+  value: { fontSize: 15, fontFamily: Fonts.body, color: Colors.textPrimary },
 });

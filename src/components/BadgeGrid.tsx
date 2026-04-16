@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   },
   counter: {
     fontSize: 12,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
     letterSpacing: 0.3,
   },
   categorySection: {
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   badgeName: {
     fontSize: 9,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
     marginTop: 4,
     textAlign: 'center',
     paddingHorizontal: 2,

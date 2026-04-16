@@ -58,8 +58,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  currentRank: { fontSize: 12, fontFamily: Fonts.serifBold },
-  nextRank: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  currentRank: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
+  nextRank: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
   trackBg: {
     height: 6,
     borderRadius: 3,
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 10,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     marginTop: 4,
     textAlign: 'center',
   },

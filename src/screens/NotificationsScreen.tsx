@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  Animated, ActivityIndicator,
+  Animated, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -222,18 +222,18 @@ export const NotificationsScreen: React.FC = () => {
   const renderItem = useCallback(({ item }: { item: typeof flatData[number] }) => {
     if (item.type === 'header') {
       return (
-        <Text style={[styles.sectionHeader, { color: C.gray600 }]}>{item.label}</Text>
+        <Text style={[styles.sectionHeader, { color: C.textTertiary }]}>{item.label}</Text>
       );
     }
 
     const notif = item.data;
-    const icon = NOTIF_ICONS[notif.type] || { name: 'notifications', color: C.gray600 };
+    const icon = NOTIF_ICONS[notif.type] || { name: 'notifications', color: C.textTertiary };
     const isUnread = !notif.read;
     const fadeAnim = fadeAnims[notif.id] || new Animated.Value(1);
 
     return (
       <TouchableOpacity
-        style={[styles.notifRow, isUnread && { backgroundColor: C.unreadBg || '#2A2118' }]}
+        style={[styles.notifRow, isUnread && { backgroundColor: C.unreadBg }]}
         onPress={() => handlePress(notif)}
         activeOpacity={0.7}
       >
@@ -259,11 +259,11 @@ export const NotificationsScreen: React.FC = () => {
 
         {/* Content */}
         <View style={styles.notifContent}>
-          <Text style={[styles.notifText, { color: C.black }]} numberOfLines={2}>
+          <Text style={[styles.notifText, { color: C.textPrimary }]} numberOfLines={2}>
             <Text style={styles.notifBold}>{notif.senderUsername} </Text>
             {notif.content.replace(notif.senderUsername + ' ', '')}
           </Text>
-          <Text style={[styles.notifTime, { color: C.gray600 }]}>{formatTimeAgo(notif.createdAt)}</Text>
+          <Text style={[styles.notifTime, { color: C.textTertiary }]}>{formatTimeAgo(notif.createdAt)}</Text>
         </View>
 
         {/* Follow-back button for new_follower notifs */}
@@ -271,8 +271,8 @@ export const NotificationsScreen: React.FC = () => {
           const status = followStatus[notif.senderId];
           if (status === 'loading') return <ActivityIndicator size="small" color={C.primary} style={{ width: 110 }} />;
           if (status === 'following') return (
-            <View style={[styles.followBtn, styles.followBtnFollowing, { borderColor: C.gray400 }]}>
-              <Text style={[styles.followBtnText, { color: C.gray700 }]}>Suivi(e)</Text>
+            <View style={[styles.followBtn, styles.followBtnFollowing, { borderColor: C.borderMedium }]}>
+              <Text style={[styles.followBtnText, { color: C.textSecondary }]}>Suivi(e)</Text>
             </View>
           );
           if (status === 'not_following') return (
@@ -281,7 +281,7 @@ export const NotificationsScreen: React.FC = () => {
               onPress={() => handleFollowBack(notif.senderId)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.followBtnText, { color: '#FFF' }]}>Suivre en retour</Text>
+              <Text style={[styles.followBtnText, { color: Colors.textOnAccent }]}>Suivre en retour</Text>
             </TouchableOpacity>
           );
           return null;
@@ -296,13 +296,14 @@ export const NotificationsScreen: React.FC = () => {
   }, [C, handlePress, senderAvatars, followStatus, handleFollowBack]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.bgPrimary }]}>
+      <StatusBar barStyle="dark-content" />
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.border }]}>
+      <View style={[styles.header, { borderBottomColor: C.borderMedium }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={C.black} />
+          <Ionicons name="chevron-back" size={22} color={C.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: C.black }]}>Notifications</Text>
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Notifications</Text>
         <TouchableOpacity onPress={handleMarkAllRead}>
           <Text style={[styles.markAll, { color: C.primary }]}>Mark all as read</Text>
         </TouchableOpacity>
@@ -343,14 +344,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1,
   },
   backBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '800', fontFamily: Fonts.serifBold },
-  markAll: { fontSize: 12, fontWeight: '600' },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
+  markAll: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
   list: { paddingBottom: 40 },
   loadingWrap: { paddingTop: 60, alignItems: 'center' },
 
   // Section header
   sectionHeader: {
-    fontSize: 10, fontWeight: '700', textTransform: 'uppercase',
+    fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase',
     letterSpacing: 0.8, paddingHorizontal: Layout.screenPadding,
     paddingTop: 18, paddingBottom: 8,
   },
@@ -359,7 +360,7 @@ const styles = StyleSheet.create({
   notifRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: Layout.screenPadding, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.borderLight,
+    borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle,
     gap: 12,
   },
   unreadDot: {
@@ -370,14 +371,14 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   notifContent: { flex: 1 },
-  notifText: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18 },
-  notifBold: { fontFamily: Fonts.serifBold },
-  notifTime: { fontSize: 11, marginTop: 3 },
+  notifText: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18 },
+  notifBold: { fontFamily: Fonts.bodySemiBold },
+  notifTime: { fontSize: 11, fontFamily: Fonts.body, marginTop: 3 },
   planThumb: { width: 44, height: 44, borderRadius: 8 },
 
   // Follow-back buttons
   followBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   followBtnFollow: {},
   followBtnFollowing: { borderWidth: 1 },
-  followBtnText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  followBtnText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 });

@@ -64,7 +64,7 @@ export const AccountPromptModal: React.FC = () => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(44,36,32,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 30,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#2C2420',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
@@ -90,12 +90,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     marginBottom: 8,
   },
   body: {
     fontSize: 14,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
@@ -108,15 +108,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   primaryBtnText: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 15,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   secondaryBtn: {
     paddingVertical: 10,
   },
   secondaryBtnText: {
     fontSize: 14,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
 });

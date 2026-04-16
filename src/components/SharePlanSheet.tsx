@@ -197,7 +197,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
           </View>
         ) : (
           <View style={[styles.sendBtn, { backgroundColor: C.primary }]}>
-            <Ionicons name="paper-plane" size={14} color="#FFF" />
+            <Ionicons name="paper-plane" size={14} color={Colors.textOnAccent} />
           </View>
         )}
       </TouchableOpacity>
@@ -303,7 +303,7 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  overlay: { flex: 1, backgroundColor: 'rgba(44,36,32,0.4)' },
   sheetWrap: {
     position: 'absolute',
     bottom: 0,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.gray400,
     opacity: 0.3,
     alignSelf: 'center',
     marginTop: 10,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   quickChipText: {
     fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   messageInputRow: {
     flexDirection: 'row',
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   messageInput: {
     flex: 1,
     fontSize: 14,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     paddingVertical: 0,
   },
 
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     paddingVertical: 0,
   },
 
@@ -398,8 +398,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowText: { flex: 1 },
-  name: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  username: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 1 },
+  name: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  username: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
   sendBtn: {
     width: 32,
     height: 32,
@@ -414,8 +414,8 @@ const styles = StyleSheet.create({
   },
   sentText: {
     fontSize: 12,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   emptyContainer: { paddingVertical: 40, alignItems: 'center' },
-  emptyText: { fontSize: 14, fontFamily: Fonts.serif },
+  emptyText: { fontSize: 14, fontFamily: Fonts.body },
 });

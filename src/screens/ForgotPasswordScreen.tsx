@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Layout } from '../constants';
+import { Colors, Layout, Fonts } from '../constants';
 import { PrimaryButton, TextInput } from '../components';
 import mockApi from '../services/mockApi';
 import { useTranslation } from '../hooks/useTranslation';
@@ -86,7 +86,7 @@ export const ForgotPasswordScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.bgPrimary,
   },
   backButton: {
     paddingHorizontal: Layout.screenPadding,
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     fontSize: 24,
-    color: Colors.black,
+    color: Colors.textPrimary,
   },
   content: {
     paddingHorizontal: Layout.screenPadding,
@@ -104,13 +104,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 21,
-    fontWeight: '800',
-    color: Colors.black,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
     marginBottom: 10,
   },
   description: {
     fontSize: 14,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     marginBottom: 28,
     lineHeight: 20,
   },
@@ -129,13 +130,14 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     fontSize: 21,
-    fontWeight: '800',
-    color: Colors.black,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
     marginBottom: 10,
   },
   successSubtitle: {
     fontSize: 14,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 28,
@@ -143,6 +145,6 @@ const styles = StyleSheet.create({
   link: {
     color: Colors.primary,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: Fonts.bodySemiBold,
   },
 });

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput as RNTextInput,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -74,14 +75,14 @@ export const FriendRequestsScreen: React.FC = () => {
 
   const renderSearchItem = ({ item }: { item: User }) => (
     <TouchableOpacity
-      style={[styles.row, { borderBottomColor: C.borderLight }]}
+      style={[styles.row, { borderBottomColor: C.borderSubtle }]}
       activeOpacity={0.7}
       onPress={() => navigation.navigate('OtherProfile', { userId: item.id })}
     >
       <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl} />
       <View style={styles.rowInfo}>
-        <Text style={[styles.rowName, { color: C.black }]}>{item.displayName}</Text>
-        <Text style={[styles.rowUsername, { color: C.gray700 }]}>@{item.username}</Text>
+        <Text style={[styles.rowName, { color: C.textPrimary }]}>{item.displayName}</Text>
+        <Text style={[styles.rowUsername, { color: C.textSecondary }]}>@{item.username}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -90,19 +91,19 @@ export const FriendRequestsScreen: React.FC = () => {
     const sender = item.fromUser;
     if (!sender) return null;
     return (
-      <View style={[styles.row, { borderBottomColor: C.borderLight }]}>
+      <View style={[styles.row, { borderBottomColor: C.borderSubtle }]}>
         <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => navigation.navigate('OtherProfile', { userId: sender.id })}>
           <Avatar initials={sender.initials} bg={sender.avatarBg} color={sender.avatarColor} size="M" avatarUrl={sender.avatarUrl} />
           <View style={styles.rowInfo}>
-            <Text style={[styles.rowName, { color: C.black }]}>{sender.displayName}</Text>
-            <Text style={[styles.rowUsername, { color: C.gray700 }]}>@{sender.username}</Text>
+            <Text style={[styles.rowName, { color: C.textPrimary }]}>{sender.displayName}</Text>
+            <Text style={[styles.rowUsername, { color: C.textSecondary }]}>@{sender.username}</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.acceptBtn, { backgroundColor: C.black }]} onPress={() => handleAccept(item.id)}>
+        <TouchableOpacity style={[styles.acceptBtn, { backgroundColor: C.primary }]} onPress={() => handleAccept(item.id)}>
           <Text style={styles.acceptText}>{t.friend_requests_accept}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.declineBtn, { borderColor: C.border }]} onPress={() => handleDecline(item.id)}>
-          <Text style={[styles.declineText, { color: C.gray700 }]}>{t.friend_requests_decline}</Text>
+        <TouchableOpacity style={[styles.declineBtn, { borderColor: C.borderMedium }]} onPress={() => handleDecline(item.id)}>
+          <Text style={[styles.declineText, { color: C.textSecondary }]}>{t.friend_requests_decline}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -113,17 +114,17 @@ export const FriendRequestsScreen: React.FC = () => {
     if (!recipient) return null;
     return (
       <TouchableOpacity
-        style={[styles.row, { borderBottomColor: C.borderLight }]}
+        style={[styles.row, { borderBottomColor: C.borderSubtle }]}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('OtherProfile', { userId: recipient.id })}
       >
         <Avatar initials={recipient.initials} bg={recipient.avatarBg} color={recipient.avatarColor} size="M" avatarUrl={recipient.avatarUrl} />
         <View style={styles.rowInfo}>
-          <Text style={[styles.rowName, { color: C.black }]}>{recipient.displayName}</Text>
-          <Text style={[styles.rowUsername, { color: C.gray700 }]}>@{recipient.username}</Text>
+          <Text style={[styles.rowName, { color: C.textPrimary }]}>{recipient.displayName}</Text>
+          <Text style={[styles.rowUsername, { color: C.textSecondary }]}>@{recipient.username}</Text>
         </View>
-        <View style={[styles.pendingBadge, { backgroundColor: C.gray200 }]}>
-          <Text style={[styles.pendingText, { color: C.gray700 }]}>{t.friend_requests_pending}</Text>
+        <View style={[styles.pendingBadge, { backgroundColor: C.bgTertiary }]}>
+          <Text style={[styles.pendingText, { color: C.textSecondary }]}>{t.friend_requests_pending}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -131,19 +132,19 @@ export const FriendRequestsScreen: React.FC = () => {
 
   const renderSearchContent = () => (
     <>
-      <View style={[styles.searchBar, { backgroundColor: C.gray200 }]}>
-        <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
+      <View style={[styles.searchBar, { backgroundColor: C.bgTertiary }]}>
+        <Ionicons name="search-outline" size={16} color={C.textTertiary} style={{ marginRight: 8 }} />
         <RNTextInput
-          style={[styles.searchInput, { color: C.black }]}
+          style={[styles.searchInput, { color: C.textPrimary }]}
           placeholder={t.friend_requests_search_placeholder}
-          placeholderTextColor={C.gray600}
+          placeholderTextColor={C.textTertiary}
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-            <Ionicons name="close-circle" size={18} color={C.gray700} />
+            <Ionicons name="close-circle" size={18} color={C.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -187,37 +188,38 @@ export const FriendRequestsScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.bgPrimary }]}>
+      <StatusBar barStyle="dark-content" />
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.border }]}>
-        <Text style={[styles.back, { color: C.black }]} onPress={() => navigation.goBack()}>‹</Text>
-        <Text style={[styles.headerTitle, { color: C.black }]}>{t.friend_requests_title}</Text>
+      <View style={[styles.header, { borderBottomColor: C.borderMedium }]}>
+        <Text style={[styles.back, { color: C.textPrimary }]} onPress={() => navigation.goBack()}>‹</Text>
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>{t.friend_requests_title}</Text>
         <View style={{ width: 30 }} />
       </View>
 
       {/* Tabs */}
-      <View style={[styles.tabs, { borderBottomColor: C.border }]}>
+      <View style={[styles.tabs, { borderBottomColor: C.borderMedium }]}>
         <TouchableOpacity
-          style={[styles.tab, tab === 'search' && [styles.tabActive, { borderBottomColor: C.black }]]}
+          style={[styles.tab, tab === 'search' && [styles.tabActive, { borderBottomColor: C.primary }]]}
           onPress={() => setTab('search')}
         >
-          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'search' && { color: C.black, fontFamily: Fonts.serifBold }]}>
+          <Text style={[styles.tabText, { color: C.textTertiary }, tab === 'search' && { color: C.textPrimary, fontFamily: Fonts.displaySemiBold }]}>
             {t.friend_requests_search}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, tab === 'received' && [styles.tabActive, { borderBottomColor: C.black }]]}
+          style={[styles.tab, tab === 'received' && [styles.tabActive, { borderBottomColor: C.primary }]]}
           onPress={() => setTab('received')}
         >
-          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'received' && { color: C.black, fontFamily: Fonts.serifBold }]}>
+          <Text style={[styles.tabText, { color: C.textTertiary }, tab === 'received' && { color: C.textPrimary, fontFamily: Fonts.displaySemiBold }]}>
             {t.friend_requests_received} ({incomingRequests.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, tab === 'sent' && [styles.tabActive, { borderBottomColor: C.black }]]}
+          style={[styles.tab, tab === 'sent' && [styles.tabActive, { borderBottomColor: C.primary }]]}
           onPress={() => setTab('sent')}
         >
-          <Text style={[styles.tabText, { color: C.gray700 }, tab === 'sent' && { color: C.black, fontFamily: Fonts.serifBold }]}>
+          <Text style={[styles.tabText, { color: C.textTertiary }, tab === 'sent' && { color: C.textPrimary, fontFamily: Fonts.displaySemiBold }]}>
             {t.friend_requests_sent} ({sentRequests.length})
           </Text>
         </TouchableOpacity>
@@ -238,8 +240,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  back: { fontSize: 24, fontWeight: '600', width: 30 },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
+  back: { fontSize: 24, fontFamily: Fonts.bodySemiBold, width: 30 },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
   tabs: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -252,7 +254,7 @@ const styles = StyleSheet.create({
   tabActive: {
     borderBottomWidth: 2,
   },
-  tabText: { fontSize: 13, fontFamily: Fonts.serifMedium },
+  tabText: { fontSize: 13, fontFamily: Fonts.bodyMedium },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -264,7 +266,7 @@ const styles = StyleSheet.create({
     height: 42,
   },
   searchIcon: { fontSize: 14, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: Fonts.body },
   clearBtn: { fontSize: 16, paddingLeft: 8 },
   list: { padding: Layout.screenPadding, paddingTop: 4 },
   row: {
@@ -274,26 +276,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   rowInfo: { flex: 1, marginLeft: 12 },
-  rowName: { fontSize: 14, fontFamily: Fonts.serifBold },
-  rowUsername: { fontSize: 12, marginTop: 1 },
+  rowName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  rowUsername: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
   acceptBtn: {
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 7,
     marginRight: 8,
   },
-  acceptText: { color: '#FFFFFF', fontSize: 12, fontFamily: Fonts.serifBold },
+  acceptText: { color: Colors.textOnAccent, fontSize: 12, fontFamily: Fonts.bodySemiBold },
   declineBtn: {
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  declineText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  declineText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
   pendingBadge: {
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  pendingText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  pendingText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 });

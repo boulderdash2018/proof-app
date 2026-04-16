@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyText: { fontSize: 14, fontFamily: Fonts.serif },
+  emptyText: { fontSize: 14, fontFamily: Fonts.body },
 
   // Grid — same as profile published plans
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   cellTitle: {
     color: '#FFF',
     fontSize: 12,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     top: 8,
     left: 8,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(44,36,32,0.5)',
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 4,
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   dateBadgeMonth: {
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,248,240,0.85)',
     fontSize: 9,
     fontWeight: '600',
     textTransform: 'lowercase',
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(44,36,32,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,

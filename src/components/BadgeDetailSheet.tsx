@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
-import { Fonts } from '../constants';
+import { Colors, Fonts } from '../constants';
 import { AchievementDef } from '../constants/achievements';
 import { useColors } from '../hooks/useColors';
 
@@ -43,8 +43,8 @@ export const BadgeDetailSheet: React.FC<Props> = ({ badge, isUnlocked, visible, 
               </View>
               <Text style={[styles.description, { color: C.gray700 }]}>{desc}</Text>
               {isUnlocked ? (
-                <View style={[styles.statusPill, { backgroundColor: '#1E2A22', borderColor: '#2D3D30' }]}>
-                  <Text style={[styles.statusText, { color: '#5B9A7B' }]}>Débloqué ✓</Text>
+                <View style={[styles.statusPill, { backgroundColor: Colors.successBg, borderColor: Colors.successBorder }]}>
+                  <Text style={[styles.statusText, { color: Colors.success }]}>Débloqué ✓</Text>
                 </View>
               ) : (
                 <View style={[styles.statusPill, { backgroundColor: C.gray300, borderColor: C.border }]}>
@@ -65,7 +65,7 @@ export const BadgeDetailSheet: React.FC<Props> = ({ badge, isUnlocked, visible, 
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(44,36,32,0.5)',
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 32 },
   name: {
     fontSize: 18,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
     marginBottom: 8,
   },
   categoryPill: {
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 13,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 16,
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   closeBtn: {
     borderRadius: 14,
@@ -134,6 +134,6 @@ const styles = StyleSheet.create({
   },
   closeBtnText: {
     fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
 });

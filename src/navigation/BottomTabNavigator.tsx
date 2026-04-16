@@ -114,7 +114,7 @@ const TabIcon: React.FC<{ label: string; focused: boolean }> = ({ label, focused
 const CreateTabButton: React.FC<{ onPress?: () => void }> = ({ onPress }) => (
   <TouchableOpacity style={styles.createButtonWrapper} onPress={onPress} activeOpacity={0.8}>
     <View style={styles.createButton}>
-      <Ionicons name="add" size={26} color="#FFFFFF" />
+      <Ionicons name="add" size={26} color={Colors.textOnAccent} />
     </View>
   </TouchableOpacity>
 );
@@ -255,7 +255,7 @@ export const BottomTabNavigator: React.FC = () => {
               <Text style={[styles.draftExitBtnText, { color: Colors.gray600 }]}>Supprimer</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.draftExitBtn, styles.draftExitBtnSave]} onPress={handleDraftSave} activeOpacity={0.7}>
-              <Text style={[styles.draftExitBtnText, { color: '#FFF' }]}>Enregistrer</Text>
+              <Text style={[styles.draftExitBtnText, { color: Colors.textOnAccent }]}>Enregistrer</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -318,7 +318,7 @@ export const BottomTabNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#000',
+    backgroundColor: Colors.bgPrimary,
     borderTopWidth: 0,
     elevation: 0,
     paddingTop: 6,
@@ -346,14 +346,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   createButtonIcon: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
     fontSize: 24,
     fontWeight: '300',
     lineHeight: 28,
   },
   createModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(44, 36, 32, 0.45)',
     justifyContent: 'flex-end',
     paddingBottom: 100,
     paddingHorizontal: 16,
@@ -386,25 +386,25 @@ const styles = StyleSheet.create({
   },
   createModalTitle: {
     fontSize: 15,
-    fontFamily: Fonts.serifBold,
-    color: Colors.black,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     marginBottom: 3,
   },
   createModalDesc: {
     fontSize: 12,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     color: Colors.gray600,
     lineHeight: 16,
   },
   createModalDivider: {
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.borderSubtle,
     marginHorizontal: 16,
   },
   // Draft exit sheet
   draftExitBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(44, 36, 32, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 30,
@@ -413,21 +413,21 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.white,
+    borderColor: Colors.borderMedium,
+    backgroundColor: Colors.bgSecondary,
     padding: 24,
     alignItems: 'center',
   },
   draftExitTitle: {
     fontSize: 18,
-    fontFamily: Fonts.serifBold,
-    color: Colors.black,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
     marginBottom: 4,
   },
   draftExitSub: {
     fontSize: 13,
-    fontFamily: Fonts.serif,
-    color: Colors.gray600,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     marginBottom: 20,
   },
   draftExitBtns: {
@@ -448,10 +448,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   draftExitBtnSave: {
-    backgroundColor: '#C8571A',
+    backgroundColor: Colors.primary,
   },
   draftExitBtnText: {
     fontSize: 14,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displaySemiBold,
   },
 });

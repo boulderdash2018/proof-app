@@ -408,7 +408,7 @@ export const OrganizeScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.chipEmoji}>{p.emoji}</Text>
-                  <Text style={[styles.chipText, { color: isSelected ? '#FFF' : C.gray700 }]}>{p.label}</Text>
+                  <Text style={[styles.chipText, { color: isSelected ? Colors.textOnAccent : C.gray700 }]}>{p.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -444,7 +444,7 @@ export const OrganizeScreen: React.FC = () => {
               onPress={() => setShowSubcategories(!showSubcategories)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.chipText, { color: showSubcategories ? '#FFF' : C.gray700, fontWeight: '700' }]}>Voir +</Text>
+              <Text style={[styles.chipText, { color: showSubcategories ? Colors.textOnAccent : C.gray700, fontWeight: '700' }]}>Voir +</Text>
               <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray700} />
             </TouchableOpacity>
           </ScrollView>
@@ -546,11 +546,11 @@ export const OrganizeScreen: React.FC = () => {
             disabled={!canLaunch || isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFF" size="small" />
+              <ActivityIndicator color={Colors.textOnAccent} size="small" />
             ) : (
               <>
-                <Ionicons name="rocket-outline" size={18} color={canLaunch ? '#FFF' : C.gray500} />
-                <Text style={[styles.launchBtnText, { color: canLaunch ? '#FFF' : C.gray500 }]}>Lancer le plan</Text>
+                <Ionicons name="rocket-outline" size={18} color={canLaunch ? Colors.textOnAccent : C.gray500} />
+                <Text style={[styles.launchBtnText, { color: canLaunch ? Colors.textOnAccent : C.gray500 }]}>Lancer le plan</Text>
               </>
             )}
           </TouchableOpacity>
@@ -670,7 +670,7 @@ export const OrganizeScreen: React.FC = () => {
               <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: C.gray500 }]} onPress={handlePickupNew} activeOpacity={0.7}>
                 <Text style={[styles.sheetBtnOutlineText, { color: C.gray700 }]}>New plan</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: '#C8571A' }]} onPress={handlePickupResume} activeOpacity={0.7}>
+              <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: Colors.primary }]} onPress={handlePickupResume} activeOpacity={0.7}>
                 <Text style={styles.sheetBtnFillText}>Resume draft</Text>
               </TouchableOpacity>
             </View>
@@ -693,15 +693,15 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 18, fontFamily: Fonts.serifBold, letterSpacing: -0.3 },
+  headerTitle: { fontSize: 18, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
 
   // Scroll
   scroll: { flex: 1 },
   scrollContent: { padding: Layout.screenPadding },
 
   // Section
-  sectionLabel: { fontSize: 13, fontFamily: Fonts.serifBold, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 },
-  sectionHint: { fontSize: 12, fontFamily: Fonts.serif, marginBottom: 10 },
+  sectionLabel: { fontSize: 13, fontFamily: Fonts.bodySemiBold, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 },
+  sectionHint: { fontSize: 12, fontFamily: Fonts.body, marginBottom: 10 },
 
   // Title input
   inputWrap: {
@@ -712,8 +712,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1.5,
   },
-  textInput: { flex: 1, fontSize: 15, fontFamily: Fonts.serif, paddingVertical: 0 },
-  charCount: { fontSize: 11, fontFamily: Fonts.serif, textAlign: 'right', marginTop: 4, marginBottom: 4 },
+  textInput: { flex: 1, fontSize: 15, fontFamily: Fonts.body, paddingVertical: 0 },
+  charCount: { fontSize: 11, fontFamily: Fonts.body, textAlign: 'right', marginTop: 4, marginBottom: 4 },
 
   // Filter rows
   filterRowLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
@@ -729,21 +729,21 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   chipEmoji: { fontSize: 14 },
-  chipText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  chipText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
   // Subcategory flat list
   subcategorySection: { marginBottom: 12 },
-  subcategorySectionTitle: { fontSize: 10, fontFamily: Fonts.serifSemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  subcategorySectionTitle: { fontSize: 10, fontFamily: Fonts.bodySemiBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
   flatSubcatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   flatSubcatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
   flatSubcatTextCol: { flex: 1 },
-  flatSubcatName: { fontSize: 15, fontFamily: Fonts.serifSemiBold },
+  flatSubcatName: { fontSize: 15, fontFamily: Fonts.bodySemiBold },
   flatSubcatSub: { fontSize: 11, marginTop: 2 },
 
   // Selected tags
   selectedTagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 },
   selectedTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1, gap: 4 },
-  selectedTagText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  selectedTagText: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
 
   // Places
   placesList: { gap: 8, marginBottom: 12 },
@@ -756,10 +756,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   placeNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  placeNumberText: { fontSize: 12, fontWeight: '700', color: '#FFF' },
+  placeNumberText: { fontSize: 12, fontWeight: '700', color: Colors.textOnAccent },
   placeInfo: { flex: 1 },
-  placeName: { fontSize: 14, fontFamily: Fonts.serifBold },
-  placeType: { fontSize: 11, fontFamily: Fonts.serif, marginTop: 2 },
+  placeName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  placeType: { fontSize: 11, fontFamily: Fonts.body, marginTop: 2 },
   placeCardInner: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, flex: 1 },
   addPlaceBtn: {
     flexDirection: 'row',
@@ -771,7 +771,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
   },
-  addPlaceText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  addPlaceText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
 
   // Bottom bar
   bottomBar: {
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
   },
-  launchBtnText: { fontSize: 16, fontFamily: Fonts.serifBold },
+  launchBtnText: { fontSize: 16, fontFamily: Fonts.displaySemiBold },
 
   // Place picker modal
   modalContainer: { flex: 1 },
@@ -803,8 +803,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  modalTitle: { fontSize: 17, fontFamily: Fonts.serifBold },
-  modalClose: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  modalTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
+  modalClose: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
   },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: Fonts.serif, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: Fonts.body, paddingVertical: 0 },
   modalList: { padding: Layout.screenPadding },
   placeOption: {
     flexDirection: 'row',
@@ -825,25 +825,25 @@ const styles = StyleSheet.create({
   },
   placeOptionIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   placeOptionInfo: { flex: 1 },
-  placeOptionName: { fontSize: 14, fontFamily: Fonts.serifBold },
-  placeOptionAddr: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 2 },
+  placeOptionName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  placeOptionAddr: { fontSize: 12, fontFamily: Fonts.body, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingTop: 40, gap: 12 },
-  emptyText: { fontSize: 14, fontFamily: Fonts.serif, textAlign: 'center' },
-  savedSectionLabel: { fontSize: 12, fontFamily: Fonts.serifBold, letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  emptyText: { fontSize: 14, fontFamily: Fonts.body, textAlign: 'center' },
+  savedSectionLabel: { fontSize: 12, fontFamily: Fonts.bodySemiBold, letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
 
   // Pickup draft sheet (non-blocking — no overlay)
   pickupSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 900,
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingHorizontal: 20, paddingBottom: 34,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 12,
+    shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 12,
   },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 16 },
-  pickupTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.serifBold, marginBottom: 4 },
-  pickupSubtitle: { fontSize: 13, fontFamily: Fonts.serif, marginBottom: 14 },
+  pickupTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.displaySemiBold, marginBottom: 4 },
+  pickupSubtitle: { fontSize: 13, fontFamily: Fonts.body, marginBottom: 14 },
   sheetButtons: { flexDirection: 'row', gap: 10, marginTop: 18 },
   sheetBtnOutline: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.serifBold },
+  sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   sheetBtnFill: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.serifBold, color: '#FFF' },
+  sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.bodySemiBold, color: Colors.textOnAccent },
 });

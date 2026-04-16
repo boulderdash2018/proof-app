@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Colors, Typography, Layout } from '../constants';
+import { Colors, Typography, Layout, Fonts } from '../constants';
 import { PrimaryButton, SecondaryButton, TextInput } from '../components';
 import { useAuthStore, useGuestStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -190,7 +190,7 @@ export const SignupScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.bgPrimary,
   },
   flex: {
     flex: 1,
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   logo: {
     ...Typography.logo,
     fontSize: 30,
-    color: Colors.black,
+    color: Colors.textPrimary,
     marginBottom: 32,
   },
   dot: {
@@ -211,13 +211,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 21,
-    fontWeight: '800',
-    color: Colors.black,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
     marginBottom: 24,
   },
   passwordHint: {
     fontSize: 11,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
     marginTop: -10,
     marginBottom: 14,
     marginLeft: 2,
@@ -231,16 +232,18 @@ const styles = StyleSheet.create({
   checkbox: {
     fontSize: 20,
     lineHeight: 24,
-    color: Colors.black,
+    color: Colors.textPrimary,
   },
   checkboxLabel: {
     flex: 1,
     fontSize: 13,
-    color: Colors.gray800,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
     lineHeight: 20,
   },
   checkboxError: {
     fontSize: 11,
+    fontFamily: Fonts.body,
     color: Colors.error,
     marginBottom: 8,
     marginLeft: 30,
@@ -256,11 +259,12 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.borderSubtle,
   },
   separatorText: {
-    color: Colors.gray700,
+    color: Colors.textSecondary,
     fontSize: 13,
+    fontFamily: Fonts.body,
     marginHorizontal: 14,
   },
   bottomRow: {
@@ -270,11 +274,12 @@ const styles = StyleSheet.create({
   },
   bottomText: {
     fontSize: 14,
-    color: Colors.gray700,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
   },
   bottomLink: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: Fonts.bodyBold,
     color: Colors.primary,
   },
   guestBackBtn: {
@@ -282,6 +287,6 @@ const styles = StyleSheet.create({
   },
   guestBackText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: Fonts.bodySemiBold,
   },
 });

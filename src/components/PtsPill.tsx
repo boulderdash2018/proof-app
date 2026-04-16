@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 11,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.gold,
   },
 });

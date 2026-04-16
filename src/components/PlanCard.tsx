@@ -246,7 +246,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               <View style={[styles.photoSlide, { width: bannerWidth }]}>
                 <Image source={{ uri: item }} style={styles.photoImage} />
                 <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.72)']}
+                  colors={['transparent', 'rgba(44,36,32,0.42)', 'rgba(44,36,32,0.72)']}
                   locations={[0, 0.5, 1]}
                   style={styles.slideGradient}
                   pointerEvents="none"
@@ -273,20 +273,20 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                       <Text style={[styles.overlayMetaText, { fontWeight: '700' }]}>Free ✦</Text>
                     ) : (
                       <>
-                        <Ionicons name="cash-outline" size={10} color="rgba(255,255,255,0.85)" />
+                        <Ionicons name="cash-outline" size={10} color="rgba(255,248,240,0.85)" />
                         <Text style={styles.overlayMetaText}>{plan.price}</Text>
                       </>
                     )}
                     <Text style={styles.overlayMetaDot}>·</Text>
-                    <Ionicons name="hourglass-outline" size={10} color="rgba(255,255,255,0.85)" />
+                    <Ionicons name="hourglass-outline" size={10} color="rgba(255,248,240,0.85)" />
                     <Text style={styles.overlayMetaText}>{plan.duration}</Text>
                     <Text style={styles.overlayMetaDot}>·</Text>
-                    <Ionicons name={getTransportIcon(plan.transport) as any} size={10} color="rgba(255,255,255,0.85)" />
+                    <Ionicons name={getTransportIcon(plan.transport) as any} size={10} color="rgba(255,248,240,0.85)" />
                     <Text style={styles.overlayMetaText}>{plan.transport}</Text>
                     {plan.places.some((p) => p.reservationRecommended) && (
                       <>
                         <Text style={styles.overlayMetaDot}>·</Text>
-                        <Ionicons name="calendar-outline" size={10} color="rgba(255,255,255,0.85)" />
+                        <Ionicons name="calendar-outline" size={10} color="rgba(255,248,240,0.85)" />
                         <Text style={styles.overlayMetaText}>Résa conseillée</Text>
                       </>
                     )}
@@ -331,7 +331,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                 key={i}
                 style={[
                   styles.photoDot,
-                  { backgroundColor: i === activePhotoIndex ? '#FFF' : 'rgba(255,255,255,0.4)' },
+                  { backgroundColor: i === activePhotoIndex ? '#FFF8F0' : 'rgba(255,248,240,0.4)' },
                 ]}
               />
             ))}
@@ -425,12 +425,12 @@ const styles = StyleSheet.create({
   postSeparator: { height: 1, marginTop: 4 },
   userRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10 },
   userInfo: { flex: 1, marginLeft: 10, marginRight: 8 },
-  displayName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  displayName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   timeAgo: { fontSize: 11, marginTop: 1 },
   bannerWrap: { overflow: 'hidden', position: 'relative' } as any,
   doubleTapHeart: { position: 'absolute', width: 70, height: 70, alignItems: 'center', justifyContent: 'center' },
   banner: { height: BANNER_HEIGHT },
-  bannerTitle: { fontSize: 22, fontFamily: Fonts.serifBold, color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 10 },
+  bannerTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, color: '#FFFFFF', textShadowColor: 'rgba(44,36,32,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 10 },
   photoBanner: { height: BANNER_HEIGHT },
   photoSlide: { height: BANNER_HEIGHT },
   photoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
@@ -440,30 +440,30 @@ const styles = StyleSheet.create({
   photoDot: { width: 6, height: 6, borderRadius: 3 },
   // Overlay — category pills (on slide 0)
   overlayTags: { position: 'absolute', bottom: 74, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5 } as any,
-  overlayTagPill: { backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8 },
-  overlayTagText: { color: 'rgba(255,255,255,0.92)', fontSize: 10, fontFamily: Fonts.serifSemiBold },
+  overlayTagPill: { backgroundColor: 'rgba(44,36,32,0.48)', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8 },
+  overlayTagText: { color: 'rgba(255,248,240,0.92)', fontSize: 10, fontFamily: Fonts.bodySemiBold },
   overlayTrending: { backgroundColor: 'rgba(255,107,53,0.3)', paddingHorizontal: 6, paddingVertical: 3.5, borderRadius: 8 },
   overlayTrendingText: { fontSize: 10 },
   // Overlay — metadata pill (on slide 1)
-  overlayMeta: { position: 'absolute', bottom: 74, right: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, gap: 4 } as any,
-  overlayMetaText: { color: 'rgba(255,255,255,0.92)', fontSize: 10, fontFamily: Fonts.serifMedium },
-  overlayMetaDot: { color: 'rgba(255,255,255,0.4)', fontSize: 8, marginHorizontal: 1 },
+  overlayMeta: { position: 'absolute', bottom: 74, right: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(44,36,32,0.48)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, gap: 4 } as any,
+  overlayMetaText: { color: 'rgba(255,248,240,0.92)', fontSize: 10, fontFamily: Fonts.bodyMedium },
+  overlayMetaDot: { color: 'rgba(255,248,240,0.4)', fontSize: 8, marginHorizontal: 1 },
   newBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  newBadgeText: { fontSize: 11, fontFamily: Fonts.serifBold, color: '#FFF', letterSpacing: 0.5 },
+  newBadgeText: { fontSize: 11, fontFamily: Fonts.bodySemiBold, color: Colors.textOnAccent, letterSpacing: 0.5 },
   actionBar: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
   saveIconWrap: { position: 'relative', width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   saveFlash: { position: 'absolute', width: 32, height: 32, borderRadius: 16 },
-  saveLabel: { fontSize: 12, fontFamily: Fonts.serifBold, marginLeft: 4 },
-  actionCount: { fontSize: 14, fontFamily: Fonts.serifSemiBold, marginLeft: 6 },
+  saveLabel: { fontSize: 12, fontFamily: Fonts.bodySemiBold, marginLeft: 4 },
+  actionCount: { fontSize: 14, fontFamily: Fonts.bodySemiBold, marginLeft: 6 },
   actionSpacer: { flex: 1 },
   // Places preview
   placesPreview: { paddingHorizontal: 14, paddingBottom: 12 },
   placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4.5 },
   placeIdx: { width: 20, height: 20, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   placeIdxText: { fontSize: 10, fontWeight: '700' },
-  placeName: { flex: 1, fontSize: 13, fontFamily: Fonts.serifSemiBold },
-  placeType: { fontSize: 11, fontFamily: Fonts.serif, marginLeft: 8 },
-  placeMore: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginLeft: 30, marginTop: 2, paddingBottom: 2 },
+  placeName: { flex: 1, fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  placeType: { fontSize: 11, fontFamily: Fonts.body, marginLeft: 8 },
+  placeMore: { fontSize: 12, fontFamily: Fonts.bodySemiBold, marginLeft: 30, marginTop: 2, paddingBottom: 2 },
 });

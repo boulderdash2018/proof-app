@@ -203,26 +203,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { padding: Layout.screenPadding, alignItems: 'center' },
   emoji: { fontSize: 56, marginTop: 20, marginBottom: 12 },
-  title: { fontSize: 26, fontFamily: Fonts.serifBold, marginBottom: 6 },
-  subtitle: { fontSize: 15, fontFamily: Fonts.serif, marginBottom: 20 },
+  title: { fontSize: 26, fontFamily: Fonts.displaySemiBold, marginBottom: 6 },
+  subtitle: { fontSize: 15, fontFamily: Fonts.body, marginBottom: 20 },
 
   badge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, marginBottom: 8 },
-  badgeText: { fontSize: 13, fontFamily: Fonts.serifBold, color: Colors.gold },
+  badgeText: { fontSize: 13, fontFamily: Fonts.displaySemiBold, color: Colors.gold },
 
   statsRow: { flexDirection: 'row', gap: 10, marginVertical: 20, width: '100%' },
   statCard: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', gap: 6 },
-  statValue: { fontSize: 20, fontFamily: Fonts.serifBold },
-  statLabel: { fontSize: 11, fontFamily: Fonts.serif },
+  statValue: { fontSize: 20, fontFamily: Fonts.displaySemiBold },
+  statLabel: { fontSize: 11, fontFamily: Fonts.body },
 
-  sectionTitle: { fontSize: 12, fontFamily: Fonts.serifBold, letterSpacing: 1, alignSelf: 'flex-start', marginBottom: 12, marginTop: 8 },
+  sectionTitle: { fontSize: 12, fontFamily: Fonts.bodySemiBold, letterSpacing: 1, alignSelf: 'flex-start', marginBottom: 12, marginTop: 8 },
 
   recapItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, width: '100%' },
   recapIndex: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  recapIndexText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
+  recapIndexText: { color: Colors.textOnAccent, fontSize: 12, fontWeight: '800' },
   recapInfo: { flex: 1 },
-  recapName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  recapMeta: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 2 },
+  recapName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  recapMeta: { fontSize: 12, fontFamily: Fonts.body, marginTop: 2 },
 
   proofBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 24 },
-  proofBtnText: { color: '#FFF', fontSize: 16, fontFamily: Fonts.serifBold },
+  proofBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displaySemiBold },
 });

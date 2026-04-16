@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Fonts } from '../constants';
+import { Colors, Fonts } from '../constants';
 
 interface Props {
   visible: boolean;
@@ -14,7 +14,7 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => (
       <View style={styles.card}>
         <Text style={styles.text}>Carte disponible uniquement sur mobile</Text>
         <TouchableOpacity onPress={onClose} style={styles.btn}>
-          <Ionicons name="close" size={18} color="#E8E0D6" />
+          <Ionicons name="close" size={18} color={Colors.textOnAccent} />
         </TouchableOpacity>
       </View>
     </View>
@@ -26,28 +26,33 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(44, 36, 32, 0.4)',
   },
   card: {
-    backgroundColor: '#1C1917',
+    backgroundColor: Colors.bgSecondary,
     padding: 28,
     borderRadius: 16,
     alignItems: 'center',
     gap: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: Colors.borderSubtle,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
   },
   text: {
-    color: '#A09585',
+    color: Colors.textSecondary,
     fontSize: 14,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     textAlign: 'center',
   },
   btn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#3D352E',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

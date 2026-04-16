@@ -63,27 +63,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   chipGray: {
-    backgroundColor: Colors.gray300,
+    backgroundColor: Colors.terracotta100,
   },
   chipOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: Colors.gray600,
+    borderColor: Colors.borderMedium,
   },
   label: {
     fontSize: 12,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
   labelSmall: {
     fontSize: 10,
   },
   labelWhite: {
-    color: '#FFFFFF',
+    color: Colors.textOnAccent,
   },
   labelLight: {
     color: Colors.black,
   },
   labelDark: {
-    color: Colors.gray700,
+    color: Colors.terracotta700,
   },
 });

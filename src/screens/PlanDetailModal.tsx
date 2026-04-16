@@ -457,10 +457,10 @@ export const PlanDetailModal: React.FC = () => {
 
   if (!plan) {
     return (
-      <View style={[st.container, { backgroundColor: C.white }]}>
+      <View style={[st.container, { backgroundColor: Colors.bgSecondary }]}>
         <View style={st.loadingWrap}>
-          <ActivityIndicator size="large" color={C.primary} />
-          <Text style={[st.loadingText, { color: C.gray700 }]}>{t.plan_loading}</Text>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={[st.loadingText, { color: Colors.textSecondary }]}>{t.plan_loading}</Text>
         </View>
       </View>
     );
@@ -469,7 +469,7 @@ export const PlanDetailModal: React.FC = () => {
   // ==================== RENDER ====================
 
   return (
-    <View style={[st.container, { backgroundColor: C.white }]}>
+    <View style={[st.container, { backgroundColor: Colors.bgSecondary }]}>
       {/* Floating header over hero */}
       <View style={[st.floatingHeader, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <TouchableOpacity style={st.floatingBtn} onPress={() => navigation.goBack()}>
@@ -486,24 +486,24 @@ export const PlanDetailModal: React.FC = () => {
 
       {/* Owner menu dropdown */}
       {showPlanMenu && (
-        <View style={[st.planMenu, { backgroundColor: C.gray200, borderColor: C.border, top: insets.top + 52 }]}>
+        <View style={[st.planMenu, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderMedium, top: insets.top + 52 }]}>
           <TouchableOpacity style={st.planMenuItem} onPress={handleTogglePin}>
-            <Ionicons name={isPinned ? 'pin-outline' : 'pin'} size={18} color={isPinned ? C.gray700 : C.primary} />
-            <Text style={[st.planMenuText, { color: isPinned ? C.black : C.primary }]}>
+            <Ionicons name={isPinned ? 'pin-outline' : 'pin'} size={18} color={isPinned ? Colors.textSecondary : Colors.primary} />
+            <Text style={[st.planMenuText, { color: isPinned ? Colors.textPrimary : Colors.primary }]}>
               {isPinned ? 'Désépingler' : 'Épingler'}
             </Text>
           </TouchableOpacity>
-          <View style={[st.planMenuDivider, { backgroundColor: C.border }]} />
+          <View style={[st.planMenuDivider, { backgroundColor: Colors.borderSubtle }]} />
           <TouchableOpacity style={st.planMenuItem} onPress={handleEditPlan}>
-            <Ionicons name="create-outline" size={18} color={C.gray700} />
-            <Text style={[st.planMenuText, { color: C.black }]}>Modifier</Text>
+            <Ionicons name="create-outline" size={18} color={Colors.textSecondary} />
+            <Text style={[st.planMenuText, { color: Colors.textPrimary }]}>Modifier</Text>
           </TouchableOpacity>
-          <View style={[st.planMenuDivider, { backgroundColor: C.border }]} />
+          <View style={[st.planMenuDivider, { backgroundColor: Colors.borderSubtle }]} />
           <TouchableOpacity style={st.planMenuItem} onPress={handleArchivePlan}>
-            <Ionicons name="archive-outline" size={18} color={C.gray700} />
-            <Text style={[st.planMenuText, { color: C.black }]}>Archiver</Text>
+            <Ionicons name="archive-outline" size={18} color={Colors.textSecondary} />
+            <Text style={[st.planMenuText, { color: Colors.textPrimary }]}>Archiver</Text>
           </TouchableOpacity>
-          <View style={[st.planMenuDivider, { backgroundColor: C.border }]} />
+          <View style={[st.planMenuDivider, { backgroundColor: Colors.borderSubtle }]} />
           <TouchableOpacity style={st.planMenuItem} onPress={handleDeletePlan}>
             <Ionicons name="trash-outline" size={18} color={Colors.error} />
             <Text style={[st.planMenuText, { color: Colors.error }]}>Supprimer</Text>
@@ -563,44 +563,44 @@ export const PlanDetailModal: React.FC = () => {
         </View>
 
         {/* ===== IDENTITY CARD ===== */}
-        <View style={[st.idCard, { backgroundColor: C.gray200, borderColor: C.border }]}>
+        <View style={[st.idCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
           <View style={st.idTop}>
             <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: plan.author.id })} activeOpacity={0.7}>
               <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
             </TouchableOpacity>
             <View style={st.idInfo}>
               <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: plan.author.id })} activeOpacity={0.7}>
-                <Text style={[st.idName, { color: C.black }]}>{plan.author.displayName}</Text>
+                <Text style={[st.idName, { color: Colors.textPrimary }]}>{plan.author.displayName}</Text>
               </TouchableOpacity>
               <View style={st.idMeta}>
                 <UserBadge type={plan.author.badgeType} small />
-                <Text style={[st.idRank, { color: C.gray600 }]}>{plan.author.rank}</Text>
-                <View style={[st.idDot, { backgroundColor: C.gray500 }]} />
-                <Text style={[st.idTime, { color: C.gray600 }]}>{plan.timeAgo}</Text>
+                <Text style={[st.idRank, { color: Colors.textSecondary }]}>{plan.author.rank}</Text>
+                <View style={[st.idDot, { backgroundColor: Colors.textTertiary }]} />
+                <Text style={[st.idTime, { color: Colors.textSecondary }]}>{plan.timeAgo}</Text>
               </View>
             </View>
           </View>
           <View style={st.pillsRow}>
-            <View style={[st.pill, { backgroundColor: C.gray300 }]}>
-              <Ionicons name="cash-outline" size={13} color={C.primary} />
-              <Text style={[st.pillText, { color: C.gray800 }]}>{plan.price}</Text>
+            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
+              <Ionicons name="cash-outline" size={13} color={Colors.primary} />
+              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.price}</Text>
             </View>
-            <View style={[st.pill, { backgroundColor: C.gray300 }]}>
-              <Ionicons name="hourglass-outline" size={13} color={C.primary} />
-              <Text style={[st.pillText, { color: C.gray800 }]}>{plan.duration}</Text>
+            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
+              <Ionicons name="hourglass-outline" size={13} color={Colors.primary} />
+              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.duration}</Text>
             </View>
-            <View style={[st.pill, { backgroundColor: C.gray300 }]}>
-              <Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={13} color={C.primary} />
-              <Text style={[st.pillText, { color: C.gray800 }]}>{plan.transport}</Text>
+            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
+              <Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={13} color={Colors.primary} />
+              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.transport}</Text>
             </View>
-            <View style={[st.pill, { backgroundColor: C.gray300 }]}>
-              <Ionicons name="location-outline" size={13} color={C.primary} />
-              <Text style={[st.pillText, { color: C.gray800 }]}>{plan.places.length} étapes</Text>
+            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
+              <Ionicons name="location-outline" size={13} color={Colors.primary} />
+              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.places.length} étapes</Text>
             </View>
             {hasMapPlaces && (
-              <TouchableOpacity style={[st.pill, { backgroundColor: C.primary + '20' }]} onPress={() => setShowMap(true)} activeOpacity={0.7}>
-                <Ionicons name="map-outline" size={13} color={C.primary} />
-                <Text style={[st.pillText, { color: C.primary }]}>Map</Text>
+              <TouchableOpacity style={[st.pill, { backgroundColor: Colors.primary + '20' }]} onPress={() => setShowMap(true)} activeOpacity={0.7}>
+                <Ionicons name="map-outline" size={13} color={Colors.primary} />
+                <Text style={[st.pillText, { color: Colors.primary }]}>Map</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -612,11 +612,11 @@ export const PlanDetailModal: React.FC = () => {
             <View style={st.likesAvatars}>
               {likerUsers.slice(0, 5).map((u, i) => (
                 <View key={u.id} style={[st.likerAvatarWrap, i > 0 && { marginLeft: -6 }]}>
-                  <Avatar initials={u.initials} bg={u.avatarBg} color={u.avatarColor} size="SS" avatarUrl={u.avatarUrl ?? undefined} borderColor={C.white} />
+                  <Avatar initials={u.initials} bg={u.avatarBg} color={u.avatarColor} size="SS" avatarUrl={u.avatarUrl ?? undefined} borderColor={Colors.bgSecondary} />
                 </View>
               ))}
             </View>
-            <Text style={[st.likesText, { color: C.gray800 }]} numberOfLines={1}>
+            <Text style={[st.likesText, { color: Colors.textPrimary }]} numberOfLines={1}>
               Liked by <Text style={st.likesName}>{likerUsers[0].displayName.split(' ')[0]}</Text>
               {(plan.likedByIds?.length ?? 0) > 1 && (
                 <Text> and <Text style={st.likesName}>{(plan.likedByIds!.length - 1)} other{(plan.likedByIds!.length - 1) > 1 ? 's' : ''}</Text></Text>
@@ -637,11 +637,11 @@ export const PlanDetailModal: React.FC = () => {
           <TouchableOpacity
             style={[st.proofBanner, {
               backgroundColor: isDone
-                ? savedPlan?.proofStatus === 'validated' ? '#C8571A15' : Colors.successBg
-                : C.primary + '15',
+                ? savedPlan?.proofStatus === 'validated' ? Colors.primary + '15' : Colors.successBg
+                : Colors.primary + '15',
               borderColor: isDone
-                ? savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.successBorder
-                : C.primary,
+                ? savedPlan?.proofStatus === 'validated' ? Colors.primary : Colors.successBorder
+                : Colors.primary,
             }]}
             onPress={!isDone ? handleMarkDone : undefined}
             activeOpacity={isDone ? 1 : 0.7}
@@ -649,10 +649,10 @@ export const PlanDetailModal: React.FC = () => {
             <Ionicons
               name={isDone ? 'checkmark-circle' : 'flag-outline'}
               size={18}
-              color={isDone ? (savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.success) : C.primary}
+              color={isDone ? (savedPlan?.proofStatus === 'validated' ? Colors.primary : Colors.success) : Colors.primary}
             />
             <Text style={[st.proofBannerText, {
-              color: isDone ? (savedPlan?.proofStatus === 'validated' ? '#C8571A' : Colors.success) : C.primary,
+              color: isDone ? (savedPlan?.proofStatus === 'validated' ? Colors.primary : Colors.success) : Colors.primary,
             }]}>
               {isDone
                 ? savedPlan?.proofStatus === 'validated' ? 'Proof. ✓' : t.plan_already_done
@@ -666,14 +666,14 @@ export const PlanDetailModal: React.FC = () => {
           <View style={st.tipWrap}>
             <View style={st.tipBar} />
             <View style={st.tipBody}>
-              <Text style={[st.tipLabel, { color: C.gray600 }]}>Conseil du créateur</Text>
-              <Text style={[st.tipText, { color: C.gray800 }]}>"{creatorTip}"</Text>
+              <Text style={[st.tipLabel, { color: Colors.textSecondary }]}>Conseil du créateur</Text>
+              <Text style={[st.tipText, { color: Colors.textPrimary }]}>"{creatorTip}"</Text>
             </View>
           </View>
         )}
 
         {/* ===== ITINERARY ===== */}
-        <Text style={[st.sectionLabel, { color: C.gray700 }]}>{t.plan_full}</Text>
+        <Text style={[st.sectionLabel, { color: Colors.textSecondary }]}>{t.plan_full}</Text>
 
         <View style={st.itinerary}>
           {plan.places.map((place, index) => {
@@ -691,14 +691,14 @@ export const PlanDetailModal: React.FC = () => {
                 <View style={st.placeRow}>
                   <View style={st.tlCol}>
                     <View style={[st.tlLineTop, index === 0 && { backgroundColor: 'transparent' }]} />
-                    <View style={[st.tlCircle, { backgroundColor: C.primary }]}>
+                    <View style={[st.tlCircle, { backgroundColor: Colors.primary }]}>
                       <Text style={st.tlNum}>{index + 1}</Text>
                     </View>
                     <View style={[st.tlLineBot, isLast && !travelToNext && { backgroundColor: 'transparent' }]} />
                   </View>
 
                   <TouchableOpacity
-                    style={[st.placeCard, { backgroundColor: C.gray200, borderColor: C.border }]}
+                    style={[st.placeCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
                     onPress={() => navigation.navigate('PlaceDetail', { placeId: place.id, planId: plan.id })}
                     activeOpacity={0.7}
                   >
@@ -706,26 +706,26 @@ export const PlanDetailModal: React.FC = () => {
                     <View style={st.placeCardBody}>
                       <View style={st.placeCardHead}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[st.placeName, { color: C.black }]} numberOfLines={1}>{place.name}{place.reservationRecommended ? <Text style={st.reservationAsterisk}>{' ﹡'}</Text> : null}</Text>
-                          <Text style={[st.placeType, { color: C.gray600 }]}>{place.type}</Text>
+                          <Text style={[st.placeName, { color: Colors.textPrimary }]} numberOfLines={1}>{place.name}{place.reservationRecommended ? <Text style={st.reservationAsterisk}>{' ﹡'}</Text> : null}</Text>
+                          <Text style={[st.placeType, { color: Colors.textSecondary }]}>{place.type}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color={C.gray500} />
+                        <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
                       </View>
                       <View style={st.ratingRow}>
                         <Ionicons name="star" size={12} color="#F5A623" style={{ marginRight: 3 }} />
-                        <Text style={[st.ratingNum, { color: C.black }]}>{place.rating}</Text>
-                        <Text style={[st.ratingCnt, { color: C.gray600 }]}>({place.reviewCount} {t.plan_reviews})</Text>
+                        <Text style={[st.ratingNum, { color: Colors.textPrimary }]}>{place.rating}</Text>
+                        <Text style={[st.ratingCnt, { color: Colors.textSecondary }]}>({place.reviewCount} {t.plan_reviews})</Text>
                       </View>
                       {(place.placePrice != null || place.placeDuration != null) && (
                         <View style={st.placeMetaRow}>
                           {place.placePrice != null && place.placePrice > 0 && (
-                            <View style={[st.placeMetaPill, { backgroundColor: C.gray300 }]}>
-                              <Text style={[st.placeMetaText, { color: C.gray700 }]}>{place.placePrice}{cityConfig.currency}</Text>
+                            <View style={[st.placeMetaPill, { backgroundColor: Colors.terracotta100 }]}>
+                              <Text style={[st.placeMetaText, { color: Colors.terracotta700 }]}>{place.placePrice}{cityConfig.currency}</Text>
                             </View>
                           )}
                           {place.placeDuration != null && place.placeDuration > 0 && (
-                            <View style={[st.placeMetaPill, { backgroundColor: C.gray300 }]}>
-                              <Text style={[st.placeMetaText, { color: C.gray700 }]}>{fmtMin(place.placeDuration!)}</Text>
+                            <View style={[st.placeMetaPill, { backgroundColor: Colors.terracotta100 }]}>
+                              <Text style={[st.placeMetaText, { color: Colors.terracotta700 }]}>{fmtMin(place.placeDuration!)}</Text>
                             </View>
                           )}
                         </View>
@@ -733,19 +733,19 @@ export const PlanDetailModal: React.FC = () => {
                       {/* Inline widgets */}
                       {place.address ? (
                         <View style={st.inlineAddr}>
-                          <Ionicons name="location-outline" size={13} color={C.gray600} />
-                          <Text style={[st.inlineAddrText, { color: C.gray700 }]} numberOfLines={1}>{place.address.split(',')[0]}</Text>
+                          <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
+                          <Text style={[st.inlineAddrText, { color: Colors.textSecondary }]} numberOfLines={1}>{place.address.split(',')[0]}</Text>
                         </View>
                       ) : null}
                       {place.comment ? (
-                        <View style={[st.inlineQuote, { borderLeftColor: C.primary }]}>
-                          <Text style={[st.inlineQuoteText, { color: C.gray800 }]} numberOfLines={2}>"{place.comment}"</Text>
+                        <View style={[st.inlineQuote, { borderLeftColor: Colors.primary }]}>
+                          <Text style={[st.inlineQuoteText, { color: Colors.textPrimary }]} numberOfLines={2}>"{place.comment}"</Text>
                         </View>
                       ) : null}
                       {(place.questions && place.questions.length > 0 ? place.questions : (place.questionAnswer && place.question ? [{ question: place.question, answer: place.questionAnswer }] : [])).map((qa, qIdx) => (
-                        <View key={qIdx} style={[st.inlineQa, { backgroundColor: C.gray300 }]}>
-                          <Text style={[st.inlineQaLabel, { color: C.gray600 }]}>{qa.question}</Text>
-                          <Text style={[st.inlineQaAnswer, { color: C.black }]} numberOfLines={2}>{qa.answer}</Text>
+                        <View key={qIdx} style={[st.inlineQa, { backgroundColor: Colors.bgTertiary }]}>
+                          <Text style={[st.inlineQaLabel, { color: Colors.textSecondary }]}>{qa.question}</Text>
+                          <Text style={[st.inlineQaAnswer, { color: Colors.textPrimary }]} numberOfLines={2}>{qa.answer}</Text>
                         </View>
                       ))}
                     </View>
@@ -761,16 +761,16 @@ export const PlanDetailModal: React.FC = () => {
                     <View style={st.tlCol}>
                       <View style={st.tlLineFull} />
                     </View>
-                    <View style={[st.travelBubble, { backgroundColor: C.gray200, borderColor: C.border }]}>
+                    <View style={[st.travelBubble, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
                       {travelToNext ? (
                         <>
-                          <Ionicons name={(TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any} size={13} color={C.primary} />
-                          <Text style={[st.travelText, { color: C.gray700 }]}>{travelToNext.transport}</Text>
-                          <View style={[st.travelDot, { backgroundColor: C.gray500 }]} />
-                          <Text style={[st.travelText, { color: C.gray700 }]}>{fmtMin(travelToNext.duration)}</Text>
+                          <Ionicons name={(TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any} size={13} color={Colors.primary} />
+                          <Text style={[st.travelText, { color: Colors.textSecondary }]}>{travelToNext.transport}</Text>
+                          <View style={[st.travelDot, { backgroundColor: Colors.textTertiary }]} />
+                          <Text style={[st.travelText, { color: Colors.textSecondary }]}>{fmtMin(travelToNext.duration)}</Text>
                         </>
                       ) : (
-                        <ActivityIndicator size="small" color={C.gray500} />
+                        <ActivityIndicator size="small" color={Colors.textTertiary} />
                       )}
                     </View>
                   </View>
@@ -782,21 +782,21 @@ export const PlanDetailModal: React.FC = () => {
 
         {/* Reservation legend */}
         {plan.places.some((p) => p.reservationRecommended) && (
-          <Text style={[st.reservationLegend, { color: C.gray600 }]}>﹡ Reservation recommended</Text>
+          <Text style={[st.reservationLegend, { color: Colors.textSecondary }]}>﹡ Reservation recommended</Text>
         )}
 
         {/* ===== SOCIAL PROOF ===== */}
         {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
-          <View style={[st.socialProof, { backgroundColor: C.gray200, borderColor: C.border }]}>
+          <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
             <MiniStampIcon type="proof" size={18} />
-            <Text style={[st.socialProofText, { color: C.gray800 }]}>
+            <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
               {plan.proofCount ?? 0} {(plan.proofCount ?? 0) === 1 ? 'personne l\'a' : 'personnes l\'ont'} vérifié sur Proof.
             </Text>
             {(plan.declinedCount ?? 0) > 0 && (
               <>
-                <View style={[st.socialDot, { backgroundColor: C.gray500 }]} />
+                <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
                 <MiniStampIcon type="declined" size={18} />
-                <Text style={[st.socialDeclined, { color: C.gray600 }]}>{plan.declinedCount}</Text>
+                <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
               </>
             )}
           </View>
@@ -805,7 +805,7 @@ export const PlanDetailModal: React.FC = () => {
         {/* ===== SIMILAR PLANS ===== */}
         {similarPlans.length > 0 && (
           <>
-            <Text style={[st.sectionLabel, { color: C.gray700, marginTop: 24 }]}>PLANS SIMILAIRES</Text>
+            <Text style={[st.sectionLabel, { color: Colors.textSecondary, marginTop: 24 }]}>PLANS SIMILAIRES</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.similarScroll}>
               {similarPlans.map((sp) => {
                 const spPhoto = sp.coverPhotos?.[0] || sp.places[0]?.photoUrls?.[0];
@@ -813,7 +813,7 @@ export const PlanDetailModal: React.FC = () => {
                 return (
                   <TouchableOpacity
                     key={sp.id}
-                    style={[st.similarCard, { backgroundColor: C.gray200, borderColor: C.border }]}
+                    style={[st.similarCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
                     onPress={() => navigation.push('PlanDetail', { planId: sp.id })}
                     activeOpacity={0.7}
                   >
@@ -823,8 +823,8 @@ export const PlanDetailModal: React.FC = () => {
                       <LinearGradient colors={spGrad as [string, string, ...string[]]} style={st.similarImg} />
                     )}
                     <View style={st.similarBody}>
-                      <Text style={[st.similarTitle, { color: C.black }]} numberOfLines={2}>{sp.title}</Text>
-                      <Text style={[st.similarAuthor, { color: C.gray600 }]}>{sp.author.displayName}</Text>
+                      <Text style={[st.similarTitle, { color: Colors.textPrimary }]} numberOfLines={2}>{sp.title}</Text>
+                      <Text style={[st.similarAuthor, { color: Colors.textSecondary }]}>{sp.author.displayName}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -835,36 +835,36 @@ export const PlanDetailModal: React.FC = () => {
       </Animated.ScrollView>
 
       {/* ===== STICKY BOTTOM BAR ===== */}
-      <View style={[st.bottomBar, { paddingBottom: insets.bottom + 6, backgroundColor: C.white, borderTopColor: C.border }]}>
+      <View style={[st.bottomBar, { paddingBottom: insets.bottom + 6, backgroundColor: Colors.bgSecondary, borderTopColor: Colors.borderMedium }]}>
         {!isGuest && hasMapPlaces && (
           <TouchableOpacity
-            style={[st.doItNowBtn, { backgroundColor: isDone ? C.gray300 : C.primary }]}
+            style={[st.doItNowBtn, { backgroundColor: isDone ? Colors.bgTertiary : Colors.primary }]}
             onPress={isDone ? undefined : () => setShowTransportChooser(true)}
             activeOpacity={isDone ? 1 : 0.8}
             disabled={isDone}
           >
-            <Ionicons name={isDone ? 'checkmark-circle' : 'navigate'} size={18} color={isDone ? C.gray600 : '#FFF'} />
-            <Text style={[st.doItNowText, isDone && { color: C.gray600 }]}>
+            <Ionicons name={isDone ? 'checkmark-circle' : 'navigate'} size={18} color={isDone ? Colors.textSecondary : Colors.textOnAccent} />
+            <Text style={[st.doItNowText, isDone && { color: Colors.textSecondary }]}>
               {isDone ? 'Déjà fait ✓' : 'Do it now'}
             </Text>
           </TouchableOpacity>
         )}
         <View style={st.actionsRow}>
           <TouchableOpacity style={st.actionBtn} onPress={handleLike} activeOpacity={0.7}>
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? C.primary : C.gray600} />
-            <Text style={[st.actionText, { color: isLiked ? C.primary : C.gray800 }]}>{localLikesCount}</Text>
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? Colors.primary : Colors.textSecondary} />
+            <Text style={[st.actionText, { color: isLiked ? Colors.primary : Colors.textPrimary }]}>{localLikesCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={st.actionBtn} onPress={() => setShowCommentSheet(true)} activeOpacity={0.7}>
-            <Ionicons name="chatbubble-outline" size={20} color={C.gray600} />
-            <Text style={[st.actionText, { color: C.gray800 }]}>{localCommentsCount}</Text>
+            <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
+            <Text style={[st.actionText, { color: Colors.textPrimary }]}>{localCommentsCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={st.actionBtn} onPress={handleSave} activeOpacity={isSaved && isDone ? 1 : 0.7}>
-            <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={isSaved ? C.primary : C.gray600} />
-            <Text style={[st.actionText, { color: isSaved ? C.primary : C.gray800 }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
-            {isSaved && isDone && <Ionicons name="lock-closed" size={10} color={C.gray500} style={{ marginLeft: 2 }} />}
+            <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={isSaved ? Colors.primary : Colors.textSecondary} />
+            <Text style={[st.actionText, { color: isSaved ? Colors.primary : Colors.textPrimary }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
+            {isSaved && isDone && <Ionicons name="lock-closed" size={10} color={Colors.textTertiary} style={{ marginLeft: 2 }} />}
           </TouchableOpacity>
           <TouchableOpacity style={st.actionBtn} onPress={() => { if (isGuest) { setShowAccountPrompt(true); return; } setShowShareSheet(true); }} activeOpacity={0.7}>
-            <Ionicons name="paper-plane-outline" size={20} color={C.gray600} />
+            <Ionicons name="paper-plane-outline" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -875,26 +875,26 @@ export const PlanDetailModal: React.FC = () => {
           <View style={st.sheetBackdrop}>
             <TouchableWithoutFeedback>
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={st.sheetKav}>
-                <View style={[st.sheet, { backgroundColor: C.gray100, paddingBottom: insets.bottom + 8 }]}>
-                  <View style={[st.sheetHandle, { backgroundColor: C.gray500 }]} />
-                  <Text style={[st.sheetTitle, { color: C.black }]}>{t.plan_comments_title} ({localCommentsCount})</Text>
+                <View style={[st.sheet, { backgroundColor: Colors.bgPrimary, paddingBottom: insets.bottom + 8 }]}>
+                  <View style={[st.sheetHandle, { backgroundColor: Colors.textTertiary }]} />
+                  <Text style={[st.sheetTitle, { color: Colors.textPrimary }]}>{t.plan_comments_title} ({localCommentsCount})</Text>
 
                   <ScrollView style={st.sheetScroll} keyboardShouldPersistTaps="handled">
                     {comments.length === 0 ? (
                       <View style={st.emptyComments}>
-                        <Text style={[st.emptyText, { color: C.gray600 }]}>{t.plan_no_comments}</Text>
-                        <Text style={[st.emptySub, { color: C.gray500 }]}>{t.plan_no_comments_sub}</Text>
+                        <Text style={[st.emptyText, { color: Colors.textSecondary }]}>{t.plan_no_comments}</Text>
+                        <Text style={[st.emptySub, { color: Colors.textTertiary }]}>{t.plan_no_comments_sub}</Text>
                       </View>
                     ) : (
                       comments.map((comment) => (
-                        <View key={comment.id} style={[st.commentRow, { borderBottomColor: C.border }]}>
+                        <View key={comment.id} style={[st.commentRow, { borderBottomColor: Colors.borderSubtle }]}>
                           <Avatar initials={comment.authorInitials} bg={comment.authorAvatarBg} color={comment.authorAvatarColor} size="S" avatarUrl={comment.authorAvatarUrl} />
                           <View style={st.commentBody}>
                             <View style={st.commentHead}>
-                              <Text style={[st.commentAuthor, { color: C.black }]}>{comment.authorName}</Text>
-                              <Text style={[st.commentTime, { color: C.gray600 }]}>{getCommentTimeAgo(comment.createdAt)}</Text>
+                              <Text style={[st.commentAuthor, { color: Colors.textPrimary }]}>{comment.authorName}</Text>
+                              <Text style={[st.commentTime, { color: Colors.textTertiary }]}>{getCommentTimeAgo(comment.createdAt)}</Text>
                             </View>
-                            <Text style={[st.commentText, { color: C.gray800 }]}>{comment.text}</Text>
+                            <Text style={[st.commentText, { color: Colors.textPrimary }]}>{comment.text}</Text>
                           </View>
                         </View>
                       ))
@@ -903,18 +903,18 @@ export const PlanDetailModal: React.FC = () => {
 
                   {isGuest ? (
                     <TouchableOpacity
-                      style={[st.commentInputRow, { backgroundColor: C.gray200 }]}
+                      style={[st.commentInputRow, { backgroundColor: Colors.bgTertiary }]}
                       onPress={() => { setShowCommentSheet(false); setShowAccountPrompt(true); }}
                       activeOpacity={0.7}
                     >
-                      <Text style={[st.commentPlaceholder, { color: C.gray600 }]}>{t.plan_comment_placeholder}</Text>
+                      <Text style={[st.commentPlaceholder, { color: Colors.textTertiary }]}>{t.plan_comment_placeholder}</Text>
                     </TouchableOpacity>
                   ) : (
-                    <View style={[st.commentInputRow, { backgroundColor: C.gray200 }]}>
+                    <View style={[st.commentInputRow, { backgroundColor: Colors.bgTertiary }]}>
                       <RNTextInput
-                        style={[st.commentInput, { color: C.black }]}
+                        style={[st.commentInput, { color: Colors.textPrimary }]}
                         placeholder={t.plan_comment_placeholder}
-                        placeholderTextColor={C.gray600}
+                        placeholderTextColor={Colors.textTertiary}
                         value={commentText}
                         onChangeText={setCommentText}
                         multiline
@@ -926,9 +926,9 @@ export const PlanDetailModal: React.FC = () => {
                         style={[st.sendBtn, { opacity: commentText.trim() ? 1 : 0.4 }]}
                       >
                         {isSending ? (
-                          <ActivityIndicator size="small" color={C.primary} />
+                          <ActivityIndicator size="small" color={Colors.primary} />
                         ) : (
-                          <Ionicons name="send" size={18} color={C.primary} />
+                          <Ionicons name="send" size={18} color={Colors.primary} />
                         )}
                       </TouchableOpacity>
                     </View>
@@ -945,9 +945,9 @@ export const PlanDetailModal: React.FC = () => {
         <TouchableWithoutFeedback onPress={() => setShowLikersSheet(false)}>
           <View style={st.sheetBackdrop}>
             <TouchableWithoutFeedback>
-              <View style={[st.sheet, { backgroundColor: C.gray100, paddingBottom: insets.bottom + 8 }]}>
-                <View style={[st.sheetHandle, { backgroundColor: C.gray500 }]} />
-                <Text style={[st.sheetTitle, { color: C.black }]}>Likes</Text>
+              <View style={[st.sheet, { backgroundColor: Colors.bgPrimary, paddingBottom: insets.bottom + 8 }]}>
+                <View style={[st.sheetHandle, { backgroundColor: Colors.textTertiary }]} />
+                <Text style={[st.sheetTitle, { color: Colors.textPrimary }]}>Likes</Text>
                 <ScrollView style={st.likersScroll}>
                   {likerUsers.map((u) => (
                     <TouchableOpacity
@@ -962,7 +962,7 @@ export const PlanDetailModal: React.FC = () => {
                       activeOpacity={0.7}
                     >
                       <Avatar initials={u.initials} bg={u.avatarBg} color={u.avatarColor} size="S" avatarUrl={u.avatarUrl ?? undefined} />
-                      <Text style={[st.likerName, { color: C.black }]}>{u.displayName}</Text>
+                      <Text style={[st.likerName, { color: Colors.textPrimary }]}>{u.displayName}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -1052,7 +1052,7 @@ export const PlanDetailModal: React.FC = () => {
 const st = StyleSheet.create({
   container: { flex: 1 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { fontSize: 14, fontFamily: Fonts.serif },
+  loadingText: { fontSize: 14, fontFamily: Fonts.body },
 
   // Floating header
   floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
@@ -1060,9 +1060,9 @@ const st = StyleSheet.create({
   floatingRight: { flexDirection: 'row', gap: 8 },
 
   // Owner menu
-  planMenu: { position: 'absolute', right: 16, borderRadius: 14, borderWidth: 1, paddingVertical: 4, zIndex: 999, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, minWidth: 160 },
+  planMenu: { position: 'absolute', right: 16, borderRadius: 14, borderWidth: 1, paddingVertical: 4, zIndex: 999, elevation: 10, shadowColor: 'rgba(44, 36, 32, 0.25)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, minWidth: 160 },
   planMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  planMenuText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  planMenuText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   planMenuDivider: { height: 1, marginHorizontal: 10 },
 
   // Scroll
@@ -1073,42 +1073,42 @@ const st = StyleSheet.create({
   heroImageWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_H * 0.65 },
   heroContent: { position: 'absolute', bottom: 28, left: 20, right: 20 },
-  heroBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 },
-  heroBadgeText: { fontSize: 11, fontFamily: Fonts.serifSemiBold, color: '#FFF', textTransform: 'uppercase', letterSpacing: 0.5 },
-  heroTitle: { fontSize: 26, fontFamily: Fonts.serifBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  heroBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(44, 36, 32, 0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 },
+  heroBadgeText: { fontSize: 11, fontFamily: Fonts.bodySemiBold, color: '#FFF', textTransform: 'uppercase', letterSpacing: 0.5 },
+  heroTitle: { fontSize: 26, fontFamily: Fonts.displayBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   heroDots: { position: 'absolute', bottom: 12, alignSelf: 'center', flexDirection: 'row', gap: 5 },
-  heroDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+  heroDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(44, 36, 32, 0.35)' },
   heroDotActive: { backgroundColor: '#FFF', width: 18 },
 
   // Identity card
-  idCard: { marginTop: -30, marginHorizontal: 16, borderRadius: 16, borderWidth: 1, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 8 },
+  idCard: { marginTop: -30, marginHorizontal: 16, borderRadius: 16, borderWidth: 1, padding: 16, shadowColor: 'rgba(44, 36, 32, 0.15)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 8 },
   idTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   idInfo: { flex: 1 },
-  idName: { fontSize: 15, fontFamily: Fonts.serifBold, marginBottom: 2 },
+  idName: { fontSize: 15, fontFamily: Fonts.displayBold, marginBottom: 2 },
   idMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  idRank: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  idRank: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
   idDot: { width: 3, height: 3, borderRadius: 1.5 },
-  idTime: { fontSize: 11, fontFamily: Fonts.serif },
+  idTime: { fontSize: 11, fontFamily: Fonts.body },
   pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  pillText: { fontSize: 12, fontFamily: Fonts.serifSemiBold },
+  pillText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 
   // Tags
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 18, marginTop: 14, gap: 6 },
 
   // Proof banner
   proofBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 14, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
-  proofBannerText: { fontSize: 13, fontFamily: Fonts.serifBold },
+  proofBannerText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
   // Creator tip
   tipWrap: { flexDirection: 'row', marginHorizontal: 18, marginTop: 18 },
   tipBar: { width: 3, borderRadius: 1.5, backgroundColor: Colors.primary, marginRight: 12 },
   tipBody: { flex: 1 },
-  tipLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
-  tipText: { fontSize: 14, fontFamily: Fonts.serif, fontStyle: 'italic', lineHeight: 20 },
+  tipLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
+  tipText: { fontSize: 14, fontFamily: Fonts.displayItalic, lineHeight: 20 },
 
   // Section label
-  sectionLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
+  sectionLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
 
   // Itinerary
   itinerary: { paddingHorizontal: 10 },
@@ -1119,7 +1119,7 @@ const st = StyleSheet.create({
   tlLineBot: { width: 2, flex: 1, backgroundColor: Colors.primary + '40' },
   tlLineFull: { width: 2, flex: 1, minHeight: 20, backgroundColor: Colors.primary + '40' },
   tlCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  tlNum: { fontSize: 13, fontWeight: '700', color: '#FFF' },
+  tlNum: { fontSize: 13, fontWeight: '700', color: Colors.textOnAccent },
 
   // Place card
   placeRow: { flexDirection: 'row' },
@@ -1127,72 +1127,72 @@ const st = StyleSheet.create({
   placeCardImg: { width: '100%', height: 140, resizeMode: 'cover' },
   placeCardBody: { padding: 12 },
   placeCardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  placeName: { fontSize: 14, fontFamily: Fonts.serifBold, marginBottom: 2 },
-  reservationAsterisk: { fontSize: 10, color: '#C8571A' },
-  reservationLegend: { fontSize: 10, fontStyle: 'italic', paddingHorizontal: 20, marginTop: 8, marginBottom: 4 },
-  placeType: { fontSize: 12, fontFamily: Fonts.serif, marginBottom: 4 },
+  placeName: { fontSize: 14, fontFamily: Fonts.displayBold, marginBottom: 2 },
+  reservationAsterisk: { fontSize: 10, color: Colors.primary },
+  reservationLegend: { fontSize: 10, fontFamily: Fonts.body, fontStyle: 'italic', paddingHorizontal: 20, marginTop: 8, marginBottom: 4 },
+  placeType: { fontSize: 12, fontFamily: Fonts.body, marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  ratingNum: { fontSize: 12, fontFamily: Fonts.serifSemiBold, marginRight: 4 },
-  ratingCnt: { fontSize: 11, fontFamily: Fonts.serif },
+  ratingNum: { fontSize: 12, fontFamily: Fonts.bodySemiBold, marginRight: 4 },
+  ratingCnt: { fontSize: 11, fontFamily: Fonts.body },
   placeMetaRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
   placeMetaPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  placeMetaText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  placeMetaText: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
 
   // Inline widgets inside place card
   inlineAddr: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  inlineAddrText: { fontSize: 11, fontFamily: Fonts.serif, flex: 1 },
+  inlineAddrText: { fontSize: 11, fontFamily: Fonts.body, flex: 1 },
   inlineQuote: { borderLeftWidth: 3, paddingLeft: 8, marginTop: 8 },
-  inlineQuoteText: { fontSize: 12, fontFamily: Fonts.serif, fontStyle: 'italic', lineHeight: 17 },
+  inlineQuoteText: { fontSize: 12, fontFamily: Fonts.displayItalic, lineHeight: 17 },
   inlineQa: { marginTop: 8, borderRadius: 8, padding: 8 },
-  inlineQaLabel: { fontSize: 10, fontFamily: Fonts.serif, marginBottom: 2 },
-  inlineQaAnswer: { fontSize: 12, fontFamily: Fonts.serifSemiBold, lineHeight: 17 },
+  inlineQaLabel: { fontSize: 10, fontFamily: Fonts.body, marginBottom: 2 },
+  inlineQaAnswer: { fontSize: 12, fontFamily: Fonts.bodySemiBold, lineHeight: 17 },
 
   // Travel
   travelRow: { flexDirection: 'row', paddingVertical: 2 },
   travelBubble: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
-  travelText: { fontSize: 11, fontFamily: Fonts.serifSemiBold },
+  travelText: { fontSize: 11, fontFamily: Fonts.bodySemiBold },
   travelDot: { width: 3, height: 3, borderRadius: 1.5 },
 
   // Social proof
   socialProof: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 20, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
-  socialProofText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  socialProofText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   socialDot: { width: 3, height: 3, borderRadius: 1.5 },
-  socialDeclined: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  socialDeclined: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
   // Similar plans
   similarScroll: { paddingHorizontal: 16, gap: 12, paddingBottom: 8 },
   similarCard: { width: 160, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   similarImg: { width: 160, height: 100, resizeMode: 'cover' },
   similarBody: { padding: 10 },
-  similarTitle: { fontSize: 13, fontFamily: Fonts.serifBold, marginBottom: 2 },
-  similarAuthor: { fontSize: 11, fontFamily: Fonts.serif },
+  similarTitle: { fontSize: 13, fontFamily: Fonts.displaySemiBold, marginBottom: 2 },
+  similarAuthor: { fontSize: 11, fontFamily: Fonts.body },
 
   // Bottom bar
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, paddingTop: 8, paddingHorizontal: 16 },
   doItNowBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, marginBottom: 8 },
-  doItNowText: { color: '#FFF', fontSize: 15, fontFamily: Fonts.serifBold },
+  doItNowText: { color: Colors.textOnAccent, fontSize: 15, fontFamily: Fonts.bodySemiBold },
   actionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8 },
-  actionText: { fontSize: 13, fontFamily: Fonts.serifSemiBold },
+  actionText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
   // Comment sheet
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetKav: { maxHeight: '80%' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 12 },
-  sheetTitle: { fontSize: 16, fontFamily: Fonts.serifBold, marginBottom: 12 },
+  sheetTitle: { fontSize: 16, fontFamily: Fonts.displaySemiBold, marginBottom: 12 },
   sheetScroll: { maxHeight: SCREEN_H * 0.45 },
   emptyComments: { alignItems: 'center', paddingVertical: 30, paddingHorizontal: 18 },
-  emptyText: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
-  emptySub: { fontSize: 12, fontFamily: Fonts.serif, marginTop: 4 },
+  emptyText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+  emptySub: { fontSize: 12, fontFamily: Fonts.body, marginTop: 4 },
   commentRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1 },
   commentBody: { flex: 1, marginLeft: 10 },
   commentHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
-  commentAuthor: { fontSize: 13, fontFamily: Fonts.serifBold },
+  commentAuthor: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
   commentTime: { fontSize: 11 },
-  commentText: { fontSize: 13, fontFamily: Fonts.serif, lineHeight: 18 },
+  commentText: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, minHeight: 38, marginTop: 8 },
-  commentPlaceholder: { fontSize: 13, fontFamily: Fonts.serif },
+  commentPlaceholder: { fontSize: 13, fontFamily: Fonts.body },
   commentInput: { flex: 1, fontSize: 13, maxHeight: 60, paddingVertical: 0 },
   sendBtn: { marginLeft: 8, paddingHorizontal: 4 },
 
@@ -1200,11 +1200,11 @@ const st = StyleSheet.create({
   likesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, marginTop: 14 },
   likesAvatars: { flexDirection: 'row', alignItems: 'center' },
   likerAvatarWrap: { zIndex: 1 },
-  likesText: { flex: 1, fontSize: 12, fontFamily: Fonts.serif },
-  likesName: { fontFamily: Fonts.serifBold },
+  likesText: { flex: 1, fontSize: 12, fontFamily: Fonts.body },
+  likesName: { fontFamily: Fonts.bodySemiBold },
 
   // Likers sheet
   likersScroll: { maxHeight: SCREEN_H * 0.45 },
   likerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4 },
-  likerName: { fontSize: 14, fontFamily: Fonts.serifSemiBold },
+  likerName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
 });
