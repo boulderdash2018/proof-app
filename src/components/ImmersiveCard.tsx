@@ -17,7 +17,8 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, getRankForProofs } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
-import { Plan, TravelSegment, TransportMode } from '../types';
+import { Plan, TravelSegment, TransportMode, Comment } from '../types';
+import { fetchComments } from '../services/plansService';
 
 /* ================================================================
    ImmersiveCard — pull-down to reveal plan detail
@@ -63,6 +64,19 @@ const fmtMin = (m: number): string => {
   const h = Math.floor(m / 60);
   const r = m % 60;
   return r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
+};
+
+const getCommentTimeAgo = (dateStr: string): string => {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}j`;
 };
 
 // ── Layout ───────────────────────────────────────────────────
@@ -112,6 +126,14 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const isDetailRef = useRef(false);
   const isCommitting = useRef(false);
   const [hasScrolled, setHasScrolled] = useState(false);
+
+  // ── Inline comments (fetched when detail opens) ─────────────
+  const [inlineComments, setInlineComments] = useState<Comment[]>([]);
+  useEffect(() => {
+    if (isDetailOpen) {
+      fetchComments(plan.id).then(setInlineComments).catch(() => {});
+    }
+  }, [isDetailOpen, plan.id]);
 
   // ── Cover photo & rank ─────────────────────────────────────
   const coverUrl =
@@ -572,7 +594,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
             </Animated.View>
           </View>
 
-          {/* ══ DETAIL CONTENT (below fold) ══ */}
+          {/* ══ DETAIL CONTENT — editorial layout (hero → metrics → pull-quote → timeline → tags → comments → CTA) ══ */}
           <View style={styles.detail}>
             {/* Return indicator */}
             {isDetailOpen && (
@@ -586,385 +608,275 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </View>
             )}
 
-            {/* 0 — Title & meta */}
+            {/* ═══════ SECTION 1 — Hero immersif ═══════ */}
             <Animated.View
-              style={{
-                opacity: d0.opacity,
-                transform: [{ translateY: d0.translateY }],
-              }}
+              style={[styles.heroSection, { opacity: d0.opacity, transform: [{ translateY: d0.translateY }] }]}
             >
-              <View style={styles.detailTitleRow}>
-                <Text style={styles.detailTitle}>{plan.title}</Text>
-                {plan.timeAgo ? (
-                  <Text style={styles.detailTimeAgo}>{plan.timeAgo}</Text>
-                ) : null}
-              </View>
-              <View style={styles.detailMeta}>
-                {plan.price ? (
-                  <View style={styles.metaPill}>
-                    <Ionicons
-                      name="wallet-outline"
-                      size={13}
-                      color={Colors.textSecondary}
-                    />
-                    <Text style={styles.metaPillText}>{plan.price}</Text>
-                  </View>
-                ) : null}
-                {plan.duration ? (
-                  <View style={styles.metaPill}>
-                    <Ionicons
-                      name="time-outline"
-                      size={13}
-                      color={Colors.textSecondary}
-                    />
-                    <Text style={styles.metaPillText}>{plan.duration}</Text>
-                  </View>
-                ) : null}
-                {plan.places?.length > 0 ? (
-                  <View style={styles.metaPill}>
-                    <Ionicons
-                      name="location-outline"
-                      size={13}
-                      color={Colors.textSecondary}
-                    />
-                    <Text style={styles.metaPillText}>
-                      {plan.places.length} lieu
-                      {plan.places.length > 1 ? 'x' : ''}
-                    </Text>
-                  </View>
-                ) : null}
-                {plan.transport ? (
-                  <View style={styles.metaPill}>
-                    <Ionicons
-                      name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
-                      size={13}
-                      color={Colors.textSecondary}
-                    />
-                    <Text style={styles.metaPillText}>{plan.transport}</Text>
-                  </View>
-                ) : null}
-                {plan.places?.some((p: any) => p.latitude && p.longitude) && (
-                  <TouchableOpacity style={styles.mapPill} onPress={onMapPress} activeOpacity={0.7}>
-                    <Ionicons name="map-outline" size={13} color={Colors.primary} />
-                    <Text style={styles.mapPillText}>Map</Text>
-                  </TouchableOpacity>
+              <View style={styles.heroImageWrap}>
+                {coverUrl ? (
+                  <Image source={{ uri: coverUrl }} style={styles.heroImage} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.heroImage, { backgroundColor: Colors.gray300 }]} />
                 )}
-              </View>
-            </Animated.View>
-
-            {/* 1 — Action bar (like, comment, save, share) */}
-            <Animated.View
-              style={{
-                opacity: d1.opacity,
-                transform: [{ translateY: d1.translateY }],
-              }}
-            >
-              <View style={styles.detailActionBar}>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onLike} activeOpacity={0.7}>
-                  <Ionicons
-                    name={isLiked ? 'heart' : 'heart-outline'}
-                    size={22}
-                    color={isLiked ? Colors.primary : Colors.textSecondary}
-                  />
-                  {likesCount > 0 && (
-                    <Text style={[styles.detailActionCount, isLiked && { color: Colors.primary }]}>
-                      {likesCount}
+                <LinearGradient
+                  colors={['transparent', 'rgba(44,36,32,0.2)', 'rgba(44,36,32,0.78)']}
+                  locations={[0, 0.5, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={styles.heroTextOverlay}>
+                  {plan.tags && plan.tags.length > 0 ? (
+                    <Text style={styles.heroOverline}>
+                      {plan.tags.slice(0, 2).map((t) => t.toUpperCase()).join(' · ')}
                     </Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onComment} activeOpacity={0.7}>
-                  <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
-                  {commentsCount > 0 && (
-                    <Text style={styles.detailActionCount}>{commentsCount}</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onSave} activeOpacity={0.7}>
-                  <Ionicons
-                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                    size={20}
-                    color={isSaved ? Colors.primary : Colors.textSecondary}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onShare} activeOpacity={0.7}>
-                  <Ionicons name="paper-plane-outline" size={20} color={Colors.textSecondary} />
-                </TouchableOpacity>
+                  ) : null}
+                  <Text style={styles.heroTitle} numberOfLines={3}>{plan.title}</Text>
+                  <TouchableOpacity style={styles.heroAuthorRow} onPress={onAuthorPress} activeOpacity={0.7}>
+                    <View style={[styles.heroAuthorAvatar, { backgroundColor: plan.author?.avatarBg || '#444' }]}>
+                      {plan.author?.avatarUrl ? (
+                        <Image source={{ uri: plan.author.avatarUrl }} style={styles.heroAuthorAvatarImg} />
+                      ) : (
+                        <Text style={[styles.heroAuthorInitials, { color: plan.author?.avatarColor || '#FFF' }]}>
+                          {plan.author?.initials || '?'}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.heroAuthorText}>
+                      par {plan.author?.displayName || 'Inconnu'}
+                      {plan.city ? ` · ${plan.city}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </Animated.View>
 
-            {/* 2 — Tags */}
-            {plan.tags?.length > 0 && (
-              <Animated.View
-                style={[
-                  styles.detailTags,
-                  {
-                    opacity: d1.opacity,
-                    transform: [{ translateY: d1.translateY }],
-                  },
-                ]}
-              >
-                {plan.tags.map((tag, i) => (
-                  <View key={i} style={styles.detailTagChip}>
-                    <Text style={styles.detailTagText}>{tag}</Text>
-                  </View>
-                ))}
-              </Animated.View>
-            )}
+            {/* ═══════ SECTION 2 — Metrics (horizontal line with fine separators) ═══════ */}
+            <Animated.View
+              style={[styles.metricsRow, { opacity: d1.opacity, transform: [{ translateY: d1.translateY }] }]}
+            >
+              {plan.price ? (
+                <View style={styles.metricItem}>
+                  <Ionicons name="wallet-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.metricText}>{plan.price}</Text>
+                </View>
+              ) : null}
+              {plan.price && plan.duration ? <View style={styles.metricSep} /> : null}
+              {plan.duration ? (
+                <View style={styles.metricItem}>
+                  <Ionicons name="time-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.metricText}>{plan.duration}</Text>
+                </View>
+              ) : null}
+              {(plan.price || plan.duration) && plan.places?.length > 0 ? <View style={styles.metricSep} /> : null}
+              {plan.places?.length > 0 ? (
+                <View style={styles.metricItem}>
+                  <Ionicons name="location-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.metricText}>{plan.places.length} lieu{plan.places.length > 1 ? 'x' : ''}</Text>
+                </View>
+              ) : null}
+              {plan.transport ? <View style={styles.metricSep} /> : null}
+              {plan.transport ? (
+                <View style={styles.metricItem}>
+                  <Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={16} color={Colors.primary} />
+                  <Text style={styles.metricText}>{plan.transport}</Text>
+                </View>
+              ) : null}
+              {plan.places?.some((p: any) => p.latitude && p.longitude) ? (
+                <>
+                  <View style={styles.metricSep} />
+                  <TouchableOpacity style={styles.metricItem} onPress={onMapPress} activeOpacity={0.7}>
+                    <Ionicons name="map-outline" size={16} color={Colors.primary} />
+                    <Text style={[styles.metricText, { color: Colors.primary }]}>Map</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+            </Animated.View>
 
-            {/* 3 — Creator's tip */}
+            {/* ═══════ SECTION 3 — Creator tip as editorial pull-quote ═══════ */}
             {(() => {
               const creatorTip = plan.places?.find((p) => p.comment)?.comment;
               if (!creatorTip) return null;
               return (
                 <Animated.View
-                  style={{
-                    opacity: d2.opacity,
-                    transform: [{ translateY: d2.translateY }],
-                  }}
+                  style={[styles.tipSection, { opacity: d1.opacity, transform: [{ translateY: d1.translateY }] }]}
                 >
-                  <View style={styles.tipWrap}>
-                    <View style={styles.tipBar} />
-                    <View style={styles.tipBody}>
-                      <Text style={styles.tipLabel}>Conseil du créateur</Text>
-                      <Text style={styles.tipText}>"{creatorTip}"</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.tipQuoteMark}>&ldquo;</Text>
+                  <Text style={styles.tipQuote}>{creatorTip}</Text>
+                  <Text style={styles.tipAttribution}>— {plan.author?.displayName || 'Créateur'}, créateur</Text>
                 </Animated.View>
               );
             })()}
 
-            {/* 4 — "Do it now" CTA — launches plan directly */}
+            {/* ═══════ SECTION 4 — Itinerary timeline (Citymapper × Airbnb) ═══════ */}
             <Animated.View
-              style={{
-                opacity: d2.opacity,
-                transform: [{ translateY: d2.translateY }],
-              }}
+              style={[styles.itinerarySection, { opacity: d2.opacity, transform: [{ translateY: d2.translateY }] }]}
             >
-              <TouchableOpacity
-                style={styles.doItNowBtn}
-                activeOpacity={0.8}
-                onPress={onDoItNow}
-              >
-                <Ionicons name="navigate" size={18} color={Colors.textOnAccent} />
-                <Text style={styles.doItNowText}>Do it now</Text>
-              </TouchableOpacity>
-            </Animated.View>
-
-            {/* 5 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
-            <Animated.View
-              style={{
-                opacity: d4.opacity,
-                transform: [{ translateY: d4.translateY }],
-              }}
-            >
-              <Text style={styles.sectionTitle}>Itinéraire</Text>
+              <View style={styles.itineraryHeader}>
+                <Text style={styles.itineraryTitle}>Itinéraire</Text>
+                {plan.duration ? (
+                  <Text style={styles.itineraryMeta}>{plan.places?.length || 0} étapes · {plan.duration}</Text>
+                ) : null}
+              </View>
               {plan.places?.map((place, i) => {
                 const isLast = i === (plan.places?.length ?? 0) - 1;
                 const placePhoto = place.customPhoto || place.photoUrls?.[0];
-
-                // Find travel segment to next place
                 const travelToNext: TravelSegment | undefined =
                   plan.travelSegments?.find(
                     (ts) => ts.fromPlaceId === place.id || ts.fromPlaceId === place.googlePlaceId,
                   ) || (plan.travelSegments && plan.travelSegments[i]);
 
                 return (
-                  <View key={place.id || i}>
-                    {/* Place card */}
-                    <View style={styles.placeRow}>
-                      {/* Timeline column */}
-                      <View style={styles.tlCol}>
-                        <View style={[styles.tlLineTop, i === 0 && { backgroundColor: 'transparent' }]} />
-                        <View style={styles.tlCircle}>
-                          <Text style={styles.tlNum}>{i + 1}</Text>
+                  <React.Fragment key={place.id || i}>
+                    <TouchableOpacity
+                      style={styles.timelineStep}
+                      activeOpacity={0.7}
+                      onPress={() => onPlacePress(place.id)}
+                    >
+                      <View style={styles.timelineLeft}>
+                        <View style={styles.timelineNodeHalo}>
+                          <View style={styles.timelineNode} />
                         </View>
-                        <View style={[styles.tlLineBot, isLast && !travelToNext && { backgroundColor: 'transparent' }]} />
+                        {!isLast && <View style={styles.timelineLine} />}
                       </View>
-
-                      {/* Card body — tappable */}
-                      <TouchableOpacity
-                        style={styles.placeBody}
-                        activeOpacity={0.7}
-                        onPress={() => onPlacePress(place.id)}
-                      >
-                        {placePhoto && (
-                          <Image
-                            source={{ uri: placePhoto }}
-                            style={styles.placePhoto}
-                            resizeMode="cover"
-                          />
-                        )}
-                        <View style={styles.placeInfo}>
-                          {/* Name + reservation + chevron */}
-                          <View style={styles.placeHead}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.placeName}>
-                                {place.name}
-                                {place.reservationRecommended ? (
-                                  <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
-                                ) : null}
-                              </Text>
-                              <Text style={styles.placeType}>{place.type}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
+                      <View style={styles.timelineContent}>
+                        <View style={styles.timelinePlaceHead}>
+                          <Text style={styles.timelinePlaceName}>
+                            {place.name}
+                            {place.reservationRecommended ? (
+                              <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
+                            ) : null}
+                          </Text>
+                          <Text style={styles.timelinePlaceType}>{place.type}</Text>
+                        </View>
+                        {place.rating > 0 ? (
+                          <View style={styles.timelineRating}>
+                            <Ionicons name="star" size={11} color="#F5A623" />
+                            <Text style={styles.timelineRatingText}>{place.rating}</Text>
+                            {place.reviewCount > 0 ? (
+                              <Text style={styles.timelineRatingCount}> ({place.reviewCount})</Text>
+                            ) : null}
                           </View>
-
-                          {/* Rating */}
-                          {place.rating > 0 && (
-                            <View style={styles.ratingRow}>
-                              <Ionicons name="star" size={11} color="#F5A623" style={{ marginRight: 3 }} />
-                              <Text style={styles.ratingNum}>{place.rating}</Text>
-                              {place.reviewCount > 0 && (
-                                <Text style={styles.ratingCnt}>({place.reviewCount} avis)</Text>
-                              )}
-                            </View>
-                          )}
-
-                          {/* Price / Duration pills */}
-                          {(place.placePrice != null || place.placeDuration != null) && (
-                            <View style={styles.placeMetaRow}>
-                              {place.placePrice != null && place.placePrice > 0 && (
-                                <View style={styles.placeMetaPill}>
-                                  <Text style={styles.placeMetaText}>{place.placePrice}€</Text>
-                                </View>
-                              )}
-                              {place.placeDuration != null && place.placeDuration > 0 && (
-                                <View style={styles.placeMetaPill}>
-                                  <Text style={styles.placeMetaText}>{fmtMin(place.placeDuration)}</Text>
-                                </View>
-                              )}
-                            </View>
-                          )}
-
-                          {/* Address */}
-                          {place.address ? (
-                            <View style={styles.inlineAddr}>
-                              <Ionicons name="location-outline" size={12} color={Colors.textTertiary} />
-                              <Text style={styles.placeAddress} numberOfLines={1}>
-                                {place.address.split(',')[0]}
-                              </Text>
-                            </View>
-                          ) : null}
-
-                          {/* Creator's comment */}
-                          {place.comment ? (
-                            <View style={styles.inlineQuote}>
-                              <Text style={styles.placeComment} numberOfLines={2}>
-                                "{place.comment}"
-                              </Text>
-                            </View>
-                          ) : null}
-
-                          {/* Q&A answers */}
-                          {(place.questions && place.questions.length > 0
-                            ? place.questions
-                            : place.questionAnswer && place.question
-                              ? [{ question: place.question, answer: place.questionAnswer }]
-                              : []
-                          ).map((qa, qIdx) => (
-                            <View key={qIdx} style={styles.inlineQa}>
-                              <Text style={styles.inlineQaLabel}>{qa.question}</Text>
-                              <Text style={styles.inlineQaAnswer} numberOfLines={2}>{qa.answer}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Travel segment to next place */}
-                    {!isLast && (
-                      <View style={styles.travelRow}>
-                        <View style={styles.tlCol}>
-                          <View style={styles.tlLineFull} />
-                        </View>
-                        <View style={styles.travelBubble}>
-                          {travelToNext ? (
-                            <>
-                              <Ionicons
-                                name={(TRANSPORT_ICONS[travelToNext.transport] || 'walk-outline') as any}
-                                size={13}
-                                color={Colors.primary}
-                              />
-                              <Text style={styles.travelText}>{travelToNext.transport}</Text>
-                              <View style={styles.travelDot} />
-                              <Text style={styles.travelText}>{fmtMin(travelToNext.duration)}</Text>
-                            </>
-                          ) : (
-                            <>
-                              <Ionicons
-                                name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
-                                size={13}
-                                color={Colors.textTertiary}
-                              />
-                              <Text style={[styles.travelText, { color: Colors.textTertiary }]}>{plan.transport || 'À pied'}</Text>
-                            </>
-                          )}
-                        </View>
+                        ) : null}
+                        {place.comment ? (
+                          <Text style={styles.timelineDesc} numberOfLines={3}>{place.comment}</Text>
+                        ) : null}
+                        {placePhoto ? (
+                          <Image source={{ uri: placePhoto }} style={styles.timelinePhoto} resizeMode="cover" />
+                        ) : null}
+                        {(place.questions && place.questions.length > 0
+                          ? place.questions
+                          : place.questionAnswer && place.question
+                            ? [{ question: place.question, answer: place.questionAnswer }]
+                            : []
+                        ).map((qa, qIdx) => (
+                          <View key={qIdx} style={styles.timelineQa}>
+                            <Text style={styles.timelineQaLabel}>{qa.question}</Text>
+                            <Text style={styles.timelineQaAnswer}>{qa.answer}</Text>
+                          </View>
+                        ))}
                       </View>
-                    )}
-                  </View>
+                    </TouchableOpacity>
+
+                    {/* Travel pill between steps (pill sits ON the line) */}
+                    {!isLast ? (
+                      <View style={styles.travelPillWrap}>
+                        <View style={styles.travelPillLineVert} />
+                        <View style={styles.travelPill}>
+                          <Ionicons
+                            name={(TRANSPORT_ICONS[travelToNext?.transport || plan.transport] || 'walk-outline') as any}
+                            size={12}
+                            color={Colors.textSecondary}
+                          />
+                          <Text style={styles.travelPillText}>
+                            {travelToNext
+                              ? `${travelToNext.transport} · ${fmtMin(travelToNext.duration)}`
+                              : (plan.transport || 'À pied')}
+                          </Text>
+                        </View>
+                        <View style={styles.travelPillLineVert} />
+                      </View>
+                    ) : null}
+                  </React.Fragment>
                 );
               })}
-
-              {/* Reservation legend */}
-              {plan.places?.some((p) => p.reservationRecommended) && (
+              {plan.places?.some((p) => p.reservationRecommended) ? (
                 <Text style={styles.reservationLegend}>﹡ Réservation recommandée</Text>
-              )}
+              ) : null}
             </Animated.View>
 
-            {/* 6 — Author */}
-            <Animated.View
-              style={{
-                opacity: d5.opacity,
-                transform: [{ translateY: d5.translateY }],
-              }}
-            >
-              <Text style={styles.sectionTitle}>Publié par</Text>
-              <TouchableOpacity
-                style={styles.authorCard}
-                activeOpacity={0.7}
-                onPress={onAuthorPress}
+            {/* ═══════ SECTION 5 — Tags (overline + pills) ═══════ */}
+            {plan.tags && plan.tags.length > 0 ? (
+              <Animated.View
+                style={[styles.tagsSection, { opacity: d3.opacity, transform: [{ translateY: d3.translateY }] }]}
               >
-                <View
-                  style={[
-                    styles.authorCardAvatar,
-                    { backgroundColor: plan.author?.avatarBg || '#444' },
-                  ]}
-                >
-                  {plan.author?.avatarUrl ? (
-                    <Image
-                      source={{ uri: plan.author.avatarUrl }}
-                      style={styles.authorCardImg}
-                    />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.authorCardInitials,
-                        { color: plan.author?.avatarColor || '#FFF' },
-                      ]}
-                    >
-                      {plan.author?.initials || '?'}
-                    </Text>
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.authorCardName}>
-                    {plan.author?.displayName}
-                  </Text>
-                  {rank && (
-                    <View style={{ marginTop: 4 }}>
-                      <RankBadge rank={rank} small />
+                <Text style={styles.overline}>DÉTAILS DU PLAN</Text>
+                <View style={styles.tagsList}>
+                  {plan.tags.map((tag, i) => (
+                    <View key={i} style={styles.tagPill}>
+                      <Text style={styles.tagPillText}>{tag}</Text>
                     </View>
-                  )}
+                  ))}
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={Colors.textTertiary}
-                />
+              </Animated.View>
+            ) : null}
+
+            {/* ═══════ SECTION 6 — Comments (inline last 3 + see all link) ═══════ */}
+            <Animated.View
+              style={[styles.commentsSection, { opacity: d4.opacity, transform: [{ translateY: d4.translateY }] }]}
+            >
+              <View style={styles.commentsHeader}>
+                <Text style={styles.commentsTitle}>Commentaires</Text>
+                {(plan.commentsCount || 0) > 0 ? (
+                  <Text style={styles.commentsCountBadge}>{plan.commentsCount}</Text>
+                ) : null}
+              </View>
+              {inlineComments.length > 0 ? (
+                inlineComments.slice(0, 3).map((c, idx, arr) => (
+                  <View key={c.id} style={[styles.commentRow, idx < arr.length - 1 && styles.commentRowDivider]}>
+                    <View style={[styles.commentAvatar, { backgroundColor: c.authorAvatarBg || Colors.gray300 }]}>
+                      {c.authorAvatarUrl ? (
+                        <Image source={{ uri: c.authorAvatarUrl }} style={styles.commentAvatarImg} />
+                      ) : (
+                        <Text style={[styles.commentAvatarInitials, { color: c.authorAvatarColor || Colors.textPrimary }]}>
+                          {c.authorInitials}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.commentBody}>
+                      <View style={styles.commentHeadRow}>
+                        <Text style={styles.commentAuthor}>{c.authorName}</Text>
+                        <Text style={styles.commentTime}>{getCommentTimeAgo(c.createdAt)}</Text>
+                      </View>
+                      <Text style={styles.commentText}>{c.text}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.commentsEmpty}>Sois le premier à commenter</Text>
+              )}
+              <TouchableOpacity onPress={onComment} style={styles.commentsSeeAll} activeOpacity={0.7}>
+                <Text style={styles.commentsSeeAllText}>
+                  {(plan.commentsCount || 0) > 3
+                    ? `Voir tous les ${plan.commentsCount} commentaires →`
+                    : 'Ajouter un commentaire →'}
+                </Text>
               </TouchableOpacity>
             </Animated.View>
 
-            <View style={{ height: 120 }} />
+            {/* ═══════ SECTION 7 — Final CTA "Do it now" (emotional climax) ═══════ */}
+            <Animated.View
+              style={[styles.ctaSection, { opacity: d5.opacity, transform: [{ translateY: d5.translateY }] }]}
+            >
+              <Text style={styles.ctaHook}>Prêt à vivre ce plan ?</Text>
+              <TouchableOpacity style={styles.ctaButton} onPress={onDoItNow} activeOpacity={0.85}>
+                <Ionicons name="compass" size={18} color={Colors.textOnAccent} />
+                <Text style={styles.ctaButtonText}>Do it now</Text>
+              </TouchableOpacity>
+              {plan.duration ? (
+                <Text style={styles.ctaSubtext}>⏱ Ce plan prend environ {plan.duration}</Text>
+              ) : null}
+            </Animated.View>
+
+            <View style={{ height: 140 }} />
           </View>
         </Animated.ScrollView>
       </View>
@@ -1200,18 +1112,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── Detail content ─────────────────────────────────────────
+  // ── Detail content (editorial) ─────────────────────────────
+  // NOTE: no `paddingHorizontal` — the hero is full-bleed. Each inner
+  // section below owns its own horizontal padding (typically 24px).
   detail: {
-    backgroundColor: Colors.bgSecondary,
+    backgroundColor: Colors.bgPrimary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 14,
     minHeight: 400,
   },
   returnHint: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   returnText: {
     fontSize: 11,
@@ -1219,425 +1132,452 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     marginTop: 2,
   },
-  detailTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 8,
-  } as any,
-  detailTitle: {
-    flex: 1,
-    fontSize: 24,
+  // ══════════════════════════════════════════════════════════
+  //  EDITORIAL DETAIL LAYOUT
+  // ══════════════════════════════════════════════════════════
+
+  // ── SECTION 1: Hero ──
+  heroSection: {
+    marginBottom: 26,
+  },
+  heroImageWrap: {
+    height: 320,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: Colors.gray300,
+    position: 'relative',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroTextOverlay: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    bottom: 24,
+  },
+  heroOverline: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta200,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  heroTitle: {
+    fontSize: 32,
+    lineHeight: 36,
     fontFamily: Fonts.displayBold,
-    color: Colors.textPrimary,
-    lineHeight: 30,
-    marginBottom: 12,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.5,
+    marginBottom: 14,
+    maxWidth: '92%',
   },
-  detailTimeAgo: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    color: Colors.textTertiary,
-    marginTop: 6,
-  },
-  detailMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  } as any,
-  metaPill: {
+  heroAuthorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Colors.bgTertiary,
+    gap: 10,
   } as any,
-  metaPillText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textSecondary,
-  },
-  mapPill: {
-    flexDirection: 'row',
+  heroAuthorAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Colors.primary + '20',
-  } as any,
-  mapPillText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.primary,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  // ── Detail action bar ──────────────────────────────────────
-  detailActionBar: {
+  heroAuthorAvatarImg: { width: 24, height: 24, borderRadius: 12 },
+  heroAuthorInitials: { fontSize: 10, fontFamily: Fonts.bodyBold },
+  heroAuthorText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: 'rgba(255,248,240,0.88)',
+  },
+
+  // ── SECTION 2: Metrics row ──
+  metricsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: Colors.bgTertiary,
-    borderRadius: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-  },
-  detailActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-  } as any,
-  detailActionCount: {
-    fontSize: 13,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textSecondary,
-  },
-  detailTags: {
-    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingBottom: 28,
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 20,
-  } as any,
-  detailTagChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: Colors.terracotta100,
-    borderWidth: 1,
-    borderColor: Colors.terracotta200,
-  },
-  detailTagText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.terracotta700,
-  },
-
-  // ── Do-it-now CTA ──────────────────────────────────────────
-  doItNowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginBottom: 24,
   } as any,
-  doItNowText: {
-    fontSize: 16,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textOnAccent,
-  },
-
-  // ── Section titles ─────────────────────────────────────────
-  sectionTitle: {
-    fontSize: 17,
-    fontFamily: Fonts.displaySemiBold,
-    color: Colors.textPrimary,
-    marginBottom: 14,
-    marginTop: 8,
-  },
-
-  // ── Creator's tip ───────────────────────────────────────────
-  tipWrap: {
+  metricItem: {
     flexDirection: 'row',
-    marginBottom: 20,
+    alignItems: 'center',
+    gap: 6,
+  } as any,
+  metricText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
   },
-  tipBar: {
-    width: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.primary,
-    marginRight: 12,
+  metricSep: {
+    width: 1,
+    height: 18,
+    backgroundColor: Colors.borderSubtle,
   },
-  tipBody: { flex: 1 },
-  tipLabel: {
-    fontSize: 10,
-    fontFamily: Fonts.bodySemiBold,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+
+  // ── SECTION 3: Tip pull-quote ──
+  tipSection: {
+    paddingHorizontal: 28,
+    paddingBottom: 36,
+    position: 'relative',
+  },
+  tipQuoteMark: {
+    position: 'absolute',
+    top: -18,
+    left: 14,
+    fontSize: 72,
+    lineHeight: 72,
+    fontFamily: Fonts.displayBold,
+    color: Colors.terracotta300,
+    opacity: 0.5,
+  },
+  tipQuote: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textPrimary,
+    paddingLeft: 8,
+  },
+  tipAttribution: {
+    marginTop: 14,
+    fontSize: 11,
+    fontFamily: Fonts.bodyMedium,
     color: Colors.textTertiary,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    paddingLeft: 8,
+  },
+
+  // ── SECTION 4: Itinerary timeline ──
+  itinerarySection: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  itineraryHeader: {
+    marginBottom: 18,
+  },
+  itineraryTitle: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
     marginBottom: 4,
   },
-  tipText: {
+  itineraryMeta: {
     fontSize: 13,
-    fontFamily: Fonts.displayItalic,
-    color: Colors.textSecondary,
-    lineHeight: 19,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
   },
-
-  // ── Timeline ──────────────────────────────────────────────
-  tlCol: {
-    width: 36,
-    alignItems: 'center',
+  timelineStep: {
+    flexDirection: 'row',
+    paddingBottom: 0,
   },
-  tlLineTop: {
-    width: 2,
-    height: 14,
-    backgroundColor: Colors.borderMedium,
-  },
-  tlLineBot: {
-    width: 2,
-    flex: 1,
-    backgroundColor: Colors.borderMedium,
-  },
-  tlLineFull: {
-    width: 2,
-    flex: 1,
-    minHeight: 18,
-    backgroundColor: Colors.borderMedium,
-  },
-  tlCircle: {
+  timelineLeft: {
     width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  timelineNodeHalo: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(196,112,75,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
-  tlNum: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textOnAccent,
+  timelineNode: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.primary,
+    borderWidth: 3,
+    borderColor: Colors.bgPrimary,
   },
-
-  // ── Place card (timeline layout) ──────────────────────────
-  placeRow: {
-    flexDirection: 'row',
-  },
-  placeBody: {
+  timelineLine: {
     flex: 1,
-    backgroundColor: Colors.bgPrimary,
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginLeft: 8,
+    width: 2,
+    backgroundColor: Colors.terracotta200,
+    marginTop: 2,
+    minHeight: 12,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingLeft: 20,
+    paddingBottom: 4,
+  },
+  timelinePlaceHead: {
     marginBottom: 4,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
   },
-  placePhoto: {
-    width: '100%',
-    height: 130,
-  },
-  placeInfo: {
-    padding: 12,
-  },
-  placeHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  placeName: {
-    fontSize: 14,
+  timelinePlaceName: {
+    fontSize: 18,
+    lineHeight: 22,
     fontFamily: Fonts.displaySemiBold,
     color: Colors.textPrimary,
-    marginBottom: 2,
+    letterSpacing: -0.2,
   },
   reservationAsterisk: {
     fontSize: 10,
-    color: '#C8571A',
+    color: Colors.primary,
   },
-  placeType: {
-    fontSize: 11,
-    fontFamily: Fonts.bodySemiBold,
+  timelinePlaceType: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
     color: Colors.textTertiary,
     textTransform: 'capitalize',
-    marginBottom: 4,
+    marginTop: 2,
   },
-
-  // Rating
-  ratingRow: {
+  timelineRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  ratingNum: {
-    fontSize: 11,
+    gap: 3,
+    marginTop: 4,
+  } as any,
+  timelineRatingText: {
+    fontSize: 12,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
-    marginRight: 4,
   },
-  ratingCnt: {
-    fontSize: 10,
-    fontFamily: Fonts.body,
-    color: Colors.textTertiary,
-  },
-
-  // Price / Duration pills
-  placeMetaRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
-    marginBottom: 4,
-  } as any,
-  placeMetaPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: Colors.bgTertiary,
-  },
-  placeMetaText: {
-    fontSize: 10,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textSecondary,
-  },
-
-  // Inline address
-  inlineAddr: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  } as any,
-  placeAddress: {
+  timelineRatingCount: {
     fontSize: 11,
     fontFamily: Fonts.body,
     color: Colors.textTertiary,
-    flex: 1,
   },
-
-  // Inline quote (creator's comment on place)
-  inlineQuote: {
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
-    paddingLeft: 8,
-    marginTop: 6,
-  },
-  placeComment: {
-    fontSize: 11,
-    fontFamily: Fonts.displayItalic,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-  },
-
-  // Inline Q&A
-  inlineQa: {
-    marginTop: 6,
-    borderRadius: 8,
-    padding: 8,
-    backgroundColor: 'rgba(44,36,32,0.04)',
-  },
-  inlineQaLabel: {
-    fontSize: 9,
+  timelineDesc: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 21,
     fontFamily: Fonts.body,
-    color: Colors.textTertiary,
-    marginBottom: 2,
-  },
-  inlineQaAnswer: {
-    fontSize: 11,
-    fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
-    lineHeight: 16,
   },
-
-  // Reservation legend
-  reservationLegend: {
-    fontSize: 10,
-    fontFamily: Fonts.displayItalic,
-    color: Colors.textTertiary,
-    marginTop: 6,
-    marginBottom: 4,
+  timelinePhoto: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginTop: 12,
+    backgroundColor: Colors.gray300,
   },
-
-  // ── Travel segment ────────────────────────────────────────
-  travelRow: {
-    flexDirection: 'row',
-    paddingVertical: 2,
-  },
-  travelBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginLeft: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  timelineQa: {
+    marginTop: 10,
+    padding: 12,
     borderRadius: 10,
-    backgroundColor: Colors.bgPrimary,
+    backgroundColor: Colors.terracotta50,
+  },
+  timelineQaLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.terracotta600,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  timelineQaAnswer: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+  },
+  travelPillWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 7,
+    paddingVertical: 4,
+    gap: 8,
+  } as any,
+  travelPillLineVert: {
+    width: 2,
+    height: 16,
+    backgroundColor: Colors.terracotta200,
+    marginLeft: 6,
+  },
+  travelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 99,
+    backgroundColor: Colors.bgSecondary,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
   } as any,
-  travelText: {
+  travelPillText: {
     fontSize: 11,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+  },
+  reservationLegend: {
+    marginTop: 10,
+    paddingLeft: 48,
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+  },
+
+  // ── SECTION 5: Tags ──
+  tagsSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  overline: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  tagsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  } as any,
+  tagPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: Colors.terracotta100,
+  },
+  tagPillText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.terracotta700,
+  },
+
+  // ── SECTION 6: Comments ──
+  commentsSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 36,
+  },
+  commentsHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  commentsTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+  },
+  commentsCountBadge: {
+    fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
   },
-  travelDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.textTertiary,
-  },
-
-  // ── Author card ────────────────────────────────────────────
-  authorCard: {
+  commentRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: Colors.bgTertiary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-  } as any,
-  authorCardAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    paddingVertical: 14,
+  },
+  commentRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
+  },
+  commentAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  authorCardImg: { width: 44, height: 44, borderRadius: 22 },
-  authorCardInitials: { fontSize: 16, fontWeight: '700' },
-  authorCardName: {
-    fontSize: 15,
-    fontFamily: Fonts.displaySemiBold,
+  commentAvatarImg: { width: 36, height: 36, borderRadius: 18 },
+  commentAvatarInitials: { fontSize: 13, fontFamily: Fonts.bodyBold },
+  commentBody: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  commentHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  commentAuthor: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
   },
-
-  // ── Below card ─────────────────────────────────────────────
-  belowCard: {
-    paddingHorizontal: 4,
-    paddingTop: 10,
+  commentTime: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
   },
-  belowMeta: {
+  commentText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+  },
+  commentsEmpty: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+    paddingVertical: 12,
+  },
+  commentsSeeAll: {
+    marginTop: 12,
+    paddingVertical: 6,
+  },
+  commentsSeeAllText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.primary,
+  },
+
+  // ── SECTION 7: Final CTA ──
+  ctaSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    paddingTop: 12,
+    alignItems: 'center',
+  },
+  ctaHook: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   } as any,
-  belowMetaText: {
-    color: Colors.textSecondary,
+  ctaButtonText: {
+    fontSize: 16,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.2,
+  },
+  ctaSubtext: {
+    marginTop: 14,
     fontSize: 12,
     fontFamily: Fonts.body,
-  },
-  belowDot: {
     color: Colors.textTertiary,
-    fontSize: 12,
-  },
-  belowTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-  } as any,
-  belowTagChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: Colors.bgTertiary,
-    borderWidth: 1,
-    borderColor: Colors.borderMedium,
-  },
-  belowTagText: {
-    color: Colors.textSecondary,
-    fontSize: 11,
-    fontFamily: Fonts.bodySemiBold,
+    textAlign: 'center',
   },
 
   // ── Sticky action bar (overlays card bottom in detail mode) ──
