@@ -2,8 +2,7 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useFonts as useFraunces, Fraunces_400Regular, Fraunces_500Medium, Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_400Regular_Italic, Fraunces_600SemiBold_Italic } from '@expo-google-fonts/fraunces';
-import { useFonts as useInter, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { useFonts, Inter_400Regular, Inter_400Regular_Italic, Inter_500Medium, Inter_600SemiBold, Inter_600SemiBold_Italic, Inter_700Bold } from '@expo-google-fonts/inter';
 import { RootNavigator } from './src/navigation';
 import { initPostHog } from './src/services/posthogConfig';
 import { useAuthStore } from './src/store';
@@ -11,19 +10,12 @@ import { useAuthStore } from './src/store';
 export default function App() {
   const loadSession = useAuthStore((s) => s.loadSession);
 
-  const [frauncesLoaded] = useFraunces({
-    Fraunces_400Regular,
-    Fraunces_500Medium,
-    Fraunces_600SemiBold,
-    Fraunces_700Bold,
-    Fraunces_400Regular_Italic,
-    Fraunces_600SemiBold_Italic,
-  });
-
-  const [interLoaded] = useInter({
+  const [fontsLoaded] = useFonts({
     Inter_400Regular,
+    Inter_400Regular_Italic,
     Inter_500Medium,
     Inter_600SemiBold,
+    Inter_600SemiBold_Italic,
     Inter_700Bold,
   });
 
@@ -32,7 +24,7 @@ export default function App() {
     loadSession();
   }, []);
 
-  if (!frauncesLoaded || !interLoaded) return null;
+  if (!fontsLoaded) return null;
 
   return (
     <SafeAreaProvider>
