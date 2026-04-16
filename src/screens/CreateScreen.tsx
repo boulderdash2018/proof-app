@@ -1959,105 +1959,180 @@ export const CreateScreen: React.FC = () => {
             </View>
           )}
 
-          {/* ═══════ STEP 3: Categories ═══════ */}
-          {step === 3 && (
-          <>
-          <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
-            Sélectionne les catégories qui décrivent le mieux ton plan. Tu peux en choisir plusieurs.
-          </Text>
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_category}</Text>
+          {/* ═══════ STEP 3: Categories — horizontal chip rows + subcategory cards ═══════ */}
+          {step === 3 && (() => {
+            const visibleThemes = EXPLORE_GROUPS.filter(g => g.key !== 'trending' && g.key !== 'nearby');
+            const visiblePersons = PERSON_FILTERS.filter(p => p.key !== 'around-you');
+            const personLabels = visiblePersons.map(p => p.label);
+            const themeLabels = visibleThemes.map(g => g.label);
+            const allSubcatNames = EXPLORE_GROUPS.flatMap(g => g.sections.flatMap(s => s.items.map(i => i.name)));
+            const countMain = selectedTags.filter(t => personLabels.includes(t) || themeLabels.includes(t)).length;
+            const countSub = selectedTags.filter(t => allSubcatNames.includes(t)).length;
+            const selectedThemeGroups = visibleThemes.filter(g => selectedTags.includes(g.label));
 
-          {/* Row 1: Par personne */}
-          <Text style={[styles.filterRowLabel, { color: C.gray500 }]}>Par personne</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
-            {PERSON_FILTERS.filter(p => p.key !== 'around-you').map((p) => {
-              const isSelected = selectedTags.includes(p.label);
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.groupChip, { backgroundColor: isSelected ? C.primary : C.gray200, borderColor: isSelected ? C.primary : C.borderLight }]}
-                  onPress={() => toggleTag(p.label)}
+            return (
+              <View style={{ flex: 1 }}>
+                {/* ── Fixed top: chip rows ── */}
+                <View>
+                  {/* PAR PERSONNE */}
+                  <Text style={styles.s3Overline}>PAR PERSONNE</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.s3ChipsRow}
+                  >
+                    {visiblePersons.map((p) => {
+                      const isSelected = selectedTags.includes(p.label);
+                      return (
+                        <TouchableOpacity
+                          key={p.key}
+                          style={[styles.s3Chip, isSelected && styles.s3ChipActive]}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            toggleTag(p.label);
+                          }}
+                          activeOpacity={0.75}
+                        >
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={13} color={Colors.terracotta700} style={{ marginRight: 2 }} />
+                          )}
+                          <Text style={styles.s3ChipEmoji}>{p.emoji}</Text>
+                          <Text style={[styles.s3ChipText, isSelected && styles.s3ChipTextActive]}>{p.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {/* PAR THÈME */}
+                  <Text style={[styles.s3Overline, { marginTop: 18 }]}>PAR THÈME</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.s3ChipsRow}
+                  >
+                    {visibleThemes.map((group) => {
+                      const isSelected = selectedTags.includes(group.label);
+                      return (
+                        <TouchableOpacity
+                          key={group.key}
+                          style={[styles.s3Chip, isSelected && styles.s3ChipActive]}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            toggleTag(group.label);
+                          }}
+                          activeOpacity={0.75}
+                        >
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={13} color={Colors.terracotta700} style={{ marginRight: 2 }} />
+                          )}
+                          <Text style={styles.s3ChipEmoji}>{group.emoji}</Text>
+                          <Text style={[styles.s3ChipText, isSelected && styles.s3ChipTextActive]}>{group.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  {errors.tags && <Text style={[styles.errorText, { marginTop: 8 }]}>{errors.tags}</Text>}
+                </View>
+
+                {/* ── Scrollable middle: subcategory blocks per selected theme ── */}
+                <ScrollView
+                  style={styles.s3SubScroll}
+                  contentContainerStyle={styles.s3SubScrollContent}
+                  showsVerticalScrollIndicator={false}
                 >
-                  <Text style={styles.groupChipEmoji}>{p.emoji}</Text>
-                  <Text style={[styles.groupChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{p.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                  {selectedThemeGroups.length === 0 ? (
+                    <View style={styles.s3EmptyState}>
+                      <Ionicons name="sparkles-outline" size={22} color={Colors.terracotta400} />
+                      <Text style={styles.s3EmptyText}>
+                        Sélectionne un thème ci-dessus pour préciser ton style
+                      </Text>
+                    </View>
+                  ) : (
+                    selectedThemeGroups.map((theme) => {
+                      const items = theme.sections.flatMap((s) => s.items);
+                      const selectedInTheme = items.filter((i) => selectedTags.includes(i.name)).length;
+                      return (
+                        <View key={theme.key} style={styles.s3SubBlock}>
+                          <View style={styles.s3SubHeader}>
+                            <View style={styles.s3SubHeaderLeft}>
+                              <Text style={styles.s3SubHeaderEmoji}>{theme.emoji}</Text>
+                              <Text style={styles.s3SubHeaderTitle}>{theme.label}</Text>
+                              <Text style={styles.s3SubHeaderSep}>—</Text>
+                              <Text style={styles.s3SubHeaderHint}>précise ton style</Text>
+                            </View>
+                            {selectedInTheme > 0 && (
+                              <Text style={styles.s3SubHeaderCount}>
+                                {selectedInTheme} choisi{selectedInTheme > 1 ? 's' : ''}
+                              </Text>
+                            )}
+                          </View>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.s3CardsRow}
+                          >
+                            {items.map((item) => {
+                              const isSelected = selectedTags.includes(item.name);
+                              return (
+                                <TouchableOpacity
+                                  key={item.name}
+                                  style={[styles.s3Card, isSelected && styles.s3CardActive]}
+                                  onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    toggleTag(item.name);
+                                  }}
+                                  activeOpacity={0.75}
+                                >
+                                  <Text style={styles.s3CardEmoji}>{item.emoji}</Text>
+                                  <Text
+                                    style={[styles.s3CardName, isSelected && styles.s3CardNameActive]}
+                                    numberOfLines={2}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  {isSelected && (
+                                    <View style={styles.s3CardCheck}>
+                                      <Ionicons name="checkmark" size={10} color={Colors.textOnAccent} />
+                                    </View>
+                                  )}
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                        </View>
+                      );
+                    })
+                  )}
+                </ScrollView>
 
-          {/* Row 2: Par thème + Voir + */}
-          <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 8 }]}>Par thème</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupChipsScroll} contentContainerStyle={styles.groupChipsContainer}>
-            {EXPLORE_GROUPS.filter(g => g.key !== 'trending' && g.key !== 'nearby').map((group) => {
-              const isActive = showSubcategories
-                ? selectedGroup === group.key
-                : selectedTags.includes(group.label);
-              return (
-                <TouchableOpacity
-                  key={group.key}
-                  style={[styles.groupChip, { backgroundColor: isActive ? C.primary : C.gray200, borderColor: isActive ? C.primary : C.borderLight }]}
-                  onPress={() => {
-                    if (showSubcategories) {
-                      setSelectedGroup(group.key);
-                    } else {
-                      toggleTag(group.label);
-                    }
-                  }}
-                >
-                  <Text style={styles.groupChipEmoji}>{group.emoji}</Text>
-                  <Text style={[styles.groupChipText, { color: isActive ? Colors.textOnAccent : C.gray800 }]}>{group.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={[styles.groupChip, { backgroundColor: showSubcategories ? Colors.gold : C.gray200, borderColor: showSubcategories ? Colors.gold : C.borderLight }]}
-              onPress={() => setShowSubcategories(!showSubcategories)}
-            >
-              <Text style={[styles.groupChipText, { color: showSubcategories ? Colors.textOnAccent : C.gray800, fontWeight: '700' }]}>Voir +</Text>
-              <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? Colors.textOnAccent : C.gray800} />
-            </TouchableOpacity>
-          </ScrollView>
-
-          {/* Subcategory list (visible when Voir + toggled) */}
-          {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
-            <View key={section.title} style={styles.categorySectionWrap}>
-              <Text style={[styles.categorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
-              <View>
-                {section.items.map((item, idx) => {
-                  const isSelected = selectedTags.includes(item.name);
-                  const isLast = idx === section.items.length - 1;
-                  return (
-                    <TouchableOpacity
-                      key={item.name}
-                      style={[styles.flatSubcatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }, isSelected && { backgroundColor: Colors.primary + '10' }]}
-                      onPress={() => toggleTag(item.name)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.flatSubcatEmoji}>{item.emoji}</Text>
-                      <View style={styles.flatSubcatTextCol}>
-                        <Text style={[styles.flatSubcatName, { color: C.black }]}>{item.name}</Text>
-                        {item.subtitle ? <Text style={[styles.flatSubcatSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
-                      </View>
-                      {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : null}
-                    </TouchableOpacity>
-                  );
-                })}
+                {/* ── Fixed bottom: summary recap ── */}
+                <View style={styles.s3Summary}>
+                  <Ionicons
+                    name={countMain > 0 ? 'sparkles' : 'sparkles-outline'}
+                    size={16}
+                    color={countMain > 0 ? Colors.primary : Colors.textTertiary}
+                  />
+                  {countMain > 0 ? (
+                    <Text style={styles.s3SummaryText}>
+                      <Text style={styles.s3SummaryStrong}>{countMain}</Text>
+                      {' '}catégorie{countMain > 1 ? 's' : ''}
+                      {countSub > 0 ? (
+                        <>
+                          {'  ·  '}
+                          <Text style={styles.s3SummaryStrong}>{countSub}</Text>
+                          {' '}style{countSub > 1 ? 's' : ''}
+                        </>
+                      ) : null}
+                    </Text>
+                  ) : (
+                    <Text style={styles.s3SummaryEmpty}>
+                      Sélectionne au moins 1 catégorie
+                    </Text>
+                  )}
+                </View>
               </View>
-            </View>
-          ))}
-          {selectedTags.length > 0 && (
-            <View style={styles.selectedTagsWrap}>
-              {selectedTags.map((tag) => (
-                <TouchableOpacity key={tag} style={[styles.selectedTagChip, { backgroundColor: C.primary + '20', borderColor: C.primary }]} onPress={() => toggleTag(tag)}>
-                  <Text style={[styles.selectedTagText, { color: C.primary }]}>{tag}</Text>
-                  <Ionicons name="close" size={14} color={C.primary} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          {errors.tags && <Text style={styles.errorText}>{errors.tags}</Text>}
-          </>
-          )}
+            );
+          })()}
 
           {/* ═══════ STEP 4: Places ═══════ */}
           {step === 4 && (
@@ -2720,6 +2795,204 @@ const styles = StyleSheet.create({
   },
   s4Header: {
     marginBottom: 10,
+  },
+
+  // ── STEP 3: Editorial categories (horizontal chips + subcategory cards) ──
+  s3Overline: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    marginBottom: 10,
+  },
+  s3ChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 24,
+  } as any,
+  s3Chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 99,
+    borderWidth: 1.5,
+    borderColor: Colors.borderMedium,
+    backgroundColor: 'transparent',
+  } as any,
+  s3ChipActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.terracotta100,
+  },
+  s3ChipEmoji: {
+    fontSize: 15,
+  },
+  s3ChipText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  s3ChipTextActive: {
+    color: Colors.terracotta700,
+    fontFamily: Fonts.bodySemiBold,
+  },
+
+  // Subcategory blocks (scrollable middle)
+  s3SubScroll: {
+    flex: 1,
+    marginTop: 18,
+  },
+  s3SubScrollContent: {
+    paddingBottom: 12,
+  } as any,
+  s3SubBlock: {
+    marginBottom: 18,
+  },
+  s3SubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  s3SubHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'nowrap',
+  } as any,
+  s3SubHeaderEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  s3SubHeaderTitle: {
+    fontSize: 15,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  s3SubHeaderSep: {
+    fontSize: 13,
+    color: Colors.textTertiary,
+    marginHorizontal: 6,
+  },
+  s3SubHeaderHint: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+  },
+  s3SubHeaderCount: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    letterSpacing: 0.2,
+  },
+
+  s3CardsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 24,
+    paddingTop: 6,
+    paddingBottom: 2,
+  } as any,
+  s3Card: {
+    width: 84,
+    height: 92,
+    borderRadius: 16,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1.5,
+    borderColor: Colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    position: 'relative',
+  } as any,
+  s3CardActive: {
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.terracotta100,
+  },
+  s3CardEmoji: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  s3CardName: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    lineHeight: 13,
+  },
+  s3CardNameActive: {
+    color: Colors.terracotta700,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  s3CardCheck: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: Colors.bgPrimary,
+  },
+
+  s3EmptyState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 22,
+    borderRadius: 14,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderColor: Colors.terracotta100,
+    marginTop: 6,
+  } as any,
+  s3EmptyText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+
+  s3Summary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.terracotta50,
+    marginTop: 8,
+  } as any,
+  s3SummaryText: {
+    fontSize: 14,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+  },
+  s3SummaryStrong: {
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+  },
+  s3SummaryEmpty: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
   },
   // ── STEP 1 (pre-step): Title composer ──
   s0Container: {
