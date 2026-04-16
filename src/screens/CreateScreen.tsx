@@ -1785,7 +1785,7 @@ export const CreateScreen: React.FC = () => {
           </Animated.View>
         </Animated.View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" scrollEnabled={!draggingId}>
+        <View style={[styles.scroll, styles.scrollContent, { flex: 1 }]}>
           {/* Draft indicator with discard option */}
           {(title.length > 0 || places.length > 0 || coverPhotos.length > 0) && useDraftStore.getState().getDraft(draftIdRef.current) && (
             <View style={[styles.draftBanner, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
@@ -2064,28 +2064,36 @@ export const CreateScreen: React.FC = () => {
 
           {/* ═══════ STEP 4: Places ═══════ */}
           {step === 4 && (
-          <>
-          <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
-            Au moins 2 lieux. Ajoute-les dans l'ordre où tu les enchaînes. Tape sur un lieu pour personnaliser (prix, durée, photo, note).
-          </Text>
-          <Text style={[styles.fieldLabel, { color: C.gray800 }]}>{t.create_places}</Text>
-          {places.length > 0 && (
-            <Text style={[styles.placesCount, { color: C.gray600 }]}>
-              {places.length} {t.create_places_added}
+          <View style={{ flex: 1 }}>
+          <View style={styles.s4Header}>
+            <Text style={[styles.fieldLabel, { color: C.gray800, marginBottom: 2 }]}>
+              {t.create_places}
+              {places.length > 0 ? <Text style={{ color: C.gray600, fontFamily: Fonts.body }}>  ({places.length})</Text> : null}
             </Text>
-          )}
+            <Text style={[styles.stepIntroCompact, { color: Colors.textSecondary }]}>
+              Tape sur un lieu pour personnaliser. Minimum 2 lieux.
+            </Text>
+          </View>
 
-          {/* Places with travel segments */}
-          {renderPlacesWithTravels()}
-
-          <TouchableOpacity
-            style={[styles.addPlaceBtn, { backgroundColor: C.primary + '10', borderColor: C.primary + '30' }]}
-            onPress={() => setShowPlacePicker(true)}
-            activeOpacity={0.7}
+          {/* Places list — internal bounded scroll so the step chrome stays fixed */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 10 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={!draggingId}
           >
-            <Text style={[styles.addPlaceText, { color: C.primary }]}>{t.create_add_place}</Text>
-          </TouchableOpacity>
-          {errors.places && <Text style={styles.errorText}>{errors.places}</Text>}
+            {renderPlacesWithTravels()}
+
+            <TouchableOpacity
+              style={[styles.addPlaceBtn, { backgroundColor: C.primary + '10', borderColor: C.primary + '30', marginTop: places.length > 0 ? 4 : 0 }]}
+              onPress={() => setShowPlacePicker(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.addPlaceText, { color: C.primary }]}>{t.create_add_place}</Text>
+            </TouchableOpacity>
+            {errors.places && <Text style={styles.errorText}>{errors.places}</Text>}
+          </ScrollView>
 
           {/* ========== AUTO-CALCULATED TOTALS ========== */}
           {places.length >= 2 && (
@@ -2136,9 +2144,9 @@ export const CreateScreen: React.FC = () => {
               <Text style={[styles.previewBtnText, { color: C.primary }]}>Preview</Text>
             </TouchableOpacity>
           )}
-          </>
+          </View>
           )}
-        </ScrollView>
+        </View>
         </Animated.View>
 
         {/* ═══════ Wizard footer — dynamic action per step ═══════ */}
@@ -2708,6 +2716,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 20,
   },
+  stepIntroCompact: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: Fonts.body,
+  },
+  s4Header: {
+    marginBottom: 10,
+  },
   // ── STEP 1 (pre-step): Title composer ──
   s0Container: {
     paddingTop: 40,
@@ -2820,12 +2836,15 @@ const styles = StyleSheet.create({
 
   // ── STEP 2: editorial hero layout ──
   s1Container: {
+    flex: 1,
     paddingTop: 6,
     paddingBottom: 20,
   },
   s1Hero: {
+    // Flex-sized so it adapts to available vertical space (no-scroll fit)
+    flex: 1,
     width: '100%',
-    aspectRatio: 4 / 5,
+    maxHeight: 440,
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: Colors.bgTertiary,
@@ -2834,7 +2853,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 28,
     elevation: 10,
-    marginBottom: 20,
+    marginBottom: 16,
     alignSelf: 'center',
   },
   s1HeroEmpty: {
