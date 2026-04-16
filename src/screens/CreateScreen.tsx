@@ -1368,6 +1368,28 @@ export const CreateScreen: React.FC = () => {
 
   const [showExactPrice, setShowExactPrice] = useState<Record<string, boolean>>({});
 
+  // ── Timeline (Step 4) interaction state ──
+  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(null);
+  const [expandedTravelIdx, setExpandedTravelIdx] = useState<number | null>(null);
+  const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [showVisibilitySheet, setShowVisibilitySheet] = useState(false);
+
+  const togglePlaceExpand = useCallback((id: string) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    setExpandedPlaceId((prev) => (prev === id ? null : id));
+    setExpandedTravelIdx(null);
+  }, []);
+
+  const toggleTravelExpand = useCallback((idx: number) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    setExpandedTravelIdx((prev) => (prev === idx ? null : idx));
+    setExpandedPlaceId(null);
+  }, []);
+
   const DURATION_PRESETS = ['15', '30', '45', '60', '90', '120', '180'];
   const formatDurationLabel = (min: string) => {
     const n = parseInt(min, 10);
@@ -1570,208 +1592,338 @@ export const CreateScreen: React.FC = () => {
     );
   }
 
-  // ========== RENDER PLACE + TRAVEL ITEMS ==========
-  const renderPlacesWithTravels = () => {
-    const items: React.ReactNode[] = [];
-
-    places.forEach((place, index) => {
-      // Place card
-      items.push(
-        <Animated.View
-          key={`place-${place.id}`}
-          style={[
-            styles.placeCard,
-            { backgroundColor: C.white, borderColor: C.borderLight },
-            { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
-            draggingId === place.id && {
-              shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
-              shadowRadius: 8, elevation: 8, borderColor: C.primary,
-            },
-            { zIndex: draggingId === place.id ? 100 : 1 },
-          ]}
-          {...getOrCreateDragHandlers(place.id).panHandlers}
-        >
-          <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={{ userSelect: 'none', cursor: draggingId === place.id ? 'grabbing' : 'default' } as any}>
-          <View style={styles.placeCardHeader}>
-            <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
-              <Text style={styles.placeNumberText}>{index + 1}</Text>
-            </View>
-            <View style={styles.placeCardInfo}>
-              <Text style={[styles.placeName, { color: C.black }]}>{place.name}</Text>
-              <Text style={[styles.placeType, { color: C.gray700 }]}>{place.type}</Text>
+  // ========== RENDER TIMELINE (editorial vertical timeline) ==========
+  const renderPlaceExpanded = (place: PlaceEntry, index: number) => {
+    const hasCustom = !!(place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0));
+    return (
+      <View style={styles.tlExpanded}>
+        {/* PRIX */}
+        <Text style={styles.tlFieldLabel}>PRIX ({cityConfig.currency})</Text>
+        <View style={styles.tlPillsRow}>
+          {PRICE_RANGES.map((range, ri) => {
+            const isSelected = place.priceRangeIndex === ri;
+            const label = range.max === 0 ? range.label : range.max === Infinity ? `${range.min}${cityConfig.currency}+` : `${range.label}${cityConfig.currency}`;
+            return (
               <TouchableOpacity
-                style={styles.reservationRow}
-                onPress={() => toggleReservation(place.id)}
+                key={ri}
+                style={[styles.tlPill, isSelected && styles.tlPillActive]}
+                onPress={() => updatePlacePriceRange(place.id, ri)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.reservationLabel, { color: place.reservationRecommended ? '#8B5E3C' : C.gray500 }]}>Book in advance</Text>
-                <View style={[styles.reservationToggle, { backgroundColor: place.reservationRecommended ? Colors.primary : C.gray400 }]}>
-                  <View style={[styles.reservationThumb, place.reservationRecommended && styles.reservationThumbOn]} />
-                </View>
+                <Text style={[styles.tlPillText, isSelected && styles.tlPillTextActive]}>{label}</Text>
               </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={[styles.placeRemove, { color: C.gray600 }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Per-place price range chips */}
-          <View style={{ marginTop: 4 }}>
-            <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_price}</Text>
-            <View style={styles.durationChipsRow}>
-              {PRICE_RANGES.map((range, ri) => {
-                const isSelected = place.priceRangeIndex === ri;
-                const label = range.max === 0 ? range.label : range.max === Infinity ? `${range.min}${cityConfig.currency}+` : `${range.label}${cityConfig.currency}`;
-                return (
-                  <TouchableOpacity
-                    key={ri}
-                    style={[styles.durationChip, { backgroundColor: isSelected ? C.primary : C.gray200 }]}
-                    onPress={() => updatePlacePriceRange(place.id, ri)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {place.priceRangeIndex >= 0 && !showExactPrice[place.id] && (
-              <TouchableOpacity
-                onPress={() => setShowExactPrice((prev) => ({ ...prev, [place.id]: true }))}
-                style={{ marginTop: 6 }}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 11, color: C.primary, fontWeight: '600' }}>Préciser le montant</Text>
-              </TouchableOpacity>
-            )}
-            {showExactPrice[place.id] && (
-              <View style={[styles.placeInputWrap, { backgroundColor: C.gray200, borderColor: 'transparent', marginTop: 6, maxWidth: 140 }]}>
-                <RNTextInput
-                  style={[styles.placeInput, { color: C.black }]}
-                  placeholder="ex: 25"
-                  placeholderTextColor={C.gray500}
-                  value={place.exactPrice}
-                  onChangeText={(v) => updatePlaceExactPrice(place.id, v)}
-                  keyboardType="numeric"
-                  maxLength={5}
-                />
-                <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>{cityConfig.currency}</Text>
-              </View>
-            )}
-            {errors[`place_price_${index}`] && (
-              <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
-            )}
-          </View>
-
-          {/* Per-place duration chips */}
-          <View style={{ marginTop: 8 }}>
-            <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_place_duration}</Text>
-            <View style={styles.durationChipsRow}>
-              {DURATION_PRESETS.map((preset) => {
-                const isSelected = place.duration === preset;
-                return (
-                  <TouchableOpacity
-                    key={preset}
-                    style={[
-                      styles.durationChip,
-                      { backgroundColor: isSelected ? C.primary : C.gray200 },
-                    ]}
-                    onPress={() => updatePlaceDuration(place.id, preset)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>
-                      {formatDurationLabel(preset)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {errors[`place_duration_${index}`] && (
-              <Text style={styles.miniError}>{errors[`place_duration_${index}`]}</Text>
-            )}
-          </View>
-
-          {/* Customize / Edit button */}
+            );
+          })}
+        </View>
+        {place.priceRangeIndex >= 0 && !showExactPrice[place.id] && (
           <TouchableOpacity
-            style={[styles.customizeBtn, { borderColor: C.primary + '40' }]}
-            onPress={() => editPlaceCustomization(index)}
+            onPress={() => setShowExactPrice((prev) => ({ ...prev, [place.id]: true }))}
+            style={{ marginTop: 8 }}
             activeOpacity={0.7}
           >
-            <Ionicons name={place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0) ? 'create-outline' : 'sparkles-outline'} size={14} color={C.primary} />
-            <Text style={[styles.customizeBtnText, { color: C.primary }]}>
-              {place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0) ? 'Modifier la personnalisation' : 'Personnaliser ce lieu'}
-            </Text>
+            <Text style={styles.tlGhostLink}>Préciser le montant</Text>
           </TouchableOpacity>
-          </Pressable>
-        </Animated.View>
-      );
-
-      // Travel segment between this place and the next one
-      if (index < places.length - 1 && index < travels.length) {
-        const travel = travels[index];
-        const nextPlace = places[index + 1];
-        items.push(
-          <View key={`travel-${index}`} style={[styles.travelCard, { backgroundColor: C.gray200 + '80' }]}>
-            <View style={styles.travelHeader}>
-              <Text style={styles.travelDots}>⋮</Text>
-              <Text style={[styles.travelLabel, { color: C.gray700 }]}>
-                {t.create_between_places} <Text style={{ fontWeight: '700', color: C.black }}>{place.name.split(' ')[0]}</Text> {t.create_and} <Text style={{ fontWeight: '700', color: C.black }}>{nextPlace.name.split(' ')[0]}</Text>
-              </Text>
-            </View>
-
-            <View style={styles.travelInputsRow}>
-              <View style={styles.travelInputGroup}>
-                <Text style={[styles.placeInputLabel, { color: C.gray700 }]}>{t.create_travel_time}</Text>
-                <View style={[styles.placeInputWrap, { backgroundColor: C.white, borderColor: errors[`travel_duration_${index}`] ? Colors.error : 'transparent' }]}>
-                  {travel.duration === '...' ? (
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 }}>
-                      <ActivityIndicator size="small" color={C.primary} />
-                      <Text style={[styles.placeInput, { color: C.gray500 }]}>Calcul...</Text>
-                    </View>
-                  ) : (
-                    <Text style={[styles.placeInput, { color: travel.duration ? C.black : C.gray500, paddingHorizontal: 8, paddingVertical: 6 }]}>
-                      {travel.duration ? `${travel.duration}` : 'Auto'}
-                    </Text>
-                  )}
-                  <Text style={[styles.placeInputUnit, { color: C.gray600 }]}>min</Text>
-                </View>
-                {errors[`travel_duration_${index}`] && (
-                  <Text style={styles.miniError}>{errors[`travel_duration_${index}`]}</Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.travelTransportRow}>
-              {TRANSPORT_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[
-                    styles.transportMiniChip,
-                    {
-                      backgroundColor: travel.transport === opt ? C.primary : C.white,
-                      borderColor: travel.transport === opt ? C.primary : C.borderLight,
-                    },
-                  ]}
-                  onPress={() => updateTravelTransport(index, opt)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.transportMiniEmoji}>{TRANSPORT_EMOJIS[opt]}</Text>
-                  <Text style={[
-                    styles.transportMiniText,
-                    { color: travel.transport === opt ? Colors.textOnAccent : C.gray800 },
-                  ]}>
-                    {getTransportLabel(opt)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        )}
+        {showExactPrice[place.id] && (
+          <View style={styles.tlExactPriceWrap}>
+            <RNTextInput
+              style={styles.tlExactPriceInput}
+              placeholder="ex: 25"
+              placeholderTextColor={Colors.textTertiary}
+              value={place.exactPrice}
+              onChangeText={(v) => updatePlaceExactPrice(place.id, v)}
+              keyboardType="numeric"
+              maxLength={5}
+            />
+            <Text style={styles.tlExactPriceUnit}>{cityConfig.currency}</Text>
           </View>
-        );
-      }
-    });
+        )}
+        {errors[`place_price_${index}`] && (
+          <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
+        )}
 
-    return items;
+        {/* DURÉE */}
+        <Text style={[styles.tlFieldLabel, { marginTop: 14 }]}>DURÉE</Text>
+        <View style={styles.tlPillsRow}>
+          {DURATION_PRESETS.map((preset) => {
+            const isSelected = place.duration === preset;
+            return (
+              <TouchableOpacity
+                key={preset}
+                style={[styles.tlPill, isSelected && styles.tlPillActive]}
+                onPress={() => updatePlaceDuration(place.id, preset)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tlPillText, isSelected && styles.tlPillTextActive]}>
+                  {formatDurationLabel(preset)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {errors[`place_duration_${index}`] && (
+          <Text style={styles.miniError}>{errors[`place_duration_${index}`]}</Text>
+        )}
+
+        {/* Book in advance toggle */}
+        <TouchableOpacity
+          style={styles.tlToggleRow}
+          onPress={() => toggleReservation(place.id)}
+          activeOpacity={0.75}
+        >
+          <View style={{ flex: 1 }}>
+            <View style={styles.tlToggleTitleRow}>
+              <Ionicons
+                name={place.reservationRecommended ? 'bookmark' : 'bookmark-outline'}
+                size={14}
+                color={place.reservationRecommended ? Colors.primary : Colors.textSecondary}
+              />
+              <Text style={styles.tlToggleTitle}>Réserver à l'avance</Text>
+            </View>
+            <Text style={styles.tlToggleHint}>Recommandé pour ce lieu</Text>
+          </View>
+          <View style={[styles.tlSwitch, place.reservationRecommended && styles.tlSwitchOn]}>
+            <View style={[styles.tlSwitchThumb, place.reservationRecommended && styles.tlSwitchThumbOn]} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Personalize */}
+        <TouchableOpacity
+          style={[styles.tlPersonalizeBtn, hasCustom && styles.tlPersonalizeBtnDone]}
+          onPress={() => editPlaceCustomization(index)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name={hasCustom ? 'create' : 'sparkles'} size={14} color={Colors.primary} />
+          <Text style={styles.tlPersonalizeText}>
+            {hasCustom ? 'Modifier la personnalisation' : 'Personnaliser ce lieu'}
+          </Text>
+          {hasCustom && <Ionicons name="checkmark-circle" size={14} color={Colors.primary} style={{ marginLeft: 4 }} />}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderTransition = (fromIdx: number) => {
+    const travel = travels[fromIdx];
+    if (!travel) return null;
+    const isExpanded = expandedTravelIdx === fromIdx;
+    const emoji = TRANSPORT_EMOJIS[travel.transport] || '🚶';
+    const durationLabel = travel.duration && travel.duration !== '...' ? `${travel.duration}min` : 'Auto';
+
+    return (
+      <View style={styles.tlTransitionRow} key={`tr-${fromIdx}`}>
+        <TouchableOpacity
+          style={[styles.tlTransitionPill, isExpanded && styles.tlTransitionPillActive]}
+          onPress={() => toggleTravelExpand(fromIdx)}
+          activeOpacity={0.75}
+        >
+          {travel.duration === '...' ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Text style={styles.tlTransitionEmoji}>{emoji}</Text>
+          )}
+          <Text style={styles.tlTransitionText}>{durationLabel}</Text>
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={11}
+            color={Colors.textTertiary}
+            style={{ marginLeft: 2 }}
+          />
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.tlTransitionCard}>
+            <Text style={styles.tlFieldLabel}>MODE DE TRANSPORT</Text>
+            <View style={styles.tlPillsRow}>
+              {TRANSPORT_OPTIONS.map((opt) => {
+                const isActive = travel.transport === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.tlTransportPill, isActive && styles.tlTransportPillActive]}
+                    onPress={() => updateTravelTransport(fromIdx, opt)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={{ fontSize: 12 }}>{TRANSPORT_EMOJIS[opt]}</Text>
+                    <Text style={[styles.tlTransportPillText, isActive && styles.tlTransportPillTextActive]}>
+                      {getTransportLabel(opt)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.tlTransitionHint}>
+              {travel.duration === '...' ? 'Calcul en cours…' : `${travel.duration || '—'} min estimées · ${getTransportLabel(travel.transport).toLowerCase()}`}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderPlacesWithTravels = () => {
+    if (places.length === 0) {
+      return (
+        <View style={styles.tlEmptyState}>
+          <View style={styles.tlEmptyIconWrap}>
+            <Ionicons name="map-outline" size={26} color={Colors.terracotta400} />
+          </View>
+          <Text style={styles.tlEmptyTitle}>Commence par un premier lieu</Text>
+          <Text style={styles.tlEmptyHint}>Ajoute au moins 2 lieux pour construire ton itinéraire.</Text>
+          <TouchableOpacity
+            style={styles.tlAddCardStandalone}
+            onPress={() => setShowPlacePicker(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="add" size={16} color={Colors.primary} />
+            <Text style={styles.tlAddText}>Ajouter un lieu</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.tlWrap}>
+        {/* Vertical backbone line — covers nodes + add node */}
+        <View style={styles.tlBackbone} pointerEvents="none" />
+
+        {places.map((place, index) => {
+          const isExpanded = expandedPlaceId === place.id;
+          const isDragging = draggingId === place.id;
+          const hasCustom = !!(place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0));
+          const hasPhoto = !!(place.customPhoto || place.previewPhotoUrl);
+
+          return (
+            <React.Fragment key={`place-${place.id}`}>
+              <Animated.View
+                style={[
+                  styles.tlRow,
+                  { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
+                  { zIndex: isDragging ? 100 : isExpanded ? 10 : 1 },
+                ]}
+                {...getOrCreateDragHandlers(place.id).panHandlers}
+              >
+                {/* Node */}
+                <View
+                  style={[
+                    styles.tlNode,
+                    isExpanded && styles.tlNodeFocus,
+                    isDragging && styles.tlNodeDragging,
+                  ]}
+                >
+                  <Text style={styles.tlNodeText}>{index + 1}</Text>
+                </View>
+
+                {/* Card */}
+                <Pressable
+                  onPress={() => togglePlaceExpand(place.id)}
+                  onLongPress={() => handleLongPressPlace(place.id)}
+                  delayLongPress={350}
+                  style={({ pressed }) => [
+                    styles.tlCard,
+                    isExpanded && styles.tlCardExpanded,
+                    isDragging && styles.tlCardDragging,
+                    pressed && !isExpanded && styles.tlCardPressed,
+                  ]}
+                >
+                  {/* Top row: thumb + name + remove */}
+                  <View style={styles.tlCardTop}>
+                    <View style={styles.tlThumb}>
+                      {hasPhoto ? (
+                        <Image
+                          source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
+                          style={styles.tlThumbImg}
+                        />
+                      ) : (
+                        <LinearGradient
+                          colors={[Colors.terracotta300, Colors.terracotta500]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.tlThumbImg}
+                        >
+                          <Ionicons name="location" size={20} color={Colors.textOnAccent} />
+                        </LinearGradient>
+                      )}
+                    </View>
+
+                    <View style={styles.tlCardInfo}>
+                      <Text style={styles.tlPlaceName} numberOfLines={1}>{place.name}</Text>
+                      <Text style={styles.tlPlaceAddr} numberOfLines={1}>
+                        {place.address || place.type}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation(); removePlace(place.id); }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={styles.tlRemoveBtn}
+                    >
+                      <Ionicons name="close" size={16} color={Colors.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Meta inline row */}
+                  <View style={styles.tlMetaRow}>
+                    <View style={styles.tlMetaItem}>
+                      <Ionicons name="time-outline" size={11} color={Colors.terracotta500} />
+                      <Text style={[styles.tlMetaText, !place.duration && styles.tlMetaPlaceholder]}>
+                        {place.duration ? formatDurationLabel(place.duration) : 'Durée ?'}
+                      </Text>
+                    </View>
+                    <Text style={styles.tlMetaSep}>·</Text>
+                    <View style={styles.tlMetaItem}>
+                      <Text style={styles.tlMetaEmoji}>💰</Text>
+                      <Text style={[styles.tlMetaText, place.priceRangeIndex < 0 && styles.tlMetaPlaceholder]}>
+                        {place.priceRangeIndex >= 0
+                          ? (() => {
+                              const r = PRICE_RANGES[place.priceRangeIndex];
+                              return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
+                            })()
+                          : 'Prix ?'}
+                      </Text>
+                    </View>
+                    {place.reservationRecommended && (
+                      <>
+                        <Text style={styles.tlMetaSep}>·</Text>
+                        <View style={styles.tlMetaItem}>
+                          <Ionicons name="bookmark" size={11} color={Colors.terracotta500} />
+                          <Text style={styles.tlMetaText}>Réserver</Text>
+                        </View>
+                      </>
+                    )}
+                    {hasCustom && (
+                      <View style={styles.tlCustomBadge}>
+                        <Text style={styles.tlCustomBadgeText}>✨ Perso</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Expanded section */}
+                  {isExpanded && renderPlaceExpanded(place, index)}
+                </Pressable>
+              </Animated.View>
+
+              {/* Transition pill between this place and the next */}
+              {index < places.length - 1 && index < travels.length && renderTransition(index)}
+            </React.Fragment>
+          );
+        })}
+
+        {/* Add place node */}
+        <View style={styles.tlRow}>
+          <View style={[styles.tlNode, styles.tlNodeAdd]}>
+            <Ionicons name="add" size={16} color={Colors.primary} />
+          </View>
+          <TouchableOpacity
+            style={styles.tlAddCard}
+            onPress={() => setShowPlacePicker(true)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.tlAddText}>Ajouter un lieu</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -2134,88 +2286,79 @@ export const CreateScreen: React.FC = () => {
             );
           })()}
 
-          {/* ═══════ STEP 4: Places ═══════ */}
+          {/* ═══════ STEP 4: Places — editorial timeline ═══════ */}
           {step === 4 && (
           <View style={{ flex: 1 }}>
-          <View style={styles.s4Header}>
-            <Text style={[styles.fieldLabel, { color: C.gray800, marginBottom: 2 }]}>
-              {t.create_places}
-              {places.length > 0 ? <Text style={{ color: C.gray600, fontFamily: Fonts.body }}>  ({places.length})</Text> : null}
-            </Text>
-            <Text style={[styles.stepIntroCompact, { color: Colors.textSecondary }]}>
-              Tape sur un lieu pour personnaliser. Minimum 2 lieux.
+          {/* Editorial header */}
+          <View style={styles.tlHeader}>
+            <View style={styles.tlHeaderTitleRow}>
+              <Text style={styles.tlHeaderTitle}>Construis ton itinéraire</Text>
+              {places.length > 0 && (
+                <Text style={styles.tlHeaderCount}>
+                  {places.length < 2 ? `${places.length} / 2 min.` : `${places.length} lieu${places.length > 1 ? 'x' : ''}`}
+                  {places.length >= 2 && totalDuration > 0 ? ` · ${formatDuration(totalDuration)}` : ''}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.tlHeaderSub}>
+              Tape un lieu pour l'éditer · maintiens pour réorganiser
             </Text>
           </View>
 
-          {/* Places list — internal bounded scroll so the step chrome stays fixed */}
+          {/* Timeline (internal scroll) */}
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 10 }}
+            contentContainerStyle={{ paddingBottom: 14 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             scrollEnabled={!draggingId}
           >
             {renderPlacesWithTravels()}
+            {errors.places && <Text style={[styles.errorText, { marginLeft: 56, marginTop: 4 }]}>{errors.places}</Text>}
 
-            <TouchableOpacity
-              style={[styles.addPlaceBtn, { backgroundColor: C.primary + '10', borderColor: C.primary + '30', marginTop: places.length > 0 ? 4 : 0 }]}
-              onPress={() => setShowPlacePicker(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.addPlaceText, { color: C.primary }]}>{t.create_add_place}</Text>
-            </TouchableOpacity>
-            {errors.places && <Text style={styles.errorText}>{errors.places}</Text>}
-          </ScrollView>
-
-          {/* ========== AUTO-CALCULATED TOTALS ========== */}
-          {places.length >= 2 && (
-            <View style={[styles.totalsCard, { backgroundColor: C.primary + '08', borderColor: C.primary + '20' }]}>
-              <Text style={[styles.totalsTitle, { color: C.primary }]}>RECAP</Text>
-              <View style={styles.totalsRow}>
-                <View style={styles.totalItem}>
-                  <Text style={styles.totalEmoji}>💰</Text>
-                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_total_price}</Text>
-                  <Text style={[styles.totalValue, { color: C.black }]}>{formatPriceRange(cityConfig.currency)}</Text>
+            {/* Compact recap pill */}
+            {places.length >= 2 && (
+              <View style={styles.tlRecapPill}>
+                <View style={styles.tlRecapItem}>
+                  <Text style={styles.tlRecapEmoji}>📍</Text>
+                  <Text style={styles.tlRecapValue}>{places.length}</Text>
+                  <Text style={styles.tlRecapLabel}>étapes</Text>
                 </View>
-                <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
-                <View style={styles.totalItem}>
-                  <Text style={styles.totalEmoji}>⏱️</Text>
-                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_total_duration}</Text>
-                  <Text style={[styles.totalValue, { color: C.black }]}>{formatDuration(totalDuration)}</Text>
+                <View style={styles.tlRecapSep} />
+                <View style={styles.tlRecapItem}>
+                  <Text style={styles.tlRecapEmoji}>⏱</Text>
+                  <Text style={styles.tlRecapValue}>{formatDuration(totalDuration)}</Text>
                 </View>
-                <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
-                <View style={styles.totalItem}>
-                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>{t.create_transport}</Text>
-                  <View style={styles.transportsList}>
-                    {uniqueTransports.map((mode) => (
-                      <View key={mode} style={[styles.transportTag, { backgroundColor: C.primary + '15' }]}>
-                        <Text style={styles.transportTagEmoji}>{TRANSPORT_EMOJIS[mode]}</Text>
-                        <Text style={[styles.transportTagText, { color: C.primary }]}>{getTransportLabel(mode)}</Text>
-                      </View>
-                    ))}
-                  </View>
+                <View style={styles.tlRecapSep} />
+                <View style={styles.tlRecapItem}>
+                  <Text style={styles.tlRecapEmoji}>💰</Text>
+                  <Text style={styles.tlRecapValue}>{formatPriceRange(cityConfig.currency)}</Text>
                 </View>
-                <View style={[styles.totalsDivider, { backgroundColor: C.primary + '20' }]} />
-                <View style={styles.totalItem}>
-                  <Text style={styles.totalEmoji}>📍</Text>
-                  <Text style={[styles.totalLabel, { color: C.gray700 }]}>ÉTAPES</Text>
-                  <Text style={[styles.totalValue, { color: C.black }]}>{places.length}</Text>
-                </View>
+                {uniqueTransports.length > 0 && (
+                  <>
+                    <View style={styles.tlRecapSep} />
+                    <View style={styles.tlRecapItem}>
+                      {uniqueTransports.map((mode) => (
+                        <Text key={mode} style={styles.tlRecapTransport}>{TRANSPORT_EMOJIS[mode]}</Text>
+                      ))}
+                    </View>
+                  </>
+                )}
               </View>
-            </View>
-          )}
+            )}
 
-          {/* Preview button (only on step 3, when publishable) */}
-          {canPublish && (
-            <TouchableOpacity
-              style={[styles.previewBtn, { borderColor: C.primary, marginTop: 8 }]}
-              onPress={() => setShowPreview(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="eye-outline" size={16} color={C.primary} />
-              <Text style={[styles.previewBtnText, { color: C.primary }]}>Preview</Text>
-            </TouchableOpacity>
-          )}
+            {/* Preview button */}
+            {canPublish && (
+              <TouchableOpacity
+                style={[styles.previewBtn, { borderColor: Colors.primary, marginTop: 12 }]}
+                onPress={() => setShowPreview(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="eye-outline" size={16} color={Colors.primary} />
+                <Text style={[styles.previewBtnText, { color: Colors.primary }]}>Aperçu du plan</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
           </View>
           )}
         </View>
@@ -2223,6 +2366,24 @@ export const CreateScreen: React.FC = () => {
 
         {/* ═══════ Wizard footer — dynamic action per step ═══════ */}
         <View style={[styles.wizardFooter, { paddingBottom: insets.bottom + 12, borderTopColor: Colors.borderSubtle, backgroundColor: Colors.bgPrimary }]}>
+          {/* Visibility bandeau — only on step 4 (publish) */}
+          {step === TOTAL_STEPS && (
+            <TouchableOpacity
+              style={styles.tlVisibilityRow}
+              onPress={() => setShowVisibilitySheet(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.tlVisibilityLeft}>
+                <Text style={styles.tlVisibilityIcon}>
+                  {visibility === 'public' ? '🌍' : visibility === 'friends' ? '👥' : '🔒'}
+                </Text>
+                <Text style={styles.tlVisibilityLabel}>
+                  {visibility === 'public' ? 'Publié en public' : visibility === 'friends' ? 'Amis seulement' : 'Privé (moi uniquement)'}
+                </Text>
+              </View>
+              <Text style={styles.tlVisibilityEdit}>Modifier</Text>
+            </TouchableOpacity>
+          )}
           {step < TOTAL_STEPS ? (
             <TouchableOpacity
               style={[
@@ -2386,6 +2547,43 @@ export const CreateScreen: React.FC = () => {
               }
             />
           </View>
+        </Modal>
+
+        {/* ========== VISIBILITY SHEET (Step 4 publish audience) ========== */}
+        <Modal visible={showVisibilitySheet} animationType="fade" transparent onRequestClose={() => setShowVisibilitySheet(false)}>
+          <Pressable style={styles.tlVisSheetBackdrop} onPress={() => setShowVisibilitySheet(false)}>
+            <Pressable style={styles.tlVisSheet} onPress={() => {}}>
+              <View style={styles.tlVisSheetHandle} />
+              <Text style={styles.tlVisSheetTitle}>Qui peut voir ce plan ?</Text>
+              {(['public', 'friends', 'private'] as const).map((v) => {
+                const meta = v === 'public'
+                  ? { emoji: '🌍', title: 'Public', hint: 'Visible par tout le monde sur Proof' }
+                  : v === 'friends'
+                    ? { emoji: '👥', title: 'Amis seulement', hint: 'Visible uniquement par tes amis' }
+                    : { emoji: '🔒', title: 'Privé', hint: 'Visible uniquement par toi' };
+                const isActive = visibility === v;
+                return (
+                  <TouchableOpacity
+                    key={v}
+                    style={[styles.tlVisOption, isActive && styles.tlVisOptionActive]}
+                    onPress={() => {
+                      setVisibility(v);
+                      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      setShowVisibilitySheet(false);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.tlVisOptionEmoji}>{meta.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.tlVisOptionTitle, isActive && styles.tlVisOptionTitleActive]}>{meta.title}</Text>
+                      <Text style={styles.tlVisOptionHint}>{meta.hint}</Text>
+                    </View>
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </Pressable>
+          </Pressable>
         </Modal>
 
         {/* ========== PLACE CUSTOMIZATION MODAL ========== */}
@@ -3544,4 +3742,652 @@ const styles = StyleSheet.create({
   reorderToggle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   customizeBlockReorder: { opacity: 0.92, borderStyle: 'dashed' },
   reorderArrows: { flexDirection: 'column', alignItems: 'center', marginRight: 4 },
+
+  // ─────────────────────────────────────────────────────────────
+  // STEP 4 — Editorial Timeline (tl*)
+  // ─────────────────────────────────────────────────────────────
+  tlHeader: {
+    marginBottom: 14,
+  },
+  tlHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  tlHeaderTitle: {
+    fontSize: 24,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+    flex: 1,
+  },
+  tlHeaderCount: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+  },
+  tlHeaderSub: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 17,
+  },
+
+  // Timeline backbone
+  tlWrap: {
+    position: 'relative',
+  },
+  tlBackbone: {
+    position: 'absolute',
+    left: 15,
+    top: 16,
+    bottom: 28,
+    width: 2,
+    backgroundColor: Colors.terracotta200,
+    zIndex: 0,
+  },
+  tlRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    position: 'relative',
+  },
+
+  // Node (circle badge)
+  tlNode: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: Colors.bgPrimary,
+    marginTop: 10,
+    marginRight: 12,
+    zIndex: 2,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  tlNodeText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    fontWeight: '700' as const,
+    color: Colors.textOnAccent,
+  },
+  tlNodeFocus: {
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    transform: [{ scale: 1.05 }],
+  },
+  tlNodeDragging: {
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    transform: [{ scale: 1.1 }],
+  },
+  tlNodeAdd: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: Colors.terracotta400,
+    borderStyle: 'dashed',
+    shadowOpacity: 0,
+  },
+
+  // Card (place)
+  tlCard: {
+    flex: 1,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: 'rgba(44, 36, 32, 1)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  tlCardPressed: {
+    backgroundColor: Colors.terracotta50,
+  },
+  tlCardExpanded: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  tlCardDragging: {
+    borderColor: Colors.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+
+  // Collapsed top row
+  tlCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  tlThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: Colors.bgTertiary,
+  },
+  tlThumbImg: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tlCardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  tlPlaceName: {
+    fontSize: 15,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  tlPlaceAddr: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 2,
+  },
+  tlRemoveBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.bgTertiary,
+  },
+
+  // Meta inline row
+  tlMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  tlMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tlMetaEmoji: {
+    fontSize: 11,
+  },
+  tlMetaText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+  },
+  tlMetaPlaceholder: {
+    color: Colors.textTertiary,
+    fontStyle: 'italic',
+  },
+  tlMetaSep: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+  },
+  tlCustomBadge: {
+    backgroundColor: Colors.terracotta100,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 99,
+    marginLeft: 'auto',
+  },
+  tlCustomBadgeText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta700,
+    letterSpacing: 0.2,
+  },
+
+  // Expanded section content
+  tlExpanded: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderSubtle,
+  },
+  tlFieldLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.1,
+    marginBottom: 8,
+    textTransform: 'uppercase' as const,
+  },
+  tlPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tlPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: Colors.borderMedium,
+    backgroundColor: 'transparent',
+  },
+  tlPillActive: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: Colors.terracotta100,
+  },
+  tlPillText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  tlPillTextActive: {
+    color: Colors.terracotta700,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  tlGhostLink: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+  },
+  tlExactPriceWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.bgPrimary,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 38,
+    maxWidth: 140,
+    marginTop: 8,
+  },
+  tlExactPriceInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    paddingVertical: 0,
+  },
+  tlExactPriceUnit: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+    marginLeft: 4,
+  },
+
+  // Toggle book in advance
+  tlToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: Colors.bgPrimary,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  tlToggleTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tlToggleTitle: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  tlToggleHint: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  tlSwitch: {
+    width: 40,
+    height: 22,
+    borderRadius: 99,
+    backgroundColor: Colors.borderMedium,
+    paddingHorizontal: 2,
+    justifyContent: 'center',
+  },
+  tlSwitchOn: {
+    backgroundColor: Colors.primary,
+  },
+  tlSwitchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    shadowColor: 'rgba(44, 36, 32, 1)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tlSwitchThumbOn: {
+    alignSelf: 'flex-end',
+  },
+
+  // Personalize button
+  tlPersonalizeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.terracotta300,
+    backgroundColor: 'transparent',
+  },
+  tlPersonalizeBtnDone: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.terracotta50,
+  },
+  tlPersonalizeText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+  },
+
+  // Transition pill (between places)
+  tlTransitionRow: {
+    marginLeft: 0,
+    marginVertical: 4,
+    alignItems: 'flex-start',
+    paddingLeft: 0,
+    zIndex: 3,
+  },
+  tlTransitionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgPrimary,
+    marginLeft: 0,
+    alignSelf: 'flex-start',
+    position: 'relative',
+    left: 0,
+  },
+  tlTransitionPillActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.terracotta50,
+  },
+  tlTransitionEmoji: {
+    fontSize: 13,
+  },
+  tlTransitionText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+  },
+  tlTransitionCard: {
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    marginLeft: 44,
+    shadowColor: 'rgba(44, 36, 32, 1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  tlTransportPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: Colors.borderMedium,
+    backgroundColor: 'transparent',
+  },
+  tlTransportPillActive: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: Colors.terracotta100,
+  },
+  tlTransportPillText: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  tlTransportPillTextActive: {
+    color: Colors.terracotta700,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  tlTransitionHint: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 10,
+    fontStyle: 'italic',
+  },
+
+  // Add place CTA card
+  tlAddCard: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: Colors.terracotta400,
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tlAddCardStandalone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: Colors.terracotta400,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.terracotta50,
+    marginTop: 12,
+  },
+  tlAddText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+  },
+
+  // Empty state
+  tlEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+  },
+  tlEmptyIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.terracotta100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  tlEmptyTitle: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  tlEmptyHint: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+
+  // Recap pill (compact)
+  tlRecapPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginTop: 14,
+    marginHorizontal: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: Colors.terracotta50,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.terracotta100,
+  },
+  tlRecapItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tlRecapEmoji: {
+    fontSize: 13,
+  },
+  tlRecapValue: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  tlRecapLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginLeft: 2,
+  },
+  tlRecapSep: {
+    width: 1,
+    height: 14,
+    backgroundColor: Colors.terracotta200,
+  },
+  tlRecapTransport: {
+    fontSize: 13,
+    marginLeft: 1,
+  },
+
+  // Visibility bandeau
+  tlVisibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+    paddingVertical: 10,
+    marginBottom: 4,
+  },
+  tlVisibilityLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tlVisibilityIcon: {
+    fontSize: 14,
+  },
+  tlVisibilityLabel: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+  },
+  tlVisibilityEdit: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+  },
+
+  // Visibility sheet
+  tlVisSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(44, 36, 32, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  tlVisSheet: {
+    backgroundColor: Colors.bgPrimary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+  },
+  tlVisSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.borderMedium,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  tlVisSheetTitle: {
+    fontSize: 18,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  tlVisOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
+    marginBottom: 10,
+  },
+  tlVisOptionActive: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: Colors.terracotta50,
+  },
+  tlVisOptionEmoji: {
+    fontSize: 22,
+  },
+  tlVisOptionTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  tlVisOptionTitleActive: {
+    color: Colors.terracotta700,
+  },
+  tlVisOptionHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
 });
