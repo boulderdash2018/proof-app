@@ -39,16 +39,12 @@ interface ImmersiveCardProps {
   isActive: boolean;
   isLiked: boolean;
   isSaved: boolean;
-  likesCount: number;
-  commentsCount: number;
   onLike: () => void;
   onSave: () => void;
   onAuthorPress: () => void;
   onProfilePress: (userId: string) => void;
   onDetailStateChange: (isOpen: boolean) => void;
   onPlacePress: (placeId: string) => void;
-  onComment: () => void;
-  onShare: () => void;
   onDoItNow: () => void;
   onMapPress: () => void;
 }
@@ -83,16 +79,12 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   isActive,
   isLiked,
   isSaved,
-  likesCount,
-  commentsCount,
   onLike,
   onSave,
   onAuthorPress,
   onProfilePress,
   onDetailStateChange,
   onPlacePress,
-  onComment,
-  onShare,
   onDoItNow,
   onMapPress,
 }) => {
@@ -329,7 +321,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d2 = makeDetailAnim(2);
   const d3 = makeDetailAnim(3);
   const d4 = makeDetailAnim(4);
-  const d5 = makeDetailAnim(5);
 
   return (
     <View style={[styles.frame, { width, height }]}>
@@ -587,46 +578,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </View>
             </Animated.View>
 
-            {/* 1 — Action bar (like, comment, save, share) */}
-            <Animated.View
-              style={{
-                opacity: d1.opacity,
-                transform: [{ translateY: d1.translateY }],
-              }}
-            >
-              <View style={styles.detailActionBar}>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onLike} activeOpacity={0.7}>
-                  <Ionicons
-                    name={isLiked ? 'heart' : 'heart-outline'}
-                    size={22}
-                    color={isLiked ? '#FF4D67' : 'rgba(255,255,255,0.7)'}
-                  />
-                  {likesCount > 0 && (
-                    <Text style={[styles.detailActionCount, isLiked && { color: '#FF4D67' }]}>
-                      {likesCount}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onComment} activeOpacity={0.7}>
-                  <Ionicons name="chatbubble-outline" size={20} color="rgba(255,255,255,0.7)" />
-                  {commentsCount > 0 && (
-                    <Text style={styles.detailActionCount}>{commentsCount}</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onSave} activeOpacity={0.7}>
-                  <Ionicons
-                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                    size={20}
-                    color={isSaved ? Colors.primary : 'rgba(255,255,255,0.7)'}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={onShare} activeOpacity={0.7}>
-                  <Ionicons name="paper-plane-outline" size={20} color="rgba(255,255,255,0.7)" />
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-
-            {/* 2 — Tags */}
+            {/* 1 — Tags */}
             {plan.tags?.length > 0 && (
               <Animated.View
                 style={[
@@ -684,11 +636,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </TouchableOpacity>
             </Animated.View>
 
-            {/* 5 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
+            {/* 4 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
             <Animated.View
               style={{
-                opacity: d4.opacity,
-                transform: [{ translateY: d4.translateY }],
+                opacity: d3.opacity,
+                transform: [{ translateY: d3.translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Itinéraire</Text>
@@ -846,11 +798,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               )}
             </Animated.View>
 
-            {/* 6 — Author */}
+            {/* 5 — Author */}
             <Animated.View
               style={{
-                opacity: d5.opacity,
-                transform: [{ translateY: d5.translateY }],
+                opacity: d4.opacity,
+                transform: [{ translateY: d4.translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Publié par</Text>
@@ -1133,30 +1085,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.serifSemiBold,
     color: Colors.primary,
-  },
-  // ── Detail action bar ──────────────────────────────────────
-  detailActionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  detailActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-  } as any,
-  detailActionCount: {
-    fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
-    color: 'rgba(255,255,255,0.6)',
   },
   detailTags: {
     flexDirection: 'row',

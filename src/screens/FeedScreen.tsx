@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Animated,
+  Easing,
   Dimensions,
   StatusBar,
   ViewToken,
@@ -107,6 +108,10 @@ export const FeedScreen: React.FC = () => {
   // ── Map modal ─────────────────────────────────────────────────
   const [mapPlan, setMapPlan] = useState<Plan | null>(null);
 
+  // ── Derived (early — needed by handlers) ──────────────────────
+  const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
+  const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
+
   // ── Animations ─────────────────────────────────────────────────
   const tabIndicatorLeft = useRef(new Animated.Value(0)).current;
   const tabIndicatorWidth = useRef(new Animated.Value(0)).current;
@@ -114,6 +119,14 @@ export const FeedScreen: React.FC = () => {
   const friendsLayout = useRef({ x: 0, width: 0 });
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
+
+  // ── Sticky action bar animations ──────────────────────────────
+  const actionBarY = useRef(new Animated.Value(80)).current; // starts hidden (off-screen below)
+  const likeScale = useRef(new Animated.Value(1)).current;
+  const saveScale = useRef(new Animated.Value(1)).current;
+  const shareTranslateX = useRef(new Animated.Value(0)).current;
+  const shareRotate = useRef(new Animated.Value(0)).current;
+  const commentScale = useRef(new Animated.Value(1)).current;
 
   // ── Status bar — light on dark ────────────────────────────────
   useFocusEffect(useCallback(() => { StatusBar.setBarStyle('light-content'); }, []));
@@ -140,6 +153,30 @@ export const FeedScreen: React.FC = () => {
     }
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
+
+  // ── Sticky action bar slide in / out ───────────────────────────
+  useEffect(() => {
+    if (isDetailOpen) {
+      // Slide up with 200ms delay after panel opens
+      const timer = setTimeout(() => {
+        Animated.timing(actionBarY, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.bezier(0.22, 1, 0.36, 1),
+          useNativeDriver: true,
+        }).start();
+      }, 200);
+      return () => clearTimeout(timer);
+    } else {
+      // Slide down immediately (bar leaves before panel)
+      Animated.timing(actionBarY, {
+        toValue: 80,
+        duration: 300,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isDetailOpen]);
 
   // ── Tab switching ─────────────────────────────────────────────
   const switchTab = useCallback(
@@ -262,6 +299,74 @@ export const FeedScreen: React.FC = () => {
     setMapPlan(plan);
   }, []);
 
+  // ── Sticky bar micro-interactions ─────────────────────────────
+  const animPop = useCallback((scale: Animated.Value, peak = 1.3) => {
+    Animated.sequence([
+      Animated.timing(scale, { toValue: peak, duration: 150, useNativeDriver: true }),
+      Animated.timing(scale, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.bezier(0.34, 1.56, 0.64, 1),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const barHandleLike = useCallback(() => {
+    const activePlan = currentPlans[currentIndex];
+    if (!activePlan || requireAuth()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    animPop(likeScale);
+    toggleLike(activePlan.id);
+  }, [currentPlans, currentIndex, requireAuth, animPop]);
+
+  const barHandleSave = useCallback(() => {
+    const activePlan = currentPlans[currentIndex];
+    if (!activePlan || requireAuth()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    animPop(saveScale, 1.25);
+    toggleSave(activePlan.id);
+  }, [currentPlans, currentIndex, requireAuth, animPop]);
+
+  const barHandleComment = useCallback(() => {
+    const activePlan = currentPlans[currentIndex];
+    if (!activePlan) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    animPop(commentScale, 0.9);
+    handleOpenComment(activePlan);
+  }, [currentPlans, currentIndex, animPop, handleOpenComment]);
+
+  const barHandleShare = useCallback(() => {
+    const activePlan = currentPlans[currentIndex];
+    if (!activePlan || requireAuth()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // "send" animation: nudge right + rotate, then back
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(shareTranslateX, { toValue: 4, duration: 200, useNativeDriver: true }),
+        Animated.timing(shareRotate, { toValue: 15, duration: 200, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(shareTranslateX, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(shareRotate, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]),
+    ]).start();
+    handleShare(activePlan);
+  }, [currentPlans, currentIndex, requireAuth, handleShare]);
+
+  // ── Active plan derived data for sticky bar ───────────────────
+  const activePlan = currentPlans[currentIndex] || null;
+  const barIsLiked = activePlan ? likedPlanIds.has(activePlan.id) : false;
+  const barIsSaved = activePlan ? savedPlanIds.has(activePlan.id) : false;
+  const barLikesCount = activePlan?.likesCount ?? 0;
+  const barCommentsCount = activePlan?.commentsCount ?? 0;
+
+  // Share rotate interpolation
+  const shareRotateStr = shareRotate.interpolate({
+    inputRange: [0, 15],
+    outputRange: ['0deg', '15deg'],
+  });
+
   // ── Viewability tracking for progress ─────────────────────────
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -272,9 +377,7 @@ export const FeedScreen: React.FC = () => {
   ).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
-  // ── Derived ───────────────────────────────────────────────────
-  const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
-  const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
+  // ── Derived (continued) ────────────────────────────────────────
   const progressPercent =
     currentPlans.length > 1 ? ((currentIndex + 1) / currentPlans.length) * 100 : 100;
 
@@ -297,8 +400,6 @@ export const FeedScreen: React.FC = () => {
         isActive={index === currentIndex}
         isLiked={likedPlanIds.has(item.id)}
         isSaved={savedPlanIds.has(item.id)}
-        likesCount={item.likesCount ?? 0}
-        commentsCount={item.commentsCount ?? 0}
         onLike={() => handleLike(item.id)}
         onSave={() => handleSave(item.id)}
         onAuthorPress={() => {
@@ -310,13 +411,11 @@ export const FeedScreen: React.FC = () => {
         }}
         onDetailStateChange={setIsDetailOpen}
         onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: item.id })}
-        onComment={() => handleOpenComment(item)}
-        onShare={() => handleShare(item)}
         onDoItNow={() => handleDoItNow(item)}
         onMapPress={() => handleMapPress(item)}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleDoItNow, handleMapPress],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -481,6 +580,88 @@ export const FeedScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* ─── Sticky action bar (above tab bar) ─── */}
+      <Animated.View
+        style={[
+          styles.stickyBar,
+          { transform: [{ translateY: actionBarY }] },
+        ]}
+        pointerEvents={isDetailOpen ? 'auto' : 'none'}
+      >
+        {/* Like */}
+        <TouchableOpacity
+          style={styles.stickyBtn}
+          onPress={barHandleLike}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+            <Ionicons
+              name={barIsLiked ? 'heart' : 'heart-outline'}
+              size={24}
+              color={barIsLiked ? '#C4704B' : '#6B5D52'}
+            />
+          </Animated.View>
+          {barLikesCount > 0 && (
+            <Text style={[styles.stickyCount, barIsLiked && styles.stickyCountActive]}>
+              {barLikesCount >= 1000 ? `${(barLikesCount / 1000).toFixed(1).replace('.0', '')}k` : barLikesCount}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Comment */}
+        <TouchableOpacity
+          style={styles.stickyBtn}
+          onPress={barHandleComment}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Animated.View style={{ transform: [{ scale: commentScale }] }}>
+            <Ionicons name="chatbubble-outline" size={22} color="#6B5D52" />
+          </Animated.View>
+          {barCommentsCount > 0 && (
+            <Text style={styles.stickyCount}>
+              {barCommentsCount >= 1000 ? `${(barCommentsCount / 1000).toFixed(1).replace('.0', '')}k` : barCommentsCount}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Save */}
+        <TouchableOpacity
+          style={styles.stickyBtn}
+          onPress={barHandleSave}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+            <Ionicons
+              name={barIsSaved ? 'bookmark' : 'bookmark-outline'}
+              size={22}
+              color={barIsSaved ? '#C4704B' : '#6B5D52'}
+            />
+          </Animated.View>
+        </TouchableOpacity>
+
+        {/* Share */}
+        <TouchableOpacity
+          style={styles.stickyBtn}
+          onPress={barHandleShare}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Animated.View
+            style={{
+              transform: [
+                { translateX: shareTranslateX },
+                { rotate: shareRotateStr },
+              ],
+            }}
+          >
+            <Ionicons name="paper-plane-outline" size={22} color="#6B5D52" />
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* ─── Share plan sheet ─── */}
       {sharePlan && (
@@ -733,6 +914,47 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+  },
+
+  // ── Sticky action bar ──────────────────────────────────────
+  stickyBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(250, 247, 242, 0.92)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(107, 93, 82, 0.12)',
+    zIndex: 40,
+    // Upward shadow
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  stickyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+  } as any,
+  stickyCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B5D52',
+  },
+  stickyCountActive: {
+    color: '#C4704B',
   },
 
   // ── Comment sheet ─────────────────────────────────────────
