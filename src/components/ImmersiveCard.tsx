@@ -69,8 +69,8 @@ const fmtMin = (m: number): string => {
 const CARD_H_PAD = 14;
 const CARD_RADIUS = 22;
 const CARD_V_TOP = 6;
-const CARD_V_BOTTOM = 8;
-const BELOW_CARD_H = 64;
+const CARD_V_BOTTOM = 0;  // Minimized — card goes all the way down
+const BELOW_CARD_H = 0;   // Removed — no more meta/tags below the card
 const IMAGE_HEADER_RATIO = 0.35;
 // Extra vertical growth of the frame when detail panel opens (feed mode = 0)
 const FRAME_EXTRA_DETAIL = 80;
@@ -932,37 +932,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         </Animated.ScrollView>
       </View>
 
-      {/* ── Below card (meta + tags — fades on scroll) ── */}
-      <Animated.View style={[styles.belowCard, { opacity: belowCardOpacity }]}>
-        <View style={styles.belowMeta}>
-          {plan.price ? (
-            <Text style={styles.belowMetaText}>{plan.price}</Text>
-          ) : null}
-          {plan.price && plan.duration ? (
-            <Text style={styles.belowDot}>·</Text>
-          ) : null}
-          {plan.duration ? (
-            <Text style={styles.belowMetaText}>{plan.duration}</Text>
-          ) : null}
-          {(plan.price || plan.duration) && plan.places?.length > 0 ? (
-            <Text style={styles.belowDot}>·</Text>
-          ) : null}
-          {plan.places?.length > 0 ? (
-            <Text style={styles.belowMetaText}>
-              {plan.places.length} lieu{plan.places.length > 1 ? 'x' : ''}
-            </Text>
-          ) : null}
-        </View>
-        {plan.tags && plan.tags.length > 1 && (
-          <View style={styles.belowTags}>
-            {plan.tags.slice(0, 4).map((tag, i) => (
-              <View key={i} style={styles.belowTagChip}>
-                <Text style={styles.belowTagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </Animated.View>
     </Animated.View>
   );
 };
