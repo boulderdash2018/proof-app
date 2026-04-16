@@ -39,13 +39,18 @@ interface ImmersiveCardProps {
   isActive: boolean;
   isLiked: boolean;
   isSaved: boolean;
+  likesCount: number;
+  commentsCount: number;
   onLike: () => void;
   onSave: () => void;
   onAuthorPress: () => void;
   onProfilePress: (userId: string) => void;
   onDetailStateChange: (isOpen: boolean) => void;
-  onPlanPress: () => void;
   onPlacePress: (placeId: string) => void;
+  onComment: () => void;
+  onShare: () => void;
+  onDoItNow: () => void;
+  onMapPress: () => void;
 }
 
 // ── Transport helpers (same as PlanDetailModal) ─────────────
@@ -78,13 +83,18 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   isActive,
   isLiked,
   isSaved,
+  likesCount,
+  commentsCount,
   onLike,
   onSave,
   onAuthorPress,
   onProfilePress,
   onDetailStateChange,
-  onPlanPress,
   onPlacePress,
+  onComment,
+  onShare,
+  onDoItNow,
+  onMapPress,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
   const cardH = Math.max(1, height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H);
@@ -319,6 +329,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d2 = makeDetailAnim(2);
   const d3 = makeDetailAnim(3);
   const d4 = makeDetailAnim(4);
+  const d5 = makeDetailAnim(5);
 
   return (
     <View style={[styles.frame, { width, height }]}>
@@ -517,7 +528,12 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 transform: [{ translateY: d0.translateY }],
               }}
             >
-              <Text style={styles.detailTitle}>{plan.title}</Text>
+              <View style={styles.detailTitleRow}>
+                <Text style={styles.detailTitle}>{plan.title}</Text>
+                {plan.timeAgo ? (
+                  <Text style={styles.detailTimeAgo}>{plan.timeAgo}</Text>
+                ) : null}
+              </View>
               <View style={styles.detailMeta}>
                 {plan.price ? (
                   <View style={styles.metaPill}>
@@ -562,10 +578,55 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Text style={styles.metaPillText}>{plan.transport}</Text>
                   </View>
                 ) : null}
+                {plan.places?.some((p: any) => p.latitude && p.longitude) && (
+                  <TouchableOpacity style={styles.mapPill} onPress={onMapPress} activeOpacity={0.7}>
+                    <Ionicons name="map-outline" size={13} color={Colors.primary} />
+                    <Text style={styles.mapPillText}>Map</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </Animated.View>
 
-            {/* 1 — Tags */}
+            {/* 1 — Action bar (like, comment, save, share) */}
+            <Animated.View
+              style={{
+                opacity: d1.opacity,
+                transform: [{ translateY: d1.translateY }],
+              }}
+            >
+              <View style={styles.detailActionBar}>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onLike} activeOpacity={0.7}>
+                  <Ionicons
+                    name={isLiked ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={isLiked ? '#FF4D67' : 'rgba(255,255,255,0.7)'}
+                  />
+                  {likesCount > 0 && (
+                    <Text style={[styles.detailActionCount, isLiked && { color: '#FF4D67' }]}>
+                      {likesCount}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onComment} activeOpacity={0.7}>
+                  <Ionicons name="chatbubble-outline" size={20} color="rgba(255,255,255,0.7)" />
+                  {commentsCount > 0 && (
+                    <Text style={styles.detailActionCount}>{commentsCount}</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onSave} activeOpacity={0.7}>
+                  <Ionicons
+                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color={isSaved ? Colors.primary : 'rgba(255,255,255,0.7)'}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onShare} activeOpacity={0.7}>
+                  <Ionicons name="paper-plane-outline" size={20} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            {/* 2 — Tags */}
             {plan.tags?.length > 0 && (
               <Animated.View
                 style={[
@@ -584,7 +645,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </Animated.View>
             )}
 
-            {/* 2 — Creator's tip */}
+            {/* 3 — Creator's tip */}
             {(() => {
               const creatorTip = plan.places?.find((p) => p.comment)?.comment;
               if (!creatorTip) return null;
@@ -606,7 +667,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               );
             })()}
 
-            {/* 3 — "Do it now" CTA */}
+            {/* 4 — "Do it now" CTA — launches plan directly */}
             <Animated.View
               style={{
                 opacity: d2.opacity,
@@ -616,18 +677,18 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               <TouchableOpacity
                 style={styles.doItNowBtn}
                 activeOpacity={0.8}
-                onPress={onPlanPress}
+                onPress={onDoItNow}
               >
+                <Ionicons name="navigate" size={18} color="#FFF" />
                 <Text style={styles.doItNowText}>Do it now</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFF" />
               </TouchableOpacity>
             </Animated.View>
 
-            {/* 4 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
+            {/* 5 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
             <Animated.View
               style={{
-                opacity: d3.opacity,
-                transform: [{ translateY: d3.translateY }],
+                opacity: d4.opacity,
+                transform: [{ translateY: d4.translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Itinéraire</Text>
@@ -785,11 +846,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               )}
             </Animated.View>
 
-            {/* 4 — Author */}
+            {/* 6 — Author */}
             <Animated.View
               style={{
-                opacity: d4.opacity,
-                transform: [{ translateY: d4.translateY }],
+                opacity: d5.opacity,
+                transform: [{ translateY: d5.translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Publié par</Text>
@@ -1019,12 +1080,25 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.35)',
     marginTop: 2,
   },
+  detailTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  } as any,
   detailTitle: {
+    flex: 1,
     fontSize: 24,
     fontFamily: Fonts.serifBold,
     color: '#FFF',
     lineHeight: 30,
     marginBottom: 12,
+  },
+  detailTimeAgo: {
+    fontSize: 12,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 6,
   },
   detailMeta: {
     flexDirection: 'row',
@@ -1045,6 +1119,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.serifSemiBold,
     color: 'rgba(255,255,255,0.65)',
+  },
+  mapPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: Colors.primary + '20',
+  } as any,
+  mapPillText: {
+    fontSize: 12,
+    fontFamily: Fonts.serifSemiBold,
+    color: Colors.primary,
+  },
+  // ── Detail action bar ──────────────────────────────────────
+  detailActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  detailActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  } as any,
+  detailActionCount: {
+    fontSize: 13,
+    fontFamily: Fonts.serifSemiBold,
+    color: 'rgba(255,255,255,0.6)',
   },
   detailTags: {
     flexDirection: 'row',

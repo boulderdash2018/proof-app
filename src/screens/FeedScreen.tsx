@@ -5,10 +5,17 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Animated,
   Dimensions,
   StatusBar,
   ViewToken,
+  Modal,
+  TextInput as RNTextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -16,19 +23,38 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { ImmersiveCard } from '../components/ImmersiveCard';
-import { LoadingSkeleton, EmptyState } from '../components';
+import { LoadingSkeleton, EmptyState, Avatar } from '../components';
 import { SharePlanSheet } from '../components/SharePlanSheet';
+import { TransportChooser } from '../components/TransportChooser';
+import { ClosedPlacesSheet } from '../components/ClosedPlacesSheet';
+import { PlanMapModal } from '../components/PlanMapModal';
 import {
   useAuthStore, useFeedStore, useNotifStore,
   useTrendingStore, useSocialProofStore, useChatStore,
 } from '../store';
 import { useGuestStore } from '../store/guestStore';
+import { useDoItNowStore } from '../store/doItNowStore';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
-import { Plan } from '../types';
+import { Plan, Comment } from '../types';
+import { fetchComments, addComment } from '../services/plansService';
+import { checkPlaceOpenStatus, PlaceOpenStatus } from '../services/googlePlacesService';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 type FeedTab = 'reco' | 'friends';
+
+const getCommentTimeAgo = (dateStr: string): string => {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}j`;
+};
 
 /* ================================================================
    IMMERSIVE FEED — Creme-style rounded card, horizontal swipe
@@ -63,6 +89,23 @@ export const FeedScreen: React.FC = () => {
   const [sharePlan, setSharePlan] = useState<Plan | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const flatListRef = useRef<FlatList<Plan>>(null);
+
+  // ── Comment sheet ─────────────────────────────────────────────
+  const [commentPlan, setCommentPlan] = useState<Plan | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  // ── Do It Now flow ────────────────────────────────────────────
+  const [doItNowPlan, setDoItNowPlan] = useState<Plan | null>(null);
+  const [showTransportChooser, setShowTransportChooser] = useState(false);
+  const [showClosedSheet, setShowClosedSheet] = useState(false);
+  const [closedPlaces, setClosedPlaces] = useState<PlaceOpenStatus[]>([]);
+  const [pendingTransport, setPendingTransport] = useState<any>(null);
+  const [checkingPlaces, setCheckingPlaces] = useState(false);
+
+  // ── Map modal ─────────────────────────────────────────────────
+  const [mapPlan, setMapPlan] = useState<Plan | null>(null);
 
   // ── Animations ─────────────────────────────────────────────────
   const tabIndicatorLeft = useRef(new Animated.Value(0)).current;
@@ -138,6 +181,87 @@ export const FeedScreen: React.FC = () => {
     toggleSave(planId);
   }, [requireAuth]);
 
+  // ── Comment handlers ──────────────────────────────────────────
+  const handleOpenComment = useCallback((plan: Plan) => {
+    if (requireAuth()) return;
+    setCommentPlan(plan);
+    setComments([]);
+    fetchComments(plan.id).then(setComments);
+  }, [requireAuth]);
+
+  const handleSendComment = useCallback(async () => {
+    if (!commentText.trim() || !user || isSending || !commentPlan) return;
+    setIsSending(true);
+    try {
+      const newComment = await addComment(commentPlan.id, user, commentText.trim(), commentPlan);
+      setComments((prev) => [newComment, ...prev]);
+      useFeedStore.setState((state) => ({
+        plans: state.plans.map((p) =>
+          p.id === commentPlan.id ? { ...p, commentsCount: p.commentsCount + 1 } : p
+        ),
+      }));
+      setCommentText('');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      console.error('Failed to send comment:', err);
+    } finally {
+      setIsSending(false);
+    }
+  }, [commentText, user, isSending, commentPlan]);
+
+  const closeCommentSheet = useCallback(() => {
+    setCommentPlan(null);
+    setCommentText('');
+  }, []);
+
+  // ── Share handler ─────────────────────────────────────────────
+  const handleShare = useCallback((plan: Plan) => {
+    if (requireAuth()) return;
+    setSharePlan(plan);
+  }, [requireAuth]);
+
+  // ── Do It Now flow ────────────────────────────────────────────
+  const launchDoItNow = useCallback((targetPlan: Plan, transport: any) => {
+    useDoItNowStore.getState().startSession(targetPlan, transport, user!.id);
+    navigation.navigate('DoItNow', { planId: targetPlan.id });
+    if (user && targetPlan) {
+      import('../services/notificationsService').then(({ notifyDoItNow }) => {
+        notifyDoItNow(user, targetPlan).catch((e: any) => console.error('[notif trigger]', e));
+      });
+    }
+  }, [user, navigation]);
+
+  const handleDoItNow = useCallback((plan: Plan) => {
+    if (requireAuth()) return;
+    setDoItNowPlan(plan);
+    setShowTransportChooser(true);
+  }, [requireAuth]);
+
+  const handleTransportSelect = useCallback(async (transport: any) => {
+    if (!doItNowPlan) return;
+    setCheckingPlaces(true);
+    const placesToCheck = doItNowPlan.places.filter((p: any) => p.googlePlaceId);
+    const statuses = await Promise.all(
+      placesToCheck.map((p: any) => checkPlaceOpenStatus(p.googlePlaceId!, p.name))
+    );
+    const closed = statuses.filter((s) => s.isPermanentlyClosed || s.isOpen === false);
+    setCheckingPlaces(false);
+    setShowTransportChooser(false);
+
+    if (closed.length > 0) {
+      setClosedPlaces(closed);
+      setPendingTransport(transport);
+      setShowClosedSheet(true);
+    } else {
+      launchDoItNow(doItNowPlan, transport);
+    }
+  }, [doItNowPlan, launchDoItNow]);
+
+  // ── Map handler ───────────────────────────────────────────────
+  const handleMapPress = useCallback((plan: Plan) => {
+    setMapPlan(plan);
+  }, []);
+
   // ── Viewability tracking for progress ─────────────────────────
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -173,6 +297,8 @@ export const FeedScreen: React.FC = () => {
         isActive={index === currentIndex}
         isLiked={likedPlanIds.has(item.id)}
         isSaved={savedPlanIds.has(item.id)}
+        likesCount={item.likesCount ?? 0}
+        commentsCount={item.commentsCount ?? 0}
         onLike={() => handleLike(item.id)}
         onSave={() => handleSave(item.id)}
         onAuthorPress={() => {
@@ -183,11 +309,14 @@ export const FeedScreen: React.FC = () => {
           if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
         }}
         onDetailStateChange={setIsDetailOpen}
-        onPlanPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
         onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: item.id })}
+        onComment={() => handleOpenComment(item)}
+        onShare={() => handleShare(item)}
+        onDoItNow={() => handleDoItNow(item)}
+        onMapPress={() => handleMapPress(item)}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -364,6 +493,136 @@ export const FeedScreen: React.FC = () => {
           planAuthorName={sharePlan.author.displayName}
         />
       )}
+
+      {/* ─── Comment sheet ─── */}
+      <Modal visible={!!commentPlan} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={closeCommentSheet}>
+          <View style={styles.sheetBackdrop}>
+            <TouchableWithoutFeedback>
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetKav}>
+                <View style={[styles.sheet, { paddingBottom: insets.bottom + 8 }]}>
+                  <View style={styles.sheetHandle} />
+                  <Text style={styles.sheetTitle}>
+                    Commentaires ({commentPlan?.commentsCount ?? 0})
+                  </Text>
+
+                  <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
+                    {comments.length === 0 ? (
+                      <View style={styles.emptyComments}>
+                        <Text style={styles.emptyText}>Aucun commentaire</Text>
+                        <Text style={styles.emptySub}>Sois le premier à commenter</Text>
+                      </View>
+                    ) : (
+                      comments.map((comment) => (
+                        <View key={comment.id} style={styles.commentRow}>
+                          <Avatar
+                            initials={comment.authorInitials}
+                            bg={comment.authorAvatarBg}
+                            color={comment.authorAvatarColor}
+                            size="S"
+                            avatarUrl={comment.authorAvatarUrl ?? undefined}
+                          />
+                          <View style={styles.commentBody}>
+                            <View style={styles.commentHead}>
+                              <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+                              <Text style={styles.commentTime}>{getCommentTimeAgo(comment.createdAt)}</Text>
+                            </View>
+                            <Text style={styles.commentText}>{comment.text}</Text>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </ScrollView>
+
+                  {isGuest ? (
+                    <TouchableOpacity
+                      style={styles.commentInputRow}
+                      onPress={() => { closeCommentSheet(); setShowAccountPrompt(true); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.commentPlaceholder}>Connectez-vous pour commenter</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.commentInputRow}>
+                      <RNTextInput
+                        style={styles.commentInput}
+                        placeholder="Ajouter un commentaire..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={commentText}
+                        onChangeText={setCommentText}
+                        multiline
+                        maxLength={500}
+                      />
+                      <TouchableOpacity
+                        onPress={handleSendComment}
+                        disabled={!commentText.trim() || isSending}
+                        style={[styles.sendBtn, { opacity: commentText.trim() ? 1 : 0.4 }]}
+                      >
+                        {isSending ? (
+                          <ActivityIndicator size="small" color={Colors.primary} />
+                        ) : (
+                          <Ionicons name="send" size={18} color={Colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* ─── Transport chooser (Do It Now flow) ─── */}
+      {doItNowPlan && (
+        <TransportChooser
+          visible={showTransportChooser}
+          onClose={() => { setShowTransportChooser(false); setCheckingPlaces(false); }}
+          recommendedTransport={doItNowPlan.transport}
+          authorName={doItNowPlan.author?.username}
+          loading={checkingPlaces}
+          onSelect={handleTransportSelect}
+        />
+      )}
+
+      {/* ─── Closed places sheet ─── */}
+      {doItNowPlan && (
+        <ClosedPlacesSheet
+          visible={showClosedSheet}
+          closedPlaces={closedPlaces}
+          allClosed={closedPlaces.length === doItNowPlan.places.length}
+          onSkipClosed={() => {
+            setShowClosedSheet(false);
+            const closedIds = new Set(closedPlaces.map((cp) => cp.placeId));
+            const filteredPlan = {
+              ...doItNowPlan,
+              places: doItNowPlan.places.filter((p: any) => !closedIds.has(p.googlePlaceId || '')),
+            };
+            launchDoItNow(filteredPlan, pendingTransport);
+          }}
+          onContinue={() => {
+            setShowClosedSheet(false);
+            launchDoItNow(doItNowPlan, pendingTransport);
+          }}
+          onCancel={() => {
+            setShowClosedSheet(false);
+            setPendingTransport(null);
+            setClosedPlaces([]);
+          }}
+        />
+      )}
+
+      {/* ─── Map modal ─── */}
+      {mapPlan && (
+        <PlanMapModal
+          visible={!!mapPlan}
+          onClose={() => setMapPlan(null)}
+          title={mapPlan.title}
+          places={mapPlan.places
+            .filter((p: any) => p.latitude && p.longitude)
+            .map((p: any) => ({ name: p.name, latitude: p.latitude!, longitude: p.longitude! }))}
+        />
+      )}
     </View>
   );
 };
@@ -474,5 +733,112 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+  },
+
+  // ── Comment sheet ─────────────────────────────────────────
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheetKav: {
+    maxHeight: '80%',
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    backgroundColor: '#1A1A1A',
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontFamily: Fonts.serifBold,
+    color: '#FFF',
+    marginBottom: 12,
+  },
+  sheetScroll: {
+    maxHeight: SCREEN_H * 0.45,
+  },
+  emptyComments: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 18,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: Fonts.serifSemiBold,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  emptySub: {
+    fontSize: 12,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 4,
+  },
+  commentRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  commentBody: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  commentHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  commentAuthor: {
+    fontSize: 13,
+    fontFamily: Fonts.serifBold,
+    color: '#FFF',
+  },
+  commentTime: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  commentText: {
+    fontSize: 13,
+    fontFamily: Fonts.serif,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    minHeight: 38,
+    marginTop: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  commentPlaceholder: {
+    fontSize: 13,
+    fontFamily: Fonts.serif,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  commentInput: {
+    flex: 1,
+    fontSize: 13,
+    maxHeight: 60,
+    paddingVertical: 0,
+    color: '#FFF',
+  },
+  sendBtn: {
+    marginLeft: 8,
+    paddingHorizontal: 4,
   },
 });
