@@ -1788,53 +1788,130 @@ export const CreateScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
-          {/* ═══════ STEP 1: Cover photo + title ═══════ */}
+          {/* ═══════ STEP 1: Cover photo + title — editorial hero layout ═══════ */}
           {step === 1 && (
-            <>
-              <Text style={[styles.stepIntro, { color: Colors.textSecondary }]}>
-                Donne l'envie dès le premier coup d'œil. Une photo qui claque, un titre qui marque.
-              </Text>
-
-              {/* Cover photos first (visual anchor) */}
-              <Text style={[styles.fieldLabel, { color: C.gray800 }]}>Photos de couverture</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosPickerScroll} contentContainerStyle={styles.photosPickerContainer}>
-                {coverPhotos.map((uri, i) => (
-                  <View key={i} style={styles.photoThumbWrap}>
-                    <Image source={{ uri }} style={styles.photoThumb} />
-                    <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(i)}>
-                      <Ionicons name="close-circle" size={22} color="#FFF" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.photoEditBtn} onPress={() => setEditingPhotoIdx(i)} activeOpacity={0.7}>
-                      <Ionicons name="options-outline" size={13} color="#FFF" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {coverPhotos.length < 7 && (
-                  <TouchableOpacity
-                    style={[styles.photoAddBtn, { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-                    onPress={pickPhotos}
-                    disabled={isUploadingPhotos}
-                  >
+            <View style={styles.s1Container}>
+              {/* ── HERO PHOTO (big, centered, 4:5) ── */}
+              <TouchableOpacity
+                style={styles.s1Hero}
+                onPress={coverPhotos.length === 0 ? pickPhotos : () => setEditingPhotoIdx(0)}
+                activeOpacity={coverPhotos.length === 0 ? 0.85 : 0.9}
+                disabled={isUploadingPhotos && coverPhotos.length === 0}
+              >
+                {coverPhotos.length === 0 ? (
+                  // Empty state — big dashed placeholder, tap to pick
+                  <View style={styles.s1HeroEmpty}>
                     {isUploadingPhotos ? (
-                      <ActivityIndicator size="small" color={C.primary} />
+                      <ActivityIndicator size="large" color={Colors.primary} />
                     ) : (
                       <>
-                        <Ionicons name="camera-outline" size={24} color={C.gray600} />
-                        <Text style={[styles.photoAddText, { color: C.gray600 }]}>Ajouter</Text>
+                        <View style={styles.s1HeroIconCircle}>
+                          <Ionicons name="image-outline" size={34} color={Colors.primary} />
+                        </View>
+                        <Text style={styles.s1HeroEmptyTitle}>Ajoute la photo</Text>
+                        <Text style={styles.s1HeroEmptySub}>
+                          Celle qui donne envie au premier coup d'œil
+                        </Text>
+                        <View style={styles.s1HeroEmptyCta}>
+                          <Ionicons name="add" size={16} color={Colors.textOnAccent} />
+                          <Text style={styles.s1HeroEmptyCtaText}>Choisir une photo</Text>
+                        </View>
                       </>
                     )}
-                  </TouchableOpacity>
+                  </View>
+                ) : (
+                  // Filled state — show big photo with edit + remove pills
+                  <>
+                    <Image source={{ uri: coverPhotos[0] }} style={styles.s1HeroImg} resizeMode="cover" />
+                    <LinearGradient
+                      colors={['rgba(44,36,32,0.35)', 'transparent', 'rgba(44,36,32,0.35)']}
+                      locations={[0, 0.3, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                      pointerEvents="none"
+                    />
+                    <TouchableOpacity
+                      style={styles.s1HeroRemove}
+                      onPress={() => removePhoto(0)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close" size={18} color="#FFF" />
+                    </TouchableOpacity>
+                    <View style={styles.s1HeroEditPill}>
+                      <Ionicons name="options-outline" size={14} color="#FFF" />
+                      <Text style={styles.s1HeroEditText}>Éditer</Text>
+                    </View>
+                    <View style={styles.s1HeroChangePill}>
+                      <Text style={styles.s1HeroChangeText}>Photo principale</Text>
+                    </View>
+                  </>
                 )}
-              </ScrollView>
-              <Text style={[styles.photoHint, { color: C.gray500 }]}>
-                {coverPhotos.length === 0 ? 'Optionnel · Les photos des lieux seront utilisées par défaut' : `${coverPhotos.length}/7 photos`}
-              </Text>
+              </TouchableOpacity>
 
-              {/* Title */}
-              <View style={{ marginTop: 24 }}>
-                <TextInput label={t.create_plan_title_label} placeholder={t.create_plan_title_placeholder} value={title} onChangeText={setTitle} error={errors.title} />
+              {/* ── Additional photos row (only if main photo chosen) ── */}
+              {coverPhotos.length > 0 && (
+                <View style={styles.s1Thumbs}>
+                  {coverPhotos.slice(1).map((uri, i) => {
+                    const idx = i + 1;
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.s1Thumb}
+                        onPress={() => setEditingPhotoIdx(idx)}
+                        activeOpacity={0.85}
+                      >
+                        <Image source={{ uri }} style={styles.s1ThumbImg} />
+                        <TouchableOpacity
+                          style={styles.s1ThumbRemove}
+                          onPress={() => removePhoto(idx)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="close-circle" size={20} color={Colors.textPrimary} />
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {coverPhotos.length < 7 && (
+                    <TouchableOpacity
+                      style={styles.s1ThumbAdd}
+                      onPress={pickPhotos}
+                      activeOpacity={0.7}
+                      disabled={isUploadingPhotos}
+                    >
+                      {isUploadingPhotos ? (
+                        <ActivityIndicator size="small" color={Colors.primary} />
+                      ) : (
+                        <Ionicons name="add" size={22} color={Colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* ── TITLE — big editorial input, minimal chrome ── */}
+              <View style={styles.s1TitleWrap}>
+                <Text style={styles.s1TitleLabel}>LE TITRE DE TON PLAN</Text>
+                <RNTextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Meilleur sushi de Passy"
+                  placeholderTextColor={Colors.textTertiary}
+                  style={styles.s1TitleInput}
+                  multiline
+                  maxLength={80}
+                  returnKeyType="done"
+                  blurOnSubmit
+                />
+                <View style={styles.s1TitleMetaRow}>
+                  {errors.title ? (
+                    <Text style={styles.s1TitleError}>{errors.title}</Text>
+                  ) : (
+                    <Text style={styles.s1TitleHint}>Court, précis, qui donne envie</Text>
+                  )}
+                  <Text style={styles.s1TitleCounter}>{title.length}/80</Text>
+                </View>
               </View>
-            </>
+            </View>
           )}
 
           {/* ═══════ STEP 2: Categories ═══════ */}
@@ -2578,6 +2655,213 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     marginTop: 4,
     marginBottom: 20,
+  },
+  // ── STEP 1: editorial hero layout ──
+  s1Container: {
+    paddingTop: 6,
+    paddingBottom: 20,
+  },
+  s1Hero: {
+    width: '100%',
+    aspectRatio: 4 / 5,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: Colors.bgTertiary,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    elevation: 10,
+    marginBottom: 20,
+    alignSelf: 'center',
+  },
+  s1HeroEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: Colors.terracotta200,
+    borderRadius: 24,
+    backgroundColor: Colors.terracotta50,
+    padding: 32,
+  },
+  s1HeroIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.terracotta100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  s1HeroEmptyTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  s1HeroEmptySub: {
+    fontSize: 14,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 260,
+    marginBottom: 24,
+  },
+  s1HeroEmptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  } as any,
+  s1HeroEmptyCtaText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.1,
+  },
+  s1HeroImg: {
+    width: '100%',
+    height: '100%',
+  },
+  s1HeroRemove: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(44,36,32,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  s1HeroEditPill: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+    backgroundColor: 'rgba(44,36,32,0.55)',
+  } as any,
+  s1HeroEditText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: '#FFF',
+    letterSpacing: 0.2,
+  },
+  s1HeroChangePill: {
+    position: 'absolute',
+    bottom: 14,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: 'rgba(250, 247, 242, 0.9)',
+  },
+  s1HeroChangeText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+
+  // Additional photo thumbnails row
+  s1Thumbs: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 28,
+  } as any,
+  s1Thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    overflow: 'visible',
+    backgroundColor: Colors.bgTertiary,
+    position: 'relative',
+  },
+  s1ThumbImg: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+  },
+  s1ThumbRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.bgPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  s1ThumbAdd: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: Colors.bgTertiary,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.borderMedium,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Title — big editorial input
+  s1TitleWrap: {
+    marginTop: 4,
+  },
+  s1TitleLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    marginBottom: 10,
+  },
+  s1TitleInput: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+    paddingTop: 6,
+    paddingBottom: 14,
+    minHeight: 70,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.borderMedium,
+  },
+  s1TitleMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  s1TitleHint: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+  },
+  s1TitleError: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.error,
+  },
+  s1TitleCounter: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
   },
   wizardFooter: {
     paddingHorizontal: Layout.screenPadding,
