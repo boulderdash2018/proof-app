@@ -32,8 +32,6 @@ import { Plan, TravelSegment, TransportMode } from '../types';
    Return      → overscroll at top snaps back to feed
    ================================================================ */
 
-const ACTION_BAR_H = 56;
-
 interface ImmersiveCardProps {
   plan: Plan;
   width: number;
@@ -111,25 +109,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const isCommitting = useRef(false);
   const [hasScrolled, setHasScrolled] = useState(false);
 
-  // ── Action bar animations (JS-driven to avoid native-layer touch issues) ──
-  const barOpacity = useRef(new Animated.Value(0)).current;
-  const likeScale = useRef(new Animated.Value(1)).current;
-  const saveScale = useRef(new Animated.Value(1)).current;
-  const commentScale = useRef(new Animated.Value(1)).current;
-  const shareTransX = useRef(new Animated.Value(0)).current;
-  const shareRot = useRef(new Animated.Value(0)).current;
-
-  const animPop = useCallback((scale: Animated.Value, peak = 1.3) => {
-    Animated.sequence([
-      Animated.timing(scale, { toValue: peak, duration: 150, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 150, easing: Easing.bezier(0.34, 1.56, 0.64, 1), useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  const shareRotStr = shareRot.interpolate({
-    inputRange: [0, 15], outputRange: ['0deg', '15deg'],
-  });
-
   // ── Cover photo & rank ─────────────────────────────────────
   const coverUrl =
     plan.coverPhotos?.[0] ||
@@ -195,7 +174,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     extrapolate: 'clamp',
   });
 
-  // Title + author — parallax at 0.65x speed + scale down
+  // Title + author — parallax at 0.65× speed + scale down
   const titleCounterY = scrollY.interpolate({
     inputRange: [0, DETAIL_SNAP],
     outputRange: [0, DETAIL_SNAP * 0.35],
@@ -269,12 +248,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     onDetailStateChange(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Show action bar (JS-driven — no native layer touch issues)
-    Animated.timing(barOpacity, {
-      toValue: 1, duration: 350, delay: 150,
-      useNativeDriver: false,
-    }).start();
-
     (scrollRef.current as any)?.scrollTo({ y: DETAIL_SNAP, animated: true });
     setTimeout(() => {
       isCommitting.current = false;
@@ -292,12 +265,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     isDetailRef.current = false;
     onDetailStateChange(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    // Hide action bar quickly (before panel returns)
-    Animated.timing(barOpacity, {
-      toValue: 0, duration: 200,
-      useNativeDriver: false,
-    }).start();
 
     (scrollRef.current as any)?.scrollTo({ y: 0, animated: true });
     setTimeout(() => {
@@ -350,7 +317,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
       setIsDetailOpen(false);
       isDetailRef.current = false;
       onDetailStateChange(false);
-      barOpacity.setValue(0);
       (scrollRef.current as any)?.scrollTo({ y: 0, animated: false });
     }
   }, [isActive]);
@@ -363,11 +329,12 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d2 = makeDetailAnim(2);
   const d3 = makeDetailAnim(3);
   const d4 = makeDetailAnim(4);
+  const d5 = makeDetailAnim(5);
 
   return (
-    <View style={[styles.frame, { width, height: height + ACTION_BAR_H }]}>
+    <View style={[styles.frame, { width, height }]}>
       {/* ── Card container ── */}
-      <View style={[styles.card, { flex: 0, height: cardH }]}>
+      <View style={styles.card}>
         {/* ─── Image layer (parallax + scale + dim) ─── */}
         <Animated.View
           style={[
@@ -573,7 +540,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name="wallet-outline"
                       size={13}
-                      color={Colors.textTertiary}
+                      color={Colors.textSecondary}
                     />
                     <Text style={styles.metaPillText}>{plan.price}</Text>
                   </View>
@@ -583,7 +550,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name="time-outline"
                       size={13}
-                      color={Colors.textTertiary}
+                      color={Colors.textSecondary}
                     />
                     <Text style={styles.metaPillText}>{plan.duration}</Text>
                   </View>
@@ -593,7 +560,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name="location-outline"
                       size={13}
-                      color={Colors.textTertiary}
+                      color={Colors.textSecondary}
                     />
                     <Text style={styles.metaPillText}>
                       {plan.places.length} lieu
@@ -606,7 +573,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <Ionicons
                       name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any}
                       size={13}
-                      color={Colors.textTertiary}
+                      color={Colors.textSecondary}
                     />
                     <Text style={styles.metaPillText}>{plan.transport}</Text>
                   </View>
@@ -620,7 +587,46 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </View>
             </Animated.View>
 
-            {/* 1 — Tags */}
+            {/* 1 — Action bar (like, comment, save, share) */}
+            <Animated.View
+              style={{
+                opacity: d1.opacity,
+                transform: [{ translateY: d1.translateY }],
+              }}
+            >
+              <View style={styles.detailActionBar}>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onLike} activeOpacity={0.7}>
+                  <Ionicons
+                    name={isLiked ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={isLiked ? Colors.primary : Colors.textSecondary}
+                  />
+                  {likesCount > 0 && (
+                    <Text style={[styles.detailActionCount, isLiked && { color: Colors.primary }]}>
+                      {likesCount}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onComment} activeOpacity={0.7}>
+                  <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
+                  {commentsCount > 0 && (
+                    <Text style={styles.detailActionCount}>{commentsCount}</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onSave} activeOpacity={0.7}>
+                  <Ionicons
+                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color={isSaved ? Colors.primary : Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailActionBtn} onPress={onShare} activeOpacity={0.7}>
+                  <Ionicons name="paper-plane-outline" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            {/* 2 — Tags */}
             {plan.tags?.length > 0 && (
               <Animated.View
                 style={[
@@ -678,11 +684,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </TouchableOpacity>
             </Animated.View>
 
-            {/* 4 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
+            {/* 5 — Itinerary (enriched: travel segments, ratings, pills, Q&A) */}
             <Animated.View
               style={{
-                opacity: d3.opacity,
-                transform: [{ translateY: d3.translateY }],
+                opacity: d4.opacity,
+                transform: [{ translateY: d4.translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Itinéraire</Text>
@@ -840,11 +846,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               )}
             </Animated.View>
 
-            {/* 5 — Author */}
+            {/* 6 — Author */}
             <Animated.View
               style={{
-                opacity: d4.opacity,
-                transform: [{ translateY: d4.translateY }],
+                opacity: d5.opacity,
+                transform: [{ translateY: d5.translateY }],
               }}
             >
               <Text style={styles.sectionTitle}>Publié par</Text>
@@ -893,7 +899,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </TouchableOpacity>
             </Animated.View>
 
-            <View style={{ height: 160 }} />
+            <View style={{ height: 120 }} />
           </View>
         </Animated.ScrollView>
       </View>
@@ -928,103 +934,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
             ))}
           </View>
         )}
-      </Animated.View>
-
-      {/* ── Action bar (position: absolute at frame bottom, OUTSIDE card overflow) ── */}
-      <Animated.View
-        style={[styles.actionBar, { opacity: barOpacity }]}
-        pointerEvents={isDetailOpen ? 'auto' : 'none'}
-      >
-        {/* Like */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            animPop(likeScale);
-            onLike();
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-            <Ionicons
-              name={isLiked ? 'heart' : 'heart-outline'}
-              size={24}
-              color={isLiked ? '#C4704B' : '#6B5D52'}
-            />
-          </Animated.View>
-          {likesCount > 0 && (
-            <Text style={[styles.abCount, isLiked && styles.abCountActive]}>
-              {likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1).replace('.0', '')}k` : likesCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Comment */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            animPop(commentScale, 0.9);
-            onComment();
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: commentScale }] }}>
-            <Ionicons name="chatbubble-outline" size={22} color="#6B5D52" />
-          </Animated.View>
-          {commentsCount > 0 && (
-            <Text style={styles.abCount}>
-              {commentsCount >= 1000 ? `${(commentsCount / 1000).toFixed(1).replace('.0', '')}k` : commentsCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Save */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            animPop(saveScale, 1.25);
-            onSave();
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-            <Ionicons
-              name={isSaved ? 'bookmark' : 'bookmark-outline'}
-              size={22}
-              color={isSaved ? '#C4704B' : '#6B5D52'}
-            />
-          </Animated.View>
-        </TouchableOpacity>
-
-        {/* Share */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Animated.sequence([
-              Animated.parallel([
-                Animated.timing(shareTransX, { toValue: 4, duration: 200, useNativeDriver: true }),
-                Animated.timing(shareRot, { toValue: 15, duration: 200, useNativeDriver: true }),
-              ]),
-              Animated.parallel([
-                Animated.timing(shareTransX, { toValue: 0, duration: 200, useNativeDriver: true }),
-                Animated.timing(shareRot, { toValue: 0, duration: 200, useNativeDriver: true }),
-              ]),
-            ]).start();
-            onShare();
-          }}
-        >
-          <Animated.View style={{ transform: [{ translateX: shareTransX }, { rotate: shareRotStr }] }}>
-            <Ionicons name="paper-plane-outline" size={22} color="#6B5D52" />
-          </Animated.View>
-        </TouchableOpacity>
       </Animated.View>
     </View>
   );
@@ -1088,14 +997,14 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     fontSize: 11,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 1.5,
     marginBottom: 4,
   },
   planTitle: {
     fontSize: 22,
-    fontFamily: Fonts.serifBold,
+    fontFamily: Fonts.displayBold,
     color: '#FFF',
     lineHeight: 28,
     marginBottom: 6,
@@ -1118,7 +1027,7 @@ const styles = StyleSheet.create({
   authorName: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
-    fontFamily: Fonts.serifSemiBold,
+    fontFamily: Fonts.bodySemiBold,
   },
 
   // ── Card actions (like / save) ─────────────────────────────
@@ -1147,7 +1056,7 @@ const styles = StyleSheet.create({
   },
   chevronText: {
     fontSize: 12,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.body,
     color: 'rgba(255,255,255,0.5)',
     marginTop: 2,
   },
@@ -1180,7 +1089,7 @@ const styles = StyleSheet.create({
   detailTitle: {
     flex: 1,
     fontSize: 24,
-    fontFamily: Fonts.displaySemiBold,
+    fontFamily: Fonts.displayBold,
     color: Colors.textPrimary,
     lineHeight: 30,
     marginBottom: 12,
@@ -1208,7 +1117,7 @@ const styles = StyleSheet.create({
   } as any,
   metaPillText: {
     fontSize: 12,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
   },
   mapPill: {
@@ -1224,6 +1133,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,
+  },
+  // ── Detail action bar ──────────────────────────────────────
+  detailActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: Colors.bgTertiary,
+    borderRadius: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  detailActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  } as any,
+  detailActionCount: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
   },
   detailTags: {
     flexDirection: 'row',
@@ -1294,7 +1227,6 @@ const styles = StyleSheet.create({
   tipText: {
     fontSize: 13,
     fontFamily: Fonts.displayItalic,
-    fontStyle: 'italic',
     color: Colors.textSecondary,
     lineHeight: 19,
   },
@@ -1372,7 +1304,7 @@ const styles = StyleSheet.create({
   },
   placeType: {
     fontSize: 11,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textTertiary,
     textTransform: 'capitalize',
     marginBottom: 4,
@@ -1411,7 +1343,7 @@ const styles = StyleSheet.create({
   },
   placeMetaText: {
     fontSize: 10,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
   },
 
@@ -1440,7 +1372,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: Fonts.displayItalic,
     color: Colors.textSecondary,
-    fontStyle: 'italic',
     lineHeight: 16,
   },
 
@@ -1449,17 +1380,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
     borderRadius: 8,
     padding: 8,
-    backgroundColor: 'rgba(44, 36, 32, 0.04)',
+    backgroundColor: 'rgba(44,36,32,0.04)',
   },
   inlineQaLabel: {
     fontSize: 9,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.body,
     color: Colors.textTertiary,
     marginBottom: 2,
   },
   inlineQaAnswer: {
     fontSize: 11,
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
     lineHeight: 16,
   },
@@ -1467,8 +1398,7 @@ const styles = StyleSheet.create({
   // Reservation legend
   reservationLegend: {
     fontSize: 10,
-    fontFamily: Fonts.body,
-    fontStyle: 'italic',
+    fontFamily: Fonts.displayItalic,
     color: Colors.textTertiary,
     marginTop: 6,
     marginBottom: 4,
@@ -1487,13 +1417,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: 'rgba(44, 36, 32, 0.04)',
+    backgroundColor: Colors.bgPrimary,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
   } as any,
   travelText: {
     fontSize: 11,
-    fontFamily: Fonts.bodyMedium,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
   },
   travelDot: {
@@ -1569,48 +1499,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 11,
     fontFamily: Fonts.bodySemiBold,
-  },
-
-  // ── Action bar (inside frame, outside card overflow) ──────
-  actionBar: {
-    position: 'absolute',
-    bottom: ACTION_BAR_H,
-    left: CARD_H_PAD,
-    right: CARD_H_PAD,
-    height: BELOW_CARD_H + CARD_V_BOTTOM,
-    paddingBottom: CARD_V_BOTTOM,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(250, 247, 242, 0.92)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(107, 93, 82, 0.12)',
-    borderBottomLeftRadius: CARD_RADIUS,
-    borderBottomRightRadius: CARD_RADIUS,
-    zIndex: 50,
-    shadowColor: '#2C2420',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  abBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minWidth: 44,
-    minHeight: 44,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-  } as any,
-  abCount: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B5D52',
-  },
-  abCountActive: {
-    color: '#C4704B',
   },
 });

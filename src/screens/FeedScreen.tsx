@@ -107,10 +107,6 @@ export const FeedScreen: React.FC = () => {
   // ── Map modal ─────────────────────────────────────────────────
   const [mapPlan, setMapPlan] = useState<Plan | null>(null);
 
-  // ── Derived (early — needed by handlers) ──────────────────────
-  const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
-  const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
-
   // ── Animations ─────────────────────────────────────────────────
   const tabIndicatorLeft = useRef(new Animated.Value(0)).current;
   const tabIndicatorWidth = useRef(new Animated.Value(0)).current;
@@ -119,7 +115,7 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
 
-  // ── Status bar — dark on light ────────────────────────────────
+  // ── Status bar — dark on cream ────────────────────────────────
   useFocusEffect(useCallback(() => { StatusBar.setBarStyle('dark-content'); }, []));
 
   // ── Data fetching ─────────────────────────────────────────────
@@ -276,7 +272,9 @@ export const FeedScreen: React.FC = () => {
   ).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
-  // ── Derived (continued) ────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────
+  const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
+  const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
   const progressPercent =
     currentPlans.length > 1 ? ((currentIndex + 1) / currentPlans.length) * 100 : 100;
 
@@ -299,6 +297,8 @@ export const FeedScreen: React.FC = () => {
         isActive={index === currentIndex}
         isLiked={likedPlanIds.has(item.id)}
         isSaved={savedPlanIds.has(item.id)}
+        likesCount={item.likesCount ?? 0}
+        commentsCount={item.commentsCount ?? 0}
         onLike={() => handleLike(item.id)}
         onSave={() => handleSave(item.id)}
         onAuthorPress={() => {
@@ -308,8 +308,6 @@ export const FeedScreen: React.FC = () => {
         onProfilePress={(userId) => {
           if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
         }}
-        likesCount={item.likesCount ?? 0}
-        commentsCount={item.commentsCount ?? 0}
         onDetailStateChange={setIsDetailOpen}
         onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: item.id })}
         onComment={() => handleOpenComment(item)}
@@ -318,7 +316,7 @@ export const FeedScreen: React.FC = () => {
         onMapPress={() => handleMapPress(item)}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleDoItNow, handleMapPress, handleOpenComment, handleShare],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -722,13 +720,13 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(44, 36, 32, 0.15)',
+    backgroundColor: 'rgba(44,36,32,0.15)',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 1,
-    backgroundColor: 'rgba(44, 36, 32, 0.5)',
+    backgroundColor: 'rgba(44,36,32,0.5)',
   },
 
   // ── Loading / Empty ────────────────────────────────────────
@@ -760,7 +758,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 12,
-    backgroundColor: 'rgba(44, 36, 32, 0.15)',
+    backgroundColor: 'rgba(44,36,32,0.15)',
   },
   sheetTitle: {
     fontSize: 16,
