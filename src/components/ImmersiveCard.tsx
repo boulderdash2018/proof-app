@@ -88,8 +88,6 @@ const BELOW_CARD_H = 0;   // Removed — no more meta/tags below the card
 const IMAGE_HEADER_RATIO = 0.35;
 // Extra vertical growth of the frame when detail panel opens (feed mode = 0)
 const FRAME_EXTRA_DETAIL = 80;
-// Height of the sticky action bar that overlays the bottom of the card in detail mode
-const ACTION_BAR_H = 60;
 
 // ── Gesture thresholds ───────────────────────────────────────
 const VEL_THRESHOLD = 0.4;
@@ -152,8 +150,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     outputRange: [height, height + FRAME_EXTRA_DETAIL],
   });
 
-  // ── Sticky action bar (overlays card bottom in detail mode) ─────────────
-  const barOpacity = useRef(new Animated.Value(0)).current;
+  // ── Action bar micro-interactions (inline bar in detail) ────────────────
   const likeScale = useRef(new Animated.Value(1)).current;
   const saveScale = useRef(new Animated.Value(1)).current;
   const commentScale = useRef(new Animated.Value(1)).current;
@@ -309,14 +306,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
       useNativeDriver: false,
     }).start();
 
-    // Fade in the sticky action bar (delayed so panel opens first)
-    Animated.timing(barOpacity, {
-      toValue: 1,
-      duration: 300,
-      delay: 180,
-      useNativeDriver: false,
-    }).start();
-
     (scrollRef.current as any)?.scrollTo({ y: DETAIL_SNAP, animated: true });
     setTimeout(() => {
       isCommitting.current = false;
@@ -334,13 +323,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     isDetailRef.current = false;
     onDetailStateChange(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    // Fade out the sticky action bar quickly (before panel returns)
-    Animated.timing(barOpacity, {
-      toValue: 0,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
 
     // Shrink frame back to classic feed size
     Animated.timing(frameExtra, {
@@ -402,7 +384,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
       isDetailRef.current = false;
       onDetailStateChange(false);
       frameExtra.setValue(0);
-      barOpacity.setValue(0);
       (scrollRef.current as any)?.scrollTo({ y: 0, animated: false });
     }
   }, [isActive]);
@@ -649,6 +630,98 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </View>
             </Animated.View>
 
+            {/* ═══════ ACTIONS ROW — like / comment / save / share ═══════ */}
+            <Animated.View
+              style={[styles.actionsRow, { opacity: d0.opacity, transform: [{ translateY: d0.translateY }] }]}
+            >
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  animPop(likeScale, 1.3);
+                  onLike();
+                }}
+              >
+                <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+                  <Ionicons
+                    name={isLiked ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={isLiked ? Colors.primary : Colors.textSecondary}
+                  />
+                </Animated.View>
+                {likesCount > 0 && (
+                  <Text style={[styles.actionCount, isLiked && styles.actionCountActive]}>
+                    {likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1).replace('.0', '')}k` : likesCount}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  animPop(commentScale, 0.9);
+                  onComment();
+                }}
+              >
+                <Animated.View style={{ transform: [{ scale: commentScale }] }}>
+                  <Ionicons name="chatbubble-outline" size={21} color={Colors.textSecondary} />
+                </Animated.View>
+                {commentsCount > 0 && (
+                  <Text style={styles.actionCount}>
+                    {commentsCount >= 1000 ? `${(commentsCount / 1000).toFixed(1).replace('.0', '')}k` : commentsCount}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  animPop(saveScale, 1.25);
+                  onSave();
+                }}
+              >
+                <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                  <Ionicons
+                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                    size={21}
+                    color={isSaved ? Colors.primary : Colors.textSecondary}
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  Animated.sequence([
+                    Animated.parallel([
+                      Animated.timing(shareTransX, { toValue: 4, duration: 200, useNativeDriver: true }),
+                      Animated.timing(shareRot, { toValue: 15, duration: 200, useNativeDriver: true }),
+                    ]),
+                    Animated.parallel([
+                      Animated.timing(shareTransX, { toValue: 0, duration: 200, useNativeDriver: true }),
+                      Animated.timing(shareRot, { toValue: 0, duration: 200, useNativeDriver: true }),
+                    ]),
+                  ]).start();
+                  onShare();
+                }}
+              >
+                <Animated.View style={{ transform: [{ translateX: shareTransX }, { rotate: shareRotStr }] }}>
+                  <Ionicons name="paper-plane-outline" size={21} color={Colors.textSecondary} />
+                </Animated.View>
+              </TouchableOpacity>
+            </Animated.View>
+
             {/* ═══════ SECTION 2 — Metrics (horizontal line with fine separators) ═══════ */}
             <Animated.View
               style={[styles.metricsRow, { opacity: d1.opacity, transform: [{ translateY: d1.translateY }] }]}
@@ -881,110 +954,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         </Animated.ScrollView>
       </View>
 
-      {/* ── Sticky action bar — overlays card bottom in detail mode ── */}
-      {/* Position is static (from `height` prop), so the bar stays at the same */}
-      {/* screen y even as the frame grows in detail mode. */}
-      <Animated.View
-        style={[
-          styles.actionBar,
-          {
-            top: height - ACTION_BAR_H - 12,
-            opacity: barOpacity,
-          },
-        ]}
-        pointerEvents={isDetailOpen ? 'auto' : 'none'}
-      >
-        {/* Like */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            animPop(likeScale, 1.3);
-            onLike();
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-            <Ionicons
-              name={isLiked ? 'heart' : 'heart-outline'}
-              size={24}
-              color={isLiked ? Colors.primary : Colors.textSecondary}
-            />
-          </Animated.View>
-          {likesCount > 0 && (
-            <Text style={[styles.abCount, isLiked && styles.abCountActive]}>
-              {likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1).replace('.0', '')}k` : likesCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Comment */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            animPop(commentScale, 0.9);
-            onComment();
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: commentScale }] }}>
-            <Ionicons name="chatbubble-outline" size={22} color={Colors.textSecondary} />
-          </Animated.View>
-          {commentsCount > 0 && (
-            <Text style={styles.abCount}>
-              {commentsCount >= 1000 ? `${(commentsCount / 1000).toFixed(1).replace('.0', '')}k` : commentsCount}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Save */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            animPop(saveScale, 1.25);
-            onSave();
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-            <Ionicons
-              name={isSaved ? 'bookmark' : 'bookmark-outline'}
-              size={22}
-              color={isSaved ? Colors.primary : Colors.textSecondary}
-            />
-          </Animated.View>
-        </TouchableOpacity>
-
-        {/* Share — "send" micro-animation */}
-        <TouchableOpacity
-          style={styles.abBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Animated.sequence([
-              Animated.parallel([
-                Animated.timing(shareTransX, { toValue: 4, duration: 200, useNativeDriver: true }),
-                Animated.timing(shareRot, { toValue: 15, duration: 200, useNativeDriver: true }),
-              ]),
-              Animated.parallel([
-                Animated.timing(shareTransX, { toValue: 0, duration: 200, useNativeDriver: true }),
-                Animated.timing(shareRot, { toValue: 0, duration: 200, useNativeDriver: true }),
-              ]),
-            ]).start();
-            onShare();
-          }}
-        >
-          <Animated.View style={{ transform: [{ translateX: shareTransX }, { rotate: shareRotStr }] }}>
-            <Ionicons name="paper-plane-outline" size={22} color={Colors.textSecondary} />
-          </Animated.View>
-        </TouchableOpacity>
-      </Animated.View>
     </Animated.View>
   );
 };
@@ -1580,46 +1549,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── Sticky action bar (overlays card bottom in detail mode) ──
-  // `top` is set inline per-instance (height prop dependent).
-  // Left/right inset from card edges for a floating "pill" look.
-  actionBar: {
-    position: 'absolute',
-    left: CARD_H_PAD + 12,
-    right: CARD_H_PAD + 12,
-    height: ACTION_BAR_H,
+  // ── Inline action row (right after hero in the detail panel) ──
+  // Clean horizontal row, no card, with a thin bottom separator. Always visible
+  // as soon as the user opens the detail — zero chance to miss it.
+  actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    backgroundColor: Colors.bgSecondary,
-    borderRadius: ACTION_BAR_H / 2,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    zIndex: 50,
-    // Warm floating shadow (separates from the photo behind)
-    shadowColor: '#2C2420',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 14,
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 20,
+    marginTop: -10,
+    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
   },
-  abBtn: {
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minWidth: 44,
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     minHeight: 44,
+    minWidth: 44,
     borderRadius: 12,
-    paddingHorizontal: 8,
   } as any,
-  abCount: {
-    fontSize: 13,
+  actionCount: {
+    fontSize: 14,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
   },
-  abCountActive: {
+  actionCountActive: {
     color: Colors.primary,
   },
 });
