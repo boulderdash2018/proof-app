@@ -51,6 +51,7 @@ export const SearchScreen: React.FC = () => {
   const [googlePlaces, setGooglePlaces] = useState<GooglePlaceDetails[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<any>(null);
 
@@ -198,15 +199,26 @@ export const SearchScreen: React.FC = () => {
     <View style={[s.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
       {/* ── Header: search bar + cancel ── */}
       <View style={s.header}>
-        <View style={[s.searchBar, { backgroundColor: C.gray200, borderColor: C.border }]}>
-          <Ionicons name="search-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
+        <View
+          style={[
+            s.searchBar,
+            {
+              backgroundColor: isFocused ? Colors.terracotta50 : C.gray200,
+              borderColor: isFocused ? Colors.primary : 'transparent',
+              borderWidth: isFocused ? 1.5 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="search-outline" size={16} color={isFocused ? Colors.primary : C.gray600} style={{ marginRight: 8 }} />
           <RNTextInput
             ref={inputRef}
-            style={[s.searchInput, { color: C.black }]}
+            style={[s.searchInput, { color: C.black }, s.noWebOutline]}
             placeholder={t.explore_search_placeholder}
             placeholderTextColor={C.gray600}
             value={query}
             onChangeText={handleSearch}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             autoFocus
             returnKeyType="search"
             onSubmitEditing={() => { if (query.trim().length >= 2) addSearch(query); }}
@@ -327,6 +339,8 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingTop: 8, paddingBottom: 10, gap: 12 },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, height: 44 },
   searchInput: { flex: 1, fontSize: 14 },
+  // Web only — removes the default browser focus outline on <input>. No-op on native.
+  noWebOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
   cancelBtn: { paddingVertical: 6 },
   cancelText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
 

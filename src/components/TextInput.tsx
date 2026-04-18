@@ -34,6 +34,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         <RNTextInput
           style={[
             styles.input,
+            styles.noWebOutline,
             isFocused && styles.inputFocused,
             error ? styles.inputError : null,
             style,
@@ -84,6 +85,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
+  // Web only — removes the default browser focus outline on <input>. No-op on native.
+  noWebOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
   inputFocused: {
     borderColor: Colors.primary,
     backgroundColor: Colors.gray100,
