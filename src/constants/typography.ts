@@ -1,30 +1,32 @@
 import { TextStyle } from 'react-native';
 
 // ── Font families ───────────────────────────────────────────
-// ONE font for the whole app: Inter (clean modern sans-serif).
-// The display* aliases (originally mapped to Fraunces serif) and the serif*
-// legacy aliases all point to Inter — so every existing Fonts.xxx reference
-// across the codebase automatically renders in Inter.
+// Duo signature Proof :
+//   • Fraunces (soft-rounded serif) pour les titres éditoriaux — display*
+//   • Inter (sans-serif) pour l'UI, les CTA, les chiffres, le body — body*
+//   • Playfair Display pour le wordmark "proof." uniquement — logo
+// Règle : JAMAIS de Fraunces sur un bouton ou un chiffre. Pour tout
+// contexte UI utilitaire, utiliser les tokens body*.
 export const Fonts = {
-  // ── Display (was Fraunces serif) — now Inter ──
-  display: 'Inter_400Regular',
-  displayMedium: 'Inter_500Medium',
-  displaySemiBold: 'Inter_600SemiBold',
-  displayBold: 'Inter_700Bold',
-  displayItalic: 'Inter_400Regular_Italic',
-  displaySemiBoldItalic: 'Inter_600SemiBold_Italic',
+  // ── Display (Fraunces) — titres, hero, noms de lieux, pull-quotes ──
+  display: 'Fraunces_400Regular',
+  displayMedium: 'Fraunces_500Medium',
+  displaySemiBold: 'Fraunces_600SemiBold',
+  displayBold: 'Fraunces_700Bold',
+  displayItalic: 'Fraunces_400Regular_Italic',
+  displaySemiBoldItalic: 'Fraunces_600SemiBold_Italic',
 
-  // ── Body (Inter) ──
+  // ── Body (Inter) — UI, CTA, metrics, overlines, labels ──
   body: 'Inter_400Regular',
   bodyMedium: 'Inter_500Medium',
   bodySemiBold: 'Inter_600SemiBold',
   bodyBold: 'Inter_700Bold',
 
-  // ── Backward-compat aliases (serif → Inter) ──
-  serif: 'Inter_400Regular',
-  serifMedium: 'Inter_500Medium',
-  serifSemiBold: 'Inter_600SemiBold',
-  serifBold: 'Inter_700Bold',
+  // ── Backward-compat aliases (serif legacy → Fraunces, cohérent avec display*) ──
+  serif: 'Fraunces_400Regular',
+  serifMedium: 'Fraunces_500Medium',
+  serifSemiBold: 'Fraunces_600SemiBold',
+  serifBold: 'Fraunces_700Bold',
 
   // ── Brand logo — Playfair Display (original Proof logo font, pre-refonte) ──
   // Reserved for the "proof." wordmark only. Do not use for body/UI.

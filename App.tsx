@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_400Regular_Italic, Inter_500Medium, Inter_600SemiBold, Inter_600SemiBold_Italic, Inter_700Bold } from '@expo-google-fonts/inter';
 import { PlayfairDisplay_700Bold, PlayfairDisplay_900Black } from '@expo-google-fonts/playfair-display';
+import { Fraunces_400Regular, Fraunces_400Regular_Italic, Fraunces_500Medium, Fraunces_600SemiBold, Fraunces_600SemiBold_Italic, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import { RootNavigator } from './src/navigation';
 import { initPostHog } from './src/services/posthogConfig';
 import { useAuthStore } from './src/store';
@@ -43,6 +44,13 @@ export default function App() {
     // Playfair Display — reserved for the Proof logo only (original branding font)
     PlayfairDisplay_700Bold,
     PlayfairDisplay_900Black,
+    // Fraunces — soft-rounded serif for editorial titles (hero, place names, pull-quotes)
+    Fraunces_400Regular,
+    Fraunces_400Regular_Italic,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Fraunces_600SemiBold_Italic,
+    Fraunces_700Bold,
   });
 
   useEffect(() => {
