@@ -16,11 +16,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Fonts } from '../constants';
+import { Colors, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { Plan, ReviewSource } from '../types';
-import { useAuthStore } from '../store';
+import { Plan, ReviewSource, Place } from '../types';
+import { useAuthStore, useSavedPlacesStore } from '../store';
 import { submitPlaceReviews } from '../services/placeReviewService';
 import Svg, { Circle, Line, G, Defs, ClipPath } from 'react-native-svg';
 
@@ -75,6 +75,36 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
   const [submitting, setSubmitting] = useState(false);
   const stampScale = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // ── Favorites (saved places) ────────────────────────────────
+  const savedPlaces = useSavedPlacesStore((s) => s.places);
+  const savePlace = useSavedPlacesStore((s) => s.savePlace);
+  const unsavePlace = useSavedPlacesStore((s) => s.unsavePlace);
+
+  const placeFavKey = (place: Place) => place.googlePlaceId || place.id;
+  const isPlaceFav = (place: Place) =>
+    savedPlaces.some((p) => p.placeId === placeFavKey(place));
+
+  const togglePlaceFavorite = (place: Place) => {
+    const key = placeFavKey(place);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    if (isPlaceFav(place)) {
+      unsavePlace(key);
+    } else {
+      savePlace({
+        placeId: key,
+        name: place.name,
+        address: place.address || '',
+        types: place.type ? [place.type] : [],
+        rating: place.rating || 0,
+        reviewCount: place.reviewCount || 0,
+        photoUrl: place.customPhoto || place.photoUrls?.[0] || null,
+        savedAt: Date.now(),
+      });
+    }
+  };
 
   const initPlaceRatings = () => {
     setPlaceRatings(
@@ -332,9 +362,32 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
               >
                 {plan.places.map((place, index) => {
                   const pr = placeRatings.find((r) => r.placeId === place.id);
+                  const fav = isPlaceFav(place);
                   return (
                     <View key={place.id} style={[styles.ratePlaceCard, { backgroundColor: C.white, borderColor: C.border }]}>
-                      <View style={styles.ratePlaceHeader}>
+                      {/* Favorite toggle — top right of the rating card */}
+                      <TouchableOpacity
+                        style={styles.ratePlaceFavBtn}
+                        onPress={() => togglePlaceFavorite(place)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={fav ? 'star' : 'star-outline'}
+                          size={18}
+                          color={fav ? Colors.gold : C.gray500}
+                        />
+                        <Text
+                          style={[
+                            styles.ratePlaceFavText,
+                            { color: fav ? Colors.gold : C.gray500 },
+                          ]}
+                        >
+                          {fav ? 'Favori' : 'Favori ?'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={[styles.ratePlaceHeader, { paddingRight: 72 }]}>
                         <View style={[styles.ratePlaceIndex, { backgroundColor: STAMP_PROOF + '18' }]}>
                           <Text style={[styles.ratePlaceIndexText, { color: STAMP_PROOF }]}>{index + 1}</Text>
                         </View>
@@ -557,6 +610,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
+    position: 'relative',
+  },
+  ratePlaceFavBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 99,
+    zIndex: 2,
+  },
+  ratePlaceFavText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.2,
   },
   ratePlaceHeader: {
     flexDirection: 'row',

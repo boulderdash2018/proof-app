@@ -14,11 +14,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
 import { Colors, Fonts, getRankForProofs } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
-import { Plan, TravelSegment, TransportMode, Comment } from '../types';
+import { Plan, TravelSegment, TransportMode, Comment, Place } from '../types';
 import { fetchComments } from '../services/plansService';
+import { useSavedPlacesStore } from '../store';
 
 /* ================================================================
    ImmersiveCard — pull-down to reveal plan detail
@@ -132,6 +134,37 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
       fetchComments(plan.id).then(setInlineComments).catch(() => {});
     }
   }, [isDetailOpen, plan.id]);
+
+  // ── Favorites (saved places) ────────────────────────────────
+  // Subscribe to the array for reactivity so the star toggles visually.
+  const savedPlaces = useSavedPlacesStore((s) => s.places);
+  const savePlace = useSavedPlacesStore((s) => s.savePlace);
+  const unsavePlace = useSavedPlacesStore((s) => s.unsavePlace);
+
+  const placeFavKey = (place: Place) => place.googlePlaceId || place.id;
+  const isPlaceFav = (place: Place) =>
+    savedPlaces.some((p) => p.placeId === placeFavKey(place));
+
+  const togglePlaceFavorite = (place: Place) => {
+    const key = placeFavKey(place);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    if (isPlaceFav(place)) {
+      unsavePlace(key);
+    } else {
+      savePlace({
+        placeId: key,
+        name: place.name,
+        address: place.address || '',
+        types: place.type ? [place.type] : [],
+        rating: place.rating || 0,
+        reviewCount: place.reviewCount || 0,
+        photoUrl: place.customPhoto || place.photoUrls?.[0] || null,
+        savedAt: Date.now(),
+      });
+    }
+  };
 
   // ── Cover photo & rank ─────────────────────────────────────
   const coverUrl =
@@ -811,7 +844,21 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                         {!isLast && <View style={styles.timelineLine} />}
                       </View>
                       <View style={styles.timelineContent}>
-                        <View style={styles.timelinePlaceHead}>
+                        {/* Favorite star — top right of each place in the plan */}
+                        <TouchableOpacity
+                          style={styles.timelineFavBtn}
+                          onPress={(e) => { e.stopPropagation?.(); togglePlaceFavorite(place); }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={isPlaceFav(place) ? 'star' : 'star-outline'}
+                            size={18}
+                            color={isPlaceFav(place) ? Colors.gold : Colors.textTertiary}
+                          />
+                        </TouchableOpacity>
+
+                        <View style={[styles.timelinePlaceHead, { paddingRight: 28 }]}>
                           <Text style={styles.timelinePlaceName}>
                             {place.name}
                             {place.reservationRecommended ? (
@@ -1282,6 +1329,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingLeft: 20,
     paddingBottom: 4,
+    position: 'relative',
+  },
+  timelineFavBtn: {
+    position: 'absolute',
+    top: -2,
+    right: 0,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   timelinePlaceHead: {
     marginBottom: 4,
