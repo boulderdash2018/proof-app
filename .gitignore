@@ -13,3 +13,9 @@ web-build/
 .env.local
 
 .vercel
+
+# Claude Code / AI tooling (local-only, not shared)
+.claude/
+.agents/
+.windsurf/
+skills-lock.json
