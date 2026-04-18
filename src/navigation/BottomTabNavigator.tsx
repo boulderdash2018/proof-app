@@ -94,7 +94,7 @@ const ProfileStackNavigator: React.FC = () => (
 // Tab icon component
 const TAB_ICONS: Record<string, [string, string]> = {
   FeedTab: ['home-outline', 'home'],
-  ExploreTab: ['compass-outline', 'compass'],
+  ExploreTab: ['search-outline', 'search'],
   SavesTab: ['bookmark-outline', 'bookmark'],
   ProfileTab: ['person-outline', 'person'],
 };
