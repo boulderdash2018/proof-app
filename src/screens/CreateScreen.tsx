@@ -305,19 +305,23 @@ export const CreateScreen: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
   const [travels, setTravels] = useState<TravelEntry[]>([]);
+  const [authorTip, setAuthorTip] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // ========== 4-STEP WIZARD (1: title, 2: cover, 3: categories, 4: places) ==========
-  type Step = 1 | 2 | 3 | 4;
-  const TOTAL_STEPS: 4 = 4;
+  // ========== 5-STEP WIZARD (1: title, 2: cover, 3: categories, 4: places, 5: creator tip) ==========
+  type Step = 1 | 2 | 3 | 4 | 5;
+  const TOTAL_STEPS: 5 = 5;
   const [step, setStep] = useState<Step>(1);
+  const TIP_MIN_CHARS = 10;
+  const TIP_MAX_CHARS = 180;
   const canProceedFromStep = (s: Step): boolean => {
     if (s === 1) return title.trim().length > 0;
     if (s === 2) return true; // photo optional — can skip
     if (s === 3) return selectedTags.length > 0;
     if (s === 4) return places.length >= 2;
+    if (s === 5) return authorTip.trim().length >= TIP_MIN_CHARS;
     return false;
   };
   const goToNextStep = () => {
@@ -343,8 +347,8 @@ export const CreateScreen: React.FC = () => {
   const pickupSheetSlide = useRef(new Animated.Value(300)).current;
 
   // Ref for current form state (read from interval without stale closures)
-  const formRef = useRef({ title: '', coverPhotos: [] as string[], selectedTags: [] as CategoryTag[], places: [] as PlaceEntry[], travels: [] as TravelEntry[] });
-  formRef.current = { title, coverPhotos, selectedTags, places, travels };
+  const formRef = useRef({ title: '', coverPhotos: [] as string[], selectedTags: [] as CategoryTag[], places: [] as PlaceEntry[], travels: [] as TravelEntry[], authorTip: '' });
+  formRef.current = { title, coverPhotos, selectedTags, places, travels, authorTip };
 
   // ── Drag-to-reorder ──
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -468,12 +472,13 @@ export const CreateScreen: React.FC = () => {
       return { ...p, priceRangeIndex: idx, exactPrice: p.exactPrice ?? '' };
     }) as PlaceEntry[]);
     setTravels(saved.travels as TravelEntry[]);
+    setAuthorTip((saved as any).authorTip ?? '');
   }, []);
 
   // Helper: reset form to blank
   const resetForm = useCallback(() => {
-    setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]);
-    formRef.current = { title: '', coverPhotos: [], selectedTags: [], places: [], travels: [] };
+    setTitle(''); setCoverPhotos([]); setSelectedTags([]); setPlaces([]); setTravels([]); setAuthorTip('');
+    formRef.current = { title: '', coverPhotos: [], selectedTags: [], places: [], travels: [], authorTip: '' };
     setErrors({});
   }, []);
 
@@ -541,6 +546,7 @@ export const CreateScreen: React.FC = () => {
       useDraftStore.getState().saveDraft(draftIdRef.current, {
         title: fresh.title, coverPhotos: fresh.coverPhotos,
         selectedTags: fresh.selectedTags, places: fresh.places, travels: fresh.travels,
+        authorTip: (fresh as any).authorTip ?? '',
       });
     }
     useDraftStore.getState().deleteDraft(freshId);
@@ -568,10 +574,10 @@ export const CreateScreen: React.FC = () => {
   // Auto-save every 30s
   useEffect(() => {
     const interval = setInterval(() => {
-      const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
-      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
+      const { title, coverPhotos, selectedTags, places, travels, authorTip } = formRef.current;
+      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0 || authorTip.length > 0;
       if (!hasContent) return;
-      useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
+      useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels, authorTip });
       // Show toast once per session
       if (!toastShownRef.current) {
         toastShownRef.current = true;
@@ -589,10 +595,10 @@ export const CreateScreen: React.FC = () => {
   useEffect(() => {
     const unsubscribe = navigation.addListener('blur', () => {
       if (isSuccess || isPublishing) return;
-      const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
-      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0;
+      const { title, coverPhotos, selectedTags, places, travels, authorTip } = formRef.current;
+      const hasContent = title.length > 0 || places.length > 0 || selectedTags.length > 0 || coverPhotos.length > 0 || authorTip.length > 0;
       if (hasContent) {
-        useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
+        useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels, authorTip });
       }
     });
     return unsubscribe;
@@ -602,8 +608,8 @@ export const CreateScreen: React.FC = () => {
   useEffect(() => {
     activeCreateSession.draftId = draftIdRef.current;
     activeCreateSession.saveForm = () => {
-      const { title, coverPhotos, selectedTags, places, travels } = formRef.current;
-      useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels });
+      const { title, coverPhotos, selectedTags, places, travels, authorTip } = formRef.current;
+      useDraftStore.getState().saveDraft(draftIdRef.current, { title, coverPhotos, selectedTags, places, travels, authorTip });
     };
     activeCreateSession.discardForm = () => {
       resetForm();
@@ -1271,7 +1277,7 @@ export const CreateScreen: React.FC = () => {
 
   const qualityLabel = qualityScore >= 100 ? 'Perfect plan' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
   const labelColor = qualityScore >= 100 ? Colors.primary : qualityScore >= 80 ? Colors.primaryDeep : qualityScore >= 56 ? Colors.primary : qualityScore >= 31 ? '#D4784A' : '#8A8078';
-  const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2;
+  const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2 && authorTip.trim().length >= TIP_MIN_CHARS;
 
   useEffect(() => {
     // Spring fill
@@ -1513,6 +1519,7 @@ export const CreateScreen: React.FC = () => {
         travelSegments,
         coverPhotos,
         city: cityConfig.name,
+        authorTip: authorTip.trim(),
       };
 
       if (isEditing && editPlanIdRef.current) {
@@ -1946,18 +1953,21 @@ export const CreateScreen: React.FC = () => {
                   ? 'La photo qui claque'
                   : step === 3
                     ? 'Choisis les catégories'
-                    : 'Ajoute les lieux'}
+                    : step === 4
+                      ? 'Ajoute les lieux'
+                      : 'Ton conseil final'}
             </Text>
           </View>
           <View style={styles.wizardHeaderSide} />
         </View>
 
-        {/* Step progress bar (4 segments) */}
+        {/* Step progress bar (5 segments) */}
         <View style={styles.wizardProgress}>
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 1 ? Colors.primary : Colors.borderSubtle }]} />
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 2 ? Colors.primary : Colors.borderSubtle }]} />
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 3 ? Colors.primary : Colors.borderSubtle }]} />
           <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 4 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 5 ? Colors.primary : Colors.borderSubtle }]} />
         </View>
 
         <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
@@ -2361,6 +2371,63 @@ export const CreateScreen: React.FC = () => {
           </ScrollView>
           </View>
           )}
+
+          {/* ═══════ STEP 5: Creator tip — mandatory signature sentence ═══════ */}
+          {step === 5 && (
+            <View style={{ flex: 1 }}>
+              <View style={styles.tipHeader}>
+                <Text style={styles.tipOverline}>LA SIGNATURE DU CRÉATEUR</Text>
+                <Text style={styles.tipTitle}>Partage ton conseil</Text>
+                <Text style={styles.tipSubtitle}>
+                  Une phrase que toi seul(e) peux dire. Ce qui rend ce plan spécial, le détail qu'on ne trouve pas sur Google.
+                </Text>
+              </View>
+
+              <View style={styles.tipInputWrap}>
+                <Text style={styles.tipQuoteMark}>&ldquo;</Text>
+                <RNTextInput
+                  style={styles.tipInput}
+                  value={authorTip}
+                  onChangeText={(v) => setAuthorTip(v.slice(0, TIP_MAX_CHARS))}
+                  placeholder="Le secret, c'est d'y aller en semaine au coucher du soleil..."
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                  autoFocus
+                  maxLength={TIP_MAX_CHARS}
+                  textAlignVertical="top"
+                />
+                <View style={styles.tipFooterRow}>
+                  <Text style={[
+                    styles.tipHint,
+                    authorTip.trim().length >= TIP_MIN_CHARS && { color: Colors.primary },
+                  ]}>
+                    {authorTip.trim().length < TIP_MIN_CHARS
+                      ? `Au moins ${TIP_MIN_CHARS} caractères`
+                      : 'Parfait ✓'}
+                  </Text>
+                  <Text style={styles.tipCount}>{authorTip.length} / {TIP_MAX_CHARS}</Text>
+                </View>
+              </View>
+
+              <View style={styles.tipSuggestions}>
+                <Text style={styles.tipSuggestionsLabel}>Inspirations</Text>
+                {[
+                  'Le meilleur moment, c\'est vers 18h quand la lumière est dingue',
+                  'Demande le menu caché au bar, ils ont des plats non listés',
+                  'Réserve la table du fond, c\'est la plus intime',
+                ].map((sug) => (
+                  <TouchableOpacity
+                    key={sug}
+                    style={styles.tipSuggestionChip}
+                    onPress={() => setAuthorTip(sug)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.tipSuggestionText} numberOfLines={1}>{sug}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
         </Animated.View>
 
@@ -2401,7 +2468,9 @@ export const CreateScreen: React.FC = () => {
                   ? 'Suivant — la photo'
                   : step === 2
                     ? 'Suivant — les catégories'
-                    : 'Suivant — les lieux'}
+                    : step === 3
+                      ? 'Suivant — les lieux'
+                      : 'Suivant — ton conseil'}
               </Text>
               <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
             </TouchableOpacity>
@@ -4389,5 +4458,108 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // STEP 5 — Creator tip (editorial mandatory sentence)
+  // ─────────────────────────────────────────────────────────────
+  tipHeader: {
+    marginBottom: 18,
+  },
+  tipOverline: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  tipTitle: {
+    fontSize: 26,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  tipSubtitle: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+  },
+  tipInputWrap: {
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1.5,
+    borderColor: Colors.terracotta200,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: 'rgba(44, 36, 32, 1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  tipQuoteMark: {
+    fontSize: 38,
+    lineHeight: 38,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.terracotta400,
+    marginBottom: -8,
+  },
+  tipInput: {
+    fontSize: 17,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textPrimary,
+    lineHeight: 24,
+    minHeight: 90,
+    paddingTop: 4,
+    paddingHorizontal: 0,
+    paddingBottom: 4,
+  },
+  tipFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderSubtle,
+  },
+  tipHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+  },
+  tipCount: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+  },
+  tipSuggestions: {
+    gap: 6,
+  },
+  tipSuggestionsLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.1,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  tipSuggestionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
+  },
+  tipSuggestionText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textSecondary,
   },
 });

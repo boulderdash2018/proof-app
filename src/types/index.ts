@@ -106,6 +106,8 @@ export interface Plan {
   travelSegments?: TravelSegment[];
   coverPhotos?: string[];
   city?: string;
+  /** Creator's signature tip — a short mandatory sentence added at the end of plan creation */
+  authorTip?: string;
   likesCount: number;
   commentsCount: number;
   proofCount: number;

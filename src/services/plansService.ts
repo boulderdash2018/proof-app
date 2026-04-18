@@ -70,6 +70,7 @@ export const createPlan = async (
     travelSegments?: TravelSegment[];
     coverPhotos?: string[];
     city?: string;
+    authorTip?: string;
   },
   author: User
 ): Promise<Plan> => {
@@ -91,6 +92,7 @@ export const createPlan = async (
     travelSegments: planData.travelSegments || [],
     coverPhotos: planData.coverPhotos || [],
     city: planData.city || 'Paris',
+    ...(planData.authorTip && planData.authorTip.trim() && { authorTip: planData.authorTip.trim() }),
     likesCount: 0,
     commentsCount: 0,
     proofCount: 0,
@@ -117,6 +119,7 @@ export const updatePlan = async (
     travelSegments?: TravelSegment[];
     coverPhotos?: string[];
     city?: string;
+    authorTip?: string;
   }
 ): Promise<void> => {
   const ref = doc(db, PLANS, planId);
@@ -130,6 +133,7 @@ export const updatePlan = async (
     travelSegments: data.travelSegments || [],
     coverPhotos: data.coverPhotos || [],
     ...(data.city && { city: data.city }),
+    ...(data.authorTip !== undefined && { authorTip: data.authorTip.trim() }),
   });
 };
 

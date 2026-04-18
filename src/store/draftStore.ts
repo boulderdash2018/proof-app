@@ -37,6 +37,8 @@ export interface DraftItem {
   selectedTags: string[];
   places: DraftPlace[];
   travels: DraftTravel[];
+  /** Creator's signature tip — mandatory at publish time, optional in draft */
+  authorTip?: string;
   updatedAt: number;
   type?: DraftType;
 }

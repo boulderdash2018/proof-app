@@ -257,6 +257,7 @@ export const PlanDetailModal: React.FC = () => {
       selectedTags: plan.tags,
       places: draftPlaces,
       travels: draftTravels,
+      authorTip: plan.authorTip ?? '',
     };
 
     // Always save a fresh copy so "Annuler les modifications" can reset

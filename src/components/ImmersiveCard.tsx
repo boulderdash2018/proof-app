@@ -799,7 +799,9 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
 
             {/* ═══════ SECTION 3 — Creator tip as editorial pull-quote ═══════ */}
             {(() => {
-              const creatorTip = plan.places?.find((p) => p.comment)?.comment;
+              // Prefer the dedicated authorTip (mandatory from step 5 of wizard).
+              // Fallback to the first place comment for legacy plans created before the tip step existed.
+              const creatorTip = plan.authorTip?.trim() || plan.places?.find((p) => p.comment)?.comment;
               if (!creatorTip) return null;
               return (
                 <Animated.View
