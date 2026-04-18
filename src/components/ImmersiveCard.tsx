@@ -554,6 +554,23 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 </Text>
                 {rank && <RankBadge rank={rank} small />}
               </TouchableOpacity>
+
+              {/* Comments preview — visible directly on feed surface */}
+              <TouchableOpacity
+                style={styles.commentsPreviewRow}
+                onPress={onComment}
+                activeOpacity={0.7}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+              >
+                <Ionicons name="chatbubble-outline" size={13} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.commentsPreviewText} numberOfLines={1}>
+                  {commentsCount > 0
+                    ? commentsCount === 1
+                      ? 'Voir le commentaire'
+                      : `Voir les ${commentsCount} commentaires`
+                    : 'Sois le premier à commenter'}
+                </Text>
+              </TouchableOpacity>
             </Animated.View>
 
             {/* Actions (like / save) — counteract scroll */}
@@ -1098,6 +1115,23 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
+  },
+
+  // ── Comments preview (feed surface) ────────────────────────
+  commentsPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  } as any,
+  commentsPreviewText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   // ── Card actions (like / save) ─────────────────────────────
