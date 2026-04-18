@@ -21,6 +21,7 @@ import { RankBadge } from './RankBadge';
 import { Plan, TravelSegment, TransportMode, Comment, Place } from '../types';
 import { fetchComments } from '../services/plansService';
 import { useSavedPlacesStore } from '../store';
+import { tokenizeComment } from '../utils';
 
 /* ================================================================
    ImmersiveCard — pull-down to reveal plan detail
@@ -969,7 +970,15 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                         <Text style={styles.commentAuthor}>{c.authorName}</Text>
                         <Text style={styles.commentTime}>{getCommentTimeAgo(c.createdAt)}</Text>
                       </View>
-                      <Text style={styles.commentText}>{c.text}</Text>
+                      <Text style={styles.commentText}>
+                        {tokenizeComment(c.text).map((seg, i) =>
+                          seg.type === 'mention' ? (
+                            <Text key={i} style={styles.mentionInText}>{seg.raw}</Text>
+                          ) : (
+                            <Text key={i}>{seg.value}</Text>
+                          ),
+                        )}
+                      </Text>
                     </View>
                   </View>
                 ))
@@ -1549,6 +1558,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: Fonts.body,
     color: Colors.textPrimary,
+  },
+  mentionInText: {
+    color: Colors.primary,
+    fontFamily: Fonts.bodySemiBold,
   },
   commentsEmpty: {
     fontSize: 13,

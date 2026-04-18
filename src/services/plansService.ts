@@ -14,7 +14,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode, TravelSegment } from '../types';
-import { notifyLike, notifyComment, notifySave, notifyProofIt } from './notificationsService';
+import { notifyLike, notifyComment, notifySave, notifyProofIt, notifyMention, resolveMentionedUsers } from './notificationsService';
+import { extractMentions } from '../utils/mentions';
 
 const PLANS = 'plans';
 const SAVED_PLANS = 'savedPlans';
@@ -602,6 +603,28 @@ export const addComment = async (planId: string, author: User, text: string, pla
 
   // Notify plan author
   if (plan) notifyComment(author, plan, text).catch((e) => console.error('[notif trigger]', e));
+
+  // Notify every @mentioned user (except the author themselves and the plan author already notified)
+  if (plan) {
+    const mentionedUsernames = extractMentions(text);
+    if (mentionedUsernames.length > 0) {
+      resolveMentionedUsers(mentionedUsernames)
+        .then((resolved) => {
+          const planAuthorId = plan.author.id;
+          const unique = new Set<string>();
+          for (const { userId } of resolved) {
+            if (userId === author.id) continue; // skip self
+            if (userId === planAuthorId) continue; // plan author already gets notifyComment
+            if (unique.has(userId)) continue;
+            unique.add(userId);
+            notifyMention(author, userId, plan, text).catch((e) =>
+              console.error('[notif mention]', e),
+            );
+          }
+        })
+        .catch((e) => console.error('[notif mention resolve]', e));
+    }
+  }
 
   return { ...commentData, id: ref.id };
 };

@@ -4,7 +4,25 @@
       "Bash(npx create-expo-app@latest . --template blank-typescript)",
       "Bash(where node:*)",
       "Bash(where npm:*)",
-      "Bash(where npx:*)"
+      "Bash(where npx:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git reset:*)",
+      "Bash(git push:*)",
+      "Bash(npx expo:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(node -e \"const f = require\\('@expo-google-fonts/fraunces'\\); console.log\\(Object.keys\\(f\\).filter\\(k => !k.startsWith\\('__'\\) && k !== 'useFonts'\\).sort\\(\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const f = require\\('@expo-google-fonts/inter'\\); console.log\\(Object.keys\\(f\\).filter\\(k => !k.startsWith\\('__'\\) && k !== 'useFonts'\\).sort\\(\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(git rm:*)",
+      "Bash(git restore:*)",
+      "Read(//tmp/**)",
+      "Bash(cp /tmp/ImmersiveCard_base.tsx \"C:\\\\Users\\\\leotran\\\\Documents\\\\ProofV1\\\\src\\\\components\\\\ImmersiveCard.tsx\")",
+      "Bash(cp /tmp/FeedScreen_base.tsx \"C:\\\\Users\\\\leotran\\\\Documents\\\\ProofV1\\\\src\\\\screens\\\\FeedScreen.tsx\")",
+      "Bash(npm uninstall:*)",
+      "Bash(node -e ':*)",
+      "Bash(pdftotext --help)",
+      "Bash(pdftotext \"C:\\\\Users\\\\leotran\\\\Downloads\\\\exemple-1-plan-detail.pdf\" -)",
+      "Bash(npm install *)"
     ]
   }
 }

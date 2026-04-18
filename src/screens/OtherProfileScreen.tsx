@@ -9,9 +9,10 @@ import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton, Loadin
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
-import { useAuthStore, useFriendsStore } from '../store';
+import { useAuthStore, useFriendsStore, useChatStore } from '../store';
 import { getUserById, getFollowStatus, isFollowingUser, getFollowerIds, getFollowingIds, followUser, unfollowUser, sendFollowRequest, getPendingRequestId } from '../services/friendsService';
 import { fetchUserPlans } from '../services/plansService';
+import type { ConversationParticipant } from '../services/chatService';
 
 type FollowStatus = 'none' | 'following' | 'requested';
 
@@ -40,6 +41,7 @@ export const OtherProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const currentUser = useAuthStore(s => s.user);
+  const startChat = useChatStore((s) => s.startChat);
   const { acceptRequest, declineRequest } = useFriendsStore();
 
   const [user, setUser] = useState<User | null>(null);
@@ -125,6 +127,34 @@ export const OtherProfileScreen: React.FC = () => {
     await declineRequest(pendingRequestId, currentUser.id);
     setPendingRequestId(null);
     setActionLoading(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!currentUser || !user) return;
+    const me: ConversationParticipant = {
+      userId: currentUser.id,
+      displayName: currentUser.displayName,
+      username: currentUser.username,
+      avatarUrl: currentUser.avatarUrl || null,
+      avatarBg: currentUser.avatarBg,
+      avatarColor: currentUser.avatarColor,
+      initials: currentUser.initials,
+    };
+    const other: ConversationParticipant = {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    try {
+      const conversationId = await startChat(me, other);
+      navigation.navigate('Conversation', { conversationId, otherUser: other });
+    } catch (err) {
+      console.error('[OtherProfile] startChat error:', err);
+    }
   };
 
   if (!user) return (
@@ -230,9 +260,23 @@ export const OtherProfileScreen: React.FC = () => {
           ) : null}
         </View>
 
-        {/* Action button */}
+        {/* Action buttons — follow + message (Instagram-style) */}
         <View style={styles.actionSection}>
-          {renderFollowButton()}
+          <View style={styles.actionBtnRow}>
+            <View style={{ flex: 1 }}>{renderFollowButton()}</View>
+            {/* Hide the message button only if this is our own profile (shouldn't happen
+                on OtherProfileScreen, but defensive). */}
+            {currentUser?.id !== user.id && (
+              <TouchableOpacity
+                style={[styles.messageBtn, { backgroundColor: C.gray200 }]}
+                onPress={handleSendMessage}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chatbubble-outline" size={16} color={C.black} style={{ marginRight: 6 }} />
+                <Text style={[styles.messageBtnText, { color: C.black }]}>Message</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Content area */}
@@ -351,6 +395,25 @@ const styles = StyleSheet.create({
   actionSection: {
     paddingHorizontal: Layout.screenPadding,
     paddingBottom: 16,
+  },
+  actionBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  messageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+    minWidth: 120,
+  },
+  messageBtnText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
   },
   primaryBtn: {
     borderRadius: 10,

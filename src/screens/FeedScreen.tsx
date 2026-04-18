@@ -36,9 +36,11 @@ import { useGuestStore } from '../store/guestStore';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
-import { Plan, Comment } from '../types';
+import { Plan, Comment, User } from '../types';
 import { fetchComments, addComment } from '../services/plansService';
 import { checkPlaceOpenStatus, PlaceOpenStatus } from '../services/googlePlacesService';
+import { searchUsers } from '../services/friendsService';
+import { detectActiveMention, insertMention, tokenizeComment } from '../utils';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 type FeedTab = 'reco' | 'friends';
@@ -94,6 +96,9 @@ export const FeedScreen: React.FC = () => {
   const [commentPlan, setCommentPlan] = useState<Plan | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
+  const [commentCursor, setCommentCursor] = useState(0);
+  const [mentionSuggestions, setMentionSuggestions] = useState<User[]>([]);
+  const mentionSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSending, setIsSending] = useState(false);
 
   // ── Do It Now flow ────────────────────────────────────────────
@@ -212,7 +217,46 @@ export const FeedScreen: React.FC = () => {
   const closeCommentSheet = useCallback(() => {
     setCommentPlan(null);
     setCommentText('');
+    setMentionSuggestions([]);
   }, []);
+
+  // ── @mention autocomplete ─────────────────────────────────────
+  const handleCommentTextChange = useCallback((text: string) => {
+    setCommentText(text);
+    // Run mention detection on the portion up to the current cursor.
+    // RN TextInput doesn't expose cursor directly — we use the onSelectionChange callback
+    // to keep commentCursor up to date. We run detection based on latest cursor value.
+    const active = detectActiveMention(text, commentCursor > text.length ? text.length : commentCursor);
+    if (!active) {
+      setMentionSuggestions([]);
+      if (mentionSearchTimerRef.current) clearTimeout(mentionSearchTimerRef.current);
+      return;
+    }
+    // Debounce Firestore search
+    if (mentionSearchTimerRef.current) clearTimeout(mentionSearchTimerRef.current);
+    mentionSearchTimerRef.current = setTimeout(async () => {
+      if (active.query.length === 0) {
+        // Empty query — don't hit Firestore yet, wait for the user to type at least 1 char
+        setMentionSuggestions([]);
+        return;
+      }
+      try {
+        const results = await searchUsers(active.query, user?.id || '');
+        setMentionSuggestions(results.slice(0, 5));
+      } catch (e) {
+        console.error('[mention search]', e);
+        setMentionSuggestions([]);
+      }
+    }, 200);
+  }, [commentCursor, user?.id]);
+
+  const handleMentionSelect = useCallback((mentioned: User) => {
+    const { newText, newCursor } = insertMention(commentText, commentCursor, mentioned.username);
+    setCommentText(newText);
+    setCommentCursor(newCursor);
+    setMentionSuggestions([]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [commentText, commentCursor]);
 
   // ── Share handler ─────────────────────────────────────────────
   const handleShare = useCallback((plan: Plan) => {
@@ -527,7 +571,25 @@ export const FeedScreen: React.FC = () => {
                               <Text style={styles.commentAuthor}>{comment.authorName}</Text>
                               <Text style={styles.commentTime}>{getCommentTimeAgo(comment.createdAt)}</Text>
                             </View>
-                            <Text style={styles.commentText}>{comment.text}</Text>
+                            <Text style={styles.commentText}>
+                              {tokenizeComment(comment.text).map((seg, idx) =>
+                                seg.type === 'mention' ? (
+                                  <Text
+                                    key={idx}
+                                    style={styles.mentionInText}
+                                    onPress={() => {
+                                      // Navigate to that user's profile
+                                      closeCommentSheet();
+                                      navigation.navigate('OtherProfile', { username: seg.value });
+                                    }}
+                                  >
+                                    {seg.raw}
+                                  </Text>
+                                ) : (
+                                  <Text key={idx}>{seg.value}</Text>
+                                ),
+                              )}
+                            </Text>
                           </View>
                         </View>
                       ))
@@ -543,27 +605,60 @@ export const FeedScreen: React.FC = () => {
                       <Text style={styles.commentPlaceholder}>Connectez-vous pour commenter</Text>
                     </TouchableOpacity>
                   ) : (
-                    <View style={styles.commentInputRow}>
-                      <RNTextInput
-                        style={styles.commentInput}
-                        placeholder="Ajouter un commentaire..."
-                        placeholderTextColor={Colors.textTertiary}
-                        value={commentText}
-                        onChangeText={setCommentText}
-                        multiline
-                        maxLength={500}
-                      />
-                      <TouchableOpacity
-                        onPress={handleSendComment}
-                        disabled={!commentText.trim() || isSending}
-                        style={[styles.sendBtn, { opacity: commentText.trim() ? 1 : 0.4 }]}
-                      >
-                        {isSending ? (
-                          <ActivityIndicator size="small" color={Colors.primary} />
-                        ) : (
-                          <Ionicons name="send" size={18} color={Colors.primary} />
-                        )}
-                      </TouchableOpacity>
+                    <View>
+                      {/* Mention autocomplete suggestions — pinned above the input */}
+                      {mentionSuggestions.length > 0 && (
+                        <View style={styles.mentionSuggestions}>
+                          {mentionSuggestions.map((u) => (
+                            <TouchableOpacity
+                              key={u.id}
+                              style={styles.mentionRow}
+                              onPress={() => handleMentionSelect(u)}
+                              activeOpacity={0.7}
+                            >
+                              <Avatar
+                                initials={u.initials}
+                                bg={u.avatarBg}
+                                color={u.avatarColor}
+                                size="S"
+                                avatarUrl={u.avatarUrl || undefined}
+                              />
+                              <View style={styles.mentionRowText}>
+                                <Text style={styles.mentionDisplayName} numberOfLines={1}>
+                                  {u.displayName}
+                                </Text>
+                                <Text style={styles.mentionUsername} numberOfLines={1}>
+                                  @{u.username}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
+                      <View style={styles.commentInputRow}>
+                        <RNTextInput
+                          style={styles.commentInput}
+                          placeholder="Ajouter un commentaire…  (tape @ pour mentionner)"
+                          placeholderTextColor={Colors.textTertiary}
+                          value={commentText}
+                          onChangeText={handleCommentTextChange}
+                          onSelectionChange={(e) => setCommentCursor(e.nativeEvent.selection.end)}
+                          multiline
+                          maxLength={500}
+                        />
+                        <TouchableOpacity
+                          onPress={handleSendComment}
+                          disabled={!commentText.trim() || isSending}
+                          style={[styles.sendBtn, { opacity: commentText.trim() ? 1 : 0.4 }]}
+                        >
+                          {isSending ? (
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                          ) : (
+                            <Ionicons name="send" size={18} color={Colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -844,5 +939,48 @@ const styles = StyleSheet.create({
   sendBtn: {
     marginLeft: 8,
     paddingHorizontal: 4,
+  },
+
+  // ── @mention autocomplete + highlight ──
+  mentionSuggestions: {
+    marginHorizontal: 0,
+    marginBottom: 4,
+    maxHeight: 220,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    paddingVertical: 6,
+    shadowColor: 'rgba(44, 36, 32, 1)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  mentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  mentionRowText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  mentionDisplayName: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  mentionUsername: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 1,
+  },
+  mentionInText: {
+    color: Colors.primary,
+    fontFamily: Fonts.bodySemiBold,
   },
 });

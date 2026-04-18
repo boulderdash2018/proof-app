@@ -1,6 +1,15 @@
 export { pickImage, pickImageFromSource, pickMultipleImages } from './pickImage';
 export type { PickedImage, ImagePickerSource } from './pickImage';
 
+export {
+  extractMentions,
+  detectActiveMention,
+  insertMention,
+  tokenizeComment,
+  MENTION_REGEX,
+} from './mentions';
+export type { CommentSegment } from './mentions';
+
 export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -217,3 +217,55 @@ export const notifyFriendAccepted = async (sender: User, recipientId: string): P
     content: `${sender.username} accepted your friend request`,
   });
 };
+
+/** Call after a user is @mentioned in a comment */
+export const notifyMention = async (
+  sender: User,
+  recipientId: string,
+  plan: Plan,
+  commentText: string,
+): Promise<void> => {
+  const excerpt = commentText.length > 50 ? commentText.slice(0, 50) + '…' : commentText;
+  await createNotification({
+    recipientId,
+    sender,
+    type: 'mention',
+    content: `${sender.username} t'a mentionné dans un commentaire : "${excerpt}"`,
+    planId: plan.id,
+    planTitle: plan.title,
+    planCover: plan.coverPhotos?.[0] ?? null,
+  });
+};
+
+/** Resolve @usernames to user IDs via Firestore (batched, case-insensitive). */
+export const resolveMentionedUsers = async (
+  usernames: string[],
+): Promise<{ username: string; userId: string }[]> => {
+  if (usernames.length === 0) return [];
+  try {
+    // Firestore supports 'in' queries with up to 30 values per request.
+    // We lowercase usernames assuming they're stored lowercase.
+    const chunks: string[][] = [];
+    for (let i = 0; i < usernames.length; i += 30) {
+      chunks.push(usernames.slice(i, i + 30));
+    }
+    const results: { username: string; userId: string }[] = [];
+    for (const chunk of chunks) {
+      const q = query(
+        collection(db, 'users'),
+        where('username', 'in', chunk),
+      );
+      const snap = await getDocs(q);
+      snap.docs.forEach((d) => {
+        const data = d.data() as { username?: string };
+        if (data.username) {
+          results.push({ username: data.username, userId: d.id });
+        }
+      });
+    }
+    return results;
+  } catch (err) {
+    console.error('[notif] resolveMentionedUsers error:', err);
+    return [];
+  }
+};
