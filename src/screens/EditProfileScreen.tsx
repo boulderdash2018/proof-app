@@ -56,22 +56,9 @@ export const EditProfileScreen: React.FC = () => {
 
   const handlePhotoPress = () => {
     if (Platform.OS === 'web') {
-      // Web: ask camera vs library via native-feeling prompt
-      if (avatarUrl) {
-        Alert.alert(
-          t.edit_profile_photo_title,
-          '',
-          [
-            { text: '📷 Prendre une photo', onPress: () => pickAvatar('camera') },
-            { text: '🖼️ Choisir dans la galerie', onPress: () => pickAvatar('library') },
-            { text: t.edit_profile_photo_remove, style: 'destructive' as const, onPress: () => setAvatarUrl(null) },
-            { text: t.cancel, style: 'cancel' as const },
-          ]
-        );
-      } else {
-        // No existing avatar — go straight to the picker (it handles the ask)
-        pickAvatar();
-      }
+      // On web, the OS already shows a native menu (Photothèque / Prendre une photo /
+      // Choisir le fichier on iOS). No need for a custom pre-step.
+      pickAvatar();
     } else {
       Alert.alert(
         t.edit_profile_photo_title,

@@ -27,33 +27,40 @@ const readFileAsDataUrl = (file: Blob): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-/** Prompt the user to choose camera vs library, then return the selected image as a dataUrl. */
+/**
+ * Pick an image — intelligent source resolution:
+ *
+ * - Web: bypass any pre-step. The mobile browser's native file input already
+ *   presents a gorgeous menu (Photothèque / Prendre une photo / Choisir le fichier
+ *   on iOS Safari, same idea on Android). We just open that menu and let the OS
+ *   handle the choice — way better UX than a custom confirm dialog.
+ *
+ * - Native (iOS/Android app): no built-in menu, so we present our own Alert
+ *   asking between camera and library.
+ */
 export async function pickImage(opts: PickImageOptions = {}): Promise<PickedImage | null> {
-  // Ask user first
-  const source = await askSource();
+  if (Platform.OS === 'web') {
+    // No capture attribute → OS shows its native menu with camera + library + files.
+    return pickFromWeb(null);
+  }
+  const source = await askNativeSource();
   if (!source) return null;
   return pickFromSource(source, opts);
 }
 
-/** Pick directly from a specific source without asking — useful for flows where we know the source. */
+/** Pick directly from a specific source without asking. */
 export async function pickImageFromSource(
   source: ImagePickerSource,
   opts: PickImageOptions = {},
 ): Promise<PickedImage | null> {
+  if (Platform.OS === 'web') {
+    return pickFromWeb(source);
+  }
   return pickFromSource(source, opts);
 }
 
-function askSource(): Promise<ImagePickerSource | null> {
+function askNativeSource(): Promise<ImagePickerSource | null> {
   return new Promise((resolve) => {
-    if (Platform.OS === 'web') {
-      // On web we expose both options via separate inputs; here we ask via a simple confirm fallback.
-      // Most callers will use pickImageFromSource directly on web. This path is a safety net.
-      const wantCamera = typeof window !== 'undefined' && window.confirm
-        ? window.confirm('Prendre une photo avec l\'appareil ? (Annuler pour la bibliothèque)')
-        : false;
-      resolve(wantCamera ? 'camera' : 'library');
-      return;
-    }
     Alert.alert(
       'Ajouter une photo',
       undefined,
@@ -118,13 +125,21 @@ async function pickFromSource(
   return { dataUrl, width: asset.width, height: asset.height };
 }
 
-async function pickFromWeb(source: ImagePickerSource): Promise<PickedImage | null> {
+/**
+ * Create a hidden <input type="file"> and let the browser open its native picker.
+ *
+ * - source = null → no `capture` attribute → on iOS Safari the native sheet shows
+ *   "Photothèque / Prendre une photo / Choisir le fichier" (user chooses). On Android
+ *   Chrome shows an equivalent intent picker. This is the preferred path — zero custom UI.
+ * - source = 'camera' → `capture="environment"` hint → mobile browsers open the camera
+ *   directly (no library option).
+ * - source = 'library' → no capture attribute (same as null, user-initiated choice of gallery).
+ */
+async function pickFromWeb(source: ImagePickerSource | null): Promise<PickedImage | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    // The 'capture' attribute forces the camera app on mobile browsers.
-    // Ignored on desktop — falls back to file picker.
     if (source === 'camera') {
       input.setAttribute('capture', 'environment');
     }
@@ -141,10 +156,7 @@ async function pickFromWeb(source: ImagePickerSource): Promise<PickedImage | nul
         resolve(null);
       }
     };
-    // If the user cancels, input.onchange never fires. We rely on the caller's flow
-    // which awaits this promise — a cancelled pick will just leave the promise pending.
-    // To avoid a stuck await, we resolve null if no file is selected after focus returns.
-    // Modern browsers fire a 'cancel' event on the input (supported since Chrome 113).
+    // Modern browsers fire 'cancel' when the picker is dismissed without a selection.
     input.oncancel = () => resolve(null);
     input.click();
   });
