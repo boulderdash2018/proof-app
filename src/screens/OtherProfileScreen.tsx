@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   back: { fontSize: 24, fontWeight: '600', width: 30 },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.bodySemiBold },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingBottom: 30 },
 
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   stat: { alignItems: 'center' },
-  statValue: { fontSize: 18, fontFamily: Fonts.displaySemiBold },
+  statValue: { fontSize: 18, fontFamily: Fonts.bodyBold },
   statLabel: { fontSize: 11, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
 
   // Info section
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding,
     paddingBottom: 10,
   },
-  displayName: { fontSize: 16, fontFamily: Fonts.displaySemiBold, marginBottom: 3 },
+  displayName: { fontSize: 16, fontFamily: Fonts.bodyBold, marginBottom: 3 },
   badgeRow: { flexDirection: 'row', marginBottom: 4 },
   bio: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18, marginTop: 2 },
 

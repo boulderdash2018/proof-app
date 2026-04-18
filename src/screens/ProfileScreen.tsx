@@ -497,7 +497,7 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
+  headerTitle: { fontSize: 22, fontFamily: Fonts.bodySemiBold, letterSpacing: -0.3 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   friendReqBtn: { marginRight: 16, position: 'relative' },
   friendReqIcon: { fontSize: 22 },
@@ -506,11 +506,11 @@ const styles = StyleSheet.create({
   settingsIcon: { fontSize: 22 },
   scroll: { paddingBottom: 30 },
   hero: { alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1 },
-  displayName: { fontSize: 20, fontFamily: Fonts.displaySemiBold, marginTop: 10 },
+  displayName: { fontSize: 20, fontFamily: Fonts.bodyBold, marginTop: 10 },
   bio: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 },
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderBottomWidth: 1, marginHorizontal: Layout.screenPadding },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 18, fontFamily: Fonts.displaySemiBold },
+  statValue: { fontSize: 18, fontFamily: Fonts.bodyBold },
   statLabel: { fontSize: 11, fontFamily: Fonts.body, marginTop: 2, textTransform: 'capitalize', letterSpacing: 0.3 },
   statDivider: { width: 1, height: 28 },
   // Profile tabs
