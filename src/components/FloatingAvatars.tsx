@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Plan } from '../types';
-import { useSocialProofStore, MinimalUser } from '../store';
+import { useSocialProofStore, MinimalUser, useAuthStore } from '../store';
 import { MiniStampIcon } from './MiniStampIcon';
 
 type InteractionType = 'proof' | 'save' | 'like';
@@ -30,12 +30,16 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
   // Subscribe to userCache OBJECT — re-renders when profiles arrive
   const userCache = useSocialProofStore((s) => s.userCache);
   const ensureUsers = useSocialProofStore((s) => s.ensureUsers);
+  // Current user — we never show our own avatar on the social proof stack
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
-  // Collect all user IDs who interacted with this plan
+  // Collect all user IDs who interacted with this plan (excluding self)
+  const excludeSelf = (ids: string[]) => (currentUserId ? ids.filter((id) => id !== currentUserId) : ids);
+
   const allIds = [
-    ...(plan.recreatedByIds || []),
-    ...(plan.savedByIds || []),
-    ...(plan.likedByIds || []),
+    ...excludeSelf(plan.recreatedByIds || []),
+    ...excludeSelf(plan.savedByIds || []),
+    ...excludeSelf(plan.likedByIds || []),
   ];
   const uniqueIds = [...new Set(allIds)];
 
@@ -52,9 +56,9 @@ export const FloatingAvatars: React.FC<FloatingAvatarsProps> = ({ plan, onProfil
     return [...friends, ...others];
   };
 
-  const proofIds = sortByFriends(plan.recreatedByIds || []);
-  const saveIds = sortByFriends(plan.savedByIds || []);
-  const likeIds = sortByFriends(plan.likedByIds || []);
+  const proofIds = sortByFriends(excludeSelf(plan.recreatedByIds || []));
+  const saveIds = sortByFriends(excludeSelf(plan.savedByIds || []));
+  const likeIds = sortByFriends(excludeSelf(plan.likedByIds || []));
 
   // Fill slots: proof > save > like priority, max 3
   const slots: AvatarSlot[] = [];
