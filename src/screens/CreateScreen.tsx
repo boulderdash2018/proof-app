@@ -21,7 +21,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +35,7 @@ import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, TravelSegment, Plan } from '../types';
 import { createPlan, updatePlan } from '../services/plansService';
+import { pickImage, pickImageFromSource, pickMultipleImages } from '../utils';
 import { trackEvent } from '../services/posthogConfig';
 import {
   searchPlacesAutocomplete,
@@ -706,42 +706,13 @@ export const CreateScreen: React.FC = () => {
   };
 
   // Single-photo picker — replaces the unique cover photo (step 2 UX)
+  // Asks the user between camera & library on both native and web.
   const pickSingleCoverPhoto = async () => {
-    if (Platform.OS === 'web') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async () => {
-        const files = input.files;
-        if (!files || files.length === 0) return;
-        setIsUploadingPhotos(true);
-        try {
-          const dataUrl = await readFileAsDataUrl(files[0]);
-          const url = await uploadPhoto(dataUrl);
-          setCoverPhotos([url]);
-        } catch (err) {
-          console.error('Photo upload error:', err);
-          Alert.alert('Erreur', "Impossible d'uploader la photo.");
-        } finally {
-          setIsUploadingPhotos(false);
-        }
-      };
-      input.click();
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: false,
-      quality: 0.7,
-      base64: true,
-    });
-    if (result.canceled || !result.assets || !result.assets[0]) return;
-
+    const picked = await pickImage({ quality: 0.7 });
+    if (!picked) return;
     setIsUploadingPhotos(true);
     try {
-      const asset = result.assets[0];
-      const dataUrl = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-      const url = await uploadPhoto(dataUrl);
+      const url = await uploadPhoto(picked.dataUrl);
       setCoverPhotos([url]);
     } catch (err) {
       console.error('Photo upload error:', err);
@@ -752,67 +723,21 @@ export const CreateScreen: React.FC = () => {
   };
 
   const pickPhotos = async () => {
-    if (Platform.OS === 'web') {
-      // On web, create and click a hidden file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.multiple = true;
-      input.onchange = async () => {
-        const files = input.files;
-        if (!files || files.length === 0) return;
-        setIsUploadingPhotos(true);
-        try {
-          const maxFiles = Math.min(files.length, 7 - coverPhotos.length);
-          // Copy files to array and read all data URLs first (avoids FileList reference issues)
-          const fileArray: File[] = [];
-          for (let i = 0; i < maxFiles; i++) fileArray.push(files[i]);
-          const dataUrls = await Promise.all(fileArray.map((f) => readFileAsDataUrl(f)));
-          // Upload sequentially to avoid overwhelming Firebase
-          const urls: string[] = [];
-          for (const dataUrl of dataUrls) {
-            const url = await uploadPhoto(dataUrl);
-            urls.push(url);
-          }
-          setCoverPhotos((prev) => [...prev, ...urls].slice(0, 7));
-        } catch (err) {
-          console.error('Photo upload error:', err);
-          Alert.alert('Erreur', "Impossible d'uploader les photos. Vérifiez les règles Firebase Storage.");
-        } finally {
-          setIsUploadingPhotos(false);
-        }
-      };
-      input.click();
-      return;
-    }
-    // On native, use expo-image-picker
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: 7 - coverPhotos.length,
-      quality: 0.7,
-      base64: true,
-    });
-    if (result.canceled || !result.assets) return;
+    // Multi-select is library-only by nature (cameras capture one at a time).
+    // Use pickMultipleImages which handles web + native uniformly.
+    const picked = await pickMultipleImages({ max: 7 - coverPhotos.length, quality: 0.7 });
+    if (picked.length === 0) return;
 
     setIsUploadingPhotos(true);
     try {
       const urls: string[] = [];
-      for (const asset of result.assets) {
-        // Use base64 directly when available (native), fallback to fetch for web URIs
-        let dataUrl: string;
-        if (asset.base64) {
-          const mime = asset.mimeType || 'image/jpeg';
-          dataUrl = `data:${mime};base64,${asset.base64}`;
-        } else {
-          dataUrl = await readFileAsDataUrl(await (await fetch(asset.uri)).blob());
-        }
-        urls.push(await uploadPhoto(dataUrl));
+      for (const img of picked) {
+        urls.push(await uploadPhoto(img.dataUrl));
       }
       setCoverPhotos((prev) => [...prev, ...urls].slice(0, 7));
     } catch (err) {
       console.error('Photo upload error:', err);
-      Alert.alert('Erreur', "Impossible d'uploader les photos");
+      Alert.alert('Erreur', "Impossible d'uploader les photos. Vérifiez les règles Firebase Storage.");
     } finally {
       setIsUploadingPhotos(false);
     }
@@ -1115,15 +1040,8 @@ export const CreateScreen: React.FC = () => {
   }, [pendingPlace, places, customPhoto, customComment, customQAs, editingPlaceIndex]);
 
   const pickCustomPhoto = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-    if (!result.canceled && result.assets[0]) {
-      setCustomPhoto(result.assets[0].uri);
-    }
+    const picked = await pickImage({ quality: 0.7, allowsEditing: true, aspect: [4, 3] });
+    if (picked) setCustomPhoto(picked.dataUrl);
   }, []);
 
   const toggleTag = (tag: CategoryTag) => {

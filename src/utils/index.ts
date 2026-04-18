@@ -1,3 +1,6 @@
+export { pickImage, pickImageFromSource, pickMultipleImages } from './pickImage';
+export type { PickedImage, ImagePickerSource } from './pickImage';
+
 export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 

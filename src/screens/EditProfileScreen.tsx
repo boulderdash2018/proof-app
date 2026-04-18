@@ -14,13 +14,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, PrimaryButton, TextInput } from '../components';
 import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
+import { pickImage as pickImageUtil, pickImageFromSource } from '../utils';
 
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -37,53 +37,15 @@ export const EditProfileScreen: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Convert a blob/file URI to a data URL for persistence
-  const pickImageWeb = () => {
-    // Create a native file input for web — most reliable approach
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setIsUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarUrl(reader.result as string);
-        setIsUploading(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      };
-      reader.onerror = () => {
-        console.error('FileReader error');
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
-  };
-
-  const pickImageNative = async () => {
+  // Avatar picker — camera or library on both web + native.
+  const pickAvatar = async (source?: 'camera' | 'library') => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission requise', "Autorise l'accès à tes photos.");
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.4,
-        base64: true,
-      });
-      if (result.canceled || !result.assets[0]) return;
-      const asset = result.assets[0];
+      const picked = source
+        ? await pickImageFromSource(source, { quality: 0.4, allowsEditing: true, aspect: [1, 1] })
+        : await pickImageUtil({ quality: 0.4, allowsEditing: true, aspect: [1, 1] });
+      if (!picked) return;
       setIsUploading(true);
-      if (asset.base64) {
-        setAvatarUrl(`data:image/jpeg;base64,${asset.base64}`);
-      } else {
-        setAvatarUrl(asset.uri);
-      }
+      setAvatarUrl(picked.dataUrl);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('Image picker error:', err);
@@ -92,23 +54,31 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
-  const pickImage = () => {
-    if (Platform.OS === 'web') {
-      pickImageWeb();
-    } else {
-      pickImageNative();
-    }
-  };
-
   const handlePhotoPress = () => {
     if (Platform.OS === 'web') {
-      pickImage();
+      // Web: ask camera vs library via native-feeling prompt
+      if (avatarUrl) {
+        Alert.alert(
+          t.edit_profile_photo_title,
+          '',
+          [
+            { text: '📷 Prendre une photo', onPress: () => pickAvatar('camera') },
+            { text: '🖼️ Choisir dans la galerie', onPress: () => pickAvatar('library') },
+            { text: t.edit_profile_photo_remove, style: 'destructive' as const, onPress: () => setAvatarUrl(null) },
+            { text: t.cancel, style: 'cancel' as const },
+          ]
+        );
+      } else {
+        // No existing avatar — go straight to the picker (it handles the ask)
+        pickAvatar();
+      }
     } else {
       Alert.alert(
         t.edit_profile_photo_title,
         '',
         [
-          { text: t.edit_profile_photo_gallery, onPress: pickImage },
+          { text: '📷 Prendre une photo', onPress: () => pickAvatar('camera') },
+          { text: '🖼️ Choisir dans la galerie', onPress: () => pickAvatar('library') },
           ...(avatarUrl ? [{ text: t.edit_profile_photo_remove, style: 'destructive' as const, onPress: () => setAvatarUrl(null) }] : []),
           { text: t.cancel, style: 'cancel' as const },
         ]

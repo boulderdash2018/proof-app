@@ -12,10 +12,10 @@ import {
   Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
+import { pickImage } from '../utils';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PHOTO_H = 320;
@@ -113,14 +113,8 @@ export const PhotoEditorSheet: React.FC<Props> = ({ visible, photoUri, onApply, 
   }, []);
 
   const handleCrop = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setCurrentUri(result.assets[0].uri);
-    }
+    const picked = await pickImage({ quality: 0.8, allowsEditing: true });
+    if (picked) setCurrentUri(picked.dataUrl);
   }, []);
 
   const handleSliderChange = useCallback((tool: AdjustTool, value: number) => {
