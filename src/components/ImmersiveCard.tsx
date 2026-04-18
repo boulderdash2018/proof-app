@@ -844,27 +844,28 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                         {!isLast && <View style={styles.timelineLine} />}
                       </View>
                       <View style={styles.timelineContent}>
-                        {/* Favorite star — top right of each place in the plan */}
-                        <TouchableOpacity
-                          style={styles.timelineFavBtn}
-                          onPress={(e) => { e.stopPropagation?.(); togglePlaceFavorite(place); }}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons
-                            name={isPlaceFav(place) ? 'star' : 'star-outline'}
-                            size={18}
-                            color={isPlaceFav(place) ? Colors.gold : Colors.textTertiary}
-                          />
-                        </TouchableOpacity>
-
-                        <View style={[styles.timelinePlaceHead, { paddingRight: 28 }]}>
-                          <Text style={styles.timelinePlaceName}>
-                            {place.name}
-                            {place.reservationRecommended ? (
-                              <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
-                            ) : null}
-                          </Text>
+                        <View style={styles.timelinePlaceHead}>
+                          <View style={styles.timelinePlaceTitleRow}>
+                            <Text style={styles.timelinePlaceName}>
+                              {place.name}
+                              {place.reservationRecommended ? (
+                                <Text style={styles.reservationAsterisk}>{' ﹡'}</Text>
+                              ) : null}
+                            </Text>
+                            {/* Favorite star — right next to the place title */}
+                            <TouchableOpacity
+                              style={styles.timelineFavBtn}
+                              onPress={(e) => { e.stopPropagation?.(); togglePlaceFavorite(place); }}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons
+                                name={isPlaceFav(place) ? 'star' : 'star-outline'}
+                                size={18}
+                                color={isPlaceFav(place) ? Colors.gold : Colors.textTertiary}
+                              />
+                            </TouchableOpacity>
+                          </View>
                           <Text style={styles.timelinePlaceType}>{place.type}</Text>
                         </View>
                         {place.rating > 0 ? (
@@ -1329,20 +1330,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingLeft: 20,
     paddingBottom: 4,
-    position: 'relative',
-  },
-  timelineFavBtn: {
-    position: 'absolute',
-    top: -2,
-    right: 0,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
   },
   timelinePlaceHead: {
     marginBottom: 4,
+  },
+  timelinePlaceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  timelineFavBtn: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   timelinePlaceName: {
     fontSize: 18,
