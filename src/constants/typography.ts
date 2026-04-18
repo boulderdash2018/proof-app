@@ -25,6 +25,11 @@ export const Fonts = {
   serifMedium: 'Inter_500Medium',
   serifSemiBold: 'Inter_600SemiBold',
   serifBold: 'Inter_700Bold',
+
+  // ── Brand logo — Playfair Display (original Proof logo font, pre-refonte) ──
+  // Reserved for the "proof." wordmark only. Do not use for body/UI.
+  logo: 'PlayfairDisplay_700Bold',
+  logoBlack: 'PlayfairDisplay_900Black',
 } as const;
 
 // ── Typography presets ──────────────────────────────────────

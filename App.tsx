@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_400Regular_Italic, Inter_500Medium, Inter_600SemiBold, Inter_600SemiBold_Italic, Inter_700Bold } from '@expo-google-fonts/inter';
+import { PlayfairDisplay_700Bold, PlayfairDisplay_900Black } from '@expo-google-fonts/playfair-display';
 import { RootNavigator } from './src/navigation';
 import { initPostHog } from './src/services/posthogConfig';
 import { useAuthStore } from './src/store';
@@ -39,6 +40,9 @@ export default function App() {
     Inter_600SemiBold,
     Inter_600SemiBold_Italic,
     Inter_700Bold,
+    // Playfair Display — reserved for the Proof logo only (original branding font)
+    PlayfairDisplay_700Bold,
+    PlayfairDisplay_900Black,
   });
 
   useEffect(() => {

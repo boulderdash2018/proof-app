@@ -649,10 +649,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   logo: {
-    fontSize: 26,
-    fontFamily: Fonts.displayBold,
+    fontSize: 30,
+    fontFamily: Fonts.logo,
     color: Colors.textPrimary,
-    letterSpacing: -1,
+    letterSpacing: -1.2,
+    lineHeight: 36,
   },
   headerIcons: {
     flexDirection: 'row',
