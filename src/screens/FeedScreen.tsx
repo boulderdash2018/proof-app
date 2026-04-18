@@ -381,7 +381,7 @@ export const FeedScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Tabs: Recommandations / Amis */}
+        {/* Tabs: Feed / Amis */}
         <View style={styles.tabRow}>
           <TouchableOpacity
             onLayout={(e: any) => {
@@ -396,7 +396,7 @@ export const FeedScreen: React.FC = () => {
             activeOpacity={0.7}
           >
             <Text style={[styles.tabText, { opacity: activeTab === 'reco' ? 1 : 0.5 }]}>
-              Recommandations
+              Feed
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
