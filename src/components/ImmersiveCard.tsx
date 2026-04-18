@@ -798,6 +798,21 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               ) : null}
             </Animated.View>
 
+            {/* ═══════ Tags (moved here — shown right after metrics for instant glance) ═══════ */}
+            {plan.tags && plan.tags.length > 0 ? (
+              <Animated.View
+                style={[styles.tagsSectionTop, { opacity: d1.opacity, transform: [{ translateY: d1.translateY }] }]}
+              >
+                <View style={styles.tagsList}>
+                  {plan.tags.map((tag, i) => (
+                    <View key={i} style={styles.tagPill}>
+                      <Text style={styles.tagPillText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            ) : null}
+
             {/* ═══════ SECTION 3 — Creator tip as editorial pull-quote ═══════ */}
             {(() => {
               // Prefer the dedicated authorTip (mandatory from step 5 of wizard).
@@ -926,22 +941,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 <Text style={styles.reservationLegend}>﹡ Réservation recommandée</Text>
               ) : null}
             </Animated.View>
-
-            {/* ═══════ SECTION 5 — Tags (overline + pills) ═══════ */}
-            {plan.tags && plan.tags.length > 0 ? (
-              <Animated.View
-                style={[styles.tagsSection, { opacity: d3.opacity, transform: [{ translateY: d3.translateY }] }]}
-              >
-                <Text style={styles.overline}>DÉTAILS DU PLAN</Text>
-                <View style={styles.tagsList}>
-                  {plan.tags.map((tag, i) => (
-                    <View key={i} style={styles.tagPill}>
-                      <Text style={styles.tagPillText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              </Animated.View>
-            ) : null}
 
             {/* ═══════ SECTION 6 — Comments (inline last 3 + see all link) ═══════ */}
             <Animated.View
@@ -1463,7 +1462,13 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
 
-  // ── SECTION 5: Tags ──
+  // ── Tags (after metrics — quick-glance specificities) ──
+  tagsSectionTop: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    paddingTop: 4,
+  },
+  // ── SECTION 5: Tags (legacy — kept for backward compat, no longer rendered) ──
   tagsSection: {
     paddingHorizontal: 24,
     paddingBottom: 32,
