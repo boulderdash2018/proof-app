@@ -80,13 +80,21 @@ export const FeedScreen: React.FC = () => {
     fetchFeed, fetchFriendsFeed,
     toggleLike, toggleSave,
   } = useFeedStore();
+  const setLastIndex = useFeedStore((s) => s.setLastIndex);
+  const setLastTab = useFeedStore((s) => s.setLastTab);
+  // Read initial values non-reactively so we don't re-render mid-session.
+  const initialTab = useRef(useFeedStore.getState().lastTab).current;
+  const initialIndices = useRef(useFeedStore.getState().lastIndex).current;
   const { unreadCount, subscribe: subscribeNotifs } = useNotifStore();
   const { totalUnread: chatUnread, subscribe: subscribeChat } = useChatStore();
 
   // ── State ──────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<FeedTab>('reco');
+  // Restore the tab + index the user last viewed so the feed doesn't jump back
+  // to the beginning when they navigate away and come back.
+  const [activeTab, setActiveTab] = useState<FeedTab>(initialTab);
   const [listH, setListH] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialIndices[initialTab] ?? 0);
+  const hasRestoredScrollRef = useRef(false);
   const [friendsFetched, setFriendsFetched] = useState(false);
   const [sharePlan, setSharePlan] = useState<Plan | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -318,6 +326,33 @@ export const FeedScreen: React.FC = () => {
 
   // ── Derived ───────────────────────────────────────────────────
   const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
+
+  // ── Persist scroll position so the feed keeps its place across focus/blur ──
+  useEffect(() => {
+    setLastIndex(activeTab, currentIndex);
+  }, [currentIndex, activeTab, setLastIndex]);
+
+  useEffect(() => {
+    setLastTab(activeTab);
+  }, [activeTab, setLastTab]);
+
+  // ── Restore scroll position once the list has plans + measured height ──
+  // Runs only on the very first render where both conditions are met.
+  useEffect(() => {
+    if (hasRestoredScrollRef.current) return;
+    if (currentPlans.length === 0 || listH === 0) return;
+    const target = initialIndices[activeTab] ?? 0;
+    if (target <= 0 || target >= currentPlans.length) {
+      hasRestoredScrollRef.current = true;
+      return;
+    }
+    // Defer until after the FlatList has laid out its items.
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToIndex({ index: target, animated: false });
+      setCurrentIndex(target);
+      hasRestoredScrollRef.current = true;
+    });
+  }, [currentPlans.length, listH, activeTab, initialIndices]);
   const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
   const progressPercent =
     currentPlans.length > 1 ? ((currentIndex + 1) / currentPlans.length) * 100 : 100;

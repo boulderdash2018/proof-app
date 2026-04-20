@@ -18,6 +18,8 @@ const getCurrentUserId = (): string | null => {
   return useAuthStore.getState().user?.id || null;
 };
 
+type FeedTab = 'reco' | 'friends';
+
 interface FeedStore {
   plans: Plan[];
   friendsPlans: Plan[];
@@ -27,6 +29,11 @@ interface FeedStore {
   isFriendsRefreshing: boolean;
   likedPlanIds: Set<string>;
   savedPlanIds: Set<string>;
+  /** Last viewed plan index per tab — persists across screen focus/blur so the feed
+   * doesn't jump back to the start when the user navigates away and returns. */
+  lastIndex: Record<FeedTab, number>;
+  /** Which tab was active last — restored when the feed re-mounts. */
+  lastTab: FeedTab;
   fetchFeed: (userId?: string, guestInterests?: string[], city?: string) => Promise<void>;
   refreshFeed: (guestInterests?: string[], city?: string) => Promise<void>;
   fetchFriendsFeed: (city?: string) => Promise<void>;
@@ -34,6 +41,8 @@ interface FeedStore {
   addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
   toggleSave: (planId: string) => void;
+  setLastIndex: (tab: FeedTab, index: number) => void;
+  setLastTab: (tab: FeedTab) => void;
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
@@ -45,6 +54,19 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   isFriendsRefreshing: false,
   likedPlanIds: new Set<string>(),
   savedPlanIds: new Set<string>(),
+  lastIndex: { reco: 0, friends: 0 },
+  lastTab: 'reco',
+
+  setLastIndex: (tab, index) => {
+    const current = get().lastIndex;
+    if (current[tab] === index) return;
+    set({ lastIndex: { ...current, [tab]: index } });
+  },
+
+  setLastTab: (tab) => {
+    if (get().lastTab === tab) return;
+    set({ lastTab: tab });
+  },
 
   fetchFeed: async (userId?: string, guestInterests?: string[], city?: string) => {
     const uid = userId || getCurrentUserId();
