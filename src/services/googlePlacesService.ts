@@ -6,6 +6,11 @@ const BASE_URL = 'https://places.googleapis.com/v1/places';
 // On web, use Vercel API routes to avoid CORS; on native, call Google directly
 const isWeb = Platform.OS === 'web';
 
+// In local dev, relative /api/... routes aren't served by `expo start`, so point
+// to the deployed Vercel instance. In production, keep relative paths.
+const isDev = __DEV__ || process.env.NODE_ENV === 'development';
+const API_BASE_URL = isDev ? 'https://proof-app-black.vercel.app' : '';
+
 export interface GooglePlaceAutocomplete {
   placeId: string;
   name: string;
@@ -73,7 +78,7 @@ function getReadableType(types: string[]): string {
 
 function getPhotoUrl(photoName: string, maxWidth: number = 400): string {
   if (isWeb) {
-    return `/api/places-photo?photoName=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
+    return `${API_BASE_URL}/api/places-photo?photoName=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
   }
   return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&key=${API_KEY}`;
 }
@@ -102,7 +107,7 @@ export async function searchPlacesAutocomplete(
   }
 
   try {
-    const url = isWeb ? '/api/places-autocomplete' : 'https://places.googleapis.com/v1/places:autocomplete';
+    const url = isWeb ? `${API_BASE_URL}/api/places-autocomplete` : 'https://places.googleapis.com/v1/places:autocomplete';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (!isWeb) headers['X-Goog-Api-Key'] = API_KEY;
 
@@ -149,7 +154,7 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceDetai
 
   try {
     const url = isWeb
-      ? `/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
+      ? `${API_BASE_URL}/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
       : `${BASE_URL}/${placeId}`;
     const headers: Record<string, string> = isWeb
       ? {}
@@ -207,7 +212,7 @@ export async function checkPlaceOpenStatus(placeId: string, placeName: string): 
 
   try {
     const url = isWeb
-      ? `/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
+      ? `${API_BASE_URL}/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
       : `${BASE_URL}/${placeId}`;
     const headers: Record<string, string> = isWeb
       ? {}
@@ -294,7 +299,7 @@ export async function searchPlacesNearby(
   ];
 
   try {
-    const url = isWeb ? '/api/places-search' : `${BASE_URL}:searchText`;
+    const url = isWeb ? `${API_BASE_URL}/api/places-search` : `${BASE_URL}:searchText`;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (!isWeb) {
       headers['X-Goog-Api-Key'] = API_KEY;
@@ -364,7 +369,7 @@ export async function computeTravelDuration(
 
   try {
     if (isWeb) {
-      const res = await fetch('/api/routes-duration', {
+      const res = await fetch(`${API_BASE_URL}/api/routes-duration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ originPlaceId, destinationPlaceId, travelMode }),
