@@ -311,8 +311,10 @@ export const SharePlanSheet: React.FC<SharePlanSheetProps> = ({
                   renderItem={renderFriendRow}
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={styles.list}
+                  style={styles.flatList}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
+                  extraData={selectedIds}
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                       <Text style={[styles.emptyText, { color: C.gray600 }]}>
@@ -510,13 +512,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: '85%',
+    top: '15%', // take up to 85% of screen height, leaving the top 15% transparent
   },
   sheet: {
+    flex: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 34,
-    maxHeight: '100%',
+  },
+  flatList: {
+    flex: 1, // consume remaining vertical space so the footer stays pinned below
   },
   handle: {
     width: 36,
