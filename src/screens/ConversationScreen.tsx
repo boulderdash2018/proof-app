@@ -342,18 +342,24 @@ const MessageRow = React.memo<MessageRowProps>(({
             delayLongPress={400}
             style={{ maxWidth: '78%' }}
           >
-            {/* Quoted reply preview */}
+            {/* Quoted reply preview — identical styling on both sides */}
             {hasReply && (
               <TouchableOpacity
                 onPress={() => item.replyToId && onScrollToQuote(item.replyToId)}
-                style={[styles.quotedReply, { backgroundColor: isMine ? 'rgba(255,248,240,0.15)' : C.primary + '10', borderLeftColor: C.primary }]}
+                style={[
+                  styles.quotedReply,
+                  isMine ? styles.quotedReplyMine : styles.quotedReplyOther,
+                  { backgroundColor: Colors.terracotta100, borderLeftColor: Colors.primary },
+                ]}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.quotedName, { color: isMine ? 'rgba(255,248,240,0.8)' : C.primary }]} numberOfLines={1}>
+                <Text style={[styles.quotedName, { color: Colors.terracotta700 }]} numberOfLines={1}>
                   {item.replyToSenderId === userId ? 'Toi' : otherUser.displayName}
                 </Text>
-                <Text style={[styles.quotedText, { color: isMine ? 'rgba(255,248,240,0.6)' : C.gray600 }]} numberOfLines={1}>
-                  {item.replyToType === 'plan' ? 'Plan partagé ✦' : item.replyToContent}
+                <Text style={[styles.quotedText, { color: Colors.textSecondary }]} numberOfLines={2}>
+                  {item.replyToType === 'plan'
+                    ? 'Plan partagé ✦'
+                    : item.replyToContent || 'Message supprimé'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -362,9 +368,10 @@ const MessageRow = React.memo<MessageRowProps>(({
             <View style={[
               styles.bubble,
               isMine ? { backgroundColor: C.primary } : { backgroundColor: C.gray200 },
-              hasReply && { borderTopLeftRadius: 8, borderTopRightRadius: 8 },
               bubbleRadii,
-              hasReply && { borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+              // When there's a quoted reply on top, flatten the bubble's top corners
+              // so the preview + bubble merge into a single rounded block.
+              hasReply && { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
             ]}>
               {item.type === 'plan' ? (
                 <TouchableOpacity onPress={() => item.planId && onPlanPress(item.planId)} activeOpacity={0.8}>
@@ -900,11 +907,19 @@ const styles = StyleSheet.create({
 
   // Quoted reply in bubble
   quotedReply: {
-    borderLeftWidth: 3, borderRadius: 8, borderTopLeftRadius: 4,
-    paddingHorizontal: 10, paddingVertical: 6, marginBottom: 2,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: -2, // slight overlap so the preview visually fuses with the bubble
   },
-  quotedName: { fontSize: 11, fontFamily: Fonts.bodyBold },
-  quotedText: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
+  quotedReplyMine: { alignSelf: 'flex-end' },
+  quotedReplyOther: { alignSelf: 'flex-start' },
+  quotedName: { fontSize: 11, fontFamily: Fonts.bodySemiBold, letterSpacing: 0.4 },
+  quotedText: { fontSize: 13, fontFamily: Fonts.body, marginTop: 1, lineHeight: 17 },
 
   // Read receipt
   readReceipt: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 3, paddingRight: 2 },
