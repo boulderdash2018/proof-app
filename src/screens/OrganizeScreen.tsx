@@ -63,6 +63,29 @@ export const OrganizeScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTransport, setShowTransport] = useState(false);
   const [tempPlan, setTempPlan] = useState<Plan | null>(null);
+  const [pickedTransport, setPickedTransport] = useState<DoItNowTransport | null>(null);
+
+  // ── 4-step Wizard (1: title, 2: vibe, 3: places, 4: launch) ──
+  type Step = 1 | 2 | 3 | 4;
+  const TOTAL_STEPS: 4 = 4;
+  const [step, setStep] = useState<Step>(1);
+
+  const canProceedFromStep = (s: Step): boolean => {
+    if (s === 1) return title.trim().length >= 3;
+    if (s === 2) return selectedTags.length > 0;
+    if (s === 3) return places.length >= 1;
+    if (s === 4) return pickedTransport !== null;
+    return false;
+  };
+
+  const goToNextStep = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step < TOTAL_STEPS) setStep((step + 1) as Step);
+  };
+  const goToPrevStep = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step > 1) setStep((step - 1) as Step);
+  };
 
   // ── Draft persistence ──
   const draftIdRef = useRef<string>(route.params?.draftId || 'organize-' + Date.now());
@@ -284,7 +307,7 @@ export const OrganizeScreen: React.FC = () => {
   };
 
   const handleLaunch = async () => {
-    if (!canLaunch || !user) return;
+    if (!canLaunch || !user || !pickedTransport) return;
     setIsLoading(true);
 
     try {
@@ -338,8 +361,10 @@ export const OrganizeScreen: React.FC = () => {
         timeAgo: 'maintenant',
       };
 
+      // Launch directly with the transport picked in step 4 — no extra modal.
       setTempPlan(plan);
-      setShowTransport(true);
+      useDoItNowStore.getState().startOrganizeSession(plan, pickedTransport, user.id, title, selectedTags);
+      navigation.navigate('DoItNow', { planId: plan.id });
     } catch (err) {
       console.error('Error preparing plan:', err);
       Alert.alert('Erreur', 'Impossible de préparer le plan. Réessaie.');
@@ -357,200 +382,365 @@ export const OrganizeScreen: React.FC = () => {
 
   const canLaunch = title.trim().length >= 3 && selectedTags.length > 0 && places.length >= 1;
 
+  // Transport options for step 4 — matches TransportChooser values
+  const TRANSPORT_OPTIONS: { key: DoItNowTransport; label: string; icon: string; emoji: string }[] = [
+    { key: 'walking',   label: 'À pied',     icon: 'walk-outline',    emoji: '🚶' },
+    { key: 'transit',   label: 'Métro',      icon: 'train-outline',   emoji: '🚇' },
+    { key: 'bicycling', label: 'Vélo',       icon: 'bicycle-outline', emoji: '🚲' },
+    { key: 'driving',   label: 'Voiture',    icon: 'car-outline',     emoji: '🚗' },
+  ];
+
   // ── Render ──
+  const stepTitles: Record<Step, string> = {
+    1: 'Nomme ta journée',
+    2: 'Quelle vibe ?',
+    3: 'Ajoute les lieux',
+    4: 'Prêt à partir ?',
+  };
+  const nextLabels: Record<Step, string> = {
+    1: 'Suivant — la vibe',
+    2: 'Suivant — les lieux',
+    3: 'Suivant — lancement',
+    4: '🚀 Lancer la journée',
+  };
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.container, { backgroundColor: C.white }]}>
-        {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: C.borderLight }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="arrow-back" size={22} color={C.black} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: C.black }]}>Organiser une journée</Text>
-          <View style={{ width: 22 }} />
+      <View style={[styles.container, { backgroundColor: Colors.bgPrimary }]}>
+        {/* ═══════ Wizard header ═══════ */}
+        <View style={[styles.wizardHeader, { paddingTop: insets.top + 8 }]}>
+          {step > 1 ? (
+            <TouchableOpacity onPress={goToPrevStep} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.wizardHeaderSide}>
+              <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.wizardHeaderSide}>
+              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          )}
+          <View style={styles.wizardHeaderCenter}>
+            <Text style={styles.wizardStepLabel}>ÉTAPE {step} SUR {TOTAL_STEPS}</Text>
+            <Text style={styles.wizardStepTitle}>{stepTitles[step]}</Text>
+          </View>
+          <View style={styles.wizardHeaderSide} />
         </View>
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          scrollEnabled={!draggingId}
-        >
-          {/* ── Title ── */}
-          <Text style={[styles.sectionLabel, { color: C.gray800 }]}>Titre de la journée</Text>
-          <View style={[styles.inputWrap, { backgroundColor: C.gray200, borderColor: title.length > 0 ? C.primary + '50' : C.borderLight }]}>
-            <Ionicons name="pencil-outline" size={16} color={C.gray600} style={{ marginRight: 8 }} />
-            <RNTextInput
-              style={[styles.textInput, { color: C.black }]}
-              placeholder="Ex: Journée culture au Marais"
-              placeholderTextColor={C.gray500}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={60}
-            />
-          </View>
-          <Text style={[styles.charCount, { color: C.gray500 }]}>{title.length}/60</Text>
+        {/* ═══════ Progress bar (4 segments) ═══════ */}
+        <View style={styles.wizardProgress}>
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 1 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 2 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 3 ? Colors.primary : Colors.borderSubtle }]} />
+          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 4 ? Colors.primary : Colors.borderSubtle }]} />
+        </View>
 
-          {/* ── Categories ── */}
-          <Text style={[styles.sectionLabel, { color: C.gray800, marginTop: 20 }]}>Catégorie</Text>
-
-          {/* Row 1: Par personne */}
-          <Text style={[styles.filterRowLabel, { color: C.gray500 }]}>Par personne</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
-            {PERSON_FILTERS.filter(p => p.key !== 'around-you').map((p) => {
-              const isSelected = selectedTags.includes(p.label);
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.chip, isSelected ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-                  onPress={() => toggleTag(p.label)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.chipEmoji}>{p.emoji}</Text>
-                  <Text style={[styles.chipText, { color: isSelected ? Colors.textOnAccent : C.gray700 }]}>{p.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Row 2: Par thème + Voir + */}
-          <Text style={[styles.filterRowLabel, { color: C.gray500, marginTop: 10 }]}>Par thème</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
-            {EXPLORE_GROUPS.filter(g => g.key !== 'trending' && g.key !== 'nearby').map((group) => {
-              const isActive = showSubcategories
-                ? selectedGroup === group.key
-                : selectedTags.includes(group.label);
-              return (
-                <TouchableOpacity
-                  key={group.key}
-                  style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-                  onPress={() => {
-                    if (showSubcategories) {
-                      setSelectedGroup(group.key);
-                    } else {
-                      toggleTag(group.label);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.chipEmoji}>{group.emoji}</Text>
-                  <Text style={[styles.chipText, { color: isActive ? '#FFF' : C.gray700 }]}>{group.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={[styles.chip, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-              onPress={() => setShowSubcategories(!showSubcategories)}
-              activeOpacity={0.7}
+        {/* ═══════ Step content ═══════ */}
+        <View style={styles.stepWrap}>
+          {/* ─── Step 1 — Titre ─── */}
+          {step === 1 && (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Text style={[styles.chipText, { color: showSubcategories ? Colors.textOnAccent : C.gray700, fontWeight: '700' }]}>Voir +</Text>
-              <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? '#FFF' : C.gray700} />
-            </TouchableOpacity>
-          </ScrollView>
+              <Text style={styles.stepHint}>Le nom court qui résume l'ambiance. Tu pourras le changer plus tard.</Text>
 
-          {/* Subcategory list */}
-          {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
-            <View key={section.title} style={styles.subcategorySection}>
-              <Text style={[styles.subcategorySectionTitle, { color: C.gray600 }]}>{section.title}</Text>
-              <View>
-                {section.items.map((item, idx) => {
-                  const isSelected = selectedTags.includes(item.name);
-                  const isLast = idx === section.items.length - 1;
+              <View style={[styles.inputWrap, { backgroundColor: Colors.bgSecondary, borderColor: title.length > 0 ? Colors.primary : Colors.borderSubtle, marginTop: 16 }]}>
+                <Ionicons name="pencil-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+                <RNTextInput
+                  style={[styles.textInput, { color: Colors.textPrimary }]}
+                  placeholder="Ex: Journée culture au Marais"
+                  placeholderTextColor={Colors.textTertiary}
+                  value={title}
+                  onChangeText={setTitle}
+                  maxLength={60}
+                  autoFocus
+                />
+              </View>
+              <Text style={[styles.charCount, { color: Colors.textTertiary }]}>{title.length}/60</Text>
+
+              <Text style={[styles.inspLabel, { marginTop: 22 }]}>INSPIRATIONS</Text>
+              <View style={styles.inspWrap}>
+                {[
+                  { emoji: '🎨', label: 'Journée culture au Marais' },
+                  { emoji: '☕', label: 'Brunch dominical tranquille' },
+                  { emoji: '💕', label: 'Sortie cocooning à deux' },
+                  { emoji: '🌿', label: 'Pause nature dans Paris' },
+                ].map((insp) => (
+                  <TouchableOpacity
+                    key={insp.label}
+                    style={[styles.inspChip, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTitle(insp.label); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.inspEmoji}>{insp.emoji}</Text>
+                    <Text style={[styles.inspText, { color: Colors.textPrimary }]} numberOfLines={1}>{insp.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
+
+          {/* ─── Step 2 — Vibe (categories) ─── */}
+          {step === 2 && (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.stepHint}>Une ou plusieurs catégories qui décrivent ta journée.</Text>
+
+              {/* Row 1: Par personne */}
+              <Text style={[styles.filterRowLabel, { color: Colors.textTertiary, marginTop: 16 }]}>PAR PERSONNE</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
+                {PERSON_FILTERS.filter(p => p.key !== 'around-you').map((p) => {
+                  const isSelected = selectedTags.includes(p.label);
                   return (
                     <TouchableOpacity
-                      key={item.name}
-                      style={[styles.flatSubcatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }, isSelected && { backgroundColor: Colors.primary + '10' }]}
-                      onPress={() => toggleTag(item.name)}
+                      key={p.key}
+                      style={[styles.chip, isSelected ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+                      onPress={() => toggleTag(p.label)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.flatSubcatEmoji}>{item.emoji}</Text>
-                      <View style={styles.flatSubcatTextCol}>
-                        <Text style={[styles.flatSubcatName, { color: C.black }]}>{item.name}</Text>
-                        {item.subtitle ? <Text style={[styles.flatSubcatSub, { color: C.gray600 }]}>{item.subtitle}</Text> : null}
+                      <Text style={styles.chipEmoji}>{p.emoji}</Text>
+                      <Text style={[styles.chipText, { color: isSelected ? Colors.textOnAccent : Colors.textPrimary }]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Row 2: Par thème */}
+              <Text style={[styles.filterRowLabel, { color: Colors.textTertiary, marginTop: 12 }]}>PAR THÈME</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
+                {EXPLORE_GROUPS.filter(g => g.key !== 'trending' && g.key !== 'nearby').map((group) => {
+                  const isActive = showSubcategories
+                    ? selectedGroup === group.key
+                    : selectedTags.includes(group.label);
+                  return (
+                    <TouchableOpacity
+                      key={group.key}
+                      style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+                      onPress={() => {
+                        if (showSubcategories) {
+                          setSelectedGroup(group.key);
+                        } else {
+                          toggleTag(group.label);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.chipEmoji}>{group.emoji}</Text>
+                      <Text style={[styles.chipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{group.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[styles.chip, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+                  onPress={() => setShowSubcategories(!showSubcategories)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipText, { color: showSubcategories ? Colors.textOnAccent : Colors.textPrimary }]}>Voir +</Text>
+                  <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? Colors.textOnAccent : Colors.textPrimary} />
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* Subcategory list */}
+              {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
+                <View key={section.title} style={styles.subcategorySection}>
+                  <Text style={[styles.subcategorySectionTitle, { color: Colors.textTertiary }]}>{section.title}</Text>
+                  <View>
+                    {section.items.map((item, idx) => {
+                      const isSelected = selectedTags.includes(item.name);
+                      const isLast = idx === section.items.length - 1;
+                      return (
+                        <TouchableOpacity
+                          key={item.name}
+                          style={[styles.flatSubcatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }, isSelected && { backgroundColor: Colors.terracotta50 }]}
+                          onPress={() => toggleTag(item.name)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.flatSubcatEmoji}>{item.emoji}</Text>
+                          <View style={styles.flatSubcatTextCol}>
+                            <Text style={[styles.flatSubcatName, { color: Colors.textPrimary }]}>{item.name}</Text>
+                            {item.subtitle ? <Text style={[styles.flatSubcatSub, { color: Colors.textSecondary }]}>{item.subtitle}</Text> : null}
+                          </View>
+                          {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+
+              {/* Selected tags recap */}
+              {selectedTags.length > 0 && (
+                <View style={styles.selectedTagsWrap}>
+                  {selectedTags.map((tag) => (
+                    <TouchableOpacity key={tag} style={[styles.selectedTag, { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }]} onPress={() => toggleTag(tag)}>
+                      <Text style={[styles.selectedTagText, { color: Colors.terracotta700 }]}>{tag}</Text>
+                      <Ionicons name="close" size={14} color={Colors.primary} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          )}
+
+          {/* ─── Step 3 — Places ─── */}
+          {step === 3 && (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={!draggingId}
+            >
+              <Text style={styles.stepHint}>Au moins 1 lieu. Maintiens un lieu pour le réorganiser.</Text>
+
+              {places.length > 0 && (
+                <View style={[styles.placesList, { marginTop: 16 }]}>
+                  {places.map((place, index) => (
+                    <Animated.View
+                      key={place.id}
+                      style={[
+                        styles.placeCard,
+                        { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
+                        { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
+                        draggingId === place.id && {
+                          shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
+                          shadowRadius: 8, elevation: 8, borderColor: Colors.primary,
+                        },
+                        { zIndex: draggingId === place.id ? 100 : 1 },
+                      ]}
+                      {...getOrCreateDragHandlers(place.id).panHandlers}
+                    >
+                      <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={[styles.placeCardInner, { userSelect: 'none', cursor: draggingId === place.id ? 'grabbing' : 'default' } as any]}>
+                        <View style={[styles.placeNumber, { backgroundColor: Colors.primary }]}>
+                          <Text style={styles.placeNumberText}>{index + 1}</Text>
+                        </View>
+                        <View style={styles.placeInfo}>
+                          <Text style={[styles.placeName, { color: Colors.textPrimary }]} numberOfLines={1}>{place.name}</Text>
+                          <Text style={[styles.placeType, { color: Colors.textSecondary }]} numberOfLines={1}>{place.type}{place.address ? ` · ${place.address.split(',')[0]}` : ''}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="close-circle" size={20} color={Colors.textTertiary} />
+                        </TouchableOpacity>
+                      </Pressable>
+                    </Animated.View>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.addPlaceBtn, { backgroundColor: Colors.terracotta50, borderColor: Colors.terracotta400, marginTop: places.length > 0 ? 12 : 16 }]}
+                onPress={() => setShowPlacePicker(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                <Text style={[styles.addPlaceText, { color: Colors.primary }]}>Ajouter un lieu</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+
+          {/* ─── Step 4 — Launch (recap + transport) ─── */}
+          {step === 4 && (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.stepHint}>Choisis ton mode de transport et go !</Text>
+
+              {/* Recap card */}
+              <View style={[styles.recapCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+                <Text style={[styles.recapTitle, { color: Colors.textPrimary }]} numberOfLines={2}>{title}</Text>
+                <View style={styles.recapMeta}>
+                  <View style={styles.recapMetaItem}>
+                    <Ionicons name="location" size={14} color={Colors.primary} />
+                    <Text style={[styles.recapMetaText, { color: Colors.textSecondary }]}>{places.length} lieu{places.length > 1 ? 'x' : ''}</Text>
+                  </View>
+                  <View style={styles.recapSep} />
+                  <View style={styles.recapMetaItem}>
+                    <Ionicons name="pricetag" size={14} color={Colors.primary} />
+                    <Text style={[styles.recapMetaText, { color: Colors.textSecondary }]}>{selectedTags.length} catégorie{selectedTags.length > 1 ? 's' : ''}</Text>
+                  </View>
+                </View>
+
+                {/* Mini timeline preview */}
+                <View style={styles.miniTimelineRow}>
+                  {places.slice(0, 5).map((p, i) => (
+                    <React.Fragment key={p.id}>
+                      {i > 0 && <View style={[styles.miniTimelineDash, { backgroundColor: Colors.terracotta200 }]} />}
+                      <View style={[styles.miniTimelineDot, { backgroundColor: Colors.primary }]}>
+                        <Text style={styles.miniTimelineDotText}>{i + 1}</Text>
                       </View>
-                      {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : null}
+                    </React.Fragment>
+                  ))}
+                  {places.length > 5 && (
+                    <>
+                      <View style={[styles.miniTimelineDash, { backgroundColor: Colors.terracotta200 }]} />
+                      <Text style={[styles.miniTimelineMore, { color: Colors.textSecondary }]}>+{places.length - 5}</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+
+              {/* Transport picker */}
+              <Text style={[styles.filterRowLabel, { color: Colors.textTertiary, marginTop: 20 }]}>TON TRANSPORT</Text>
+              <View style={styles.transportGrid}>
+                {TRANSPORT_OPTIONS.map((t) => {
+                  const isActive = pickedTransport === t.key;
+                  return (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[
+                        styles.transportChip,
+                        {
+                          backgroundColor: isActive ? Colors.primary : Colors.bgSecondary,
+                          borderColor: isActive ? Colors.primary : Colors.borderSubtle,
+                        },
+                      ]}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickedTransport(t.key); }}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={styles.transportEmoji}>{t.emoji}</Text>
+                      <Text style={[styles.transportLabel, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{t.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </View>
-          ))}
 
-          {/* Selected tags display */}
-          {selectedTags.length > 0 && (
-            <View style={styles.selectedTagsWrap}>
-              {selectedTags.map((tag) => (
-                <TouchableOpacity key={tag} style={[styles.selectedTag, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]} onPress={() => toggleTag(tag)}>
-                  <Text style={[styles.selectedTagText, { color: Colors.primary }]}>{tag}</Text>
-                  <Ionicons name="close" size={14} color={Colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </View>
+              {pickedTransport && (
+                <Text style={[styles.launchHint, { color: Colors.textTertiary }]}>
+                  En lançant, ta session Do-It-Now démarre. Tu peux ensuite valider chaque lieu au fur et à mesure.
+                </Text>
+              )}
+            </ScrollView>
           )}
+        </View>
 
-          {/* ── Places ── */}
-          <Text style={[styles.sectionLabel, { color: C.gray800, marginTop: 20 }]}>Lieux</Text>
-          <Text style={[styles.sectionHint, { color: C.gray500 }]}>Ajoute les endroits que tu veux visiter</Text>
-
-          {places.length > 0 && (
-            <View style={styles.placesList}>
-              {places.map((place, index) => (
-                <Animated.View
-                  key={place.id}
-                  style={[
-                    styles.placeCard,
-                    { backgroundColor: C.gray200, borderColor: C.borderLight },
-                    { transform: [{ translateY: getDragY(place.id) }, { translateX: getDragX(place.id) }] },
-                    draggingId === place.id && {
-                      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18,
-                      shadowRadius: 8, elevation: 8, borderColor: C.primary,
-                    },
-                    { zIndex: draggingId === place.id ? 100 : 1 },
-                  ]}
-                  {...getOrCreateDragHandlers(place.id).panHandlers}
-                >
-                  <Pressable onLongPress={() => handleLongPressPlace(place.id)} delayLongPress={350} style={[styles.placeCardInner, { userSelect: 'none', cursor: draggingId === place.id ? 'grabbing' : 'default' } as any]}>
-                  <View style={[styles.placeNumber, { backgroundColor: C.primary }]}>
-                    <Text style={styles.placeNumberText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.placeInfo}>
-                    <Text style={[styles.placeName, { color: C.black }]} numberOfLines={1}>{place.name}</Text>
-                    <Text style={[styles.placeType, { color: C.gray600 }]} numberOfLines={1}>{place.type} · {place.address}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => removePlace(place.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={20} color={C.gray500} />
-                  </TouchableOpacity>
-                  </Pressable>
-                </Animated.View>
-              ))}
-            </View>
-          )}
-
+        {/* ═══════ Wizard footer ═══════ */}
+        <View style={[styles.wizardFooter, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity
-            style={[styles.addPlaceBtn, { backgroundColor: C.primary + '10', borderColor: C.primary + '30' }]}
-            onPress={() => setShowPlacePicker(true)}
-            activeOpacity={0.7}
+            style={[
+              styles.wizardPrimaryBtn,
+              canProceedFromStep(step) ? { backgroundColor: Colors.primary } : { backgroundColor: Colors.bgTertiary },
+            ]}
+            onPress={step === TOTAL_STEPS ? handleLaunch : goToNextStep}
+            disabled={!canProceedFromStep(step) || isLoading}
+            activeOpacity={0.85}
           >
-            <Ionicons name="add-circle-outline" size={18} color={C.primary} />
-            <Text style={[styles.addPlaceText, { color: C.primary }]}>Ajouter un lieu</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* ── Bottom CTA ── */}
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: C.white, borderTopColor: C.borderLight }]}>
-          <TouchableOpacity
-            style={[styles.launchBtn, { backgroundColor: canLaunch && !isLoading ? C.primary : C.gray300 }]}
-            onPress={handleLaunch}
-            activeOpacity={canLaunch ? 0.8 : 1}
-            disabled={!canLaunch || isLoading}
-          >
-            {isLoading ? (
+            {isLoading && step === TOTAL_STEPS ? (
               <ActivityIndicator color={Colors.textOnAccent} size="small" />
             ) : (
               <>
-                <Ionicons name="rocket-outline" size={18} color={canLaunch ? Colors.textOnAccent : C.gray500} />
-                <Text style={[styles.launchBtnText, { color: canLaunch ? Colors.textOnAccent : C.gray500 }]}>Lancer le plan</Text>
+                <Text style={[styles.wizardPrimaryBtnText, { color: canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary }]}>
+                  {nextLabels[step]}
+                </Text>
+                {step < TOTAL_STEPS ? (
+                  <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
+                ) : null}
               </>
             )}
           </TouchableOpacity>
@@ -684,18 +874,190 @@ export const OrganizeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Header
-  header: {
+  // ─────────────────────────────────────────────────────────────
+  // Wizard shell (header, progress, footer) — mirrors CreateScreen
+  // ─────────────────────────────────────────────────────────────
+  wizardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Layout.screenPadding,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
+    paddingBottom: 10,
+    gap: 8,
   },
-  headerTitle: { fontSize: 18, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
+  wizardHeaderSide: { width: 28, alignItems: 'flex-start' },
+  wizardHeaderCenter: { flex: 1, alignItems: 'center' },
+  wizardStepLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+  },
+  wizardStepTitle: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    marginTop: 2,
+    letterSpacing: -0.2,
+  },
+  wizardProgress: {
+    flexDirection: 'row',
+    paddingHorizontal: Layout.screenPadding,
+    gap: 4,
+    paddingBottom: 14,
+  },
+  wizardProgressSeg: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  stepWrap: { flex: 1 },
+  stepPad: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 8,
+  },
+  stepHint: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  wizardFooter: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgPrimary,
+  },
+  wizardPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
+  },
+  wizardPrimaryBtnText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+  },
 
-  // Scroll
+  // ─────────────────────────────────────────────────────────────
+  // Step 1 — title inspirations
+  // ─────────────────────────────────────────────────────────────
+  inspLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    marginBottom: 10,
+  },
+  inspWrap: { gap: 8 },
+  inspChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  inspEmoji: { fontSize: 18 },
+  inspText: { flex: 1, fontSize: 13.5, fontFamily: Fonts.body },
+
+  // ─────────────────────────────────────────────────────────────
+  // Step 4 — recap + transport
+  // ─────────────────────────────────────────────────────────────
+  recapCard: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  recapTitle: {
+    fontSize: 18,
+    fontFamily: Fonts.displaySemiBold,
+    letterSpacing: -0.3,
+    lineHeight: 22,
+  },
+  recapMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  recapMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  recapMetaText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+  },
+  recapSep: { width: 1, height: 12, backgroundColor: Colors.borderMedium },
+  miniTimelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 14,
+    flexWrap: 'wrap',
+  },
+  miniTimelineDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniTimelineDotText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+  },
+  miniTimelineDash: {
+    width: 14,
+    height: 2,
+    borderRadius: 1,
+  },
+  miniTimelineMore: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    marginLeft: 4,
+  },
+  transportGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  transportChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 99,
+    borderWidth: 1.5,
+    minWidth: '47%',
+    justifyContent: 'center',
+  },
+  transportEmoji: { fontSize: 17 },
+  transportLabel: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  launchHint: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 16,
+    paddingHorizontal: 16,
+    lineHeight: 17,
+  },
+
+  // Legacy (kept for place picker modal + pickup sheet)
   scroll: { flex: 1 },
   scrollContent: { padding: Layout.screenPadding },
 
