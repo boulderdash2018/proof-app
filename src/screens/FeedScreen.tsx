@@ -16,6 +16,7 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -127,6 +128,18 @@ export const FeedScreen: React.FC = () => {
   const friendsLayout = useRef({ x: 0, width: 0 });
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
+
+  // Header hide/show — slides up + fades out when a card enters detail mode.
+  const [headerH, setHeaderH] = useState(0);
+  const headerSlide = useRef(new Animated.Value(0)).current; // 0 = visible, 1 = hidden
+  useEffect(() => {
+    Animated.timing(headerSlide, {
+      toValue: isDetailOpen ? 1 : 0,
+      duration: 280,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [isDetailOpen]);
 
   // ── Status bar — dark on cream ────────────────────────────────
   useFocusEffect(useCallback(() => { StatusBar.setBarStyle('dark-content'); }, []));
@@ -403,8 +416,29 @@ export const FeedScreen: React.FC = () => {
   // ══════════════════════════════════════════════════════════════
   return (
     <View style={styles.container}>
-      {/* ─── Header (normal flow on cream bg) ─── */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      {/* ─── Header (normal flow on cream bg) — slides up & fades when in detail ─── */}
+      <Animated.View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h && h !== headerH) setHeaderH(h);
+        }}
+        style={[
+          styles.header,
+          { paddingTop: insets.top + 8 },
+          {
+            opacity: headerSlide.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+            transform: [
+              {
+                translateY: headerSlide.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -(headerH || 120)],
+                }),
+              },
+            ],
+          },
+        ]}
+        pointerEvents={isDetailOpen ? 'none' : 'auto'}
+      >
         <View style={styles.headerRow}>
           <Text style={styles.logo}>
             proof<Text style={{ color: Colors.primary }}>.</Text>
@@ -498,7 +532,7 @@ export const FeedScreen: React.FC = () => {
             style={[styles.tabIndicator, { left: tabIndicatorLeft, width: tabIndicatorWidth }]}
           />
         </View>
-      </View>
+      </Animated.View>
 
       {/* ─── FlatList area ─── */}
       <View style={styles.listArea} onLayout={(e) => setListH(e.nativeEvent.layout.height)}>
