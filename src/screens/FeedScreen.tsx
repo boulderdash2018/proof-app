@@ -99,6 +99,7 @@ export const FeedScreen: React.FC = () => {
   const [friendsFetched, setFriendsFetched] = useState(false);
   const [sharePlan, setSharePlan] = useState<Plan | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const flatListRef = useRef<FlatList<Plan>>(null);
 
   // ── Comment sheet ─────────────────────────────────────────────
@@ -129,17 +130,18 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
 
-  // Header hide/show — slides up + fades out when a card enters detail mode.
+  // Header hide/show — slides up + fades out as soon as the active card is pulled
+  // past a small threshold (independently from the detail commit, which happens later).
   const [headerH, setHeaderH] = useState(0);
   const headerSlide = useRef(new Animated.Value(0)).current; // 0 = visible, 1 = hidden
   useEffect(() => {
     Animated.timing(headerSlide, {
-      toValue: isDetailOpen ? 1 : 0,
-      duration: 280,
+      toValue: isHeaderHidden ? 1 : 0,
+      duration: 220,
       easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: true,
     }).start();
-  }, [isDetailOpen]);
+  }, [isHeaderHidden]);
 
   // ── Status bar — dark on cream ────────────────────────────────
   useFocusEffect(useCallback(() => { StatusBar.setBarStyle('dark-content'); }, []));
@@ -401,6 +403,7 @@ export const FeedScreen: React.FC = () => {
           if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
         }}
         onDetailStateChange={setIsDetailOpen}
+        onHeaderHideChange={setIsHeaderHidden}
         onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: item.id })}
         onComment={() => handleOpenComment(item)}
         onShare={() => handleShare(item)}
@@ -437,7 +440,7 @@ export const FeedScreen: React.FC = () => {
             ],
           },
         ]}
-        pointerEvents={isDetailOpen ? 'none' : 'auto'}
+        pointerEvents={isHeaderHidden ? 'none' : 'auto'}
       >
         <View style={styles.headerRow}>
           <Text style={styles.logo}>
@@ -535,7 +538,16 @@ export const FeedScreen: React.FC = () => {
       </Animated.View>
 
       {/* ─── FlatList area ─── */}
-      <View style={styles.listArea} onLayout={(e) => setListH(e.nativeEvent.layout.height)}>
+      <View
+        style={[
+          styles.listArea,
+          // On web, scrollEnabled={false} is not always honored by the native browser
+          // touch scroll. `touchAction: 'pan-y'` forces the browser to allow vertical
+          // pan only — blocking horizontal swipe between plans while in detail.
+          isDetailOpen && ({ touchAction: 'pan-y' } as any),
+        ]}
+        onLayout={(e) => setListH(e.nativeEvent.layout.height)}
+      >
         {listH === 0 ? null : currentLoading && currentPlans.length === 0 ? (
           <View style={styles.centeredWrap}>
             <LoadingSkeleton count={1} />

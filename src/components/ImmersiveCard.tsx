@@ -50,6 +50,7 @@ interface ImmersiveCardProps {
   onAuthorPress: () => void;
   onProfilePress: (userId: string) => void;
   onDetailStateChange: (isOpen: boolean) => void;
+  onHeaderHideChange?: (hide: boolean) => void;
   onPlacePress: (placeId: string) => void;
   onComment: () => void;
   onShare: () => void;
@@ -109,6 +110,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onAuthorPress,
   onProfilePress,
   onDetailStateChange,
+  onHeaderHideChange,
   onPlacePress,
   onComment,
   onShare,
@@ -127,6 +129,8 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const isDetailRef = useRef(false);
   const isCommitting = useRef(false);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const headerHiddenRef = useRef(false);
+  const HEADER_HIDE_THRESHOLD = 30; // px — past this, header starts its hide animation
 
   // ── Inline comments (fetched when detail opens) ─────────────
   const [inlineComments, setInlineComments] = useState<Comment[]>([]);
@@ -356,6 +360,10 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     setIsDetailOpen(false);
     isDetailRef.current = false;
     onDetailStateChange(false);
+    if (headerHiddenRef.current) {
+      headerHiddenRef.current = false;
+      onHeaderHideChange?.(false);
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     // Shrink frame back to classic feed size
@@ -370,7 +378,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     setTimeout(() => {
       isCommitting.current = false;
     }, 500);
-  }, [onDetailStateChange]);
+  }, [onDetailStateChange, onHeaderHideChange]);
 
   const handleScrollEndDrag = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -400,25 +408,38 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     [COMMIT_THRESHOLD, commitToDetail, bounceBack],
   );
 
-  // Continuous scroll listener — detect overscroll for return
+  // Continuous scroll listener — detect overscroll for return + early header hide
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const y = e.nativeEvent.contentOffset.y;
       if (isDetailRef.current && y < -75 && !isCommitting.current) {
         returnToFeed();
       }
+      // Toggle header visibility as soon as the user begins the pull
+      if (!isActive) return;
+      const shouldHide = y > HEADER_HIDE_THRESHOLD;
+      if (shouldHide !== headerHiddenRef.current) {
+        headerHiddenRef.current = shouldHide;
+        onHeaderHideChange?.(shouldHide);
+      }
     },
-    [returnToFeed],
+    [returnToFeed, isActive, onHeaderHideChange],
   );
 
   // Reset when card becomes inactive
   useEffect(() => {
-    if (!isActive && isDetailRef.current) {
-      setIsDetailOpen(false);
-      isDetailRef.current = false;
-      onDetailStateChange(false);
-      frameExtra.setValue(0);
-      (scrollRef.current as any)?.scrollTo({ y: 0, animated: false });
+    if (!isActive) {
+      if (headerHiddenRef.current) {
+        headerHiddenRef.current = false;
+        onHeaderHideChange?.(false);
+      }
+      if (isDetailRef.current) {
+        setIsDetailOpen(false);
+        isDetailRef.current = false;
+        onDetailStateChange(false);
+        frameExtra.setValue(0);
+        (scrollRef.current as any)?.scrollTo({ y: 0, animated: false });
+      }
     }
   }, [isActive]);
 
