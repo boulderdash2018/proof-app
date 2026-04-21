@@ -318,7 +318,7 @@ export const CreateScreen: React.FC = () => {
   const TIP_MAX_CHARS = 180;
   const canProceedFromStep = (s: Step): boolean => {
     if (s === 1) return title.trim().length > 0;
-    if (s === 2) return true; // photo optional — can skip
+    if (s === 2) return coverPhotos.length > 0; // cover photo is mandatory
     if (s === 3) return selectedTags.length > 0;
     if (s === 4) return places.length >= 2;
     if (s === 5) return authorTip.trim().length >= TIP_MIN_CHARS;
@@ -1195,7 +1195,7 @@ export const CreateScreen: React.FC = () => {
 
   const qualityLabel = qualityScore >= 100 ? 'Perfect plan' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
   const labelColor = qualityScore >= 100 ? Colors.primary : qualityScore >= 80 ? Colors.primaryDeep : qualityScore >= 56 ? Colors.primary : qualityScore >= 31 ? '#D4784A' : '#8A8078';
-  const canPublish = title.trim().length > 0 && selectedTags.length > 0 && places.length >= 2 && authorTip.trim().length >= TIP_MIN_CHARS;
+  const canPublish = title.trim().length > 0 && coverPhotos.length > 0 && selectedTags.length > 0 && places.length >= 2 && authorTip.trim().length >= TIP_MIN_CHARS;
 
   useEffect(() => {
     // Spring fill
@@ -1234,12 +1234,11 @@ export const CreateScreen: React.FC = () => {
   // Missing criteria for bottom sheet
   const missingCriteria = useMemo(() => {
     const list: { icon: string; text: string; pts: number }[] = [];
-    if (coverPhotos.length === 0) list.push({ icon: '\uD83D\uDCF8', text: 'Une photo de couverture', pts: 10 });
     if (!places.some((p) => p.customPhoto || p.comment || p.questionAnswer || (p.questions && p.questions.length > 0))) list.push({ icon: '\uD83D\uDCA1', text: 'Personnaliser un lieu', pts: 20 });
     if (!places.some((p) => p.price && parseInt(p.price, 10) > 0)) list.push({ icon: '\uD83D\uDCB0', text: 'Le budget', pts: 10 });
     if (!places.some((p) => p.duration && parseInt(p.duration, 10) > 0)) list.push({ icon: '\u23F1', text: 'La durée', pts: 10 });
     return list.filter((c) => c.pts >= 5).slice(0, 3);
-  }, [coverPhotos, places]);
+  }, [places]);
 
   const openPublishSheet = () => {
     setShowPublishSheet(true);
@@ -1352,9 +1351,10 @@ export const CreateScreen: React.FC = () => {
   };
 
   // ========== VALIDATION ==========
-  const validate = (): boolean => {
+  const validate = (): { ok: boolean; errors: Record<string, string> } => {
     const e: Record<string, string> = {};
     if (title.length < 5) e.title = t.create_error_title;
+    if (coverPhotos.length === 0) e.cover = 'Une photo de présentation est obligatoire';
     if (selectedTags.length === 0) e.tags = t.create_error_tags;
     if (places.length < 2) e.places = t.create_error_places;
 
@@ -1372,7 +1372,7 @@ export const CreateScreen: React.FC = () => {
 
     setErrors(e);
     if (Object.keys(e).length > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    return Object.keys(e).length === 0;
+    return { ok: Object.keys(e).length === 0, errors: e };
   };
 
   const doPublish = async () => {
@@ -1475,7 +1475,14 @@ export const CreateScreen: React.FC = () => {
   };
 
   const handlePublish = async () => {
-    if (!validate() || !user) return;
+    if (!user) return;
+    const { ok, errors: e } = validate();
+    if (!ok) {
+      // Surface the first error instead of failing silently.
+      const firstError = Object.values(e)[0] || t.create_error_publish;
+      Alert.alert(t.error, firstError);
+      return;
+    }
     setIsPublishing(true);
     setIsFlying(true);
 
@@ -2369,7 +2376,7 @@ export const CreateScreen: React.FC = () => {
               <Text style={styles.tlVisibilityEdit}>Modifier</Text>
             </TouchableOpacity>
           )}
-          {step < TOTAL_STEPS ? (
+          {step < TOTAL_STEPS && (
             <TouchableOpacity
               style={[
                 styles.wizardPrimaryBtn,
@@ -2392,7 +2399,13 @@ export const CreateScreen: React.FC = () => {
               </Text>
               <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
             </TouchableOpacity>
-          ) : (
+          )}
+          {step === 2 && coverPhotos.length === 0 && (
+            <Text style={{ fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginTop: 10, fontFamily: Fonts.body }}>
+              Une photo de présentation est obligatoire
+            </Text>
+          )}
+          {step >= TOTAL_STEPS && (
             <TouchableOpacity
               style={[
                 styles.wizardPrimaryBtn,
@@ -2846,7 +2859,7 @@ export const CreateScreen: React.FC = () => {
                   <TouchableOpacity style={[styles.sheetBtnOutline, { borderColor: Colors.primary }]} onPress={closePublishSheet} activeOpacity={0.7}>
                     <Text style={[styles.sheetBtnOutlineText, { color: Colors.primary }]}>Continuer</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: Colors.primary }]} onPress={() => { setShowPublishSheet(false); handlePublish(); }} activeOpacity={0.7}>
+                  <TouchableOpacity style={[styles.sheetBtnFill, { backgroundColor: Colors.primary }]} onPress={() => { closePublishSheet(); handlePublish(); }} activeOpacity={0.7}>
                     <Text style={styles.sheetBtnFillText}>Publier quand même</Text>
                   </TouchableOpacity>
                 </View>
