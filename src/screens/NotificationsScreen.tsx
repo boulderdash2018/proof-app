@@ -98,6 +98,87 @@ const groupByBucket = (notifs: Notification[]): NotifGroup[] => {
   return Object.values(buckets).filter((b) => b.rows.length + b.achievements.length > 0);
 };
 
+// ── Week recap widget data ──────────────────────────────────────────
+// Stats over 7 days: count of proof-its / likes / saves received.
+// Heatmap: per-day "save activity" weight. A `plan_saved` counts as 1,
+// a `new_proof_it` counts as 2 (engagement signal). Other notif types
+// don't contribute. Today's bucket lives at index 6 (rightmost bar).
+export interface WeekRecap {
+  proofs: number;
+  likes: number;
+  saves: number;
+  heatmap: number[]; // length 7, index 0 = oldest (6 days ago), index 6 = today
+  heatmapMax: number;
+  total: number;     // sum of stats — drives display condition
+}
+
+const MS_DAY = 24 * 60 * 60 * 1000;
+
+const computeWeekRecap = (notifications: Notification[], now: number = Date.now()): WeekRecap => {
+  const startOfToday = (() => {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+  // Day index 0 starts at startOfToday - 6*MS_DAY, day index 6 starts at startOfToday.
+  const dayIndexFor = (ts: number): number => {
+    const diff = startOfToday - ts;
+    if (diff <= 0) return 6; // today (or future, defensive)
+    const daysAgo = Math.floor(diff / MS_DAY);
+    if (daysAgo > 6) return -1;
+    return 6 - daysAgo - 1; // -1 because diff>0 means before today's start
+  };
+
+  const heatmap = Array(7).fill(0);
+  let proofs = 0;
+  let likes = 0;
+  let saves = 0;
+  const cutoff = now - 7 * MS_DAY;
+
+  for (const n of notifications) {
+    const ts = new Date(n.createdAt).getTime();
+    if (ts < cutoff) continue;
+
+    if (n.type === 'new_proof_it') proofs++;
+    else if (n.type === 'new_like') likes++;
+    else if (n.type === 'plan_saved') saves++;
+
+    // Heatmap weight — only saves & proof-its, proof-it weighs double.
+    const weight = n.type === 'new_proof_it' ? 2 : n.type === 'plan_saved' ? 1 : 0;
+    if (weight > 0) {
+      const idx = dayIndexFor(ts);
+      if (idx >= 0 && idx <= 6) heatmap[idx] += weight;
+    }
+  }
+
+  return {
+    proofs,
+    likes,
+    saves,
+    heatmap,
+    heatmapMax: Math.max(...heatmap, 1),
+    total: proofs + likes + saves,
+  };
+};
+
+// ── Stat cell for the weekly recap widget ──────────────────────────
+const RecapStat: React.FC<{ icon: keyof typeof Ionicons.glyphMap; value: number; label: string }> = ({ icon, value, label }) => (
+  <View style={recapStatStyles.cell}>
+    <View style={recapStatStyles.row}>
+      <Ionicons name={icon} size={14} color={Colors.terracotta600} />
+      <Text style={recapStatStyles.value}>{value}</Text>
+    </View>
+    <Text style={recapStatStyles.label}>{label}</Text>
+  </View>
+);
+
+const recapStatStyles = StyleSheet.create({
+  cell: { alignItems: 'flex-start' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6 } as any,
+  value: { fontSize: 17, fontFamily: Fonts.bodySemiBold, color: Colors.textPrimary, letterSpacing: -0.2 },
+  label: { fontSize: 10, fontFamily: Fonts.body, color: Colors.textTertiary, marginTop: 2, letterSpacing: 0.4 },
+});
+
 // ====================================================================
 //  FLAT LIST ITEM TYPES
 // ====================================================================
@@ -105,6 +186,7 @@ const groupByBucket = (notifs: Notification[]): NotifGroup[] => {
 type Item =
   | { kind: 'date'; key: string; date: Date; activity24h: number; mutationsLabel: string }
   | { kind: 'hero'; key: string; plan: Plan; stats: PlanTrendStats }
+  | { kind: 'weekRecap'; key: string; recap: WeekRecap }
   | { kind: 'sectionLabel'; key: string; label: string; count: number }
   | { kind: 'achievementsCard'; key: string; group: GroupKey; items: Notification[] }
   | { kind: 'row'; key: string; notif: Notification }
@@ -253,6 +335,13 @@ export const NotificationsScreen: React.FC = () => {
       items.push({ kind: 'hero', key: 'hero', plan: trending.plan, stats: trending.stats });
     }
 
+    // Weekly recap widget — only render if the user has *some* activity over
+    // the last 7 days. An empty widget would look broken; better to hide.
+    const recap = computeWeekRecap(notifications);
+    if (recap.total > 0) {
+      items.push({ kind: 'weekRecap', key: 'weekRecap', recap });
+    }
+
     const groups = groupByBucket(notifications);
     for (const g of groups) {
       const totalForLabel = g.rows.length + g.achievements.length;
@@ -328,6 +417,60 @@ export const NotificationsScreen: React.FC = () => {
       </View>
     );
   }, [handlePress]);
+
+  // ── Weekly recap widget — discrete card with stats + 7-day heatmap ──
+  // Layout: small caps label, then a single row split between three stat
+  // cells on the left and a vertical separator + heatmap on the right.
+  // Today's bar is accented; past days fade by intensity.
+  const renderWeekRecap = useCallback((recap: WeekRecap) => {
+    const todayIdx = 6;
+    return (
+      <View style={styles.recapCard}>
+        <Text style={styles.recapLabel}>Résumé · 7 derniers jours</Text>
+        <View style={styles.recapBody}>
+          <View style={styles.recapStats}>
+            <RecapStat icon="checkmark-done-outline" value={recap.proofs} label="proofs" />
+            <RecapStat icon="heart-outline" value={recap.likes} label="likes" />
+            <RecapStat icon="bookmark-outline" value={recap.saves} label="saves" />
+          </View>
+          <View style={styles.recapDivider} />
+          <View style={styles.recapHeatmap}>
+            <View style={styles.recapBars}>
+              {recap.heatmap.map((v, i) => {
+                const intensity = recap.heatmapMax > 0 ? v / recap.heatmapMax : 0;
+                const heightPx = 4 + intensity * 22; // 4–26 px
+                const isToday = i === todayIdx;
+                const opacity = v === 0 ? 0.18 : 0.45 + intensity * 0.55;
+                return (
+                  <View
+                    key={i}
+                    style={[
+                      styles.recapBar,
+                      { height: heightPx, opacity },
+                      isToday && styles.recapBarToday,
+                    ]}
+                  />
+                );
+              })}
+            </View>
+            <View style={styles.recapDayLabels}>
+              {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.recapDayLabel,
+                    i === todayIdx && styles.recapDayLabelToday,
+                  ]}
+                >
+                  {d}
+                </Text>
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }, []);
 
   const renderRow = useCallback((notif: Notification) => {
     const isUnread = !notif.read;
@@ -414,6 +557,8 @@ export const NotificationsScreen: React.FC = () => {
         );
       case 'hero':
         return renderHero(item.plan, item.stats);
+      case 'weekRecap':
+        return renderWeekRecap(item.recap);
       case 'sectionLabel':
         return (
           <View style={styles.sectionLabelRow}>
@@ -428,7 +573,7 @@ export const NotificationsScreen: React.FC = () => {
       case 'footer':
         return <Text style={styles.footer}>— fin du briefing —</Text>;
     }
-  }, [renderHero, renderAchievementsCard, renderRow]);
+  }, [renderHero, renderWeekRecap, renderAchievementsCard, renderRow]);
 
   // ====================================================================
   //  RENDER
@@ -550,6 +695,77 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 10,
+  },
+
+  // Weekly recap widget — discrete card sitting between hero and sections.
+  // Slight terracotta-tinted bg, generous padding, two-zone body.
+  recapCard: {
+    marginHorizontal: Layout.screenPadding,
+    marginTop: 12,
+    marginBottom: 4,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  recapLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 1.4,
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  recapBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  recapStats: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingRight: 14,
+    gap: 8,
+  } as any,
+  recapDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 36,
+    backgroundColor: Colors.borderMedium,
+  },
+  recapHeatmap: {
+    paddingLeft: 14,
+    alignItems: 'center',
+  },
+  recapBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 28,
+    gap: 4,
+  } as any,
+  recapBar: {
+    width: 8,
+    borderRadius: 2,
+    backgroundColor: Colors.primary,
+  },
+  recapBarToday: {
+    backgroundColor: Colors.primaryDeep,
+  },
+  recapDayLabels: {
+    flexDirection: 'row',
+    marginTop: 4,
+    gap: 4,
+  } as any,
+  recapDayLabel: {
+    width: 8,
+    fontSize: 8,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+  },
+  recapDayLabelToday: {
+    color: Colors.textPrimary,
+    fontFamily: Fonts.bodySemiBold,
   },
 
   // Section label row
