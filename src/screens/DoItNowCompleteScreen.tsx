@@ -22,6 +22,7 @@ import { useFeedStore, useSavesStore, useSavedPlacesStore } from '../store';
 import { saveSession, recordPlanCompletion } from '../services/doItNowService';
 import { submitPlaceReviews } from '../services/placeReviewService';
 import { SharePlanSheet } from '../components/SharePlanSheet';
+import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { Place } from '../types';
 
 // ── Format helpers ────────────────────────────────────────────
@@ -86,6 +87,7 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const [comments, setComments] = useState<Record<string, string>>({});
   const [commentOpenFor, setCommentOpenFor] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Hydrate from existing session rating/reviews (from DoItNowScreen inline review screen)
@@ -181,8 +183,9 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const savedEntry = savedPlans.find((sp) => sp.planId === plan.id);
   const isAlreadyProofed = !!savedEntry?.isDone && savedEntry.proofStatus === 'validated';
 
-  // "Fin" = submit reviews + Proof It (mark plan validated + bump count) + go back.
-  // Only fires once per plan — subsequent attempts short-circuit to the feed.
+  // "Fin" = submit reviews, then open the Proof It stamp ceremony modal.
+  // The actual markAsDone + proofCount bump happens in `handleProofConfirmed`
+  // after the user confirms the stamp. Enforces one-proof-per-plan.
   const handleFinalize = async () => {
     if (isSubmitting) return;
 
@@ -213,13 +216,24 @@ export const DoItNowCompleteScreen: React.FC = () => {
         }
       }
 
-      // Mark as done + validated (standard Proof action)
+      // Open the Proof It stamp ceremony. The visual "you did it" moment.
+      setShowProofModal(true);
+      setIsSubmitting(false);
+    } catch (err) {
+      console.error('[DoItNowComplete] submit error:', err);
+      setIsSubmitting(false);
+    }
+  };
+
+  // Called after the user taps "Proof. it ✓" inside the stamp modal.
+  // Does the actual proof business — one time only.
+  const handleProofConfirmed = () => {
+    try {
       const savesStore = useSavesStore.getState();
       const { toggleSave, savedPlanIds } = useFeedStore.getState();
       if (!savedPlanIds.has(plan.id)) toggleSave(plan.id);
       savesStore.markAsDone(plan.id, 'validated');
 
-      // Bump proof count in feed (only if not already proofed — double guard)
       useFeedStore.setState((state) => ({
         plans: state.plans.map((p) =>
           p.id === plan.id ? { ...p, proofCount: (p.proofCount ?? 0) + 1 } : p,
@@ -227,11 +241,11 @@ export const DoItNowCompleteScreen: React.FC = () => {
       }));
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setShowProofModal(false);
       clearSession();
       navigation.popToTop();
     } catch (err) {
-      console.error('[DoItNowComplete] submit error:', err);
-      setIsSubmitting(false);
+      console.error('[DoItNowComplete] proof confirm error:', err);
     }
   };
 
@@ -484,6 +498,16 @@ export const DoItNowCompleteScreen: React.FC = () => {
           planAuthorName={plan.author?.displayName || 'Créateur'}
         />
       )}
+
+      {/* Proof It stamp ceremony — opens on 'Fin' tap, plays the stamp animation,
+          and fires handleProofConfirmed when the user taps "Proof. it ✓". */}
+      <ProofSurveyModal
+        visible={showProofModal}
+        plan={plan}
+        onProof={handleProofConfirmed}
+        skipRating
+        source="do_it_now"
+      />
     </View>
   );
 };
