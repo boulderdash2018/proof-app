@@ -2,6 +2,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Plan } from '../types';
 import { EXPLORE_GROUPS } from '../constants/exploreCategories';
+import { fetchUserPlans } from './plansService';
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -158,4 +159,76 @@ export const computeTrendingCategories = async (city?: string): Promise<Trending
     console.error('[trendingService] computeTrendingCategories error:', err);
     return [];
   }
+};
+
+// ─── Plan-level trending (per-plan velocity) ────────────────
+//
+// Powers the "EN TENDANCE" hero on the notifications screen. Reads the
+// recentSaves[] timestamp log on each plan (maintained atomically in
+// plansService.savePlan) and computes a velocity score.
+
+const MIN_SAVES_24H = 3;
+const MS_24H = 24 * 60 * 60 * 1000;
+const MS_7D = 7 * MS_24H;
+
+export interface PlanTrendStats {
+  saves24h: number;
+  saves7d: number;
+  totalSaves: number;
+  score: number;
+}
+
+/**
+ *   acceleration = saves24h / max(0.5, saves7d / 7)   // pace vs baseline
+ *   mass         = log10(saves24h + 1)                // require min volume
+ *   recency      = 1 / (1 + days_since_posted / 14)   // half-decay ~2 weeks
+ *   score        = acceleration * mass * recency
+ *
+ * Returns null when below MIN_SAVES_24H — no false-positive trends on noise.
+ */
+export const computePlanTrendStats = (plan: Plan, now: number = Date.now()): PlanTrendStats | null => {
+  const ts = plan.recentSaves || [];
+  const saves24h = ts.filter((t) => now - t < MS_24H).length;
+  if (saves24h < MIN_SAVES_24H) return null;
+
+  const saves7d = ts.filter((t) => now - t < MS_7D).length;
+  const baseline = Math.max(0.5, saves7d / 7);
+  const acceleration = saves24h / baseline;
+  const mass = Math.log10(saves24h + 1);
+  const ageDays = Math.max(0, (now - new Date(plan.createdAt).getTime()) / MS_24H);
+  const recency = 1 / (1 + ageDays / 14);
+
+  return {
+    saves24h,
+    saves7d,
+    totalSaves: (plan.savedByIds || []).length,
+    score: acceleration * mass * recency,
+  };
+};
+
+/** User's most-trending plan over the last week (or null). */
+export const findUserTrendingPlan = async (
+  userId: string,
+): Promise<{ plan: Plan; stats: PlanTrendStats } | null> => {
+  const plans = await fetchUserPlans(userId);
+  let best: { plan: Plan; stats: PlanTrendStats } | null = null;
+  const now = Date.now();
+  for (const p of plans) {
+    const stats = computePlanTrendStats(p, now);
+    if (!stats) continue;
+    if (!best || stats.score > best.stats.score) best = { plan: p, stats };
+  }
+  return best;
+};
+
+/** Total recent saves across all plans authored by the user. */
+export const countAuthorActivity24h = async (userId: string): Promise<number> => {
+  const plans = await fetchUserPlans(userId);
+  const now = Date.now();
+  let total = 0;
+  for (const p of plans) {
+    const ts = p.recentSaves || [];
+    total += ts.filter((t) => now - t < MS_24H).length;
+  }
+  return total;
 };

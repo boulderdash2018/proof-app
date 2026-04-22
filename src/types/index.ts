@@ -118,6 +118,12 @@ export interface Plan {
   likedByIds?: string[];
   savedByIds?: string[];
   recreatedByIds?: string[];
+  /**
+   * Append-only log of save timestamps (ms epoch). Used for the trending
+   * algorithm — read-side pruning keeps memory bounded. Best-effort: on
+   * unsave we don't remove the timestamp (cheap noise, decays out within 7 days).
+   */
+  recentSaves?: number[];
 }
 
 export type BadgeId =

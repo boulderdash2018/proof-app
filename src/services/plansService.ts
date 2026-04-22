@@ -288,11 +288,16 @@ export const fetchSavedPlanIds = async (userId: string): Promise<Set<string>> =>
 
 /** Save a plan (to do) */
 export const savePlan = async (userId: string, planId: string, sender?: User, plan?: Plan): Promise<void> => {
+  const now = Date.now();
   await setDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), {
     isDone: false,
-    savedAt: new Date().toISOString(),
+    savedAt: new Date(now).toISOString(),
   });
-  await updateDoc(doc(db, PLANS, planId), { savedByIds: arrayUnion(userId) }).catch(() => {});
+  // recentSaves powers the trending algorithm — append the timestamp atomically.
+  await updateDoc(doc(db, PLANS, planId), {
+    savedByIds: arrayUnion(userId),
+    recentSaves: arrayUnion(now),
+  }).catch(() => {});
   if (sender && plan) notifySave(sender, plan).catch((e) => console.error('[notif trigger]', e));
 };
 

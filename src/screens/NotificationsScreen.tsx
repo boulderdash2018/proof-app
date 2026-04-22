@@ -11,69 +11,108 @@ import { Colors, Layout, Fonts } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useNotifStore, useAuthStore, useFriendsStore } from '../store';
 import { useColors } from '../hooks/useColors';
-import { Notification, NotificationType } from '../types';
+import { Notification, NotificationType, Plan } from '../types';
 import { getUserById, isFollowingUser } from '../services/friendsService';
+import {
+  findUserTrendingPlan,
+  countAuthorActivity24h,
+  type PlanTrendStats,
+} from '../services/trendingService';
 
-// ========== HELPERS ==========
-
-const NOTIF_ICONS: Partial<Record<NotificationType, { name: string; color: string }>> = {
-  new_like: { name: 'heart', color: '#E85D5D' },
-  new_follower: { name: 'person-add', color: '#5B9BB5' },
-  new_comment: { name: 'chatbubble', color: '#7BA06E' },
-  new_proof_it: { name: 'checkmark-circle', color: '#C9A84C' },
-  plan_saved: { name: 'bookmark', color: '#D4845A' },
-  plan_recreated: { name: 'copy', color: '#8B7BA0' },
-  mention: { name: 'at', color: '#5B9BB5' },
-  rank_up: { name: 'trophy', color: '#C9A84C' },
-  badge_unlocked: { name: 'ribbon', color: '#C9A84C' },
-  xp_milestone: { name: 'flash', color: '#D4845A' },
-  plan_trending: { name: 'trending-up', color: '#E85D5D' },
-  plan_milestone: { name: 'flag', color: '#C9A84C' },
-  first_in_city: { name: 'location', color: '#5B9BB5' },
-  friend_posted: { name: 'document-text', color: '#7BA06E' },
-  friend_completed: { name: 'checkmark-done', color: '#5B9BB5' },
-};
+// ====================================================================
+//  HELPERS — time formatting, classification, grouping
+// ====================================================================
 
 const formatTimeAgo = (dateStr: string): string => {
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diff = now - date;
+  const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
+  if (mins < 1) return "à l'instant";
+  if (mins < 60) return `il y a ${mins} min`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
+  if (hrs < 24) return `il y a ${hrs} h`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
+  if (days < 7) return `il y a ${days} j`;
   const weeks = Math.floor(days / 7);
-  return `${weeks}w`;
+  return `il y a ${weeks} sem`;
+};
+
+const formatDateHeadline = (d: Date): string => {
+  // « Mardi 21 avril »
+  const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const day = days[d.getDay()];
+  return `${day.charAt(0).toUpperCase()}${day.slice(1)} ${d.getDate()} ${months[d.getMonth()]}`.toUpperCase();
+};
+
+// Achievement notifs collapse into a single weekly card.
+const ACHIEVEMENT_TYPES: ReadonlySet<NotificationType> = new Set([
+  'rank_up',
+  'badge_unlocked',
+  'xp_milestone',
+  'plan_milestone',
+  'first_in_city',
+]);
+
+const ACHIEVEMENT_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
+  rank_up: { icon: 'trophy-outline', label: 'Nouveau rang' },
+  badge_unlocked: { icon: 'ribbon-outline', label: 'Badge débloqué' },
+  xp_milestone: { icon: 'flash-outline', label: 'Palier XP' },
+  plan_milestone: { icon: 'flag-outline', label: 'Cap franchi' },
+  first_in_city: { icon: 'location-outline', label: 'Premier sur la ville' },
+};
+
+type RowKind = 'social' | 'mention' | 'follow' | 'validation';
+const classifyRow = (type: NotificationType): RowKind => {
+  if (type === 'new_follower') return 'follow';
+  if (type === 'new_proof_it' || type === 'plan_recreated' || type === 'friend_completed') return 'validation';
+  if (type === 'mention') return 'mention';
+  return 'social';
 };
 
 type GroupKey = 'today' | 'week' | 'earlier';
-const groupNotifications = (notifs: Notification[]): { key: GroupKey; label: string; data: Notification[] }[] => {
+interface NotifGroup {
+  key: GroupKey;
+  label: string;
+  rows: Notification[];
+  achievements: Notification[];
+}
+
+const groupByBucket = (notifs: Notification[]): NotifGroup[] => {
   const now = Date.now();
-  const oneDayAgo = now - 86400000;
-  const oneWeekAgo = now - 604800000;
+  const oneDay = 24 * 60 * 60 * 1000;
+  const oneWeek = 7 * oneDay;
 
-  const today: Notification[] = [];
-  const week: Notification[] = [];
-  const earlier: Notification[] = [];
+  const buckets: Record<GroupKey, NotifGroup> = {
+    today: { key: 'today', label: "AUJOURD'HUI", rows: [], achievements: [] },
+    week: { key: 'week', label: 'CETTE SEMAINE', rows: [], achievements: [] },
+    earlier: { key: 'earlier', label: 'PLUS TÔT', rows: [], achievements: [] },
+  };
 
-  notifs.forEach((n) => {
-    const ts = new Date(n.createdAt).getTime();
-    if (ts >= oneDayAgo) today.push(n);
-    else if (ts >= oneWeekAgo) week.push(n);
-    else earlier.push(n);
-  });
+  for (const n of notifs) {
+    const age = now - new Date(n.createdAt).getTime();
+    const bucket = age < oneDay ? buckets.today : age < oneWeek ? buckets.week : buckets.earlier;
+    if (ACHIEVEMENT_TYPES.has(n.type)) bucket.achievements.push(n);
+    else bucket.rows.push(n);
+  }
 
-  const groups: { key: GroupKey; label: string; data: Notification[] }[] = [];
-  if (today.length > 0) groups.push({ key: 'today', label: 'TODAY', data: today });
-  if (week.length > 0) groups.push({ key: 'week', label: 'THIS WEEK', data: week });
-  if (earlier.length > 0) groups.push({ key: 'earlier', label: 'EARLIER', data: earlier });
-  return groups;
+  return Object.values(buckets).filter((b) => b.rows.length + b.achievements.length > 0);
 };
 
-// ========== COMPONENT ==========
+// ====================================================================
+//  FLAT LIST ITEM TYPES
+// ====================================================================
+
+type Item =
+  | { kind: 'date'; key: string; date: Date; activity24h: number; mutationsLabel: string }
+  | { kind: 'hero'; key: string; plan: Plan; stats: PlanTrendStats }
+  | { kind: 'sectionLabel'; key: string; label: string; count: number }
+  | { kind: 'achievementsCard'; key: string; group: GroupKey; items: Notification[] }
+  | { kind: 'row'; key: string; notif: Notification }
+  | { kind: 'footer'; key: string };
+
+// ====================================================================
+//  COMPONENT
+// ====================================================================
 
 export const NotificationsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -81,23 +120,33 @@ export const NotificationsScreen: React.FC = () => {
   const C = useColors();
   const user = useAuthStore((s) => s.user);
   const {
-    notifications, unreadCount, isLoading, hasMore,
+    notifications, isLoading,
     fetchNotifications, loadMore, markAllRead, markRead, subscribe,
   } = useNotifStore();
-
   const follow = useFriendsStore((s) => s.follow);
 
-  // Fade-out animation for mark all read
-  const fadeAnims = useRef<Record<string, Animated.Value>>({}).current;
+  // Trending hero data
+  const [trending, setTrending] = useState<{ plan: Plan; stats: PlanTrendStats } | null>(null);
+  const [activity24h, setActivity24h] = useState<number>(0);
 
+  // Subscribe to live notifications
   useEffect(() => {
-    if (user?.id) {
-      subscribe(user.id);
-      fetchNotifications(user.id);
-    }
+    if (!user?.id) return;
+    subscribe(user.id);
+    fetchNotifications(user.id);
   }, [user?.id]);
 
-  // ── Follow-back status for new_follower notifs ──
+  // Compute trending + activity counts (refresh whenever notifications change,
+  // since a new notif likely means the underlying plan stats changed too)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    findUserTrendingPlan(user.id).then((t) => { if (!cancelled) setTrending(t); });
+    countAuthorActivity24h(user.id).then((c) => { if (!cancelled) setActivity24h(c); });
+    return () => { cancelled = true; };
+  }, [user?.id, notifications.length]);
+
+  // Follow-back tracking for new_follower rows
   const [followStatus, setFollowStatus] = useState<Record<string, 'loading' | 'following' | 'not_following'>>({});
   const checkedFollowRef = useRef<Set<string>>(new Set());
 
@@ -106,15 +155,12 @@ export const NotificationsScreen: React.FC = () => {
     const followerNotifs = notifications.filter((n) => n.type === 'new_follower' && n.senderId);
     const toCheck = followerNotifs.filter((n) => !checkedFollowRef.current.has(n.senderId));
     if (toCheck.length === 0) return;
-
     toCheck.forEach((n) => checkedFollowRef.current.add(n.senderId));
-    // Set loading for unchecked ones
     setFollowStatus((prev) => {
       const next = { ...prev };
       toCheck.forEach((n) => { if (!next[n.senderId]) next[n.senderId] = 'loading'; });
       return next;
     });
-
     Promise.all(
       toCheck.map(async (n) => {
         try {
@@ -145,10 +191,9 @@ export const NotificationsScreen: React.FC = () => {
     }
   }, [user?.id, follow]);
 
-  // Fetch sender avatarUrl live from Firestore (works for old + new notifs)
+  // Live avatar URLs (Firestore lookups for senders we haven't cached)
   const [senderAvatars, setSenderAvatars] = useState<Record<string, string | null>>({});
   const fetchedIdsRef = useRef<Set<string>>(new Set());
-
   useEffect(() => {
     const ids = [...new Set(notifications.map((n) => n.senderId))].filter(
       (id) => id && !fetchedIdsRef.current.has(id),
@@ -173,161 +218,251 @@ export const NotificationsScreen: React.FC = () => {
     });
   }, [notifications]);
 
-  // Ensure anim values exist for each notification
-  notifications.forEach((n) => {
-    if (!fadeAnims[n.id]) fadeAnims[n.id] = new Animated.Value(1);
-  });
+  // ── Mark all read with subtle fade ──
+  const fadeAnims = useRef<Record<string, Animated.Value>>({}).current;
+  notifications.forEach((n) => { if (!fadeAnims[n.id]) fadeAnims[n.id] = new Animated.Value(1); });
 
   const handleMarkAllRead = useCallback(() => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Animate unread dots/bg fading out
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     const anims = unreadIds.map((id) =>
-      Animated.timing(fadeAnims[id] || new Animated.Value(1), { toValue: 0, duration: 300, useNativeDriver: true })
+      Animated.timing(fadeAnims[id] || new Animated.Value(1), { toValue: 0, duration: 240, useNativeDriver: true }),
     );
-    Animated.stagger(30, anims).start(() => {
+    Animated.stagger(20, anims).start(() => {
       markAllRead(user.id);
-      // Reset anims
       unreadIds.forEach((id) => { if (fadeAnims[id]) fadeAnims[id].setValue(1); });
     });
   }, [notifications, user]);
 
   const handlePress = useCallback((notif: Notification) => {
     markRead(notif.id);
-    // Plan notifs → PlanDetail, follower notifs → OtherProfile
-    if (notif.planId) {
-      navigation.navigate('PlanDetail', { planId: notif.planId });
-    } else if (notif.type === 'new_follower') {
-      navigation.navigate('OtherProfile', { userId: notif.senderId });
+    if (notif.planId) navigation.navigate('PlanDetail', { planId: notif.planId });
+    else if (notif.type === 'new_follower') navigation.navigate('OtherProfile', { userId: notif.senderId });
+  }, [markRead, navigation]);
+
+  // ── Build flat data for the FlatList ──
+  const flatData = useMemo<Item[]>(() => {
+    const items: Item[] = [];
+    const today = new Date();
+    const mutationsLabel =
+      activity24h === 0 ? 'Calme aujourd\u2019hui' : activity24h === 1 ? '1 mouvement aujourd\u2019hui' : `${activity24h} mouvements aujourd\u2019hui`;
+    items.push({ kind: 'date', key: 'date', date: today, activity24h, mutationsLabel });
+
+    if (trending) {
+      items.push({ kind: 'hero', key: 'hero', plan: trending.plan, stats: trending.stats });
     }
-  }, []);
 
-  const handleEndReached = useCallback(() => {
-    if (user?.id) loadMore(user.id);
-  }, [user?.id]);
+    const groups = groupByBucket(notifications);
+    for (const g of groups) {
+      const totalForLabel = g.rows.length + g.achievements.length;
+      items.push({ kind: 'sectionLabel', key: `lbl-${g.key}`, label: g.label, count: totalForLabel });
+      if (g.achievements.length > 0) {
+        items.push({ kind: 'achievementsCard', key: `ach-${g.key}`, group: g.key, items: g.achievements });
+      }
+      for (const n of g.rows) {
+        items.push({ kind: 'row', key: n.id, notif: n });
+      }
+    }
 
-  const groups = useMemo(() => groupNotifications(notifications), [notifications]);
-
-  // Flatten into sections for FlatList
-  const flatData = useMemo(() => {
-    const items: ({ type: 'header'; label: string; key: string } | { type: 'notif'; data: Notification; key: string })[] = [];
-    groups.forEach((g) => {
-      items.push({ type: 'header', label: g.label, key: `header-${g.key}` });
-      g.data.forEach((n) => items.push({ type: 'notif', data: n, key: n.id }));
-    });
+    if (notifications.length > 0) items.push({ kind: 'footer', key: 'footer' });
     return items;
-  }, [groups]);
+  }, [notifications, trending, activity24h]);
 
-  const renderItem = useCallback(({ item }: { item: typeof flatData[number] }) => {
-    if (item.type === 'header') {
-      return (
-        <Text style={[styles.sectionHeader, { color: C.textTertiary }]}>{item.label}</Text>
-      );
-    }
+  // ====================================================================
+  //  RENDER HELPERS
+  // ====================================================================
 
-    const notif = item.data;
-    const icon = NOTIF_ICONS[notif.type] || { name: 'notifications', color: C.textTertiary };
-    const isUnread = !notif.read;
-    const fadeAnim = fadeAnims[notif.id] || new Animated.Value(1);
-
+  const renderHero = useCallback((plan: Plan, stats: PlanTrendStats) => {
+    const cover = plan.coverPhotos?.[0] || plan.places?.find((p) => p.photoUrls?.length)?.photoUrls?.[0];
     return (
       <TouchableOpacity
-        style={[styles.notifRow, isUnread && { backgroundColor: C.unreadBg }]}
-        onPress={() => handlePress(notif)}
-        activeOpacity={0.7}
+        style={styles.heroCard}
+        onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}
+        activeOpacity={0.85}
       >
-        {/* Unread dot */}
-        {isUnread && (
-          <Animated.View style={[styles.unreadDot, { backgroundColor: C.primary, opacity: fadeAnim }]} />
-        )}
-
-        {/* Avatar */}
-        {notif.senderInitials ? (
-          <Avatar
-            initials={notif.senderInitials}
-            bg={notif.senderAvatar}
-            color={notif.senderAvatarColor}
-            size="M"
-            avatarUrl={senderAvatars[notif.senderId] ?? notif.senderAvatarUrl ?? undefined}
-          />
-        ) : (
-          <View style={[styles.iconCircle, { backgroundColor: icon.color + '20' }]}>
-            <Ionicons name={icon.name as any} size={18} color={icon.color} />
+        <View style={styles.heroBody}>
+          <View style={styles.heroTagRow}>
+            <Ionicons name="trending-up" size={14} color={Colors.primary} />
+            <Text style={styles.heroTagText}>EN TENDANCE</Text>
           </View>
-        )}
-
-        {/* Content */}
-        <View style={styles.notifContent}>
-          <Text style={[styles.notifText, { color: C.textPrimary }]} numberOfLines={2}>
-            <Text style={styles.notifBold}>{notif.senderUsername} </Text>
-            {notif.content.replace(notif.senderUsername + ' ', '')}
+          <Text style={styles.heroTitle} numberOfLines={2}>{plan.title}</Text>
+          <Text style={styles.heroMeta}>
+            <Text style={styles.heroMetaAccent}>+{stats.saves24h}</Text>
+            {' '}sauvegardes en 24 h
           </Text>
-          <Text style={[styles.notifTime, { color: C.textTertiary }]}>{formatTimeAgo(notif.createdAt)}</Text>
         </View>
-
-        {/* Follow-back button for new_follower notifs */}
-        {notif.type === 'new_follower' && (() => {
-          const status = followStatus[notif.senderId];
-          if (status === 'loading') return <ActivityIndicator size="small" color={C.primary} style={{ width: 110 }} />;
-          if (status === 'following') return (
-            <View style={[styles.followBtn, styles.followBtnFollowing, { borderColor: C.borderMedium }]}>
-              <Text style={[styles.followBtnText, { color: C.textSecondary }]}>Suivi(e)</Text>
-            </View>
-          );
-          if (status === 'not_following') return (
-            <TouchableOpacity
-              style={[styles.followBtn, styles.followBtnFollow, { backgroundColor: Colors.primary }]}
-              onPress={() => handleFollowBack(notif.senderId)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.followBtnText, { color: Colors.textOnAccent }]}>Suivre en retour</Text>
-            </TouchableOpacity>
-          );
-          return null;
-        })()}
-
-        {/* Plan cover thumbnail */}
-        {notif.type !== 'new_follower' && notif.planCover && (
-          <Image source={{ uri: notif.planCover }} style={styles.planThumb} />
+        {cover ? (
+          <Image source={{ uri: cover }} style={styles.heroThumb} />
+        ) : (
+          <View style={[styles.heroThumb, { backgroundColor: Colors.terracotta100 }]} />
         )}
       </TouchableOpacity>
     );
-  }, [C, handlePress, senderAvatars, followStatus, handleFollowBack]);
+  }, [navigation]);
 
+  const renderAchievementsCard = useCallback((group: GroupKey, items: Notification[]) => {
+    const title = group === 'today' ? "Tes progrès aujourd'hui" : group === 'week' ? 'Tes progrès cette semaine' : 'Tes progrès passés';
+    return (
+      <View style={styles.achCard}>
+        <Text style={styles.achTitle}>{title}</Text>
+        <View style={styles.achList}>
+          {items.slice(0, 5).map((n, idx) => {
+            const meta = ACHIEVEMENT_META[n.type] || { icon: 'sparkles-outline' as const, label: 'Étape' };
+            return (
+              <TouchableOpacity
+                key={n.id}
+                style={[styles.achRow, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle }]}
+                onPress={() => handlePress(n)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={meta.icon} size={16} color={Colors.terracotta700} style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.achLabel}>{meta.label}</Text>
+                  <Text style={styles.achContent} numberOfLines={1}>{n.content}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }, [handlePress]);
+
+  const renderRow = useCallback((notif: Notification) => {
+    const isUnread = !notif.read;
+    const fadeAnim = fadeAnims[notif.id] || new Animated.Value(1);
+    const kind = classifyRow(notif.type);
+    const time = formatTimeAgo(notif.createdAt);
+    const avatarUrl = senderAvatars[notif.senderId] ?? notif.senderAvatarUrl ?? undefined;
+
+    let cta: React.ReactNode = null;
+    if (kind === 'follow') {
+      const status = followStatus[notif.senderId];
+      if (status === 'loading') cta = <ActivityIndicator size="small" color={Colors.primary} style={{ width: 90 }} />;
+      else if (status === 'following') {
+        cta = (
+          <View style={[styles.ctaPill, styles.ctaPillGhost]}>
+            <Text style={styles.ctaPillGhostText}>Suivi</Text>
+          </View>
+        );
+      } else if (status === 'not_following') {
+        cta = (
+          <TouchableOpacity
+            style={[styles.ctaPill, styles.ctaPillFilled]}
+            onPress={() => handleFollowBack(notif.senderId)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.ctaPillFilledText}>Suivre</Text>
+          </TouchableOpacity>
+        );
+      }
+    } else if (kind === 'validation') {
+      cta = (
+        <View style={[styles.ctaPill, styles.ctaPillGhost]}>
+          <Text style={styles.ctaPillGhostText}>Voir</Text>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => handlePress(notif)}
+        activeOpacity={0.7}
+      >
+        {isUnread && (
+          <Animated.View style={[styles.unreadDot, { opacity: fadeAnim }]} />
+        )}
+        <View style={styles.rowAvatar}>
+          {notif.senderInitials ? (
+            <Avatar
+              initials={notif.senderInitials}
+              bg={notif.senderAvatar}
+              color={notif.senderAvatarColor}
+              size="SS"
+              avatarUrl={avatarUrl}
+            />
+          ) : (
+            <View style={styles.iconAvatar}>
+              <Ionicons name="notifications-outline" size={14} color={Colors.terracotta700} />
+            </View>
+          )}
+        </View>
+        <View style={styles.rowContent}>
+          <Text style={styles.rowText} numberOfLines={2}>
+            <Text style={styles.rowActor}>{notif.senderUsername}</Text>
+            <Text style={styles.rowAction}>
+              {' '}{notif.content.replace(notif.senderUsername + ' ', '')}
+            </Text>
+          </Text>
+          <Text style={styles.rowTime}>{time}</Text>
+        </View>
+        {cta}
+      </TouchableOpacity>
+    );
+  }, [fadeAnims, senderAvatars, followStatus, handleFollowBack, handlePress]);
+
+  const renderItem = useCallback(({ item }: { item: Item }) => {
+    switch (item.kind) {
+      case 'date':
+        return (
+          <View style={styles.dateBlock}>
+            <Text style={styles.dateLabel}>{formatDateHeadline(item.date)}</Text>
+            <Text style={styles.dateHeadline}>{item.mutationsLabel}.</Text>
+          </View>
+        );
+      case 'hero':
+        return renderHero(item.plan, item.stats);
+      case 'sectionLabel':
+        return (
+          <View style={styles.sectionLabelRow}>
+            <Text style={styles.sectionLabel}>{item.label}</Text>
+            <Text style={styles.sectionCount}>{item.count}</Text>
+          </View>
+        );
+      case 'achievementsCard':
+        return renderAchievementsCard(item.group, item.items);
+      case 'row':
+        return renderRow(item.notif);
+      case 'footer':
+        return <Text style={styles.footer}>— fin du briefing —</Text>;
+    }
+  }, [renderHero, renderAchievementsCard, renderRow]);
+
+  // ====================================================================
+  //  RENDER
+  // ====================================================================
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.bgPrimary }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
       <StatusBar barStyle="dark-content" />
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.borderMedium }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={C.textPrimary} />
+          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Notifications</Text>
+        <Text style={styles.headerTitle}>Activité</Text>
         <TouchableOpacity onPress={handleMarkAllRead}>
-          <Text style={[styles.markAll, { color: C.primary }]}>Mark all as read</Text>
+          <Text style={styles.markAll}>Tout lire</Text>
         </TouchableOpacity>
       </View>
 
-      {/* List */}
       <FlatList
         data={flatData}
         renderItem={renderItem}
         keyExtractor={(item) => item.key}
-        extraData={senderAvatars}
         contentContainerStyle={styles.list}
-        onEndReached={handleEndReached}
+        onEndReached={() => user?.id && loadMore(user.id)}
         onEndReachedThreshold={0.3}
         ListEmptyComponent={
           isLoading ? (
-            <View style={styles.loadingWrap}><ActivityIndicator color={C.primary} /></View>
+            <View style={styles.loadingWrap}><ActivityIndicator color={Colors.primary} /></View>
           ) : (
-            <EmptyState icon="🔔" title="Nothing yet" subtitle="Go post a plan and see what happens 👀" />
+            <EmptyState icon="📭" title="Calme plat" subtitle="Poste un plan, observe l'écho." />
           )
         }
         ListFooterComponent={
           isLoading && notifications.length > 0 ? (
-            <ActivityIndicator color={C.primary} style={{ paddingVertical: 20 }} />
+            <ActivityIndicator color={Colors.primary} style={{ paddingVertical: 20 }} />
           ) : null
         }
       />
@@ -335,50 +470,205 @@ export const NotificationsScreen: React.FC = () => {
   );
 };
 
-// ========== STYLES ==========
-
+// ====================================================================
+//  STYLES
+// ====================================================================
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Layout.screenPadding, paddingVertical: 12, borderBottomWidth: 1,
+    paddingHorizontal: Layout.screenPadding, paddingVertical: 12,
   },
-  backBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.displaySemiBold },
-  markAll: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
-  list: { paddingBottom: 40 },
+  backBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 20, fontFamily: Fonts.displaySemiBold, color: Colors.textPrimary, letterSpacing: -0.2 },
+  markAll: { fontSize: 13, fontFamily: Fonts.bodySemiBold, color: Colors.primary },
+  list: { paddingBottom: 60 },
   loadingWrap: { paddingTop: 60, alignItems: 'center' },
 
-  // Section header
-  sectionHeader: {
-    fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase',
-    letterSpacing: 0.8, paddingHorizontal: Layout.screenPadding,
-    paddingTop: 18, paddingBottom: 8,
+  // Date block
+  dateBlock: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 18,
+    paddingBottom: 14,
+  },
+  dateLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 1.4,
+    color: Colors.textTertiary,
+    marginBottom: 6,
+  },
+  dateHeadline: {
+    fontSize: 26,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.4,
+    lineHeight: 32,
   },
 
-  // Notification row
-  notifRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Layout.screenPadding, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle,
+  // Hero — En tendance
+  heroCard: {
+    marginHorizontal: Layout.screenPadding,
+    marginBottom: 8,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroBody: { flex: 1 },
+  heroTagRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginBottom: 6,
+  },
+  heroTagText: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 1.2,
+    color: Colors.primary,
+  },
+  heroTitle: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  heroMeta: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+  },
+  heroMetaAccent: {
+    fontFamily: Fonts.displaySemiBold,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  heroThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+  },
+
+  // Section label row
+  sectionLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 22,
+    paddingBottom: 10,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 1.4,
+    color: Colors.textTertiary,
+  },
+  sectionCount: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+  },
+
+  // Achievements card (consolidated)
+  achCard: {
+    marginHorizontal: Layout.screenPadding,
+    marginBottom: 6,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  achTitle: {
+    fontSize: 16,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  achList: {},
+  achRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  achLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.6,
+    color: Colors.terracotta700,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  achContent: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    lineHeight: 17,
+  },
+
+  // Compact row
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Layout.screenPadding,
+    paddingVertical: 11,
     gap: 12,
   },
   unreadDot: {
-    position: 'absolute', left: 6, width: 6, height: 6, borderRadius: 3,
+    position: 'absolute',
+    left: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
   },
-  iconCircle: {
-    width: 40, height: 40, borderRadius: 20,
+  rowAvatar: { width: 36, height: 36 },
+  iconAvatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.terracotta100,
     alignItems: 'center', justifyContent: 'center',
   },
-  notifContent: { flex: 1 },
-  notifText: { fontSize: 13, fontFamily: Fonts.body, lineHeight: 18 },
-  notifBold: { fontFamily: Fonts.bodySemiBold },
-  notifTime: { fontSize: 11, fontFamily: Fonts.body, marginTop: 3 },
-  planThumb: { width: 44, height: 44, borderRadius: 8 },
+  rowContent: { flex: 1 },
+  rowText: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+  },
+  rowActor: { fontFamily: Fonts.bodySemiBold },
+  rowAction: { color: Colors.textPrimary },
+  rowTime: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 2,
+  },
 
-  // Follow-back buttons
-  followBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  followBtnFollow: {},
-  followBtnFollowing: { borderWidth: 1 },
-  followBtnText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
+  // Inline CTA pills
+  ctaPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaPillFilled: { backgroundColor: Colors.primary },
+  ctaPillFilledText: { fontSize: 12, fontFamily: Fonts.bodySemiBold, color: Colors.textOnAccent },
+  ctaPillGhost: { borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderMedium },
+  ctaPillGhostText: { fontSize: 12, fontFamily: Fonts.bodySemiBold, color: Colors.textSecondary },
+
+  // Footer
+  footer: {
+    fontSize: 12,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 28,
+    marginBottom: 12,
+  },
 });
