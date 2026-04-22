@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -56,9 +56,6 @@ interface ImmersiveCardProps {
   onShare: () => void;
   onDoItNow: () => void;
   onMapPress: () => void;
-  /** Horizontal scroll position of the parent FlatList — drives card focus animation. */
-  feedScrollX?: Animated.Value;
-  feedIndex?: number;
 }
 
 // ── Transport helpers (same as PlanDetailModal) ─────────────
@@ -119,8 +116,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onShare,
   onDoItNow,
   onMapPress,
-  feedScrollX,
-  feedIndex,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
   const cardH = Math.max(1, height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H);
@@ -458,30 +453,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d4 = makeDetailAnim(4);
   const d5 = makeDetailAnim(5);
 
-  // ── Feed-level focus animation (drives by parent FlatList scrollX) ──
-  // Card scales/dims slightly when off-center so the focused one feels primary.
-  // Wrapped in a separate native-driver Animated.View to avoid mixing drivers
-  // with `animatedFrameHeight` (JS-driven for layout height).
-  const focusScale = useMemo(() => {
-    if (!feedScrollX || feedIndex == null || width <= 0) return null;
-    const center = feedIndex * width;
-    return feedScrollX.interpolate({
-      inputRange: [center - width, center, center + width],
-      outputRange: [0.94, 1, 0.94],
-      extrapolate: 'clamp',
-    });
-  }, [feedScrollX, feedIndex, width]);
-  const focusOpacity = useMemo(() => {
-    if (!feedScrollX || feedIndex == null || width <= 0) return null;
-    const center = feedIndex * width;
-    return feedScrollX.interpolate({
-      inputRange: [center - width, center, center + width],
-      outputRange: [0.7, 1, 0.7],
-      extrapolate: 'clamp',
-    });
-  }, [feedScrollX, feedIndex, width]);
-
-  const frame = (
+  return (
     <Animated.View style={[styles.frame, { width, height: animatedFrameHeight }]}>
       {/* ── Card container ── */}
       {/* Explicit height so the card stays put (same image area) when the frame grows */}
@@ -1061,13 +1033,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         </Animated.ScrollView>
       </View>
 
-    </Animated.View>
-  );
-
-  if (!focusScale || !focusOpacity) return frame;
-  return (
-    <Animated.View style={{ transform: [{ scale: focusScale }], opacity: focusOpacity }}>
-      {frame}
     </Animated.View>
   );
 };
