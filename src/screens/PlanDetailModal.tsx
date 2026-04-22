@@ -111,10 +111,18 @@ export const PlanDetailModal: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(plan?.likesCount ?? 0);
   const [localCommentsCount, setLocalCommentsCount] = useState(plan?.commentsCount ?? 0);
+  const [localProofCount, setLocalProofCount] = useState(plan?.proofCount ?? 0);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
   const savedPlan = savedPlans.find((sp) => sp.planId === planId);
-  const isDone = savedPlan?.isDone ?? false;
+  const isDoneLocal = savedPlan?.isDone ?? false;
+  // Belt-and-suspenders : aussi vérifier côté serveur via recreatedByIds
+  // (synchro plan.recreatedByIds via feedStore). Si l'user a déjà proofé
+  // ce plan dans une autre session, recreatedByIds le reflète même quand
+  // savedPlans local n'a pas encore été hydraté par fetchSaves.
+  const isProofedByUser =
+    !!currentUser && !!plan?.recreatedByIds?.includes(currentUser.id);
+  const isDone = isDoneLocal || isProofedByUser;
   const [showProofSurvey, setShowProofSurvey] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
@@ -306,6 +314,7 @@ export const PlanDetailModal: React.FC = () => {
     if (feedPlan) {
       setLocalLikesCount(feedPlan.likesCount);
       setLocalCommentsCount(feedPlan.commentsCount);
+      setLocalProofCount(feedPlan.proofCount ?? 0);
     }
   }, [feedPlans, planId]);
 
@@ -316,6 +325,7 @@ export const PlanDetailModal: React.FC = () => {
           setPlan(result);
           setLocalLikesCount(result.likesCount);
           setLocalCommentsCount(result.commentsCount);
+          setLocalProofCount(result.proofCount ?? 0);
         }
       });
     }
@@ -786,22 +796,21 @@ export const PlanDetailModal: React.FC = () => {
           <Text style={[st.reservationLegend, { color: Colors.textSecondary }]}>﹡ Reservation recommended</Text>
         )}
 
-        {/* ===== SOCIAL PROOF ===== */}
-        {((plan.proofCount ?? 0) > 0 || (plan.declinedCount ?? 0) > 0) && (
-          <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
-            <MiniStampIcon type="proof" size={18} />
-            <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
-              {plan.proofCount ?? 0} {(plan.proofCount ?? 0) === 1 ? 'personne l\'a' : 'personnes l\'ont'} vérifié sur Proof.
-            </Text>
-            {(plan.declinedCount ?? 0) > 0 && (
-              <>
-                <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
-                <MiniStampIcon type="declined" size={18} />
-                <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
-              </>
-            )}
-          </View>
-        )}
+        {/* ===== SOCIAL PROOF ===== Always visible so the user can see the count update live after proofing */}
+        <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+          <MiniStampIcon type="proof" size={18} />
+          <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
+            {localProofCount} {localProofCount === 1 ? "personne l'a" : "personnes l'ont"} vérifié sur Proof.
+            {isProofedByUser ? '  (toi inclus ✓)' : ''}
+          </Text>
+          {(plan.declinedCount ?? 0) > 0 && (
+            <>
+              <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
+              <MiniStampIcon type="declined" size={18} />
+              <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
+            </>
+          )}
+        </View>
 
         {/* ===== SIMILAR PLANS ===== */}
         {similarPlans.length > 0 && (

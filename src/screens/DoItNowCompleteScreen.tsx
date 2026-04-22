@@ -276,12 +276,21 @@ export const DoItNowCompleteScreen: React.FC = () => {
       // À ce stade l'entrée existe forcément, donc le map() dans markAsDone va la muter.
       useSavesStore.getState().markAsDone(plan.id, 'validated');
 
-      // Step 3 — Optimistic bump du proofCount dans le feed pour feedback immédiat.
-      // markPlanAsDone va aussi bumper côté Firestore → reconciliation au prochain fetch.
+      // Step 3 — Optimistic bump du proofCount + ajout au recreatedByIds pour
+      // que les écrans liés (PlanDetail) voient immédiatement l'user dans les
+      // proofers et lockent le bouton 'Do it now'.
       useFeedStore.setState((state) => ({
-        plans: state.plans.map((p) =>
-          p.id === plan.id ? { ...p, proofCount: (p.proofCount ?? 0) + 1 } : p,
-        ),
+        plans: state.plans.map((p) => {
+          if (p.id !== plan.id) return p;
+          const alreadyInList = (p.recreatedByIds ?? []).includes(currentUser.id);
+          return {
+            ...p,
+            proofCount: alreadyInList ? (p.proofCount ?? 0) : (p.proofCount ?? 0) + 1,
+            recreatedByIds: alreadyInList
+              ? p.recreatedByIds
+              : [...(p.recreatedByIds ?? []), currentUser.id],
+          };
+        }),
       }));
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
