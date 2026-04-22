@@ -190,6 +190,22 @@ export const PlanDetailModal: React.FC = () => {
     });
   }, [plan?.id, plan?.likedByIds?.length]);
 
+  // Fetch proofer profiles (users who validated this plan via Do-It-Now).
+  // Same pattern than likers — uses socialProofStore as user cache.
+  const [prooferUsers, setProoferUsers] = useState<MinimalUser[]>([]);
+  useEffect(() => {
+    if (!plan || !plan.recreatedByIds || plan.recreatedByIds.length === 0) {
+      setProoferUsers([]);
+      return;
+    }
+    useSocialProofStore.getState().ensureUsers(plan.recreatedByIds).then(() => {
+      const users = plan.recreatedByIds!
+        .map((id) => useSocialProofStore.getState().getUser(id))
+        .filter(Boolean) as MinimalUser[];
+      setProoferUsers(users);
+    });
+  }, [plan?.id, plan?.recreatedByIds?.length]);
+
   // Redesign state
   const [showCommentSheet, setShowCommentSheet] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -798,17 +814,56 @@ export const PlanDetailModal: React.FC = () => {
 
         {/* ===== SOCIAL PROOF ===== Always visible so the user can see the count update live after proofing */}
         <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
-          <MiniStampIcon type="proof" size={18} />
-          <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
-            {localProofCount} {localProofCount === 1 ? "personne l'a" : "personnes l'ont"} vérifié sur Proof.
-            {isProofedByUser ? '  (toi inclus ✓)' : ''}
-          </Text>
-          {(plan.declinedCount ?? 0) > 0 && (
-            <>
-              <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
-              <MiniStampIcon type="declined" size={18} />
-              <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
-            </>
+          <View style={st.socialProofTop}>
+            <MiniStampIcon type="proof" size={18} />
+            <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
+              {localProofCount} {localProofCount === 1 ? "personne l'a" : "personnes l'ont"} vérifié sur Proof.
+              {isProofedByUser ? '  (toi inclus ✓)' : ''}
+            </Text>
+            {(plan.declinedCount ?? 0) > 0 && (
+              <>
+                <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
+                <MiniStampIcon type="declined" size={18} />
+                <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
+              </>
+            )}
+          </View>
+          {/* Avatars empilés + texte "Marie, Paul et N autres ont fait ce plan" */}
+          {prooferUsers.length > 0 && (
+            <View style={st.proofersRow}>
+              <View style={st.proofersAvatarsStack}>
+                {prooferUsers.slice(0, 3).map((u, i) => (
+                  <View
+                    key={u.id}
+                    style={[
+                      st.proofersAvatarWrap,
+                      {
+                        marginLeft: i === 0 ? 0 : -10,
+                        zIndex: 3 - i,
+                        borderColor: Colors.bgSecondary,
+                      },
+                    ]}
+                  >
+                    <Avatar
+                      initials={u.initials}
+                      bg={u.avatarBg}
+                      color={u.avatarColor}
+                      size="XS"
+                      avatarUrl={u.avatarUrl || undefined}
+                    />
+                  </View>
+                ))}
+              </View>
+              <Text style={[st.proofersText, { color: Colors.textSecondary }]} numberOfLines={2}>
+                {(() => {
+                  const names = prooferUsers.slice(0, 2).map((u) => u.displayName.split(' ')[0]);
+                  const remaining = prooferUsers.length - 2;
+                  if (prooferUsers.length === 1) return `${names[0]} a fait ce plan`;
+                  if (prooferUsers.length === 2) return `${names[0]} et ${names[1]} ont fait ce plan`;
+                  return `${names[0]}, ${names[1]} et ${remaining} autre${remaining > 1 ? 's' : ''} ont fait ce plan`;
+                })()}
+              </Text>
+            </View>
           )}
         </View>
 
@@ -1165,10 +1220,15 @@ const st = StyleSheet.create({
   travelDot: { width: 3, height: 3, borderRadius: 1.5 },
 
   // Social proof
-  socialProof: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 20, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
-  socialProofText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  socialProof: { marginHorizontal: 16, marginTop: 20, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
+  socialProofTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  socialProofText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, flex: 1 },
   socialDot: { width: 3, height: 3, borderRadius: 1.5 },
   socialDeclined: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  proofersRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(44, 36, 32, 0.08)' },
+  proofersAvatarsStack: { flexDirection: 'row', alignItems: 'center' },
+  proofersAvatarWrap: { borderRadius: 99, borderWidth: 2 },
+  proofersText: { flex: 1, fontSize: 12, fontFamily: Fonts.body, lineHeight: 16 },
 
   // Similar plans
   similarScroll: { paddingHorizontal: 16, gap: 12, paddingBottom: 8 },

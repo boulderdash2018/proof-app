@@ -11,11 +11,13 @@ import {
   getDoc,
   arrayUnion,
   arrayRemove,
+  increment,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Plan, Place, User, SavedPlan, Comment, CategoryTag, TransportMode, TravelSegment } from '../types';
 import { notifyLike, notifyComment, notifySave, notifyProofIt, notifyMention, resolveMentionedUsers } from './notificationsService';
 import { extractMentions } from '../utils/mentions';
+import { trackEvent } from './posthogConfig';
 
 const PLANS = 'plans';
 const SAVED_PLANS = 'savedPlans';
@@ -330,7 +332,11 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
   if (proofStatus) data.proofStatus = proofStatus;
   await setDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data, { merge: true });
 
-  // Handle unique proof vote per user per plan
+  // Handle unique proof vote per user per plan.
+  //
+  // ATOMIQUE — utilise increment() Firestore côté serveur, plus de race
+  // condition possible. Si 100 users votent en parallèle, les compteurs
+  // convergent exactement au bon total sans getDoc + updateDoc lock step.
   if (proofStatus) {
     try {
       const voteRef = doc(db, `${PLANS}/${planId}/proofVotes`, userId);
@@ -339,34 +345,36 @@ export const markPlanAsDone = async (userId: string, planId: string, proofStatus
 
       if (voteSnap.exists()) {
         const existingStatus = voteSnap.data().status;
-        if (existingStatus === proofStatus) return; // Same vote, no change
-        // Changed vote: swap counts
-        const planSnap = await getDoc(planRef);
-        if (planSnap.exists()) {
-          const pd = planSnap.data();
-          const oldField = existingStatus === 'validated' ? 'proofCount' : 'declinedCount';
-          const newField = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
-          await updateDoc(planRef, {
-            [oldField]: Math.max(0, (pd[oldField] || 0) - 1),
-            [newField]: (pd[newField] || 0) + 1,
-          });
-        }
+        if (existingStatus === proofStatus) return; // same vote, rien à faire
+
+        // Vote changé (validated ↔ declined) : on décrémente l'ancien et incrémente le nouveau
+        const oldField = existingStatus === 'validated' ? 'proofCount' : 'declinedCount';
+        const newField = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
+        await updateDoc(planRef, {
+          [oldField]: increment(-1),
+          [newField]: increment(1),
+        });
       } else {
-        // New vote: increment
-        const planSnap = await getDoc(planRef);
-        if (planSnap.exists()) {
-          const pd = planSnap.data();
-          const field = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
-          await updateDoc(planRef, { [field]: (pd[field] || 0) + 1 });
-        }
+        // Nouveau vote : incrémente directement le bon compteur
+        const field = proofStatus === 'validated' ? 'proofCount' : 'declinedCount';
+        await updateDoc(planRef, { [field]: increment(1) });
       }
-      // Save/update the vote record
+
+      // Enregistre le vote (doc en place → empêche le double-compte au prochain appel)
       await setDoc(voteRef, { status: proofStatus, votedAt: new Date().toISOString() });
-      // Track in recreatedByIds
+
+      // Track dans recreatedByIds (arrayUnion = idempotent, pas de doublon)
       if (proofStatus === 'validated') {
         await updateDoc(planRef, { recreatedByIds: arrayUnion(userId) }).catch(() => {});
+
+        // PostHog event — signature exacte demandée dans la spec
+        trackEvent('proof_it_stamped', {
+          plan_id: planId,
+          plan_creator_id: plan?.authorId ?? 'unknown',
+        });
       }
-      // Notify plan author on validated proof
+
+      // Notifie le créateur du plan (uniquement sur validated)
       if (proofStatus === 'validated' && sender && plan) {
         notifyProofIt(sender, plan).catch((e) => console.error('[notif trigger]', e));
       }

@@ -371,6 +371,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             <Ionicons name="chatbubble-outline" size={20} color={C.gray600} />
             <Text style={[styles.actionCount, { color: C.gray700 }]}>{plan.commentsCount}</Text>
           </TouchableOpacity>
+          {(plan.proofCount ?? 0) > 0 && (
+            <View style={styles.actionButton}>
+              <MiniStampIcon type="proof" size={16} />
+              <Text style={[styles.actionCount, { color: C.primary }]}>{plan.proofCount}</Text>
+            </View>
+          )}
           <TouchableOpacity style={styles.actionButton} onPress={handleSavePress} activeOpacity={0.7}>
             <View style={styles.saveIconWrap}>
               <Animated.View pointerEvents="none" style={[styles.saveFlash, { backgroundColor: C.primary, opacity: saveFlashOpacity }]} />

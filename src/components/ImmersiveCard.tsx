@@ -18,6 +18,7 @@ import { Platform } from 'react-native';
 import { Colors, Fonts, getRankForProofs } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
+import { MiniStampIcon } from './MiniStampIcon';
 import { Plan, TravelSegment, TransportMode, Comment, Place } from '../types';
 import { fetchComments } from '../services/plansService';
 import { useSavedPlacesStore } from '../store';
@@ -533,10 +534,20 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 containerStyle={styles.avatarsInline}
               />
 
-              {plan.tags?.length > 0 && (
-                <Text style={styles.categoryLabel}>
-                  {plan.tags[0].toUpperCase()}
-                </Text>
+              {(plan.tags?.length > 0 || (plan.proofCount ?? 0) > 0) && (
+                <View style={styles.metaRow}>
+                  {plan.tags?.length > 0 && (
+                    <Text style={styles.categoryLabel}>
+                      {plan.tags[0].toUpperCase()}
+                    </Text>
+                  )}
+                  {(plan.proofCount ?? 0) > 0 && (
+                    <View style={styles.proofBadgePill}>
+                      <MiniStampIcon type="proof" size={11} />
+                      <Text style={styles.proofBadgeCount}>{plan.proofCount}</Text>
+                    </View>
+                  )}
+                </View>
               )}
 
               {/* Title — NOT tappable (swipe is the only entry) */}
@@ -1099,7 +1110,29 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodySemiBold,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 1.5,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 4,
+  },
+  proofBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 99,
+    backgroundColor: 'rgba(196, 112, 75, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 112, 75, 0.4)',
+  },
+  proofBadgeCount: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyBold,
+    color: '#FFF',
+    letterSpacing: 0.3,
   },
   planTitle: {
     fontSize: 22,
