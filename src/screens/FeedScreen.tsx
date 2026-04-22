@@ -63,6 +63,11 @@ const getCommentTimeAgo = (dateStr: string): string => {
    IMMERSIVE FEED — Creme-style rounded card, horizontal swipe
    ================================================================ */
 
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
+
+// Auto-refresh on focus if the feed hasn't been fetched in this many ms.
+const FEED_STALE_MS = 5 * 60 * 1000;
+
 export const FeedScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -125,10 +130,43 @@ export const FeedScreen: React.FC = () => {
   // ── Animations ─────────────────────────────────────────────────
   const tabIndicatorLeft = useRef(new Animated.Value(0)).current;
   const tabIndicatorWidth = useRef(new Animated.Value(0)).current;
+  // Horizontal scroll position of the FlatList — drives per-card focus animation.
+  const feedScrollX = useRef(new Animated.Value(0)).current;
   const recoLayout = useRef({ x: 0, width: 0 });
   const friendsLayout = useRef({ x: 0, width: 0 });
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
+
+  // ── Refresh ─────────────────────────────────────────────────
+  // Tap on the "proof." logo refreshes the active feed (Twitter pattern).
+  // A focus check also auto-refreshes when the screen has been stale for > FEED_STALE_MS.
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const lastFetchedAtRef = useRef<Record<FeedTab, number>>({ reco: Date.now(), friends: 0 });
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (activeTab === 'reco') await fetchFeed(cityConfig.name);
+      else await fetchFriendsFeed(cityConfig.name);
+      lastFetchedAtRef.current[activeTab] = Date.now();
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      setCurrentIndex(0);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, activeTab, cityConfig.name, fetchFeed, fetchFriendsFeed]);
+
+  // Auto-refresh on focus when stale
+  useFocusEffect(
+    useCallback(() => {
+      const last = lastFetchedAtRef.current[activeTab] || 0;
+      if (Date.now() - last > FEED_STALE_MS) {
+        handleRefresh();
+      }
+    }, [activeTab, handleRefresh]),
+  );
 
   // Header hide/show — slides up + fades out as soon as the active card is pulled
   // past a small threshold (independently from the detail commit, which happens later).
@@ -179,15 +217,22 @@ export const FeedScreen: React.FC = () => {
         Animated.spring(tabIndicatorLeft, { toValue: target.x, useNativeDriver: false, friction: 8, tension: 80 }),
         Animated.spring(tabIndicatorWidth, { toValue: target.width, useNativeDriver: false, friction: 8, tension: 80 }),
       ]).start();
+      // Restore the saved scroll position for the destination tab so we don't
+      // jump back to the first card every time the user toggles between feeds.
+      const savedIdx = useFeedStore.getState().lastIndex[tab] ?? 0;
       setActiveTab(tab);
-      setCurrentIndex(0);
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      setCurrentIndex(savedIdx);
+      // Force the next restore pass to re-run after the data swap.
+      hasRestoredScrollRef.current = false;
+      // Snap immediately to avoid the brief flash at offset 0 during data swap.
+      flatListRef.current?.scrollToOffset({ offset: savedIdx * SCREEN_W, animated: false });
+      feedScrollX.setValue(savedIdx * SCREEN_W);
       if (tab === 'friends' && !friendsFetched) {
         fetchFriendsFeed(cityConfig.name);
         setFriendsFetched(true);
       }
     },
-    [activeTab, isGuest, friendsFetched, cityConfig.name],
+    [activeTab, isGuest, friendsFetched, cityConfig.name, feedScrollX],
   );
 
   // ── Auth guard ────────────────────────────────────────────────
@@ -409,9 +454,11 @@ export const FeedScreen: React.FC = () => {
         onShare={() => handleShare(item)}
         onDoItNow={() => handleDoItNow(item)}
         onMapPress={() => handleMapPress(item)}
+        feedScrollX={feedScrollX}
+        feedIndex={index}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress, feedScrollX],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -443,9 +490,16 @@ export const FeedScreen: React.FC = () => {
         pointerEvents={isHeaderHidden ? 'none' : 'auto'}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.logo}>
-            proof<Text style={{ color: Colors.primary }}>.</Text>
-          </Text>
+          <TouchableOpacity onPress={handleRefresh} activeOpacity={0.6} accessibilityLabel="Rafraîchir le feed">
+            <View style={styles.logoWrap}>
+              <Text style={styles.logo}>
+                proof<Text style={{ color: Colors.primary }}>.</Text>
+              </Text>
+              {isRefreshing && (
+                <ActivityIndicator size="small" color={Colors.primary} style={styles.logoSpinner} />
+              )}
+            </View>
+          </TouchableOpacity>
           <View style={styles.headerIcons}>
             {isGuest ? (
               <TouchableOpacity
@@ -574,19 +628,19 @@ export const FeedScreen: React.FC = () => {
             />
           </View>
         ) : (
-          <FlatList
+          <AnimatedFlatList
             ref={flatListRef}
             horizontal
             pagingEnabled
             scrollEnabled={!isDetailOpen}
             data={currentPlans}
             renderItem={renderItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item: Plan) => item.id}
             showsHorizontalScrollIndicator={false}
             windowSize={3}
             initialNumToRender={1}
             maxToRenderPerBatch={2}
-            getItemLayout={(_, index) => ({
+            getItemLayout={(_: any, index: number) => ({
               length: SCREEN_W,
               offset: SCREEN_W * index,
               index,
@@ -594,6 +648,11 @@ export const FeedScreen: React.FC = () => {
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             decelerationRate="fast"
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: feedScrollX } } }],
+              { useNativeDriver: true },
+            )}
           />
         )}
       </View>
@@ -824,6 +883,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 6,
   },
+  logoWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 } as any,
+  logoSpinner: { transform: [{ scale: 0.7 }] },
   logo: {
     fontSize: 30,
     fontFamily: Fonts.logo,
