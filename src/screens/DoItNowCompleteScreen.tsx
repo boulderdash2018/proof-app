@@ -20,7 +20,9 @@ import { useDoItNowStore } from '../store/doItNowStore';
 import { useAuthStore } from '../store/authStore';
 import { useFeedStore, useSavesStore, useSavedPlacesStore } from '../store';
 import { saveSession, recordPlanCompletion } from '../services/doItNowService';
+import { savePlan as savePlanFS } from '../services/plansService';
 import { submitPlaceReviews } from '../services/placeReviewService';
+import { SavedPlan } from '../types';
 import { SharePlanSheet } from '../components/SharePlanSheet';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
 import { Place } from '../types';
@@ -227,13 +229,55 @@ export const DoItNowCompleteScreen: React.FC = () => {
 
   // Called after the user taps "Proof. it ✓" inside the stamp modal.
   // Does the actual proof business — one time only.
-  const handleProofConfirmed = () => {
+  //
+  // IMPORTANT : savesStore.markAsDone ne crée pas l'entrée si elle n'existe
+  // pas (elle ne fait que muter les entrées présentes). Si le plan n'a jamais
+  // été saved avant, il faut d'abord garantir qu'une entrée locale existe +
+  // qu'elle est persistée en Firestore, sinon la proof n'est pas enregistrée
+  // et l'user peut re-proof indéfiniment.
+  const handleProofConfirmed = async () => {
     try {
-      const savesStore = useSavesStore.getState();
-      const { toggleSave, savedPlanIds } = useFeedStore.getState();
-      if (!savedPlanIds.has(plan.id)) toggleSave(plan.id);
-      savesStore.markAsDone(plan.id, 'validated');
+      if (!currentUser) {
+        console.warn('[DoItNowComplete] no current user, skipping proof');
+        setShowProofModal(false);
+        navigation.popToTop();
+        return;
+      }
 
+      const savesState = useSavesStore.getState();
+      const feedState = useFeedStore.getState();
+      const existingEntry = savesState.savedPlans.find((sp) => sp.planId === plan.id);
+
+      // Step 1 — Garantir l'existence d'une entrée saved (local + Firestore).
+      if (!existingEntry) {
+        // Local state — ajoute l'entrée avec isDone=false (on bascule à true juste après).
+        const entry: SavedPlan = {
+          planId: plan.id,
+          plan,
+          isDone: false,
+          savedAt: new Date().toISOString(),
+        };
+        useSavesStore.setState((state) => ({
+          savedPlans: [entry, ...state.savedPlans],
+        }));
+        // Aligne aussi le savedPlanIds du feedStore (même source de vérité pour le bookmark).
+        const newSet = new Set(feedState.savedPlanIds);
+        newSet.add(plan.id);
+        useFeedStore.setState({ savedPlanIds: newSet });
+        // Persist en Firestore — AWAIT pour éviter la race avec markPlanAsDone qui vient après.
+        try {
+          await savePlanFS(currentUser.id, plan.id, currentUser, plan);
+        } catch (err) {
+          console.error('[DoItNowComplete] savePlan FS failed:', err);
+        }
+      }
+
+      // Step 2 — Marque le plan comme done + validated (local state + Firestore via markPlanAsDone).
+      // À ce stade l'entrée existe forcément, donc le map() dans markAsDone va la muter.
+      useSavesStore.getState().markAsDone(plan.id, 'validated');
+
+      // Step 3 — Optimistic bump du proofCount dans le feed pour feedback immédiat.
+      // markPlanAsDone va aussi bumper côté Firestore → reconciliation au prochain fetch.
       useFeedStore.setState((state) => ({
         plans: state.plans.map((p) =>
           p.id === plan.id ? { ...p, proofCount: (p.proofCount ?? 0) + 1 } : p,
@@ -246,6 +290,7 @@ export const DoItNowCompleteScreen: React.FC = () => {
       navigation.popToTop();
     } catch (err) {
       console.error('[DoItNowComplete] proof confirm error:', err);
+      setShowProofModal(false);
     }
   };
 
