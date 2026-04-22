@@ -78,6 +78,9 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const savePlace = useSavedPlacesStore((s) => s.savePlace);
   const unsavePlace = useSavedPlacesStore((s) => s.unsavePlace);
 
+  // Saved plans — used to enforce one-proof-per-plan
+  const savedPlans = useSavesStore((s) => s.savedPlans);
+
   // Inline review state (per place): rating + comment, keyed by placeId
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -172,9 +175,24 @@ export const DoItNowCompleteScreen: React.FC = () => {
     navigation.replace('PlanDetail', { planId: plan.id });
   };
 
-  // "Retour" = submit reviews + mark plan validated + go back to feed
-  const handleReturn = async () => {
+  // Already-proofed guard : a plan can only be Proof-It'd once.
+  // When a saved entry exists with isDone + proofStatus='validated', the user
+  // has already proofed this plan in a previous session.
+  const savedEntry = savedPlans.find((sp) => sp.planId === plan.id);
+  const isAlreadyProofed = !!savedEntry?.isDone && savedEntry.proofStatus === 'validated';
+
+  // "Fin" = submit reviews + Proof It (mark plan validated + bump count) + go back.
+  // Only fires once per plan — subsequent attempts short-circuit to the feed.
+  const handleFinalize = async () => {
     if (isSubmitting) return;
+
+    // Already proofed in a past session → just go back without re-submitting.
+    if (isAlreadyProofed) {
+      clearSession();
+      navigation.popToTop();
+      return;
+    }
+
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
@@ -201,7 +219,7 @@ export const DoItNowCompleteScreen: React.FC = () => {
       if (!savedPlanIds.has(plan.id)) toggleSave(plan.id);
       savesStore.markAsDone(plan.id, 'validated');
 
-      // Bump proof count in feed
+      // Bump proof count in feed (only if not already proofed — double guard)
       useFeedStore.setState((state) => ({
         plans: state.plans.map((p) =>
           p.id === plan.id ? { ...p, proofCount: (p.proofCount ?? 0) + 1 } : p,
@@ -430,13 +448,28 @@ export const DoItNowCompleteScreen: React.FC = () => {
           <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Refaire</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: Colors.primary, opacity: isSubmitting ? 0.7 : 1 }]}
-          onPress={handleReturn}
+          style={[
+            styles.primaryBtn,
+            {
+              backgroundColor: isAlreadyProofed ? Colors.bgTertiary : Colors.primary,
+              opacity: isSubmitting ? 0.7 : 1,
+            },
+          ]}
+          onPress={handleFinalize}
           activeOpacity={0.85}
           disabled={isSubmitting}
         >
-          <Text style={styles.primaryBtnText}>Retour</Text>
-          <Ionicons name="sparkles" size={14} color={Colors.textOnAccent} />
+          {isAlreadyProofed ? (
+            <>
+              <Ionicons name="checkmark-circle" size={14} color={Colors.textSecondary} />
+              <Text style={[styles.primaryBtnText, { color: Colors.textSecondary }]}>Déjà validé</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.primaryBtnText}>Fin</Text>
+              <Ionicons name="sparkles" size={14} color={Colors.textOnAccent} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
 
