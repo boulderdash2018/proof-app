@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   Dimensions,
   Platform,
@@ -19,9 +20,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Layout } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useDoItNowStore } from '../store/doItNowStore';
+import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { getDirections, decodePolyline, RouteResult } from '../services/directionsService';
 import { Plan, DoItNowTransport } from '../types';
 import { useCity } from '../hooks/useCity';
+
+// Quick-word chips shown on the editorial review screen.
+const QUICK_WORDS: { key: string; label: string }[] = [
+  { key: 'ambiance',    label: 'Ambiance ✨' },
+  { key: 'service',     label: 'Service' },
+  { key: 'qp',          label: 'Bon rapport qualité-prix' },
+  { key: 'intimiste',   label: 'Intimiste' },
+  { key: 'revenir',     label: 'À revenir' },
+  { key: 'insta',       label: 'Instagrammable' },
+  { key: 'insolite',    label: 'Insolite' },
+];
+
+const RATING_LABELS: Record<number, string> = {
+  1: 'Décevant',
+  2: 'Moyen',
+  3: 'Correct',
+  4: 'Top',
+  5: 'Inoubliable',
+};
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -91,11 +112,19 @@ export const DoItNowScreen: React.FC = () => {
   const [placeMode, setPlaceMode] = useState<PlaceModeState | null>(null);
   const [loading, setLoading] = useState(true);
   const [arrivedMessage, setArrivedMessage] = useState<string | null>(null);
+  // price / time states kept for backward compat with existing handleNextStop,
+  // but no longer surfaced in the UI (per editorial review redesign).
   const [placePrice, setPlacePrice] = useState('');
   const [placeTime, setPlaceTime] = useState('');
   const [placeComment, setPlaceComment] = useState('');
   const [timeMode, setTimeMode] = useState<'none' | 'manual' | 'auto'>('none');
+  const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const locationSub = useRef<Location.LocationSubscription | null>(null);
+
+  // Favorites — live subscribe to the store so the toggle re-renders instantly.
+  const savedPlaces = useSavedPlacesStore((s) => s.places);
+  const savePlace = useSavedPlacesStore((s) => s.savePlace);
+  const unsavePlace = useSavedPlacesStore((s) => s.unsavePlace);
 
   if (!session || !plan) return null;
 
@@ -294,30 +323,85 @@ export const DoItNowScreen: React.FC = () => {
     return Math.max(1, Math.round((Date.now() - placeMode.arrivedAt.getTime()) / 60000));
   };
 
-  const handleNextStop = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  // ── Favorites + quick word helpers for the editorial review screen ──
+  const placeFavKey = (p: { googlePlaceId?: string; id: string }) => p.googlePlaceId || p.id;
+  const isCurrentPlaceFavorite =
+    !!currentPlace && savedPlaces.some((sp) => sp.placeId === placeFavKey(currentPlace));
 
-    // Save price if in organize mode
-    if (session.isOrganizeMode && placePrice) {
-      useDoItNowStore.getState().setPriceForPlace(currentIndex, parseFloat(placePrice) || 0);
+  const toggleCurrentPlaceFavorite = () => {
+    if (!currentPlace) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const key = placeFavKey(currentPlace);
+    if (isCurrentPlaceFavorite) {
+      unsavePlace(key);
+    } else {
+      savePlace({
+        placeId: key,
+        name: currentPlace.name,
+        address: currentPlace.address || '',
+        types: currentPlace.type ? [currentPlace.type] : [],
+        rating: currentPlace.rating || 0,
+        reviewCount: currentPlace.reviewCount || 0,
+        photoUrl: currentPlace.customPhoto || currentPlace.photoUrls?.[0] || null,
+        savedAt: Date.now(),
+      });
     }
-    // Save time spent
-    if (placeTime) {
-      useDoItNowStore.getState().setTimeForPlace(currentIndex, parseInt(placeTime, 10) || 0);
-    }
-    // Save comment with rating
-    if (placeMode && placeMode.rating > 0) {
-      useDoItNowStore.getState().ratePlace(currentIndex, placeMode.rating, placeComment.trim() || undefined);
-    }
+  };
 
+  const toggleWord = (key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setSelectedWords((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const buildCommentWithTags = (): string | undefined => {
+    const tagLabels = QUICK_WORDS
+      .filter((w) => selectedWords.has(w.key))
+      .map((w) => w.label);
+    const rawComment = placeComment.trim();
+    if (tagLabels.length === 0 && !rawComment) return undefined;
+    const prefix = tagLabels.length > 0 ? tagLabels.join(' · ') : '';
+    if (prefix && rawComment) return `${prefix}\n${rawComment}`;
+    return prefix || rawComment;
+  };
+
+  const resetPlaceModeUi = () => {
     setPlaceMode(null);
     setPlacePrice('');
     setPlaceTime('');
     setPlaceComment('');
+    setSelectedWords(new Set());
     setTimeMode('none');
     setRoute(null);
     setRouteCoords([]);
+  };
 
+  const handleNextStop = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Save comment (with prepended quick word tags) + rating if rated.
+    if (placeMode && placeMode.rating > 0) {
+      useDoItNowStore.getState().ratePlace(currentIndex, placeMode.rating, buildCommentWithTags());
+    }
+
+    resetPlaceModeUi();
+
+    if (isLastPlace) {
+      completeSession();
+      navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
+    } else {
+      nextStop();
+    }
+  };
+
+  // "Passer" — skip review entirely (no rating, no comment).
+  const handleSkipReview = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetPlaceModeUi();
     if (isLastPlace) {
       completeSession();
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
@@ -521,137 +605,161 @@ export const DoItNowScreen: React.FC = () => {
           )}
       </MapView>
 
-      {/* Place mode */}
+      {/* ═════════════════ Place review mode — editorial layout ═════════════════ */}
       {placeMode && currentPlace && (
-        <View style={[styles.placeModeContainer, { backgroundColor: C.white }]}>
-          <View style={[styles.placeModeIcon, { backgroundColor: C.primary + '15' }]}>
-            <Ionicons name="location" size={32} color={C.primary} />
-          </View>
-          <Text style={[styles.placeModeName, { color: C.black }]}>{currentPlace.name}</Text>
-          <Text style={[styles.placeModeType, { color: C.gray600 }]}>{currentPlace.type}</Text>
+        <View style={[styles.reviewContainer, { backgroundColor: Colors.bgPrimary, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.reviewScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Overline */}
+            <Text style={styles.reviewOverline}>
+              ÉTAPE {currentIndex + 1} / {plan.places.length} TERMINÉE
+            </Text>
 
-          {/* Time spent section */}
-          <View style={styles.timeSection}>
-            <Text style={[styles.timeLabel, { color: C.gray600 }]}>Temps sur place</Text>
-            {timeMode === 'none' ? (
-              <View style={styles.timeBtnRow}>
+            {/* Editorial title */}
+            <Text style={styles.reviewTitle}>
+              Alors,{'\n'}
+              <Text style={styles.reviewTitleQuote}>« {currentPlace.name} »</Text> ?
+            </Text>
+
+            {/* Subtitle */}
+            <Text style={styles.reviewSubtitle}>
+              Ton retour aide la communauté à découvrir le vrai {cityConfig.name}.
+              {'\n'}Optionnel · tu peux passer.
+            </Text>
+
+            {/* Big stars */}
+            <View style={styles.reviewStars}>
+              {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
-                  style={[styles.timeBtn, { backgroundColor: C.gray200, borderColor: C.borderLight }]}
-                  onPress={() => setTimeMode('manual')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="pencil-outline" size={16} color={C.gray700} />
-                  <Text style={[styles.timeBtnText, { color: C.gray800 }]}>Remplir</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.timeBtn, { backgroundColor: C.primary + '15', borderColor: C.primary + '30' }]}
+                  key={star}
                   onPress={() => {
-                    const mins = getHiddenTimerMinutes();
-                    setPlaceTime(String(mins));
-                    setTimeMode('auto');
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    useDoItNowStore.getState().ratePlace(currentIndex, star);
+                    setPlaceMode({ ...placeMode, rating: star });
                   }}
-                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                 >
-                  <Ionicons name="timer-outline" size={16} color={C.primary} />
-                  <Text style={[styles.timeBtnText, { color: C.primary }]}>Calculer</Text>
+                  <Ionicons
+                    name={star <= placeMode.rating ? 'star' : 'star-outline'}
+                    size={36}
+                    color={star <= placeMode.rating ? Colors.primary : Colors.borderMedium}
+                    style={{ marginHorizontal: 4 }}
+                  />
                 </TouchableOpacity>
-              </View>
+              ))}
+            </View>
+            {placeMode.rating > 0 ? (
+              <Text style={styles.reviewRatingLabel}>{RATING_LABELS[placeMode.rating]}</Text>
             ) : (
-              <View>
-                <View style={styles.durationChipsRow}>
-                  {['15', '30', '45', '60', '90', '120', '180'].map((preset) => {
-                    const isSelected = placeTime === preset;
-                    const n = parseInt(preset, 10);
-                    const label = n < 60 ? `${n}min` : n % 60 === 0 ? `${n / 60}h` : `${Math.floor(n / 60)}h${(n % 60).toString().padStart(2, '0')}`;
-                    return (
-                      <TouchableOpacity
-                        key={preset}
-                        style={[styles.durationChip, { backgroundColor: isSelected ? C.primary : C.gray200 }]}
-                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlaceTime(preset); setTimeMode('manual'); }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <TouchableOpacity onPress={() => { setTimeMode('none'); setPlaceTime(''); }} style={{ alignSelf: 'flex-end', marginTop: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close-circle" size={18} color={C.gray500} />
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.reviewRatingHint}>Note ton expérience</Text>
             )}
-          </View>
 
-          {/* Rating */}
-          <View style={styles.ratingRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => {
-                  useDoItNowStore.getState().ratePlace(currentIndex, star);
-                  setPlaceMode({ ...placeMode, rating: star });
-                }}
-              >
-                <Ionicons
-                  name={star <= placeMode.rating ? 'star' : 'star-outline'}
-                  size={32}
-                  color={star <= placeMode.rating ? C.gold : C.gray500}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
+            {/* Favorite card (dark when active) */}
+            <TouchableOpacity
+              style={[
+                styles.favCard,
+                isCurrentPlaceFavorite
+                  ? { backgroundColor: '#2C2420' }
+                  : { backgroundColor: Colors.bgSecondary, borderWidth: 1, borderColor: Colors.borderMedium },
+              ]}
+              onPress={toggleCurrentPlaceFavorite}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="star"
+                size={16}
+                color={isCurrentPlaceFavorite ? '#F2CF7A' : Colors.textPrimary}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.favCardTitle,
+                    { color: isCurrentPlaceFavorite ? Colors.textOnAccent : Colors.textPrimary },
+                  ]}
+                >
+                  {isCurrentPlaceFavorite ? 'Ajouté à tes favoris' : 'Ajouter aux favoris'}
+                </Text>
+                <Text
+                  style={[
+                    styles.favCardHint,
+                    { color: isCurrentPlaceFavorite ? 'rgba(255, 248, 240, 0.65)' : Colors.textSecondary },
+                  ]}
+                >
+                  Retrouve-le dans Plans → Lieux favoris
+                </Text>
+              </View>
+              {isCurrentPlaceFavorite && (
+                <Ionicons name="checkmark" size={16} color="#F2CF7A" />
+              )}
+            </TouchableOpacity>
 
-          {/* Comment (appears when rated) */}
-          {placeMode.rating > 0 && (
+            {/* Quick words */}
+            <Text style={[styles.reviewOverline, { marginTop: 22, marginBottom: 10 }]}>
+              UN MOT RAPIDE ?
+            </Text>
+            <View style={styles.quickWordsWrap}>
+              {QUICK_WORDS.map((word) => {
+                const isSelected = selectedWords.has(word.key);
+                return (
+                  <TouchableOpacity
+                    key={word.key}
+                    style={[
+                      styles.quickWordChip,
+                      isSelected
+                        ? { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }
+                        : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
+                    ]}
+                    onPress={() => toggleWord(word.key)}
+                    activeOpacity={0.75}
+                  >
+                    <Text
+                      style={[
+                        styles.quickWordText,
+                        { color: isSelected ? Colors.terracotta700 : Colors.textPrimary },
+                      ]}
+                    >
+                      {word.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Comment */}
             <RNTextInput
-              style={[styles.commentInput, { color: C.black, backgroundColor: C.gray200, borderColor: C.borderLight }]}
-              placeholder="Un commentaire ? (optionnel)"
-              placeholderTextColor={C.gray500}
+              style={[styles.reviewCommentInput, { backgroundColor: Colors.bgSecondary, borderColor: placeComment.length > 0 ? Colors.primary : Colors.borderSubtle, color: Colors.textPrimary }]}
+              placeholder="Un commentaire, une anecdote ? (optionnel)"
+              placeholderTextColor={Colors.textTertiary}
               value={placeComment}
               onChangeText={setPlaceComment}
               multiline
               maxLength={300}
+              textAlignVertical="top"
             />
-          )}
+          </ScrollView>
 
-          {/* Price input — organize mode only */}
-          {session.isOrganizeMode && (
-            <View style={styles.priceSection}>
-              <Text style={[styles.priceLabel, { color: C.gray600 }]}>Prix payé</Text>
-              <View style={styles.durationChipsRow}>
-                {[
-                  { label: 'Gratuit', value: '0' },
-                  { label: `< 15${cityConfig.currency}`, value: '10' },
-                  { label: `15–30${cityConfig.currency}`, value: '22' },
-                  { label: `30–60${cityConfig.currency}`, value: '45' },
-                  { label: `60–100${cityConfig.currency}`, value: '80' },
-                  { label: `100${cityConfig.currency}+`, value: '120' },
-                ].map((chip) => {
-                  const isSelected = placePrice === chip.value;
-                  return (
-                    <TouchableOpacity
-                      key={chip.value}
-                      style={[styles.durationChip, { backgroundColor: isSelected ? C.primary : C.gray200 }]}
-                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPlacePrice(chip.value); }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.durationChipText, { color: isSelected ? Colors.textOnAccent : C.gray800 }]}>{chip.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.nextBtn, { backgroundColor: C.primary }]}
-            onPress={handleNextStop}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.nextBtnText}>
-              {isLastPlace ? 'Terminer le plan 🏁' : 'Prochain arrêt →'}
-            </Text>
-          </TouchableOpacity>
+          {/* Footer — Passer / Étape suivante */}
+          <View style={[styles.reviewFooter, { borderTopColor: Colors.borderSubtle }]}>
+            <TouchableOpacity
+              style={styles.reviewSkipBtn}
+              onPress={handleSkipReview}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.reviewSkipText, { color: Colors.textSecondary }]}>Passer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reviewNextBtn, { backgroundColor: Colors.primary }]}
+              onPress={handleNextStop}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.reviewNextText}>
+                {isLastPlace ? 'Terminer 🏁' : 'Étape suivante →'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -764,6 +872,135 @@ const styles = StyleSheet.create({
   priceLabel: { fontSize: 11, fontFamily: Fonts.body, textAlign: 'center' },
   nextBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 16 },
   nextBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displaySemiBold },
+
+  // ─────────────────────────────────────────────────────────────
+  // Editorial review screen (after arriving at a place)
+  // ─────────────────────────────────────────────────────────────
+  reviewContainer: {
+    flex: 1,
+  },
+  reviewScroll: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  reviewOverline: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+  reviewTitle: {
+    fontSize: 32,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.6,
+    lineHeight: 38,
+    marginTop: 10,
+  },
+  reviewTitleQuote: {
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: Colors.textPrimary,
+  },
+  reviewSubtitle: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+    marginTop: 14,
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  reviewRatingLabel: {
+    fontSize: 14,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.primary,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  reviewRatingHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 10,
+    fontStyle: 'italic',
+  },
+  favCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 22,
+    padding: 14,
+    borderRadius: 14,
+  },
+  favCardTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  favCardHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    marginTop: 2,
+  },
+  quickWordsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickWordChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1.5,
+  },
+  quickWordText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+  },
+  reviewCommentInput: {
+    marginTop: 14,
+    minHeight: 88,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    fontSize: 14,
+    fontFamily: Fonts.body,
+  },
+  reviewFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  reviewSkipBtn: {
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+  },
+  reviewSkipText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  reviewNextBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewNextText: {
+    color: Colors.textOnAccent,
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+  },
 
   // Bottom card
   bottomCard: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24, shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
