@@ -63,6 +63,11 @@ const getCommentTimeAgo = (dateStr: string): string => {
    IMMERSIVE FEED — Creme-style rounded card, horizontal swipe
    ================================================================ */
 
+// Animated wrapper for FlatList — needed to drive a native-driver
+// Animated.event from its onScroll. Cast to any because RN's typings for
+// createAnimatedComponent don't infer FlatList's generic signature.
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
+
 export const FeedScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -129,6 +134,11 @@ export const FeedScreen: React.FC = () => {
   const friendsLayout = useRef({ x: 0, width: 0 });
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
+
+  // Horizontal scroll position of the FlatList — drives the per-card cover
+  // parallax effect. Native-driver throughout, so the animation runs on the
+  // UI thread and stays smooth even during heavy renders.
+  const feedScrollX = useRef(new Animated.Value(0)).current;
 
   // Header hide/show — slides up + fades out as soon as the active card is pulled
   // past a small threshold (independently from the detail commit, which happens later).
@@ -409,9 +419,11 @@ export const FeedScreen: React.FC = () => {
         onShare={() => handleShare(item)}
         onDoItNow={() => handleDoItNow(item)}
         onMapPress={() => handleMapPress(item)}
+        feedScrollX={feedScrollX}
+        feedIndex={index}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress, feedScrollX],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -574,19 +586,19 @@ export const FeedScreen: React.FC = () => {
             />
           </View>
         ) : (
-          <FlatList
+          <AnimatedFlatList
             ref={flatListRef}
             horizontal
             pagingEnabled
             scrollEnabled={!isDetailOpen}
             data={currentPlans}
             renderItem={renderItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item: Plan) => item.id}
             showsHorizontalScrollIndicator={false}
             windowSize={3}
             initialNumToRender={1}
             maxToRenderPerBatch={2}
-            getItemLayout={(_, index) => ({
+            getItemLayout={(_: any, index: number) => ({
               length: SCREEN_W,
               offset: SCREEN_W * index,
               index,
@@ -594,6 +606,11 @@ export const FeedScreen: React.FC = () => {
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             decelerationRate="fast"
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: feedScrollX } } }],
+              { useNativeDriver: true },
+            )}
           />
         )}
       </View>
