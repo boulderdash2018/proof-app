@@ -190,6 +190,36 @@ export const FeedScreen: React.FC = () => {
   // ── Status bar — dark on cream ────────────────────────────────
   useFocusEffect(useCallback(() => { StatusBar.setBarStyle('dark-content'); }, []));
 
+  // ── Focus: restore scroll + auto-refresh when stale ──────────
+  // On every focus we explicitly snap to the saved index. react-native-web's
+  // display:none hiding can drop scroll state on hidden FlatLists; this is
+  // defensive — a no-op when the position is already correct on native.
+  // If the current tab's data is older than FEED_STALE_MS, we kick off a
+  // silent refetch (no spinner) so the user gets fresh content next refresh.
+  const FEED_STALE_MS = 5 * 60 * 1000;
+  useFocusEffect(
+    useCallback(() => {
+      const tab = activeTab;
+      const savedIdx = useFeedStore.getState().lastIndex[tab] ?? 0;
+      // Defer one frame so the FlatList has rendered its current data.
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: savedIdx * SCREEN_W, animated: false });
+      });
+
+      const fetchedAt = useFeedStore.getState().lastFetchedAt[tab] ?? 0;
+      const isStale = Date.now() - fetchedAt > FEED_STALE_MS;
+      if (isStale) {
+        // Silent — no isRefreshing flag, no scrollToOffset to top. Items keep
+        // their keys so scroll position is preserved through the data swap.
+        if (tab === 'reco') {
+          fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name).catch(() => {});
+        } else {
+          fetchFriendsFeed(cityConfig.name).catch(() => {});
+        }
+      }
+    }, [activeTab, user?.id, isGuest, guestInterests, cityConfig.name, fetchFeed, fetchFriendsFeed]),
+  );
+
   // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
     fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name);
@@ -251,15 +281,21 @@ export const FeedScreen: React.FC = () => {
         Animated.spring(tabIndicatorLeft, { toValue: target.x, useNativeDriver: false, friction: 8, tension: 80 }),
         Animated.spring(tabIndicatorWidth, { toValue: target.width, useNativeDriver: false, friction: 8, tension: 80 }),
       ]).start();
+      // Restore each tab's own scroll position instead of jumping back to 0.
+      const savedIdx = useFeedStore.getState().lastIndex[tab] ?? 0;
       setActiveTab(tab);
-      setCurrentIndex(0);
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      setCurrentIndex(savedIdx);
+      // Force the on-focus restore effect to re-run after the data swap.
+      hasRestoredScrollRef.current = false;
+      // Snap immediately — avoids the brief flash at offset 0 during the swap.
+      flatListRef.current?.scrollToOffset({ offset: savedIdx * SCREEN_W, animated: false });
+      feedScrollX.setValue(savedIdx * SCREEN_W);
       if (tab === 'friends' && !friendsFetched) {
         fetchFriendsFeed(cityConfig.name);
         setFriendsFetched(true);
       }
     },
-    [activeTab, isGuest, friendsFetched, cityConfig.name],
+    [activeTab, isGuest, friendsFetched, cityConfig.name, fetchFriendsFeed, feedScrollX],
   );
 
   // ── Auth guard ────────────────────────────────────────────────
