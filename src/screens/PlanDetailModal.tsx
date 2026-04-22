@@ -989,6 +989,7 @@ export const PlanDetailModal: React.FC = () => {
             recommendedTransport={plan.transport}
             authorName={plan.author.username}
             loading={checkingPlaces}
+            plan={plan}
             onSelect={async (transport) => {
               setCheckingPlaces(true);
               // Check open status for all places with a googlePlaceId

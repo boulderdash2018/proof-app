@@ -757,6 +757,7 @@ export const FeedScreen: React.FC = () => {
           recommendedTransport={doItNowPlan.transport}
           authorName={doItNowPlan.author?.username}
           loading={checkingPlaces}
+          plan={doItNowPlan}
           onSelect={handleTransportSelect}
         />
       )}
