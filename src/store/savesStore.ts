@@ -38,16 +38,39 @@ export const useSavesStore = create<SavesStore>((set, get) => ({
     }
   },
 
+  /**
+   * Mark a plan as done with optional proof status.
+   *
+   * Robust against missing entries: if the planId is not yet in savedPlans
+   * (e.g. user proofs a plan they never bookmarked), we INSERT a new entry
+   * with the done/validated state rather than silently no-op'ing. This was
+   * the root cause of the "impossible d'enregistrer la proof + l'user peut
+   * re-proof" bug — the map() approach only mutated existing entries.
+   */
   markAsDone: (planId: string, proofStatus?: ProofStatus) => {
     const uid = getCurrentUserId();
     const sender = useAuthStore.getState().user || undefined;
     const { savedPlans } = get();
-    const plan = savedPlans.find((sp) => sp.planId === planId)?.plan || undefined;
-    const updated = savedPlans.map((sp) =>
-      sp.planId === planId ? { ...sp, isDone: true, proofStatus } : sp
-    );
+    const existing = savedPlans.find((sp) => sp.planId === planId);
+
+    let updated: SavedPlan[];
+    if (existing) {
+      updated = savedPlans.map((sp) =>
+        sp.planId === planId ? { ...sp, isDone: true, proofStatus } : sp
+      );
+    } else {
+      // No existing entry → insert a minimal one. The plan payload is only
+      // known locally when the caller provides it via the store elsewhere;
+      // here we insert with a null plan so the entry is at least findable
+      // for the isAlreadyProofed check. Subsequent fetchSaves will hydrate
+      // the full Plan object from Firestore.
+      updated = [
+        { planId, plan: null as any, isDone: true, proofStatus, savedAt: new Date().toISOString() },
+        ...savedPlans,
+      ];
+    }
     set({ savedPlans: updated });
-    if (uid) markPlanAsDone(uid, planId, proofStatus, sender, plan).catch(console.error);
+    if (uid) markPlanAsDone(uid, planId, proofStatus, sender, existing?.plan).catch(console.error);
   },
 
   addCreatedPlan: (plan: Plan) => {

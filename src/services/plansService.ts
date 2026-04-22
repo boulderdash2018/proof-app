@@ -315,11 +315,20 @@ export const unsavePlan = async (userId: string, planId: string): Promise<void> 
   await updateDoc(doc(db, PLANS, planId), { savedByIds: arrayRemove(userId) }).catch(() => {});
 };
 
-/** Mark a saved plan as done with optional proof status (unique vote per user) */
+/** Mark a saved plan as done with optional proof status (unique vote per user).
+ *
+ * Uses setDoc + merge so this is safe even if the savedPlan doc doesn't exist
+ * yet (e.g. user proofs a plan they never bookmarked before). updateDoc would
+ * throw on a missing doc and silently drop the state update.
+ */
 export const markPlanAsDone = async (userId: string, planId: string, proofStatus?: 'validated' | 'declined', sender?: User, plan?: Plan): Promise<void> => {
-  const data: Record<string, any> = { isDone: true };
+  const data: Record<string, any> = {
+    isDone: true,
+    // Ensure these minimal fields exist for first-time writes via merge.
+    savedAt: new Date().toISOString(),
+  };
   if (proofStatus) data.proofStatus = proofStatus;
-  await updateDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data);
+  await setDoc(doc(db, `users/${userId}/${SAVED_PLANS}`, planId), data, { merge: true });
 
   // Handle unique proof vote per user per plan
   if (proofStatus) {
