@@ -11,7 +11,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { User, Plan } from '../types';
 import { useAuthStore, useFriendsStore, useChatStore } from '../store';
 import { getUserById, getFollowStatus, isFollowingUser, getFollowerIds, getFollowingIds, followUser, unfollowUser, sendFollowRequest, getPendingRequestId } from '../services/friendsService';
-import { fetchUserPlans } from '../services/plansService';
+import { fetchUserPlans, fetchSavedPlans } from '../services/plansService';
 import type { ConversationParticipant } from '../services/chatService';
 
 type FollowStatus = 'none' | 'following' | 'requested';
@@ -49,6 +49,8 @@ export const OtherProfileScreen: React.FC = () => {
   const [theyFollowMe, setTheyFollowMe] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [userPlans, setUserPlans] = useState<Plan[]>([]);
+  const [doneByUserPlans, setDoneByUserPlans] = useState<Plan[]>([]);
+  const [activeTab, setActiveTab] = useState<'created' | 'done'>('created');
   const [otherFollowersCount, setOtherFollowersCount] = useState(0);
   const [otherFollowingCount, setOtherFollowingCount] = useState(0);
   const C = useColors();
@@ -77,6 +79,16 @@ export const OtherProfileScreen: React.FC = () => {
     // Check if they follow us (for "follow back" label)
     isFollowingUser(userId, currentUser.id).then(setTheyFollowMe);
     fetchUserPlans(userId).then(setUserPlans);
+    // "Plans faits" — saves with isDone, excluding their own plans
+    fetchSavedPlans(userId)
+      .then((saves) =>
+        setDoneByUserPlans(
+          saves
+            .filter((sp) => sp.isDone && sp.plan && sp.plan.author?.id !== userId)
+            .map((sp) => sp.plan),
+        ),
+      )
+      .catch(() => setDoneByUserPlans([]));
     refreshCounts();
   }, [userId, currentUser]);
 
@@ -282,53 +294,138 @@ export const OtherProfileScreen: React.FC = () => {
         {/* Content area */}
         {canSeeContent ? (
           <>
-            {/* Plans grid — Instagram style */}
-            {userPlans.length > 0 ? (
-              <View style={styles.instaGrid}>
-                {(() => {
-                  const otherPinnedIds = user?.pinnedPlanIds ?? [];
-                  const sorted = [...userPlans].sort((a, b) => {
-                    const aPin = otherPinnedIds.indexOf(a.id);
-                    const bPin = otherPinnedIds.indexOf(b.id);
-                    if (aPin !== -1 && bPin !== -1) return aPin - bPin;
-                    if (aPin !== -1) return -1;
-                    if (bPin !== -1) return 1;
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                  });
-                  return sorted.map((plan) => {
-                    const colors = parseGradient(plan.gradient);
-                    const photo = getPlanPhoto(plan);
-                    const isPinned = otherPinnedIds.includes(plan.id);
-                    return (
-                      <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
-                        <View style={styles.instaCell}>
-                          {photo ? (
-                            <Image source={{ uri: photo }} style={styles.instaCellImage} />
-                          ) : (
-                            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                          )}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
-                          {isPinned && (
-                            <View style={styles.pinBadge}>
-                              <Ionicons name="pin" size={12} color="#FFF" />
-                            </View>
-                          )}
-                          <View style={styles.instaCellBottom}>
-                            <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
-                            <View style={styles.instaCellLikes}>
-                              <Ionicons name="heart" size={11} color="#FFF" />
-                              <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
+            {/* Tabs — plans créés vs plans faits */}
+            <View style={[styles.tabRow, { borderTopColor: C.border, borderBottomColor: C.border }]}>
+              <TouchableOpacity
+                style={styles.tabBtn}
+                onPress={() => setActiveTab('created')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    { color: activeTab === 'created' ? C.black : C.gray600 },
+                  ]}
+                >
+                  Plans créés
+                </Text>
+                <Text
+                  style={[
+                    styles.tabCount,
+                    { color: activeTab === 'created' ? C.gray700 : C.gray500 },
+                  ]}
+                >
+                  {userPlans.length}
+                </Text>
+                {activeTab === 'created' && (
+                  <View style={[styles.tabUnderline, { backgroundColor: C.primary }]} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.tabBtn}
+                onPress={() => setActiveTab('done')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    { color: activeTab === 'done' ? C.black : C.gray600 },
+                  ]}
+                >
+                  Plans faits
+                </Text>
+                <Text
+                  style={[
+                    styles.tabCount,
+                    { color: activeTab === 'done' ? C.gray700 : C.gray500 },
+                  ]}
+                >
+                  {doneByUserPlans.length}
+                </Text>
+                {activeTab === 'done' && (
+                  <View style={[styles.tabUnderline, { backgroundColor: C.primary }]} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {activeTab === 'created' ? (
+              userPlans.length > 0 ? (
+                <View style={styles.instaGrid}>
+                  {(() => {
+                    const otherPinnedIds = user?.pinnedPlanIds ?? [];
+                    const sorted = [...userPlans].sort((a, b) => {
+                      const aPin = otherPinnedIds.indexOf(a.id);
+                      const bPin = otherPinnedIds.indexOf(b.id);
+                      if (aPin !== -1 && bPin !== -1) return aPin - bPin;
+                      if (aPin !== -1) return -1;
+                      if (bPin !== -1) return 1;
+                      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                    });
+                    return sorted.map((plan) => {
+                      const colors = parseGradient(plan.gradient);
+                      const photo = getPlanPhoto(plan);
+                      const isPinned = otherPinnedIds.includes(plan.id);
+                      return (
+                        <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                          <View style={styles.instaCell}>
+                            {photo ? (
+                              <Image source={{ uri: photo }} style={styles.instaCellImage} />
+                            ) : (
+                              <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                            )}
+                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                            {isPinned && (
+                              <View style={styles.pinBadge}>
+                                <Ionicons name="pin" size={12} color="#FFF" />
+                              </View>
+                            )}
+                            <View style={styles.instaCellBottom}>
+                              <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
+                              <View style={styles.instaCellLikes}>
+                                <Ionicons name="heart" size={11} color="#FFF" />
+                                <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
+                              </View>
                             </View>
                           </View>
+                        </TouchableOpacity>
+                      );
+                    });
+                  })()}
+                </View>
+              ) : (
+                <View style={styles.emptyPlans}>
+                  <Text style={[styles.emptyPlansText, { color: C.gray600 }]}>{t.other_profile_no_plans}</Text>
+                </View>
+              )
+            ) : doneByUserPlans.length > 0 ? (
+              <View style={styles.instaGrid}>
+                {doneByUserPlans.map((plan) => {
+                  const colors = parseGradient(plan.gradient);
+                  const photo = getPlanPhoto(plan);
+                  return (
+                    <TouchableOpacity key={plan.id} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: plan.id })}>
+                      <View style={styles.instaCell}>
+                        {photo ? (
+                          <Image source={{ uri: photo }} style={styles.instaCellImage} />
+                        ) : (
+                          <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                        )}
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={styles.instaCellOverlay} />
+                        <View style={styles.instaCellBottom}>
+                          <Text style={styles.instaCellTitle} numberOfLines={2}>{plan.title}</Text>
+                          <View style={styles.instaCellLikes}>
+                            <Ionicons name="heart" size={11} color="#FFF" />
+                            <Text style={styles.instaCellLikesText}>{plan.likesCount ?? 0}</Text>
+                          </View>
                         </View>
-                      </TouchableOpacity>
-                    );
-                  });
-                })()}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             ) : (
               <View style={styles.emptyPlans}>
-                <Text style={[styles.emptyPlansText, { color: C.gray600 }]}>{t.other_profile_no_plans}</Text>
+                <Text style={[styles.emptyPlansText, { color: C.gray600 }]}>Pas encore de plans faits</Text>
               </View>
             )}
           </>
@@ -506,11 +603,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  // Tabs — plans créés / plans faits (au-dessus de la grille, style Instagram-like)
+  tabRow: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    position: 'relative',
+  } as any,
+  tabLabel: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.2,
+  },
+  tabCount: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+  },
+  tabUnderline: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    bottom: -StyleSheet.hairlineWidth,
+    height: 2,
+    borderRadius: 1,
+  },
   emptyPlans: {
     paddingVertical: 40,
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderSubtle,
     marginTop: 0,
   },
   emptyPlansText: {
