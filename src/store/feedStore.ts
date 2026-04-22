@@ -34,10 +34,6 @@ interface FeedStore {
   lastIndex: Record<FeedTab, number>;
   /** Which tab was active last — restored when the feed re-mounts. */
   lastTab: FeedTab;
-  /** Wall-clock ms of last successful fetch per tab. Drives the stale-check
-   * on focus: if `Date.now() - lastFetchedAt > FEED_STALE_MS` the feed is
-   * silently refetched in background while preserving scroll position. */
-  lastFetchedAt: Record<FeedTab, number>;
   fetchFeed: (userId?: string, guestInterests?: string[], city?: string) => Promise<void>;
   refreshFeed: (guestInterests?: string[], city?: string) => Promise<void>;
   fetchFriendsFeed: (city?: string) => Promise<void>;
@@ -47,8 +43,6 @@ interface FeedStore {
   toggleSave: (planId: string) => void;
   setLastIndex: (tab: FeedTab, index: number) => void;
   setLastTab: (tab: FeedTab) => void;
-  /** Force the next focus-stale-check to refetch (used by the AppState resume hook). */
-  markStale: (tab?: FeedTab) => void;
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
@@ -62,7 +56,6 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   savedPlanIds: new Set<string>(),
   lastIndex: { reco: 0, friends: 0 },
   lastTab: 'reco',
-  lastFetchedAt: { reco: 0, friends: 0 },
 
   setLastIndex: (tab, index) => {
     const current = get().lastIndex;
@@ -73,12 +66,6 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   setLastTab: (tab) => {
     if (get().lastTab === tab) return;
     set({ lastTab: tab });
-  },
-
-  markStale: (tab) => {
-    const current = get().lastFetchedAt;
-    if (tab) set({ lastFetchedAt: { ...current, [tab]: 0 } });
-    else set({ lastFetchedAt: { reco: 0, friends: 0 } });
   },
 
   fetchFeed: async (userId?: string, guestInterests?: string[], city?: string) => {
@@ -112,8 +99,6 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         }
         set({ plans, isLoading: false } as any);
       }
-      const at = get().lastFetchedAt;
-      set({ lastFetchedAt: { ...at, reco: Date.now() } });
     } catch (err) {
       console.error('fetchFeed error:', err);
       set({ isLoading: false });
@@ -165,8 +150,6 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       const mutualSet = new Set(mutualIds);
       const friendsPlans = allPlans.filter((p) => mutualSet.has(p.authorId));
       set({ friendsPlans, isFriendsLoading: false });
-      const at = get().lastFetchedAt;
-      set({ lastFetchedAt: { ...at, friends: Date.now() } });
     } catch (err) {
       console.error('fetchFriendsFeed error:', err);
       set({ isFriendsLoading: false });

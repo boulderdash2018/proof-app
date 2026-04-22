@@ -17,8 +17,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Easing,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -31,7 +29,6 @@ import { SharePlanSheet } from '../components/SharePlanSheet';
 import { TransportChooser } from '../components/TransportChooser';
 import { ClosedPlacesSheet } from '../components/ClosedPlacesSheet';
 import { PlanMapModal } from '../components/PlanMapModal';
-import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import {
   useAuthStore, useFeedStore, useNotifStore,
   useTrendingStore, useSocialProofStore, useChatStore,
@@ -65,11 +62,6 @@ const getCommentTimeAgo = (dateStr: string): string => {
 /* ================================================================
    IMMERSIVE FEED — Creme-style rounded card, horizontal swipe
    ================================================================ */
-
-// Animated wrapper for FlatList — needed to drive a native-driver
-// Animated.event from its onScroll. Cast to any because RN's typings for
-// createAnimatedComponent don't infer FlatList's generic signature.
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
 
 export const FeedScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -138,42 +130,6 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
 
-  // Horizontal scroll position of the FlatList — drives both the per-card
-  // cover parallax and the horizontal pull-to-refresh indicator. Native-driver
-  // throughout, so the animation runs on the UI thread.
-  const feedScrollX = useRef(new Animated.Value(0)).current;
-
-  // ── Pull-to-refresh state ─────────────────────────────────────
-  // The user pulls the first card to the right (overscroll left). When the
-  // pull crosses PULL_THRESHOLD px, releasing triggers a refresh. The indicator
-  // sits behind the card and reveals itself as the card slides away.
-  const PULL_THRESHOLD = 80;
-  const [isPulling, setIsPulling] = useState(false);
-  const [pulledPastThreshold, setPulledPastThreshold] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Light haptic on threshold crossing — same as iOS Mail's pull-to-refresh.
-  // The listener fires on every scroll frame, so we keep edge-detection in refs
-  // and only call setState when the boolean actually flips. Avoids re-renders.
-  useEffect(() => {
-    const past = { current: false };
-    const pulling = { current: false };
-    const id = feedScrollX.addListener(({ value }) => {
-      const isPast = value < -PULL_THRESHOLD;
-      if (isPast !== past.current) {
-        past.current = isPast;
-        setPulledPastThreshold(isPast);
-        if (isPast) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-      const isPulling = value < -2;
-      if (isPulling !== pulling.current) {
-        pulling.current = isPulling;
-        setIsPulling(isPulling);
-      }
-    });
-    return () => feedScrollX.removeListener(id);
-  }, [feedScrollX]);
-
   // Header hide/show — slides up + fades out as soon as the active card is pulled
   // past a small threshold (independently from the detail commit, which happens later).
   const [headerH, setHeaderH] = useState(0);
@@ -189,36 +145,6 @@ export const FeedScreen: React.FC = () => {
 
   // ── Status bar — dark on cream ────────────────────────────────
   useFocusEffect(useCallback(() => { StatusBar.setBarStyle('dark-content'); }, []));
-
-  // ── Focus: restore scroll + auto-refresh when stale ──────────
-  // On every focus we explicitly snap to the saved index. react-native-web's
-  // display:none hiding can drop scroll state on hidden FlatLists; this is
-  // defensive — a no-op when the position is already correct on native.
-  // If the current tab's data is older than FEED_STALE_MS, we kick off a
-  // silent refetch (no spinner) so the user gets fresh content next refresh.
-  const FEED_STALE_MS = 5 * 60 * 1000;
-  useFocusEffect(
-    useCallback(() => {
-      const tab = activeTab;
-      const savedIdx = useFeedStore.getState().lastIndex[tab] ?? 0;
-      // Defer one frame so the FlatList has rendered its current data.
-      requestAnimationFrame(() => {
-        flatListRef.current?.scrollToOffset({ offset: savedIdx * SCREEN_W, animated: false });
-      });
-
-      const fetchedAt = useFeedStore.getState().lastFetchedAt[tab] ?? 0;
-      const isStale = Date.now() - fetchedAt > FEED_STALE_MS;
-      if (isStale) {
-        // Silent — no isRefreshing flag, no scrollToOffset to top. Items keep
-        // their keys so scroll position is preserved through the data swap.
-        if (tab === 'reco') {
-          fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name).catch(() => {});
-        } else {
-          fetchFriendsFeed(cityConfig.name).catch(() => {});
-        }
-      }
-    }, [activeTab, user?.id, isGuest, guestInterests, cityConfig.name, fetchFeed, fetchFriendsFeed]),
-  );
 
   // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
@@ -243,34 +169,6 @@ export const FeedScreen: React.FC = () => {
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
 
-  // ── Pull-to-refresh trigger ───────────────────────────────────
-  // Called when the user releases the gesture past the threshold.
-  // Fetches the active tab's data and snaps the FlatList back to offset 0.
-  const handleRefresh = useCallback(async () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    try {
-      if (activeTab === 'reco') {
-        await fetchFeed(user?.id, isGuest ? guestInterests : undefined, cityConfig.name);
-      } else {
-        await fetchFriendsFeed(cityConfig.name);
-      }
-    } finally {
-      setIsRefreshing(false);
-      // Spring back to the first card after the data lands.
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    }
-  }, [isRefreshing, activeTab, user?.id, isGuest, guestInterests, cityConfig.name, fetchFeed, fetchFriendsFeed]);
-
-  // Detects release past the threshold on the leftmost card.
-  const handleScrollEndDrag = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = e.nativeEvent.contentOffset.x;
-    if (x < -PULL_THRESHOLD && currentIndex === 0 && !isRefreshing) {
-      handleRefresh();
-    }
-  }, [currentIndex, isRefreshing, handleRefresh]);
-
   // ── Tab switching ─────────────────────────────────────────────
   const switchTab = useCallback(
     (tab: FeedTab) => {
@@ -281,21 +179,15 @@ export const FeedScreen: React.FC = () => {
         Animated.spring(tabIndicatorLeft, { toValue: target.x, useNativeDriver: false, friction: 8, tension: 80 }),
         Animated.spring(tabIndicatorWidth, { toValue: target.width, useNativeDriver: false, friction: 8, tension: 80 }),
       ]).start();
-      // Restore each tab's own scroll position instead of jumping back to 0.
-      const savedIdx = useFeedStore.getState().lastIndex[tab] ?? 0;
       setActiveTab(tab);
-      setCurrentIndex(savedIdx);
-      // Force the on-focus restore effect to re-run after the data swap.
-      hasRestoredScrollRef.current = false;
-      // Snap immediately — avoids the brief flash at offset 0 during the swap.
-      flatListRef.current?.scrollToOffset({ offset: savedIdx * SCREEN_W, animated: false });
-      feedScrollX.setValue(savedIdx * SCREEN_W);
+      setCurrentIndex(0);
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
       if (tab === 'friends' && !friendsFetched) {
         fetchFriendsFeed(cityConfig.name);
         setFriendsFetched(true);
       }
     },
-    [activeTab, isGuest, friendsFetched, cityConfig.name, fetchFriendsFeed, feedScrollX],
+    [activeTab, isGuest, friendsFetched, cityConfig.name],
   );
 
   // ── Auth guard ────────────────────────────────────────────────
@@ -517,11 +409,9 @@ export const FeedScreen: React.FC = () => {
         onShare={() => handleShare(item)}
         onDoItNow={() => handleDoItNow(item)}
         onMapPress={() => handleMapPress(item)}
-        feedScrollX={feedScrollX}
-        feedIndex={index}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress, feedScrollX],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -684,46 +574,27 @@ export const FeedScreen: React.FC = () => {
             />
           </View>
         ) : (
-          <>
-            {/* Pull-to-refresh indicator — sits behind the FlatList; revealed
-                as the first card slides right under the user's finger. */}
-            {(isPulling || isRefreshing) && (
-              <PullToRefreshIndicator
-                scrollX={feedScrollX}
-                threshold={PULL_THRESHOLD}
-                pastThreshold={pulledPastThreshold}
-                isRefreshing={isRefreshing}
-              />
-            )}
-            <AnimatedFlatList
-              ref={flatListRef}
-              horizontal
-              pagingEnabled
-              scrollEnabled={!isDetailOpen && !isRefreshing}
-              data={currentPlans}
-              renderItem={renderItem}
-              keyExtractor={(item: Plan) => item.id}
-              showsHorizontalScrollIndicator={false}
-              windowSize={3}
-              initialNumToRender={1}
-              maxToRenderPerBatch={2}
-              getItemLayout={(_: any, index: number) => ({
-                length: SCREEN_W,
-                offset: SCREEN_W * index,
-                index,
-              })}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
-              decelerationRate="fast"
-              scrollEventThrottle={16}
-              bounces
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { x: feedScrollX } } }],
-                { useNativeDriver: true },
-              )}
-              onScrollEndDrag={handleScrollEndDrag}
-            />
-          </>
+          <FlatList
+            ref={flatListRef}
+            horizontal
+            pagingEnabled
+            scrollEnabled={!isDetailOpen}
+            data={currentPlans}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            windowSize={3}
+            initialNumToRender={1}
+            maxToRenderPerBatch={2}
+            getItemLayout={(_, index) => ({
+              length: SCREEN_W,
+              offset: SCREEN_W * index,
+              index,
+            })}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            decelerationRate="fast"
+          />
         )}
       </View>
 

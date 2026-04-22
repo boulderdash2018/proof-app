@@ -1,10 +1,8 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { useAuthStore } from '../store/authStore';
 import { useGuestStore } from '../store/guestStore';
-import { useFeedStore } from '../store/feedStore';
-import { useAppActiveResume } from '../hooks/useAppActiveResume';
 import { AuthNavigator } from './AuthNavigator';
 import { BottomTabNavigator } from './BottomTabNavigator';
 import { SetupProfileScreen } from '../screens/SetupProfileScreen';
@@ -44,13 +42,6 @@ export const RootNavigator: React.FC = () => {
 
   // User needs setup if: new account (setupComplete falsy) OR username doesn't conform
   const needsSetup = isAuthenticated && user && (!user.setupComplete || !isUsernameValid(user.username));
-
-  // App resume → mark feed as stale so the next focus triggers a silent refetch.
-  // Only fires after >1 min in background — short blurs (share sheet, etc.) are ignored.
-  const handleResume = useCallback(() => {
-    useFeedStore.getState().markStale();
-  }, []);
-  useAppActiveResume(handleResume, 60_000);
 
   return (
     <>

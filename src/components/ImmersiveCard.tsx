@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -56,14 +56,6 @@ interface ImmersiveCardProps {
   onShare: () => void;
   onDoItNow: () => void;
   onMapPress: () => void;
-  /**
-   * Parent FlatList horizontal scroll position. When provided alongside
-   * `feedIndex`, the cover image translates at 0.6× the card speed,
-   * creating a subtle "card change" parallax during swipes between plans.
-   * Both values must be set together — pass undefined to disable.
-   */
-  feedScrollX?: Animated.Value;
-  feedIndex?: number;
 }
 
 // ── Transport helpers (same as PlanDetailModal) ─────────────
@@ -124,8 +116,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onShare,
   onDoItNow,
   onMapPress,
-  feedScrollX,
-  feedIndex,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
   const cardH = Math.max(1, height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H);
@@ -252,22 +242,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     outputRange: [25, 0, -25, -70],
     extrapolate: 'clamp',
   });
-
-  // Horizontal parallax — driven by parent FlatList scroll. The cover image
-  // moves at 0.6× the card's screen velocity, so it appears to "lag" slightly
-  // behind during swipes — a subtle weight that signals card change.
-  // Math: when card center is at `feedIndex × width`, distance = 0 → translateX = 0.
-  // When the card has been scrolled fully off (distance = ±width), the image is
-  // shifted ±width × 0.4 inside its frame, producing the slower apparent motion.
-  const imageParallaxX = useMemo(() => {
-    if (!feedScrollX || feedIndex == null || width <= 0) return null;
-    const center = feedIndex * width;
-    return feedScrollX.interpolate({
-      inputRange: [center - width, center, center + width],
-      outputRange: [-width * 0.4, 0, width * 0.4],
-      extrapolate: 'clamp',
-    });
-  }, [feedScrollX, feedIndex, width]);
   const imageScale = scrollY.interpolate({
     inputRange: [-50, 0, DETAIL_SNAP * 0.3, DETAIL_SNAP],
     outputRange: [1.04, 1, 0.94, 0.82],
@@ -490,7 +464,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
             styles.imageWrap,
             {
               transform: [
-                ...(imageParallaxX ? [{ translateX: imageParallaxX }] : []),
                 { translateY: imageTranslateY },
                 { scale: imageScale },
               ],
