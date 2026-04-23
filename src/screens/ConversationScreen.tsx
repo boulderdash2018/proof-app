@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   KeyboardAvoidingView, Platform, Keyboard, Image, Animated, PanResponder,
   NativeSyntheticEvent, NativeScrollEvent, Modal, Pressable, Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,6 +18,7 @@ import { useColors } from '../hooks/useColors';
 import { ChatMessage, ConversationParticipant, resetUnreadCount } from '../services/chatService';
 import { createGroupSession } from '../services/planSessionService';
 import { fetchPlanById } from '../services/plansService';
+import { pickImage } from '../utils';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
 const HEART_EMOJI = '❤️';
@@ -148,6 +150,75 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ otherUser, isGrouped,
 };
 
 // ═══════════════════════════════════════════════
+// Photo Bubble — respects aspect ratio, caps the max dimensions
+// ═══════════════════════════════════════════════
+
+interface PhotoBubbleProps {
+  url: string;
+  width?: number;
+  height?: number;
+  caption?: string;
+  isMine: boolean;
+}
+
+const PHOTO_MAX_W = 220;
+const PHOTO_MAX_H = 280;
+
+const PhotoBubble: React.FC<PhotoBubbleProps> = ({ url, width, height, caption, isMine }) => {
+  // Default to a portrait-ish frame if dimensions are unknown.
+  let renderW = PHOTO_MAX_W;
+  let renderH = PHOTO_MAX_H;
+  if (typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0) {
+    const ratio = width / height;
+    if (ratio >= 1) {
+      // Landscape — cap by width.
+      renderW = PHOTO_MAX_W;
+      renderH = Math.round(PHOTO_MAX_W / ratio);
+      if (renderH > PHOTO_MAX_H) {
+        renderH = PHOTO_MAX_H;
+        renderW = Math.round(PHOTO_MAX_H * ratio);
+      }
+    } else {
+      // Portrait — cap by height.
+      renderH = PHOTO_MAX_H;
+      renderW = Math.round(PHOTO_MAX_H * ratio);
+      if (renderW > PHOTO_MAX_W) {
+        renderW = PHOTO_MAX_W;
+        renderH = Math.round(PHOTO_MAX_W / ratio);
+      }
+    }
+  }
+  return (
+    <View>
+      <Image
+        source={{ uri: url }}
+        style={{
+          width: renderW,
+          height: renderH,
+          borderRadius: 16,
+          backgroundColor: Colors.bgTertiary,
+        }}
+      />
+      {!!caption && (
+        <Text
+          style={{
+            fontSize: 13,
+            fontFamily: Fonts.body,
+            color: isMine ? Colors.textOnAccent : Colors.textPrimary,
+            marginTop: 6,
+            paddingHorizontal: 4,
+            lineHeight: 17,
+            maxWidth: renderW,
+          }}
+        >
+          {caption}
+        </Text>
+      )}
+    </View>
+  );
+};
+
+// ═══════════════════════════════════════════════
 // Swipeable Message Row
 // ═══════════════════════════════════════════════
 
@@ -174,13 +245,14 @@ interface MessageRowProps {
   onScrollToQuote: (msgId: string) => void;
   onPlanPress: (planId: string) => void;
   onJoinSession: () => void;
+  onPhotoPress: (url: string) => void;
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
   item, prevMsg, nextMsg, userId, senderUser, isGroupContext, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
-  onScrollToQuote, onPlanPress, onJoinSession,
+  onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress,
 }) => {
   const isMine = item.senderId === userId;
   const showDate = shouldShowDateSeparator(item, prevMsg);
@@ -452,14 +524,29 @@ const MessageRow = React.memo<MessageRowProps>(({
                     borderWidth: StyleSheet.hairlineWidth,
                     borderColor: Colors.borderSubtle,
                   },
-              // Plan messages get a tighter padding so the inner card breathes
-              item.type === 'plan' && styles.bubblePlanPadding,
+              // Plan / photo messages get a tighter padding so the inner card breathes
+              (item.type === 'plan' || item.type === 'photo') && styles.bubblePlanPadding,
+              // Photo bubbles have no bg / border — the image fills.
+              item.type === 'photo' && { backgroundColor: 'transparent', borderWidth: 0 },
               bubbleRadii,
               // When there's a quoted reply on top, flatten the bubble's top corners
               // so the preview + bubble merge into a single rounded block.
               hasReply && { borderTopLeftRadius: 6, borderTopRightRadius: 6 },
             ]}>
-              {item.type === 'plan' ? (
+              {item.type === 'photo' ? (
+                <TouchableOpacity
+                  activeOpacity={0.92}
+                  onPress={() => item.photoUrl && onPhotoPress(item.photoUrl)}
+                >
+                  <PhotoBubble
+                    url={item.photoUrl!}
+                    width={item.photoWidth}
+                    height={item.photoHeight}
+                    caption={item.content}
+                    isMine={isMine}
+                  />
+                </TouchableOpacity>
+              ) : item.type === 'plan' ? (
                 <TouchableOpacity
                   onPress={() => item.planId && onPlanPress(item.planId)}
                   activeOpacity={0.85}
@@ -695,6 +782,7 @@ export const ConversationScreen: React.FC = () => {
   const addToGroup = useChatStore((s) => s.addToGroup);
   const leaveGroupConv = useChatStore((s) => s.leaveGroupConv);
   const renameGroupConv = useChatStore((s) => s.renameGroupConv);
+  const sendPhoto = useChatStore((s) => s.sendPhoto);
 
   // Active conversation (looked up once, used for status + kebab actions)
   const activeConv = useMemo(
@@ -777,6 +865,29 @@ export const ConversationScreen: React.FC = () => {
 
   // ── Session handlers (multi-user DoItNow) ──
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const handlePickPhoto = useCallback(async () => {
+    setAttachMenuOpen(false);
+    if (isUploadingPhoto) return;
+    try {
+      const picked = await pickImage({ quality: 0.7 });
+      if (!picked) return;
+      setIsUploadingPhoto(true);
+      await sendPhoto({
+        imageDataUrl: picked.dataUrl,
+        width: picked.width,
+        height: picked.height,
+        sessionId: activeConv?.activeSessionId || undefined,
+      });
+    } catch (err) {
+      console.warn('[ConversationScreen] photo upload error:', err);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  }, [isUploadingPhoto, sendPhoto, activeConv?.activeSessionId]);
 
   const handleStartSession = useCallback(async () => {
     if (!user?.id || !activeConv?.linkedPlanId || isStartingSession) return;
@@ -1028,6 +1139,7 @@ export const ConversationScreen: React.FC = () => {
       onScrollToQuote={handleScrollToQuote}
       onPlanPress={handlePlanPress}
       onJoinSession={handleJoinSession}
+      onPhotoPress={setLightboxUrl}
     />
     );
   }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession]);
@@ -1257,30 +1369,64 @@ export const ConversationScreen: React.FC = () => {
 
         {/* Input bar */}
         <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="Message..."
-              placeholderTextColor={Colors.textTertiary}
-              value={text}
-              onChangeText={handleTextChange}
-              multiline
-              maxLength={2000}
-              blurOnSubmit={false}
-              onKeyPress={(e: any) => {
-                const key = e.nativeEvent?.key ?? (e as any).key;
-                if (key === 'Enter' && !(e.nativeEvent?.shiftKey ?? (e as any).shiftKey)) {
-                  e.preventDefault?.();
-                  if (text.trim().length > 0) handleSend();
-                }
-              }}
-            />
-            {text.trim().length > 0 && (
-              <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
-                <Ionicons name="arrow-up" size={18} color={Colors.textOnAccent} />
-              </TouchableOpacity>
-            )}
+          <View style={styles.inputBarRow}>
+            {/* Attach "+" button — opens photo picker + future actions */}
+            <TouchableOpacity
+              style={styles.attachBtn}
+              onPress={() => setAttachMenuOpen((v) => !v)}
+              activeOpacity={0.7}
+              disabled={isUploadingPhoto}
+            >
+              {isUploadingPhoto ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Ionicons
+                  name={attachMenuOpen ? 'close' : 'add'}
+                  size={22}
+                  color={Colors.primary}
+                />
+              )}
+            </TouchableOpacity>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="Message..."
+                placeholderTextColor={Colors.textTertiary}
+                value={text}
+                onChangeText={handleTextChange}
+                multiline
+                maxLength={2000}
+                blurOnSubmit={false}
+                onKeyPress={(e: any) => {
+                  const key = e.nativeEvent?.key ?? (e as any).key;
+                  if (key === 'Enter' && !(e.nativeEvent?.shiftKey ?? (e as any).shiftKey)) {
+                    e.preventDefault?.();
+                    if (text.trim().length > 0) handleSend();
+                  }
+                }}
+              />
+              {text.trim().length > 0 && (
+                <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
+                  <Ionicons name="arrow-up" size={18} color={Colors.textOnAccent} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+          {/* Attach menu — appears when + is tapped */}
+          {attachMenuOpen && (
+            <View style={styles.attachMenu}>
+              <TouchableOpacity
+                style={styles.attachMenuItem}
+                onPress={handlePickPhoto}
+                activeOpacity={0.7}
+              >
+                <View style={styles.attachMenuIcon}>
+                  <Ionicons name="image" size={18} color={Colors.primary} />
+                </View>
+                <Text style={styles.attachMenuText}>Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -1461,6 +1607,32 @@ export const ConversationScreen: React.FC = () => {
         </Pressable>
       </Modal>
 
+      {/* Photo lightbox — full-screen dimmed backdrop + zoomed image */}
+      {lightboxUrl && (
+        <Modal
+          visible={!!lightboxUrl}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setLightboxUrl(null)}
+        >
+          <Pressable style={lightboxStyles.backdrop} onPress={() => setLightboxUrl(null)}>
+            <Image
+              source={{ uri: lightboxUrl }}
+              style={lightboxStyles.image}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              style={[lightboxStyles.closeBtn, { top: insets.top + 12 }]}
+              onPress={() => setLightboxUrl(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={22} color={Colors.textOnAccent} />
+            </TouchableOpacity>
+          </Pressable>
+        </Modal>
+      )}
+
       {/* Add participants sheet (groups only) */}
       {isGroup && (
         <AddParticipantsSheet
@@ -1599,6 +1771,33 @@ const kebabStyles = StyleSheet.create({
     fontSize: 15,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
+  },
+});
+
+// ═══════════════════════════════════════════════
+// Photo lightbox styles
+// ═══════════════════════════════════════════════
+
+const lightboxStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  closeBtn: {
+    position: 'absolute',
+    right: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
@@ -2136,7 +2335,52 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderSubtle,
     backgroundColor: Colors.bgSecondary,
   },
+  inputBarRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  attachBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.bgTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachMenu: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 8,
+    paddingLeft: 2,
+  },
+  attachMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.bgPrimary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  attachMenuIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.terracotta50,
+  },
+  attachMenuText: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
   inputRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderRadius: 20,

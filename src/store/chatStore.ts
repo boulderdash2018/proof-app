@@ -8,6 +8,7 @@ import {
   fetchMessages,
   sendTextMessage,
   sendPlanMessage,
+  sendPhotoMessage,
   toggleReaction as toggleReactionService,
   resetUnreadCount,
   getOrCreateConversation,
@@ -56,6 +57,7 @@ interface ChatStore {
   closeConversation: () => void;
   sendText: (text: string, replyTo?: ReplyTo) => Promise<void>;
   sendPlan: (plan: { id: string; title: string; coverPhoto?: string; authorName: string }) => Promise<void>;
+  sendPhoto: (opts: { imageDataUrl: string; width?: number; height?: number; caption?: string; sessionId?: string }) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string) => void;
   setTyping: (isTyping: boolean) => void;
 
@@ -274,6 +276,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const { activeConversationId, _userId } = get();
     if (!activeConversationId || !_userId) return;
     await sendPlanMessage(activeConversationId, _userId, plan);
+  },
+
+  // ── Send photo (uploads to Storage then writes msg doc) ──
+  sendPhoto: async (opts) => {
+    const { activeConversationId, _userId } = get();
+    if (!activeConversationId || !_userId) return;
+    try {
+      await sendPhotoMessage(activeConversationId, _userId, opts);
+    } catch (err) {
+      console.warn('[chatStore] sendPhoto error:', err);
+    }
   },
 
   // ── Toggle reaction (optimistic — apply locally, write to Firestore in background) ──

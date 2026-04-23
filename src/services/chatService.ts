@@ -14,7 +14,8 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebaseConfig';
 
 // ═══════════════════════════════════════════════
 // Types
@@ -492,6 +493,80 @@ export const fetchMessages = async (
   } as ChatMessage));
   messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return messages;
+};
+
+// ═══════════════════════════════════════════════
+// Photo messages
+// ═══════════════════════════════════════════════
+
+export interface SendPhotoOptions {
+  /** Data URL for the image (base64 or blob URL). */
+  imageDataUrl: string;
+  /** Optional image dimensions for aspect-ratio preservation. */
+  width?: number;
+  height?: number;
+  /** Optional caption sent alongside the photo (stored as `content`). */
+  caption?: string;
+  /** Optional sessionId — used for the group album feature (commit 8). */
+  sessionId?: string;
+}
+
+/**
+ * Uploads the image to Firebase Storage then writes a `photo` message in the
+ * conversation's messages subcollection and updates the conversation preview.
+ */
+export const sendPhotoMessage = async (
+  conversationId: string,
+  senderId: string,
+  options: SendPhotoOptions,
+): Promise<string> => {
+  const { imageDataUrl, width, height, caption, sessionId } = options;
+
+  // Upload to a stable path — future cleanup by convId/msgId is easy.
+  const filename = `chat_photos/${conversationId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+  const storageRef = ref(storage, filename);
+  await uploadString(storageRef, imageDataUrl, 'data_url');
+  const photoUrl = await getDownloadURL(storageRef);
+
+  const msgData: Record<string, any> = {
+    conversationId,
+    senderId,
+    type: 'photo',
+    content: caption?.trim() || '',
+    photoUrl,
+    reactions: [],
+    readBy: [senderId],
+    createdAt: serverTimestamp(),
+  };
+  if (typeof width === 'number') msgData.photoWidth = width;
+  if (typeof height === 'number') msgData.photoHeight = height;
+  if (sessionId) msgData.sessionId = sessionId;
+
+  const msgRef = await addDoc(
+    collection(db, CONVERSATIONS, conversationId, MESSAGES),
+    msgData,
+  );
+
+  // Update conversation preview + unread counts.
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const convSnap = await getDoc(convRef);
+  if (convSnap.exists()) {
+    const data = convSnap.data();
+    const newUnread: Record<string, number> = { ...data.unreadCount };
+    (data.participants as string[]).forEach((uid) => {
+      if (uid !== senderId) newUnread[uid] = (newUnread[uid] || 0) + 1;
+    });
+    await updateDoc(convRef, {
+      lastMessage: caption?.trim() || '📷 Photo',
+      lastMessageType: 'photo',
+      lastMessageSenderId: senderId,
+      lastMessageAt: serverTimestamp(),
+      unreadCount: newUnread,
+      [`typing.${senderId}`]: 0,
+    });
+  }
+
+  return msgRef.id;
 };
 
 // ═══════════════════════════════════════════════
