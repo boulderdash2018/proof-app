@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
@@ -677,6 +677,9 @@ export const ConversationScreen: React.FC = () => {
   const togglePin = useChatStore((s) => s.togglePin);
   const toggleMute = useChatStore((s) => s.toggleMute);
   const deleteConv = useChatStore((s) => s.deleteConv);
+  const addToGroup = useChatStore((s) => s.addToGroup);
+  const leaveGroupConv = useChatStore((s) => s.leaveGroupConv);
+  const renameGroupConv = useChatStore((s) => s.renameGroupConv);
 
   // Active conversation (looked up once, used for status + kebab actions)
   const activeConv = useMemo(
@@ -748,8 +751,14 @@ export const ConversationScreen: React.FC = () => {
     return () => clearInterval(id);
   }, []);
 
-  // Kebab action sheet
+  // Kebab action sheet + group sub-sheets
   const [kebabOpen, setKebabOpen] = useState(false);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [renameSheetOpen, setRenameSheetOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+
+  // Only the creator can hard-delete a group — others leave.
+  const isGroupCreator = isGroup && activeConv?.createdBy === user?.id;
 
   const isMuted = useMemo(
     () => Boolean(activeConv && user?.id && (activeConv.mutedBy || []).includes(user.id)),
@@ -1235,6 +1244,36 @@ export const ConversationScreen: React.FC = () => {
                 <Text style={kebabStyles.actionText}>Voir le profil</Text>
               </TouchableOpacity>
             )}
+
+            {/* Group-only actions */}
+            {isGroup && (
+              <TouchableOpacity
+                style={kebabStyles.action}
+                onPress={() => {
+                  setKebabOpen(false);
+                  setTimeout(() => setAddSheetOpen(true), 200);
+                }}
+                activeOpacity={0.6}
+              >
+                <Ionicons name="person-add-outline" size={20} color={Colors.textPrimary} />
+                <Text style={kebabStyles.actionText}>Ajouter des participants</Text>
+              </TouchableOpacity>
+            )}
+            {isGroup && (
+              <TouchableOpacity
+                style={kebabStyles.action}
+                onPress={() => {
+                  setKebabOpen(false);
+                  setRenameValue(groupDisplayName);
+                  setTimeout(() => setRenameSheetOpen(true), 200);
+                }}
+                activeOpacity={0.6}
+              >
+                <Ionicons name="pencil-outline" size={20} color={Colors.textPrimary} />
+                <Text style={kebabStyles.actionText}>Renommer le groupe</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={kebabStyles.action}
               onPress={() => {
@@ -1253,33 +1292,69 @@ export const ConversationScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
             <View style={kebabStyles.divider} />
-            <TouchableOpacity
-              style={kebabStyles.action}
-              onPress={() => {
-                setKebabOpen(false);
-                Alert.alert(
-                  'Supprimer la conversation\u00a0?',
-                  'Cette action est définitive et concerne tous les participants.',
-                  [
-                    { text: 'Annuler', style: 'cancel' },
-                    {
-                      text: 'Supprimer',
-                      style: 'destructive',
-                      onPress: async () => {
-                        await deleteConv(conversationId);
-                        navigation.goBack();
+
+            {/* Destructive action — depends on context */}
+            {isGroup && !isGroupCreator ? (
+              // Regular member : quitter le groupe
+              <TouchableOpacity
+                style={kebabStyles.action}
+                onPress={() => {
+                  setKebabOpen(false);
+                  Alert.alert(
+                    'Quitter le groupe\u00a0?',
+                    'Tu ne recevras plus les messages de ce groupe.',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Quitter',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await leaveGroupConv(conversationId);
+                          navigation.goBack();
+                        },
                       },
-                    },
-                  ],
-                );
-              }}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="trash-outline" size={20} color={Colors.error} />
-              <Text style={[kebabStyles.actionText, { color: Colors.error }]}>
-                Supprimer la conversation
-              </Text>
-            </TouchableOpacity>
+                    ],
+                  );
+                }}
+                activeOpacity={0.6}
+              >
+                <Ionicons name="exit-outline" size={20} color={Colors.error} />
+                <Text style={[kebabStyles.actionText, { color: Colors.error }]}>
+                  Quitter le groupe
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              // DM or group-creator: supprimer la conversation
+              <TouchableOpacity
+                style={kebabStyles.action}
+                onPress={() => {
+                  setKebabOpen(false);
+                  Alert.alert(
+                    isGroup ? 'Supprimer le groupe\u00a0?' : 'Supprimer la conversation\u00a0?',
+                    isGroup
+                      ? 'Le groupe sera supprimé pour tous les participants.'
+                      : 'Cette action est définitive et concerne tous les participants.',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Supprimer',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await deleteConv(conversationId);
+                          navigation.goBack();
+                        },
+                      },
+                    ],
+                  );
+                }}
+                activeOpacity={0.6}
+              >
+                <Ionicons name="trash-outline" size={20} color={Colors.error} />
+                <Text style={[kebabStyles.actionText, { color: Colors.error }]}>
+                  {isGroup ? 'Supprimer le groupe' : 'Supprimer la conversation'}
+                </Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={kebabStyles.cancel}
               onPress={() => setKebabOpen(false)}
@@ -1290,6 +1365,77 @@ export const ConversationScreen: React.FC = () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Add participants sheet (groups only) */}
+      {isGroup && (
+        <AddParticipantsSheet
+          visible={addSheetOpen}
+          onClose={() => setAddSheetOpen(false)}
+          existingParticipantIds={activeConv?.participants || []}
+          onAdd={(participant) => addToGroup(conversationId, participant)}
+        />
+      )}
+
+      {/* Rename modal (groups only) */}
+      {isGroup && (
+        <Modal
+          visible={renameSheetOpen}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setRenameSheetOpen(false)}
+        >
+          <Pressable style={renameStyles.backdrop} onPress={() => setRenameSheetOpen(false)}>
+            <Pressable style={renameStyles.card} onPress={() => {}}>
+              <Text style={renameStyles.title}>Renommer le groupe</Text>
+              <TextInput
+                style={renameStyles.input}
+                value={renameValue}
+                onChangeText={setRenameValue}
+                placeholder="Nom du groupe"
+                placeholderTextColor={Colors.textTertiary}
+                maxLength={60}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  const trimmed = renameValue.trim();
+                  if (trimmed.length > 0) {
+                    renameGroupConv(conversationId, trimmed);
+                  }
+                  setRenameSheetOpen(false);
+                }}
+              />
+              <View style={renameStyles.actionsRow}>
+                <TouchableOpacity
+                  style={[renameStyles.actionBtn, renameStyles.actionBtnCancel]}
+                  onPress={() => setRenameSheetOpen(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[renameStyles.actionBtnText, { color: Colors.textSecondary }]}>
+                    Annuler
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[renameStyles.actionBtn, renameStyles.actionBtnConfirm]}
+                  onPress={() => {
+                    const trimmed = renameValue.trim();
+                    if (trimmed.length > 0) {
+                      renameGroupConv(conversationId, trimmed);
+                    }
+                    setRenameSheetOpen(false);
+                  }}
+                  activeOpacity={0.85}
+                  disabled={renameValue.trim().length === 0}
+                >
+                  <Text style={[renameStyles.actionBtnText, { color: Colors.textOnAccent }]}>
+                    Enregistrer
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -1358,6 +1504,68 @@ const kebabStyles = StyleSheet.create({
     fontSize: 15,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
+  },
+});
+
+// ═══════════════════════════════════════════════
+// Rename modal styles (group-only)
+// ═══════════════════════════════════════════════
+
+const renameStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(44,36,32,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 18,
+    padding: 22,
+  },
+  title: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+    marginBottom: 14,
+  },
+  input: {
+    fontSize: 15,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.bgTertiary,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 18,
+  },
+  actionBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnCancel: {
+    backgroundColor: 'transparent',
+  },
+  actionBtnConfirm: {
+    backgroundColor: Colors.primary,
+  },
+  actionBtnText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
   },
 });
 

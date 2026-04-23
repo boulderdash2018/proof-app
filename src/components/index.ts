@@ -19,4 +19,5 @@ export { PlanMapModal } from './PlanMapModal';
 export { SharePlanSheet } from './SharePlanSheet';
 export { GroupPlanSheet } from './GroupPlanSheet';
 export { GroupMosaicAvatar } from './GroupMosaicAvatar';
+export { AddParticipantsSheet } from './AddParticipantsSheet';
 export { FloatingAvatars } from './FloatingAvatars';

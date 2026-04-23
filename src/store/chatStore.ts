@@ -15,6 +15,9 @@ import {
   togglePinConversation,
   toggleMuteConversation,
   deleteConversation as deleteConversationService,
+  addParticipantToGroup,
+  leaveGroup as leaveGroupService,
+  renameGroup as renameGroupService,
 } from '../services/chatService';
 
 interface ReplyTo {
@@ -63,6 +66,11 @@ interface ChatStore {
   togglePin: (conversationId: string) => Promise<void>;
   toggleMute: (conversationId: string) => Promise<void>;
   deleteConv: (conversationId: string) => Promise<void>;
+
+  // Actions — group management
+  addToGroup: (conversationId: string, newParticipant: ConversationParticipant) => Promise<void>;
+  leaveGroupConv: (conversationId: string) => Promise<void>;
+  renameGroupConv: (conversationId: string, newName: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -371,6 +379,72 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       await deleteConversationService(conversationId);
     } catch (err) {
       console.warn('[chatStore] delete error:', err);
+    }
+  },
+
+  // ── Group management (optimistic + service call) ──
+  addToGroup: async (conversationId, newParticipant) => {
+    const { _userId, conversations } = get();
+    if (!_userId) return;
+    const conv = conversations.find((c) => c.id === conversationId);
+    if (!conv) return;
+    const actor = conv.participantDetails[_userId];
+    if (!actor) return;
+
+    // Optimistic: insert into local state
+    const participants = [...conv.participants];
+    if (!participants.includes(newParticipant.userId)) {
+      participants.push(newParticipant.userId);
+    }
+    const participantDetails = { ...conv.participantDetails, [newParticipant.userId]: newParticipant };
+    const unreadCount = { ...conv.unreadCount, [newParticipant.userId]: 0 };
+    set({
+      conversations: conversations.map((c) =>
+        c.id === conversationId ? { ...c, participants, participantDetails, unreadCount } : c,
+      ),
+    });
+    try {
+      await addParticipantToGroup(conversationId, actor, newParticipant);
+    } catch (err) {
+      console.warn('[chatStore] addToGroup error:', err);
+    }
+  },
+
+  leaveGroupConv: async (conversationId) => {
+    const { _userId, conversations } = get();
+    if (!_userId) return;
+    const conv = conversations.find((c) => c.id === conversationId);
+    if (!conv) return;
+    const actor = conv.participantDetails[_userId];
+    if (!actor) return;
+    // Optimistic: remove conv from list
+    set({ conversations: conversations.filter((c) => c.id !== conversationId) });
+    try {
+      await leaveGroupService(conversationId, actor);
+    } catch (err) {
+      console.warn('[chatStore] leaveGroup error:', err);
+    }
+  },
+
+  renameGroupConv: async (conversationId, newName) => {
+    const { _userId, conversations } = get();
+    if (!_userId) return;
+    const conv = conversations.find((c) => c.id === conversationId);
+    if (!conv) return;
+    const actor = conv.participantDetails[_userId];
+    if (!actor) return;
+    const clean = newName.trim();
+    if (clean.length === 0) return;
+    // Optimistic
+    set({
+      conversations: conversations.map((c) =>
+        c.id === conversationId ? { ...c, groupName: clean } : c,
+      ),
+    });
+    try {
+      await renameGroupService(conversationId, actor, clean);
+    } catch (err) {
+      console.warn('[chatStore] renameGroup error:', err);
     }
   },
 }));
