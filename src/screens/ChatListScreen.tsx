@@ -14,6 +14,7 @@ import {
   Alert,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -107,6 +108,108 @@ const dotsStyles = StyleSheet.create({
 });
 
 // ──────────────────────────────────────────────────────────────
+// Mosaic avatar — stacks 2 participants' avatars (for groups)
+// ──────────────────────────────────────────────────────────────
+
+interface MosaicAvatarProps {
+  participants: Array<{ initials: string; avatarBg: string; avatarColor: string; avatarUrl: string | null }>;
+  size?: number;
+}
+
+const GroupMosaicAvatar: React.FC<MosaicAvatarProps> = ({ participants, size = 50 }) => {
+  // Show first 2 non-self participants. If only 1, render single avatar centered.
+  const shown = participants.slice(0, 2);
+  const subSize = Math.round(size * 0.68);
+
+  if (shown.length === 0) {
+    return (
+      <View style={[mosaicStyles.frame, { width: size, height: size, borderRadius: size / 2, backgroundColor: Colors.bgTertiary }]}>
+        <Ionicons name="people" size={20} color={Colors.textTertiary} />
+      </View>
+    );
+  }
+
+  if (shown.length === 1) {
+    const p = shown[0];
+    return (
+      <View style={[mosaicStyles.frame, { width: size, height: size, borderRadius: size / 2, backgroundColor: p.avatarBg }]}>
+        {p.avatarUrl ? (
+          <Image source={{ uri: p.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        ) : (
+          <Text style={[mosaicStyles.initials, { color: p.avatarColor, fontSize: size * 0.38 }]}>{p.initials}</Text>
+        )}
+      </View>
+    );
+  }
+
+  const [a, b] = shown;
+  return (
+    <View style={{ width: size, height: size, position: 'relative' }}>
+      {/* Back avatar — top-left */}
+      <View
+        style={[
+          mosaicStyles.subAvatar,
+          {
+            top: 0,
+            left: 0,
+            width: subSize,
+            height: subSize,
+            borderRadius: subSize / 2,
+            backgroundColor: a.avatarBg,
+            borderColor: Colors.bgPrimary,
+          },
+        ]}
+      >
+        {a.avatarUrl ? (
+          <Image source={{ uri: a.avatarUrl }} style={{ width: subSize, height: subSize, borderRadius: subSize / 2 }} />
+        ) : (
+          <Text style={[mosaicStyles.initials, { color: a.avatarColor, fontSize: subSize * 0.4 }]}>{a.initials}</Text>
+        )}
+      </View>
+      {/* Front avatar — bottom-right, overlaps */}
+      <View
+        style={[
+          mosaicStyles.subAvatar,
+          {
+            top: size - subSize,
+            left: size - subSize,
+            width: subSize,
+            height: subSize,
+            borderRadius: subSize / 2,
+            backgroundColor: b.avatarBg,
+            borderColor: Colors.bgPrimary,
+          },
+        ]}
+      >
+        {b.avatarUrl ? (
+          <Image source={{ uri: b.avatarUrl }} style={{ width: subSize, height: subSize, borderRadius: subSize / 2 }} />
+        ) : (
+          <Text style={[mosaicStyles.initials, { color: b.avatarColor, fontSize: subSize * 0.4 }]}>{b.initials}</Text>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const mosaicStyles = StyleSheet.create({
+  frame: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  subAvatar: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 2,
+  },
+  initials: {
+    fontFamily: Fonts.bodyBold,
+  },
+});
+
+// ──────────────────────────────────────────────────────────────
 // Conversation row
 // ──────────────────────────────────────────────────────────────
 
@@ -118,9 +221,20 @@ interface RowProps {
 }
 
 const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress }) => {
-  const otherId = conv.participants.find((id) => id !== meId);
-  const other = otherId ? conv.participantDetails[otherId] : null;
-  if (!other || !otherId) return null;
+  const isGroup = conv.isGroup === true;
+
+  // Resolve the "primary" other participant for DMs; for groups we collect all.
+  const otherId = isGroup ? null : conv.participants.find((id) => id !== meId);
+  const other = !isGroup && otherId ? conv.participantDetails[otherId] : null;
+  if (!isGroup && (!other || !otherId)) return null;
+
+  // For groups, precompute the list of other participants (excluding me).
+  const otherParticipants = isGroup
+    ? conv.participants
+        .filter((id) => id !== meId)
+        .map((id) => conv.participantDetails[id])
+        .filter(Boolean)
+    : [];
 
   const unread = conv.unreadCount[meId] || 0;
   const isMyLastMsg = conv.lastMessageSenderId === meId;
@@ -128,18 +242,32 @@ const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress 
   const pinned = (conv.pinnedBy || []).includes(meId);
   const showUnreadAccent = unread > 0 && !isMyLastMsg && !muted;
 
-  // Typing detection
-  const typingTs = (conv.typing && conv.typing[otherId]) || 0;
+  // Typing detection — only for DMs (single "other" to watch)
+  const typingTs = !isGroup && otherId ? (conv.typing && conv.typing[otherId]) || 0 : 0;
   const isTyping = typingTs > 0 && Date.now() - typingTs < 5000;
 
-  // "Vu" — the other party has read my last message
+  // "Vu" — DM only. Groups have per-user lastReadAt but aggregated receipt is noisy.
   let theyHaveRead = false;
-  if (isMyLastMsg && conv.lastMessageAt && conv.lastReadAt) {
+  if (!isGroup && isMyLastMsg && otherId && conv.lastMessageAt && conv.lastReadAt) {
     const theirLastReadAt = conv.lastReadAt[otherId];
     if (theirLastReadAt) {
       theyHaveRead = new Date(theirLastReadAt).getTime() >= new Date(conv.lastMessageAt).getTime();
     }
   }
+
+  // Display name + optional meetup sub-line
+  const displayName = isGroup
+    ? (conv.groupName || conv.linkedPlanTitle || 'Nouveau groupe')
+    : (other?.displayName || '');
+
+  // Sender name for group message preview prefix ("Léa: ...")
+  const lastSenderName = (() => {
+    if (!isGroup) return '';
+    if (isMyLastMsg) return 'Toi';
+    const sender = conv.participantDetails[conv.lastMessageSenderId];
+    if (!sender) return '';
+    return sender.displayName.split(' ')[0];
+  })();
 
   // ── Build preview content ──
   let previewNode: React.ReactNode;
@@ -159,15 +287,29 @@ const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress 
         style={[rowStyles.preview, { color: Colors.textTertiary, fontStyle: 'italic' }]}
         numberOfLines={1}
       >
-        Nouvelle conversation
+        {isGroup ? 'Dis bonjour au groupe' : 'Nouvelle conversation'}
+      </Text>
+    );
+  } else if (conv.lastMessageType === 'system') {
+    previewNode = (
+      <Text
+        style={[rowStyles.preview, { color: Colors.textTertiary, fontStyle: 'italic' }]}
+        numberOfLines={1}
+      >
+        {conv.lastMessage}
       </Text>
     );
   } else if (conv.lastMessageType === 'plan') {
     // Plan-share micro-pill
-    const swatch = other.avatarBg || Colors.primary;
+    const swatch = (!isGroup && other?.avatarBg) || Colors.primary;
     previewNode = (
       <View style={rowStyles.previewLine}>
-        {isMyLastMsg && (
+        {isGroup && lastSenderName && (
+          <Text style={[rowStyles.receipt, { color: Colors.textSecondary, fontFamily: Fonts.bodySemiBold }]}>
+            {lastSenderName}{': '}
+          </Text>
+        )}
+        {!isGroup && isMyLastMsg && (
           <Text
             style={[
               rowStyles.receipt,
@@ -184,7 +326,7 @@ const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress 
               backgroundColor: Colors.terracotta50,
               borderColor: Colors.terracotta100,
             },
-            isMyLastMsg && { marginLeft: 6 },
+            (isGroup || isMyLastMsg) && { marginLeft: 6 },
           ]}
         >
           <View style={[rowStyles.planSwatch, { backgroundColor: swatch }]} />
@@ -206,7 +348,22 @@ const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress 
         : Colors.textSecondary;
     const previewWeight = showUnreadAccent ? Fonts.bodySemiBold : Fonts.body;
 
-    if (isMyLastMsg) {
+    if (isGroup) {
+      // Group: "Léa: xxx" prefix (no "vu" receipt — too noisy in groups)
+      previewNode = (
+        <Text
+          style={[rowStyles.preview, { color: previewColor, fontFamily: previewWeight }]}
+          numberOfLines={1}
+        >
+          {lastSenderName && (
+            <Text style={{ color: Colors.textSecondary, fontFamily: Fonts.bodySemiBold }}>
+              {lastSenderName}{': '}
+            </Text>
+          )}
+          {conv.lastMessage}
+        </Text>
+      );
+    } else if (isMyLastMsg) {
       previewNode = (
         <Text
           style={[rowStyles.preview, { color: previewColor, fontFamily: previewWeight }]}
@@ -280,17 +437,37 @@ const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress 
       {/* Left accent bar (unread, non-muted only) */}
       {showUnreadAccent && <View style={[rowStyles.accentBar, { backgroundColor: Colors.primary }]} />}
 
-      <Avatar
-        initials={other.initials}
-        bg={other.avatarBg}
-        color={other.avatarColor}
-        size="ML"
-        avatarUrl={other.avatarUrl || undefined}
-      />
+      {isGroup ? (
+        <GroupMosaicAvatar
+          participants={otherParticipants.map((p) => ({
+            initials: p.initials,
+            avatarBg: p.avatarBg,
+            avatarColor: p.avatarColor,
+            avatarUrl: p.avatarUrl,
+          }))}
+          size={50}
+        />
+      ) : (
+        <Avatar
+          initials={other!.initials}
+          bg={other!.avatarBg}
+          color={other!.avatarColor}
+          size="ML"
+          avatarUrl={other!.avatarUrl ?? undefined}
+        />
+      )}
 
       <View style={rowStyles.body}>
         <View style={rowStyles.topLine}>
           <View style={rowStyles.nameWrap}>
+            {isGroup && (
+              <Ionicons
+                name="people"
+                size={12}
+                color={Colors.textTertiary}
+                style={{ marginRight: 6 }}
+              />
+            )}
             <Text
               style={[
                 rowStyles.name,
@@ -301,7 +478,7 @@ const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress 
               ]}
               numberOfLines={1}
             >
-              {other.displayName}
+              {displayName}
             </Text>
             {pinned && (
               <Ionicons
@@ -460,10 +637,19 @@ const ActionSheet: React.FC<ActionSheetProps> = ({
   onDelete,
 }) => {
   if (!conv) return null;
-  const otherId = conv.participants.find((id) => id !== meId);
-  const other = otherId ? conv.participantDetails[otherId] : null;
+  const isGroup = conv.isGroup === true;
+  const otherId = isGroup ? null : conv.participants.find((id) => id !== meId);
+  const other = !isGroup && otherId ? conv.participantDetails[otherId] : null;
   const pinned = (conv.pinnedBy || []).includes(meId);
   const muted = (conv.mutedBy || []).includes(meId);
+  const groupName = isGroup ? (conv.groupName || conv.linkedPlanTitle || 'Groupe') : '';
+  const participantCount = conv.participants.length;
+  const otherParticipantsForSheet = isGroup
+    ? conv.participants
+        .filter((id) => id !== meId)
+        .map((id) => conv.participantDetails[id])
+        .filter(Boolean)
+    : [];
 
   const askDelete = () => {
     onClose();
@@ -491,14 +677,34 @@ const ActionSheet: React.FC<ActionSheetProps> = ({
     >
       <Pressable style={sheetStyles.backdrop} onPress={onClose}>
         <Pressable style={sheetStyles.sheet} onPress={() => {}}>
-          {other && (
+          {isGroup ? (
+            <View style={sheetStyles.header}>
+              <GroupMosaicAvatar
+                participants={otherParticipantsForSheet.map((p) => ({
+                  initials: p.initials,
+                  avatarBg: p.avatarBg,
+                  avatarColor: p.avatarColor,
+                  avatarUrl: p.avatarUrl,
+                }))}
+                size={40}
+              />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={sheetStyles.headerName} numberOfLines={1}>
+                  {groupName}
+                </Text>
+                <Text style={sheetStyles.headerHandle} numberOfLines={1}>
+                  {participantCount} participants
+                </Text>
+              </View>
+            </View>
+          ) : other ? (
             <View style={sheetStyles.header}>
               <Avatar
                 initials={other.initials}
                 bg={other.avatarBg}
                 color={other.avatarColor}
                 size="M"
-                avatarUrl={other.avatarUrl || undefined}
+                avatarUrl={other.avatarUrl ?? undefined}
               />
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={sheetStyles.headerName} numberOfLines={1}>
@@ -509,7 +715,7 @@ const ActionSheet: React.FC<ActionSheetProps> = ({
                 </Text>
               </View>
             </View>
-          )}
+          ) : null}
 
           <View style={sheetStyles.divider} />
 
@@ -686,11 +892,19 @@ export const ChatListScreen: React.FC = () => {
     const q = search.trim().toLowerCase();
     const matchesSearch = (c: Conversation) => {
       if (!q) return true;
+      const last = (c.lastMessage || '').toLowerCase();
+      if (c.isGroup) {
+        const name = (c.groupName || c.linkedPlanTitle || '').toLowerCase();
+        // Also match any participant's displayName
+        const participantMatch = Object.values(c.participantDetails || {}).some((p) =>
+          p.displayName.toLowerCase().includes(q) || p.username.toLowerCase().includes(q),
+        );
+        return name.includes(q) || last.includes(q) || participantMatch;
+      }
       const otherId = c.participants.find((id) => id !== meId);
       const other = otherId ? c.participantDetails[otherId] : null;
       const name = other?.displayName?.toLowerCase() || '';
       const username = other?.username?.toLowerCase() || '';
-      const last = (c.lastMessage || '').toLowerCase();
       return name.includes(q) || username.includes(q) || last.includes(q);
     };
 
@@ -765,6 +979,14 @@ export const ChatListScreen: React.FC = () => {
           conv={item.conv}
           meId={meId}
           onPress={() => {
+            if (item.conv.isGroup) {
+              // Groups are identified by conv id alone; ConversationScreen derives header data from it.
+              navigation.navigate('Conversation', {
+                conversationId: item.conv.id,
+                otherUser: null,
+              });
+              return;
+            }
             const otherId = item.conv.participants.find((id) => id !== meId);
             const other = otherId ? item.conv.participantDetails[otherId] : null;
             if (!other) return;
