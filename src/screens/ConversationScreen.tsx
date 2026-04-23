@@ -363,7 +363,11 @@ const MessageRow = React.memo<MessageRowProps>(({
                   styles.quotedReply,
                   isMine ? styles.quotedReplyMine : styles.quotedReplyOther,
                   isMine
-                    ? { backgroundColor: 'rgba(255,248,240,0.18)', borderLeftColor: Colors.textOnAccent }
+                    ? {
+                        // Dark veil over terracotta = darker terracotta zone, then cream text on top.
+                        backgroundColor: 'rgba(44,36,32,0.22)',
+                        borderLeftColor: Colors.textOnAccent,
+                      }
                     : { backgroundColor: Colors.terracotta50, borderLeftColor: Colors.primary },
                 ]}
                 activeOpacity={0.7}
@@ -381,7 +385,7 @@ const MessageRow = React.memo<MessageRowProps>(({
                   style={[
                     styles.quotedText,
                     {
-                      color: isMine ? 'rgba(255,248,240,0.85)' : Colors.textSecondary,
+                      color: isMine ? Colors.textOnAccent : Colors.textSecondary,
                     },
                   ]}
                   numberOfLines={2}
