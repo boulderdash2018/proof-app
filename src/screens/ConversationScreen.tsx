@@ -364,9 +364,10 @@ const MessageRow = React.memo<MessageRowProps>(({
                   isMine ? styles.quotedReplyMine : styles.quotedReplyOther,
                   isMine
                     ? {
-                        // Dark veil over terracotta = darker terracotta zone, then cream text on top.
-                        backgroundColor: 'rgba(44,36,32,0.22)',
-                        borderLeftColor: Colors.textOnAccent,
+                        // Deeper terracotta from the same palette — feels like a "cuite plus profonde"
+                        // ceramic plate nested inside the main bubble. Stays in the warm DNA.
+                        backgroundColor: Colors.terracotta700,
+                        borderLeftColor: Colors.terracotta200,
                       }
                     : { backgroundColor: Colors.terracotta50, borderLeftColor: Colors.primary },
                 ]}
