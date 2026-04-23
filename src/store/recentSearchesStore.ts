@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface RecentSearchesStore {
   searches: string[];
   addSearch: (query: string) => void;
+  removeSearch: (query: string) => void;
   clearSearches: () => void;
 }
 
@@ -18,6 +19,10 @@ export const useRecentSearchesStore = create<RecentSearchesStore>()(
         if (!trimmed) return;
         const filtered = get().searches.filter((s) => s !== trimmed);
         set({ searches: [trimmed, ...filtered].slice(0, 5) });
+      },
+
+      removeSearch: (query: string) => {
+        set({ searches: get().searches.filter((s) => s !== query) });
       },
 
       clearSearches: () => set({ searches: [] }),

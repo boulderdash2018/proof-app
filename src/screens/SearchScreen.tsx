@@ -45,7 +45,7 @@ export const SearchScreen: React.FC = () => {
   const trendingLoading = useTrendingStore((s) => s.isLoading);
   const cityConfig = useCity();
   const savedPlacesStore = useSavedPlacesStore();
-  const { searches: recentSearches, addSearch, clearSearches } = useRecentSearchesStore();
+  const { searches: recentSearches, addSearch, removeSearch, clearSearches } = useRecentSearchesStore();
 
   const [query, setQuery] = useState('');
   const [googlePlaces, setGooglePlaces] = useState<GooglePlaceDetails[]>([]);
@@ -126,26 +126,41 @@ export const SearchScreen: React.FC = () => {
   const renderPlan = (plan: Plan) => {
     const colors = parseGradientColors(plan.gradient);
     const photo = getPlanPhoto(plan);
+    const authorName = plan.author?.displayName || plan.author?.username || '';
     return (
       <TouchableOpacity
         key={plan.id}
-        style={[s.compactCard, { borderColor: C.cardBorder, backgroundColor: C.gray200 }]}
+        style={s.planCard}
         activeOpacity={0.85}
         onPress={() => handlePlanPress(plan)}
       >
-        <View style={s.compactBanner}>
+        <View style={s.planBanner}>
           {photo ? (
-            <Image source={{ uri: photo }} style={s.compactBannerImage} />
+            <Image source={{ uri: photo }} style={s.planBannerImage} />
           ) : (
-            <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={colors as [string, string, ...string[]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
           )}
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={s.compactBannerOverlay} />
-          <Text style={s.compactTitle} numberOfLines={2}>{plan.title}</Text>
+          <LinearGradient
+            colors={['transparent', 'rgba(44,36,32,0.6)']}
+            locations={[0.45, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={s.planBannerBody}>
+            <Text style={s.planTitle} numberOfLines={2}>{plan.title}</Text>
+            {authorName ? (
+              <Text style={s.planAuthor} numberOfLines={1}>par {authorName.toLowerCase()}</Text>
+            ) : null}
+          </View>
         </View>
-        <View style={s.compactMeta}>
-          <View style={s.compactMetaItem}><Ionicons name="cash-outline" size={13} color={C.gold} /><Text style={[s.compactMetaText, { color: C.gray800 }]}>{plan.price}</Text></View>
-          <View style={s.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={C.gold} /><Text style={[s.compactMetaText, { color: C.gray800 }]}>{plan.duration}</Text></View>
-          <View style={s.compactMetaItem}><Ionicons name="heart" size={13} color={C.gold} /><Text style={[s.compactMetaText, { color: C.gray800 }]}>{plan.likesCount}</Text></View>
+        <View style={s.planMeta}>
+          <Text style={[s.planMetaText, { color: C.gray800 }]}>~{plan.price}</Text>
+          <Text style={[s.planMetaDot, { color: C.gray500 }]}>·</Text>
+          <Text style={[s.planMetaText, { color: C.gray800 }]}>{plan.duration}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -255,7 +270,14 @@ export const SearchScreen: React.FC = () => {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="time-outline" size={16} color={C.gray500} style={{ marginRight: 12 }} />
-                    <Text style={[s.recentText, { color: C.black }]}>{term}</Text>
+                    <Text style={[s.recentText, { color: C.black }]} numberOfLines={1}>{term}</Text>
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation?.(); removeSearch(term); }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={s.recentRemoveBtn}
+                    >
+                      <Ionicons name="close" size={14} color={C.gray500} />
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -263,13 +285,19 @@ export const SearchScreen: React.FC = () => {
 
             {/* Trending categories */}
             <View style={s.section}>
-              <Text style={[s.sectionLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
+              <View style={s.sectionHeaderRow}>
+                <Text style={[s.sectionLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
+                {!trendingLoading && trendingCategories.length > 0 && (
+                  <Text style={[s.sectionCount, { color: C.gray500 }]}>{trendingCategories.length}</Text>
+                )}
+              </View>
               {trendingLoading ? (
                 <LoadingSkeleton variant="list" />
               ) : (
                 <View>
                   {trendingCategories.map((cat, i) => {
                     const isLast = i === trendingCategories.length - 1;
+                    const isHot = cat.hot || i < 3;
                     return (
                       <TouchableOpacity
                         key={cat.name}
@@ -280,11 +308,29 @@ export const SearchScreen: React.FC = () => {
                           // Small delay to let the screen close, then the ExploreScreen can handle the filter
                         }}
                       >
-                        <Text style={s.trendingEmoji}>{cat.emoji}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[s.trendingName, { color: C.black }]}>{cat.name}</Text>
-                          <Text style={[s.trendingCount, { color: C.gray600 }]}>{cat.planCount} plan{cat.planCount > 1 ? 's' : ''}</Text>
+                        {/* Mini gradient tile — same palette as the Explore grid */}
+                        <View style={s.trendingTile}>
+                          <LinearGradient
+                            colors={cat.gradient as [string, string]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFill}
+                          />
                         </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={s.trendingNameRow}>
+                            <Text style={[s.trendingName, { color: C.black }]} numberOfLines={1}>
+                              {cat.name}
+                            </Text>
+                            {isHot && (
+                              <Text style={[s.trendingHotPlus, { color: Colors.gold }]}>+</Text>
+                            )}
+                          </View>
+                          <Text style={[s.trendingCount, { color: C.gray600 }]}>
+                            {cat.planCount} plan{cat.planCount > 1 ? 's' : ''}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={C.gray500} />
                       </TouchableOpacity>
                     );
                   })}
@@ -350,33 +396,60 @@ const s = StyleSheet.create({
 
   // Sections
   section: { marginTop: 18 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, fontFamily: Fonts.bodySemiBold },
+  sectionCount: { fontSize: 12, fontFamily: Fonts.body },
   clearText: { fontSize: 12, fontFamily: Fonts.body },
 
   // Recent searches
-  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1 },
-  recentText: { fontSize: 14, fontFamily: Fonts.body },
+  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1 } as any,
+  recentText: { fontSize: 14, fontFamily: Fonts.body, flex: 1 },
+  recentRemoveBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' } as any,
 
-  // Trending (same as ExploreScreen)
-  trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
-  trendingEmoji: { fontSize: 28 },
-  trendingName: { fontSize: 15, fontFamily: Fonts.bodySemiBold },
-  trendingCount: { fontSize: 12, marginTop: 2 },
+  // Trending — mini-tile gradient + name + optional gold "+" + chevron
+  trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 } as any,
+  trendingTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  trendingNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 } as any,
+  trendingName: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
+  trendingHotPlus: { fontSize: 16, fontFamily: Fonts.displayBold, marginTop: -2 },
+  trendingCount: { fontSize: 12, marginTop: 2, fontFamily: Fonts.body },
 
-  // Place results (compact rows)
-  placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
+  // Place results (compact rows) — pin in cream square + name/type + star
+  placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 12 } as any,
   placeIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   placeName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
-  placeType: { fontSize: 12, marginTop: 1 },
+  placeType: { fontSize: 12, marginTop: 1, fontFamily: Fonts.body },
 
-  // Plan results (reuse explore style)
-  compactCard: { borderRadius: 18, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
-  compactBanner: { height: 90, justifyContent: 'flex-end', padding: 12, overflow: 'hidden' },
-  compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' } as any,
-  compactBannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 } as any,
-  compactTitle: { color: '#FFFFFF', fontSize: 15, fontFamily: Fonts.displaySemiBold, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  compactMeta: { flexDirection: 'row', padding: 10, gap: 14 },
-  compactMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  compactMetaText: { fontSize: 12 },
+  // Plan results — full editorial card with author byline, meta below card
+  planCard: { marginBottom: 14 },
+  planBanner: { height: 130, borderRadius: 16, overflow: 'hidden', justifyContent: 'flex-end' },
+  planBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' } as any,
+  planBannerBody: { padding: 14 },
+  planTitle: {
+    color: Colors.textOnAccent,
+    fontSize: 18,
+    fontFamily: Fonts.displaySemiBold,
+    letterSpacing: -0.2,
+    lineHeight: 22,
+  },
+  planAuthor: {
+    color: 'rgba(255, 248, 240, 0.8)',
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    marginTop: 3,
+  },
+  planMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 10,
+    paddingHorizontal: 4,
+  } as any,
+  planMetaText: { fontSize: 13, fontFamily: Fonts.body },
+  planMetaDot: { fontSize: 13 },
 });
