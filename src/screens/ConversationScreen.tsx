@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   KeyboardAvoidingView, Platform, Keyboard, Image, Animated, PanResponder,
-  NativeSyntheticEvent, NativeScrollEvent,
+  NativeSyntheticEvent, NativeScrollEvent, Modal, Pressable, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -27,9 +27,10 @@ const TIME_REVEAL_MAX = 70;
 
 // ── Bubble shape (Instagram-style grouping) ──
 const BUBBLE_R = 20;
-const BUBBLE_FLAT = 4;
+const BUBBLE_FLAT = 6;
 const GROUP_GAP = 4;
 const NORMAL_GAP = 12;
+const PRESENCE_FRESH_MS = 5 * 60_000;
 
 // ── Reaction overlay ──
 const REACTION_OVERLAP = 16;
@@ -99,13 +100,11 @@ const getSpacing = (msg: ChatMessage, next?: ChatMessage): number => {
 
 interface TypingIndicatorProps {
   otherUser: ConversationParticipant;
-  color: string;
-  bgColor: string;
   isGrouped: boolean;
   listSlideX: Animated.Value;
 }
 
-const TypingIndicator: React.FC<TypingIndicatorProps> = ({ otherUser, color, bgColor, isGrouped, listSlideX }) => {
+const TypingIndicator: React.FC<TypingIndicatorProps> = ({ otherUser, isGrouped, listSlideX }) => {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -135,10 +134,10 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ otherUser, color, bgC
   return (
     <View style={styles.msgWrapper}>
       <Animated.View style={[styles.msgRow, styles.msgRowLeft, { transform: [{ translateX: listSlideX }] }]}>
-        <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
-        <View style={[styles.typingBubble, { backgroundColor: bgColor }, typingRadii]}>
+        <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XSM" avatarUrl={otherUser.avatarUrl || undefined} />
+        <View style={[styles.typingBubble, typingRadii]}>
           {[dot1, dot2, dot3].map((dot, i) => (
-            <Animated.View key={i} style={[styles.typingDot, { backgroundColor: color, transform: [{ translateY: dot }] }]} />
+            <Animated.View key={i} style={[styles.typingDot, { transform: [{ translateY: dot }] }]} />
           ))}
         </View>
       </Animated.View>
@@ -296,14 +295,28 @@ const MessageRow = React.memo<MessageRowProps>(({
     onLongPress(item.id);
   }, [item.id, onLongPress]);
 
-  // ── Reactions to display ──
-  const showOverlay = showHeart || nonHeartReactions.length > 0;
+  // ── Reactions to display — aggregate by emoji, with count if ≥2 ──
+  const aggregatedNonHeart = useMemo(() => {
+    const map = new Map<string, number>();
+    nonHeartReactions.forEach((r) => {
+      map.set(r.emoji, (map.get(r.emoji) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([emoji, count]) => ({ emoji, count }));
+  }, [nonHeartReactions]);
+
+  // Heart count (mine + any other hearts on the same message)
+  const heartCount = useMemo(
+    () => item.reactions.filter((r) => r.emoji === HEART_EMOJI).length,
+    [item.reactions],
+  );
+
+  const showOverlay = showHeart || aggregatedNonHeart.length > 0;
 
   return (
     <View>
       {showDate && (
         <View style={styles.dateSeparator}>
-          <Text style={[styles.dateSeparatorText, { color: C.gray600 }]}>
+          <Text style={styles.dateSeparatorText}>
             {formatDateSeparator(item.createdAt)}
           </Text>
         </View>
@@ -331,7 +344,7 @@ const MessageRow = React.memo<MessageRowProps>(({
         >
           {/* Avatar (other only, last in group) */}
           {!isMine && showAvatar && (
-            <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="SS" avatarUrl={otherUser.avatarUrl || undefined} />
+            <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XSM" avatarUrl={otherUser.avatarUrl || undefined} />
           )}
           {!isMine && !showAvatar && <View style={styles.avatarSpacer} />}
 
@@ -342,21 +355,37 @@ const MessageRow = React.memo<MessageRowProps>(({
             delayLongPress={400}
             style={{ maxWidth: '78%' }}
           >
-            {/* Quoted reply preview — identical styling on both sides */}
+            {/* Quoted reply preview — colors flip based on bubble side */}
             {hasReply && (
               <TouchableOpacity
                 onPress={() => item.replyToId && onScrollToQuote(item.replyToId)}
                 style={[
                   styles.quotedReply,
                   isMine ? styles.quotedReplyMine : styles.quotedReplyOther,
-                  { backgroundColor: Colors.terracotta100, borderLeftColor: Colors.primary },
+                  isMine
+                    ? { backgroundColor: 'rgba(255,248,240,0.18)', borderLeftColor: Colors.textOnAccent }
+                    : { backgroundColor: Colors.terracotta50, borderLeftColor: Colors.primary },
                 ]}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.quotedName, { color: Colors.terracotta700 }]} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.quotedName,
+                    { color: isMine ? Colors.textOnAccent : Colors.primaryDeep },
+                  ]}
+                  numberOfLines={1}
+                >
                   {item.replyToSenderId === userId ? 'Toi' : otherUser.displayName}
                 </Text>
-                <Text style={[styles.quotedText, { color: Colors.textSecondary }]} numberOfLines={2}>
+                <Text
+                  style={[
+                    styles.quotedText,
+                    {
+                      color: isMine ? 'rgba(255,248,240,0.85)' : Colors.textSecondary,
+                    },
+                  ]}
+                  numberOfLines={2}
+                >
                   {item.replyToType === 'plan'
                     ? 'Plan partagé ✦'
                     : item.replyToContent || 'Message supprimé'}
@@ -367,36 +396,66 @@ const MessageRow = React.memo<MessageRowProps>(({
             {/* Bubble — dynamic radii from grouping */}
             <View style={[
               styles.bubble,
-              isMine ? { backgroundColor: C.primary } : { backgroundColor: C.gray200 },
+              isMine
+                ? { backgroundColor: Colors.primary }
+                : {
+                    backgroundColor: Colors.bgSecondary,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: Colors.borderSubtle,
+                  },
+              // Plan messages get a tighter padding so the inner card breathes
+              item.type === 'plan' && styles.bubblePlanPadding,
               bubbleRadii,
               // When there's a quoted reply on top, flatten the bubble's top corners
               // so the preview + bubble merge into a single rounded block.
-              hasReply && { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+              hasReply && { borderTopLeftRadius: 6, borderTopRightRadius: 6 },
             ]}>
               {item.type === 'plan' ? (
-                <TouchableOpacity onPress={() => item.planId && onPlanPress(item.planId)} activeOpacity={0.8}>
-                  {item.planCover ? (
-                    <Image source={{ uri: item.planCover }} style={styles.planCover} />
-                  ) : (
-                    <View style={[styles.planCoverPlaceholder, { backgroundColor: C.primary + '20' }]}>
-                      <Ionicons name="map-outline" size={24} color={C.primary} />
+                <TouchableOpacity
+                  onPress={() => item.planId && onPlanPress(item.planId)}
+                  activeOpacity={0.85}
+                  style={[
+                    styles.planCard,
+                    {
+                      backgroundColor: isMine ? Colors.bgSecondary : Colors.bgPrimary,
+                    },
+                  ]}
+                >
+                  {/* Cover hero with floating tag */}
+                  <View style={styles.planHero}>
+                    {item.planCover ? (
+                      <Image source={{ uri: item.planCover }} style={StyleSheet.absoluteFill} />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFill, styles.planHeroFallback]} />
+                    )}
+                    <View style={styles.planHeroOverlay} pointerEvents="none" />
+                    <View style={styles.planHeroTag}>
+                      <Text style={styles.planHeroTagText}>✦ Plan partagé</Text>
                     </View>
-                  )}
-                  <View style={styles.planInfo}>
-                    <Text style={[styles.planLabel, { color: isMine ? 'rgba(255,248,240,0.7)' : C.gray600 }]}>PLAN PARTAGÉ</Text>
-                    <Text style={[styles.planTitle, { color: isMine ? Colors.textOnAccent : C.black }]} numberOfLines={2}>{item.planTitle}</Text>
+                  </View>
+                  <View style={styles.planBody}>
                     {item.planAuthorName && (
-                      <Text style={[styles.planAuthor, { color: isMine ? 'rgba(255,248,240,0.6)' : C.gray600 }]}>par {item.planAuthorName}</Text>
+                      <Text style={styles.planEyebrow} numberOfLines={1}>
+                        CURATEUR · {item.planAuthorName}
+                      </Text>
+                    )}
+                    <Text style={styles.planTitle} numberOfLines={2}>
+                      {item.planTitle}
+                    </Text>
+                    {item.planAuthorName && (
+                      <Text style={styles.planAuthor} numberOfLines={1}>
+                        par {item.planAuthorName}
+                      </Text>
                     )}
                   </View>
                   {!!item.content && (
-                    <View style={[styles.planAttachedWrap, { borderTopColor: isMine ? 'rgba(255,248,240,0.2)' : C.borderLight }]}>
-                      <Text style={[styles.planAttachedMsg, { color: isMine ? Colors.textOnAccent : C.black }]}>{item.content}</Text>
+                    <View style={styles.planAttachedWrap}>
+                      <Text style={styles.planAttachedMsg}>{item.content}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
               ) : (
-                <Text style={[styles.msgText, { color: isMine ? Colors.textOnAccent : C.black }]}>{item.content}</Text>
+                <Text style={[styles.msgText, { color: isMine ? Colors.textOnAccent : Colors.textPrimary }]}>{item.content}</Text>
               )}
             </View>
 
@@ -408,21 +467,21 @@ const MessageRow = React.memo<MessageRowProps>(({
               ]}>
                 {showHeart && (
                   <Animated.View style={[
-                    styles.reactionChip, { backgroundColor: C.gray300 + 'DD', borderColor: C.primary + '30' },
+                    styles.reactionChip,
                     { transform: [{ scale: heartScale }], opacity: heartScale },
                   ]}>
                     <Text style={styles.reactionEmoji}>{HEART_EMOJI}</Text>
+                    {heartCount >= 2 && (
+                      <Text style={styles.reactionCount}>{heartCount}</Text>
+                    )}
                   </Animated.View>
                 )}
-                {nonHeartReactions.map((r) => (
-                  <View
-                    key={`${r.emoji}-${r.userId}`}
-                    style={[
-                      styles.reactionChip,
-                      { backgroundColor: C.gray300 + 'DD', borderColor: C.primary + '30' },
-                    ]}
-                  >
-                    <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                {aggregatedNonHeart.map(({ emoji, count }) => (
+                  <View key={emoji} style={styles.reactionChip}>
+                    <Text style={styles.reactionEmoji}>{emoji}</Text>
+                    {count >= 2 && (
+                      <Text style={styles.reactionCount}>{count}</Text>
+                    )}
                   </View>
                 ))}
               </View>
@@ -434,10 +493,17 @@ const MessageRow = React.memo<MessageRowProps>(({
                 {otherHasRead ? (
                   <View style={styles.readReceiptInner}>
                     <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XS" avatarUrl={otherUser.avatarUrl || undefined} />
-                    <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Vu</Text>
+                    <Text style={[styles.readReceiptText, { color: Colors.primary, fontFamily: Fonts.bodyMedium }]}>
+                      Vu · {formatTime(item.createdAt)}
+                    </Text>
                   </View>
                 ) : (
-                  <Text style={[styles.readReceiptText, { color: C.gray600 }]}>Envoyé</Text>
+                  <View style={styles.readReceiptInner}>
+                    <Ionicons name="checkmark-done" size={12} color={Colors.textTertiary} />
+                    <Text style={[styles.readReceiptText, { color: Colors.textTertiary, fontFamily: Fonts.bodyMedium }]}>
+                      Livré · {formatTime(item.createdAt)}
+                    </Text>
+                  </View>
                 )}
               </View>
             )}
@@ -480,14 +546,30 @@ const formatTime = (dateStr: string): string => {
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 };
 
+/** Compact "il y a X" for header status */
+const formatRelativeShort = (dateStr: string): string => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60_000) return 'à l\u2019instant';
+  const m = Math.floor(diff / 60_000);
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `il y a ${d} j`;
+  return `il y a ${Math.floor(d / 7)} sem`;
+};
+
 const formatDateSeparator = (dateStr: string): string => {
   const d = new Date(dateStr);
   const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  if (sameDay) return `Aujourd'hui \u00b7 ${time}`;
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return `Hier \u00b7 ${time}`;
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / 86400000);
-  if (days === 0) return "Aujourd'hui";
-  if (days === 1) return 'Hier';
-  if (days < 7) return d.toLocaleDateString('fr-FR', { weekday: 'long' });
+  if (days < 7) return `${d.toLocaleDateString('fr-FR', { weekday: 'long' })} \u00b7 ${time}`;
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 };
 
@@ -521,12 +603,43 @@ export const ConversationScreen: React.FC = () => {
   const sendText = useChatStore((s) => s.sendText);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const setTypingStore = useChatStore((s) => s.setTyping);
+  const togglePin = useChatStore((s) => s.togglePin);
+  const toggleMute = useChatStore((s) => s.toggleMute);
+  const deleteConv = useChatStore((s) => s.deleteConv);
 
   // Derive read status from conversation-level unreadCount
   const otherHasRead = useMemo(() => {
     const conv = conversations.find((c) => c.id === conversationId);
     return (conv?.unreadCount[otherUser.userId] || 0) === 0;
   }, [conversations, conversationId, otherUser.userId]);
+
+  // Active conversation (looked up once, used for status + kebab actions)
+  const activeConv = useMemo(
+    () => conversations.find((c) => c.id === conversationId) || null,
+    [conversations, conversationId],
+  );
+
+  // Is the other user "fresh" (last seen < 5min) — approximate presence
+  const otherLastSeenAt = activeConv?.lastReadAt?.[otherUser.userId];
+  const otherIsFresh = useMemo(() => {
+    if (!otherLastSeenAt) return false;
+    return Date.now() - new Date(otherLastSeenAt).getTime() < PRESENCE_FRESH_MS;
+  }, [otherLastSeenAt]);
+
+  // Periodic re-render so status freshness updates without new data
+  const [, setStatusTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStatusTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Kebab action sheet
+  const [kebabOpen, setKebabOpen] = useState(false);
+
+  const isMuted = useMemo(
+    () => Boolean(activeConv && user?.id && (activeConv.mutedBy || []).includes(user.id)),
+    [activeConv, user?.id],
+  );
 
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -728,21 +841,67 @@ export const ConversationScreen: React.FC = () => {
   }, [messages, user?.id]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="chevron-back" size={24} color={C.black} />
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
+      {/* Header — reworked: avatar + name + status line + kebab */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.headerIconBtn}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.headerCenter}
           onPress={() => navigation.navigate('OtherProfile', { userId: otherUser.userId })}
           activeOpacity={0.7}
         >
-          <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="S" avatarUrl={otherUser.avatarUrl || undefined} />
-          <Text style={[styles.headerName, { color: C.black }]} numberOfLines={1}>{otherUser.displayName}</Text>
+          <View style={styles.headerAvWrap}>
+            <Avatar
+              initials={otherUser.initials}
+              bg={otherUser.avatarBg}
+              color={otherUser.avatarColor}
+              size="M"
+              avatarUrl={otherUser.avatarUrl || undefined}
+            />
+            {(otherTyping || otherIsFresh) && (
+              <View style={styles.headerPresenceDot} />
+            )}
+          </View>
+          <View style={styles.headerTxt}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {otherUser.displayName}
+            </Text>
+            {otherTyping ? (
+              <Text style={[styles.headerStatus, { color: Colors.primary }]} numberOfLines={1}>
+                en train d{'\u2019'}écrire{'\u2026'}
+              </Text>
+            ) : otherIsFresh ? (
+              <Text style={[styles.headerStatus, { color: Colors.success }]} numberOfLines={1}>
+                En ligne
+              </Text>
+            ) : otherLastSeenAt ? (
+              <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
+                Vu {formatRelativeShort(otherLastSeenAt)}
+              </Text>
+            ) : (
+              <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
+                @{otherUser.username}
+              </Text>
+            )}
+          </View>
         </TouchableOpacity>
-        <View style={{ width: 24 }} />
+
+        <TouchableOpacity
+          onPress={() => setKebabOpen(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.headerIconBtn}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="ellipsis-horizontal" size={20} color={Colors.textPrimary} />
+        </TouchableOpacity>
       </View>
 
       {/* Messages */}
@@ -763,8 +922,6 @@ export const ConversationScreen: React.FC = () => {
             ListFooterComponent={otherTyping ? (
               <TypingIndicator
                 otherUser={otherUser}
-                color={C.gray600}
-                bgColor={C.gray200}
                 isGrouped={typingIsGrouped}
                 listSlideX={listSlideX}
               />
@@ -776,39 +933,39 @@ export const ConversationScreen: React.FC = () => {
 
           {/* Gradient fade — top */}
           <Animated.View style={[styles.fadeOverlay, styles.fadeTop, { opacity: fadeTopOp }]} pointerEvents="none">
-            <LinearGradient colors={[C.white, C.white + '00']} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={[Colors.bgPrimary, Colors.bgPrimary + '00']} style={StyleSheet.absoluteFill} />
           </Animated.View>
 
           {/* Gradient fade — bottom */}
           <Animated.View style={[styles.fadeOverlay, styles.fadeBottom, { opacity: fadeBotOp }]} pointerEvents="none">
-            <LinearGradient colors={[C.white + '00', C.white]} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={[Colors.bgPrimary + '00', Colors.bgPrimary]} style={StyleSheet.absoluteFill} />
           </Animated.View>
         </View>
 
         {/* Reply preview bar */}
         {replyTo && (
-          <View style={[styles.replyBar, { backgroundColor: C.white, borderTopColor: C.borderLight }]}>
-            <View style={[styles.replyBarPreview, { borderLeftColor: C.primary }]}>
-              <Text style={[styles.replyBarName, { color: C.primary }]} numberOfLines={1}>
+          <View style={styles.replyBar}>
+            <View style={styles.replyBarPreview}>
+              <Text style={styles.replyBarName} numberOfLines={1}>
                 {replyTo.senderId === user?.id ? 'Toi' : otherUser.displayName}
               </Text>
-              <Text style={[styles.replyBarText, { color: C.gray600 }]} numberOfLines={1}>
+              <Text style={styles.replyBarText} numberOfLines={1}>
                 {replyTo.type === 'plan' ? 'Plan partagé ✦' : replyTo.content}
               </Text>
             </View>
             <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={18} color={C.gray600} />
+              <Ionicons name="close" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
         )}
 
         {/* Input bar */}
-        <View style={[styles.inputBar, { borderTopColor: C.borderLight, paddingBottom: Math.max(insets.bottom, 8) }]}>
-          <View style={[styles.inputRow, { backgroundColor: C.gray200 }]}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <View style={styles.inputRow}>
             <TextInput
-              style={[styles.input, { color: C.black }]}
+              style={styles.input}
               placeholder="Message..."
-              placeholderTextColor={C.gray600}
+              placeholderTextColor={Colors.textTertiary}
               value={text}
               onChangeText={handleTextChange}
               multiline
@@ -823,16 +980,178 @@ export const ConversationScreen: React.FC = () => {
               }}
             />
             {text.trim().length > 0 && (
-              <TouchableOpacity onPress={handleSend} style={[styles.sendBtn, { backgroundColor: C.primary }]}>
+              <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
                 <Ionicons name="arrow-up" size={18} color={Colors.textOnAccent} />
               </TouchableOpacity>
             )}
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Kebab action sheet */}
+      <Modal
+        visible={kebabOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setKebabOpen(false)}
+      >
+        <Pressable style={kebabStyles.backdrop} onPress={() => setKebabOpen(false)}>
+          <Pressable style={kebabStyles.sheet} onPress={() => {}}>
+            <View style={kebabStyles.header}>
+              <Avatar
+                initials={otherUser.initials}
+                bg={otherUser.avatarBg}
+                color={otherUser.avatarColor}
+                size="M"
+                avatarUrl={otherUser.avatarUrl || undefined}
+              />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={kebabStyles.headerName} numberOfLines={1}>
+                  {otherUser.displayName}
+                </Text>
+                <Text style={kebabStyles.headerHandle} numberOfLines={1}>
+                  @{otherUser.username}
+                </Text>
+              </View>
+            </View>
+            <View style={kebabStyles.divider} />
+            <TouchableOpacity
+              style={kebabStyles.action}
+              onPress={() => {
+                setKebabOpen(false);
+                navigation.navigate('OtherProfile', { userId: otherUser.userId });
+              }}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="person-outline" size={20} color={Colors.textPrimary} />
+              <Text style={kebabStyles.actionText}>Voir le profil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={kebabStyles.action}
+              onPress={() => {
+                setKebabOpen(false);
+                toggleMute(conversationId);
+              }}
+              activeOpacity={0.6}
+            >
+              <Ionicons
+                name={isMuted ? 'notifications-outline' : 'notifications-off-outline'}
+                size={20}
+                color={Colors.textPrimary}
+              />
+              <Text style={kebabStyles.actionText}>
+                {isMuted ? 'Réactiver les notifications' : 'Mettre en sourdine'}
+              </Text>
+            </TouchableOpacity>
+            <View style={kebabStyles.divider} />
+            <TouchableOpacity
+              style={kebabStyles.action}
+              onPress={() => {
+                setKebabOpen(false);
+                Alert.alert(
+                  'Supprimer la conversation\u00a0?',
+                  'Cette action est définitive et concerne tous les participants.',
+                  [
+                    { text: 'Annuler', style: 'cancel' },
+                    {
+                      text: 'Supprimer',
+                      style: 'destructive',
+                      onPress: async () => {
+                        await deleteConv(conversationId);
+                        navigation.goBack();
+                      },
+                    },
+                  ],
+                );
+              }}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="trash-outline" size={20} color={Colors.error} />
+              <Text style={[kebabStyles.actionText, { color: Colors.error }]}>
+                Supprimer la conversation
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={kebabStyles.cancel}
+              onPress={() => setKebabOpen(false)}
+              activeOpacity={0.6}
+            >
+              <Text style={kebabStyles.cancelText}>Annuler</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
+
+// ═══════════════════════════════════════════════
+// Kebab sheet styles (used by header menu)
+// ═══════════════════════════════════════════════
+
+const kebabStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: Colors.bgSecondary,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingTop: 6,
+    paddingBottom: 28,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerName: {
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  headerHandle: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 1,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.borderSubtle,
+    marginHorizontal: 4,
+  },
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 14,
+  },
+  actionText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  cancel: {
+    marginTop: 6,
+    marginHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: Colors.bgTertiary,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+});
 
 // ═══════════════════════════════════════════════
 // Styles
@@ -841,22 +1160,81 @@ export const ConversationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
+
+  // ── Header (refondu) ──
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
   },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'center' },
-  headerName: { fontSize: 16, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
-  messagesList: { paddingHorizontal: 12, paddingTop: 12 },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  headerAvWrap: { position: 'relative' },
+  headerPresenceDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.bgSecondary,
+  },
+  headerTxt: { flex: 1, justifyContent: 'center' },
+  headerName: {
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  headerStatus: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    marginTop: 1,
+    letterSpacing: 0.1,
+  },
 
-  // Date separator
-  dateSeparator: { alignItems: 'center', marginVertical: 16 },
-  dateSeparatorText: { fontSize: 12, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  // ── Messages list ──
+  messagesList: { paddingHorizontal: 10, paddingTop: 10 },
 
-  // Message wrapper
+  // ── Date separator pill ──
+  dateSeparator: { alignItems: 'center', marginTop: 18, marginBottom: 14 },
+  dateSeparatorText: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    color: Colors.textTertiary,
+    backgroundColor: Colors.bgTertiary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 99,
+    overflow: 'hidden',
+  },
+
+  // ── Message wrapper ──
   msgWrapper: { position: 'relative' },
 
-  // Swipe reply indicator (left for received, right for mine)
+  // ── Swipe reply indicator ──
   swipeIndicatorBase: {
     position: 'absolute', top: 0, bottom: 0,
     justifyContent: 'center', zIndex: -1,
@@ -868,71 +1246,174 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // Message row
+  // ── Message row ──
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  msgRowLeft: { justifyContent: 'flex-start', marginRight: 50 },
-  msgRowRight: { justifyContent: 'flex-end', marginLeft: 50 },
+  msgRowLeft: { justifyContent: 'flex-start', marginRight: 48 },
+  msgRowRight: { justifyContent: 'flex-end', marginLeft: 48 },
 
-  // Avatar spacer (matches Avatar SS = 20px)
-  avatarSpacer: { width: 20 },
+  // Avatar spacer (matches Avatar XSM = 24px)
+  avatarSpacer: { width: 24 },
 
-  // Bubble
-  bubble: { paddingHorizontal: 14, paddingVertical: 10, overflow: 'visible' },
-  msgText: { fontSize: 15, fontFamily: Fonts.body, lineHeight: 20 },
+  // ── Bubble ──
+  bubble: {
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    paddingBottom: 10,
+    overflow: 'visible',
+    borderRadius: BUBBLE_R,
+  },
+  bubblePlanPadding: { padding: 5 },
+  msgText: { fontSize: 15, fontFamily: Fonts.body, lineHeight: 20, letterSpacing: -0.1 },
 
-  // Reaction overlay — overlaps bottom of bubble
+  // ── Reaction overlay ──
   reactionOverlay: {
-    flexDirection: 'row', gap: 2,
+    flexDirection: 'row',
+    gap: 2,
     marginTop: -REACTION_OVERLAP,
     zIndex: 2,
   },
-  reactionOverlayLeft: { alignSelf: 'flex-start', paddingLeft: 8 },
-  reactionOverlayRight: { alignSelf: 'flex-end', paddingRight: 8 },
+  reactionOverlayLeft: { alignSelf: 'flex-start', paddingLeft: 10 },
+  reactionOverlayRight: { alignSelf: 'flex-end', paddingRight: 10 },
   reactionChip: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 11, borderWidth: 1,
-    paddingHorizontal: 5, paddingVertical: 1, minWidth: 26, height: REACTION_CHIP_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 24,
+    height: REACTION_CHIP_H,
+    shadowColor: 'rgba(44,36,32,1)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  reactionEmoji: { fontSize: 13 },
+  reactionEmoji: { fontSize: 12.5 },
+  reactionCount: {
+    fontSize: 10,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textSecondary,
+  },
 
-  // Plan in message
-  planCover: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 8, resizeMode: 'cover' },
-  planCoverPlaceholder: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 8, alignItems: 'center', justifyContent: 'center' },
-  planInfo: { gap: 2 },
-  planLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  planTitle: { fontSize: 14, fontFamily: Fonts.displaySemiBold, lineHeight: 18 },
-  planAuthor: { fontSize: 11, fontFamily: Fonts.body, marginTop: 2 },
-  planAttachedWrap: { borderTopWidth: 1, marginTop: 10, paddingTop: 8 },
-  planAttachedMsg: { fontSize: 14, fontFamily: Fonts.bodySemiBold, lineHeight: 18 },
+  // ── Plan-in-bubble (rich card) ──
+  planCard: {
+    width: 230,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  planHero: {
+    width: '100%',
+    height: 110,
+    position: 'relative',
+    justifyContent: 'flex-end',
+    padding: 10,
+  },
+  planHeroFallback: {
+    backgroundColor: Colors.terracotta400,
+  },
+  planHeroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(44,36,32,0.06)',
+  },
+  planHeroTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(44,36,32,0.55)',
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  planHeroTagText: {
+    fontSize: 9,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: Colors.textOnAccent,
+  },
+  planBody: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
+  planEyebrow: {
+    fontSize: 9,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: Colors.primary,
+  },
+  planTitle: {
+    fontSize: 15,
+    fontFamily: Fonts.displaySemiBold,
+    lineHeight: 18,
+    letterSpacing: -0.2,
+    color: Colors.textPrimary,
+    marginTop: 3,
+  },
+  planAuthor: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 3,
+  },
+  planAttachedWrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  planAttachedMsg: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+    lineHeight: 17,
+  },
 
-  // Quoted reply in bubble
+  // ── Quoted reply ──
   quotedReply: {
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
+    borderLeftWidth: 2.5,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
     borderBottomLeftRadius: 4,
     borderBottomRightRadius: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginBottom: -2, // slight overlap so the preview visually fuses with the bubble
+    marginBottom: -2,
   },
   quotedReplyMine: { alignSelf: 'flex-end' },
   quotedReplyOther: { alignSelf: 'flex-start' },
-  quotedName: { fontSize: 11, fontFamily: Fonts.bodySemiBold, letterSpacing: 0.4 },
-  quotedText: { fontSize: 13, fontFamily: Fonts.body, marginTop: 1, lineHeight: 17 },
+  quotedName: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  quotedText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    marginTop: 2,
+    lineHeight: 16,
+  },
 
-  // Read receipt
-  readReceipt: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 3, paddingRight: 2 },
+  // ── Read receipt ──
+  readReceipt: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+    paddingRight: 4,
+  },
   readReceiptInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  readReceiptText: { fontSize: 10, fontFamily: Fonts.body },
+  readReceiptText: { fontSize: 10.5, letterSpacing: 0.1 },
 
-  // Reaction picker (long press)
+  // ── Reaction picker ──
   reactionPicker: {
     position: 'absolute', top: -48,
     flexDirection: 'row', borderRadius: 22,
     paddingHorizontal: 6, paddingVertical: 6,
-    shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5,
+    shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 18, elevation: 6,
     gap: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
   },
   reactionPickerLeft: { left: 26 },
   reactionPickerRight: { right: 0 },
@@ -940,36 +1421,99 @@ const styles = StyleSheet.create({
   reactionPickerEmoji: { fontSize: 22 },
   reactionPickerActive: { fontSize: 26 },
 
-  // Time reveal (iMessage-style)
+  // ── Time reveal ──
   revealTimeWrap: {
     position: 'absolute', right: 4, top: 0, bottom: 0,
     justifyContent: 'center', alignItems: 'flex-end',
   },
-  revealTimeText: { fontSize: 11, fontFamily: Fonts.body },
+  revealTimeText: { fontSize: 11, fontFamily: Fonts.body, color: Colors.textTertiary },
 
-  // Reply bar above input
+  // ── Reply bar above input ──
   replyBar: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-    paddingVertical: 8, borderTopWidth: 1, gap: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
+    gap: 10,
   },
-  replyBarPreview: { flex: 1, borderLeftWidth: 3, paddingLeft: 10, paddingVertical: 2 },
-  replyBarName: { fontSize: 12, fontFamily: Fonts.bodyBold },
-  replyBarText: { fontSize: 12, fontFamily: Fonts.body, marginTop: 1 },
+  replyBarPreview: {
+    flex: 1,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+    paddingLeft: 10,
+    paddingVertical: 2,
+  },
+  replyBarName: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.primary,
+    letterSpacing: 0.3,
+  },
+  replyBarText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
 
-  // Typing indicator
+  // ── Typing indicator ──
   typingBubble: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: BUBBLE_R, paddingHorizontal: 14, paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: BUBBLE_R,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
   },
-  typingDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
+  typingDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6, backgroundColor: Colors.textTertiary },
 
-  // Input bar
-  inputBar: { paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1 },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8, gap: 8 },
-  input: { flex: 1, fontSize: 15, fontFamily: Fonts.body, maxHeight: 100, paddingVertical: 0 },
-  sendBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  // ── Input bar ──
+  inputBar: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
+    backgroundColor: Colors.bgTertiary,
+    minHeight: 38,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14.5,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    maxHeight: 100,
+    paddingVertical: 0,
+  },
+  sendBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 3,
+  },
 
-  // Gradient fade overlays
+  // ── Gradient fade overlays ──
   fadeOverlay: { position: 'absolute', left: 0, right: 0, height: FADE_H },
   fadeTop: { top: 0 },
   fadeBottom: { bottom: 0 },

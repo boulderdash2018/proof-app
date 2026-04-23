@@ -5,13 +5,13 @@ interface AvatarProps {
   initials: string;
   bg: string;
   color: string;
-  size?: 'XS' | 'SS' | 'S' | 'M' | 'ML' | 'L';
+  size?: 'XS' | 'SS' | 'XSM' | 'S' | 'M' | 'ML' | 'L';
   avatarUrl?: string;
   borderColor?: string;
 }
 
-const SIZES = { XS: 16, SS: 20, S: 32, M: 36, ML: 50, L: 74 };
-const FONT_SIZES = { XS: 6, SS: 8, S: 11, M: 13, ML: 17, L: 24 };
+const SIZES = { XS: 16, SS: 20, XSM: 24, S: 32, M: 36, ML: 50, L: 74 };
+const FONT_SIZES = { XS: 6, SS: 8, XSM: 9, S: 11, M: 13, ML: 17, L: 24 };
 
 export const Avatar: React.FC<AvatarProps> = ({
   initials,
