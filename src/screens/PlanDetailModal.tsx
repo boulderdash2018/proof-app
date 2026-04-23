@@ -572,13 +572,33 @@ export const PlanDetailModal: React.FC = () => {
             style={st.heroGradient}
             pointerEvents="none"
           />
-          <View style={st.heroContent} pointerEvents="none">
-            {plan.tags[0] && (
-              <View style={st.heroBadge}>
-                <Text style={st.heroBadgeText}>{plan.tags[0]}</Text>
-              </View>
+          <View style={st.heroContent} pointerEvents="box-none">
+            {plan.tags && plan.tags.length > 0 && (
+              <Text style={st.heroOverline}>
+                {plan.tags.slice(0, 2).map((t) => t.toUpperCase()).join(' · ')}
+              </Text>
             )}
             <Text style={st.heroTitle}>{plan.title}</Text>
+            {/* Author row inline in the hero — mirrors ImmersiveCard detail */}
+            <TouchableOpacity
+              style={st.heroAuthorRow}
+              onPress={() => navigation.navigate('UserProfile', { userId: plan.author.id })}
+              activeOpacity={0.7}
+            >
+              <View style={[st.heroAuthorAvatar, { backgroundColor: plan.author.avatarBg || '#444' }]}>
+                {plan.author.avatarUrl ? (
+                  <Image source={{ uri: plan.author.avatarUrl }} style={st.heroAuthorAvatarImg} />
+                ) : (
+                  <Text style={[st.heroAuthorInitials, { color: plan.author.avatarColor || '#FFF' }]}>
+                    {plan.author.initials || '?'}
+                  </Text>
+                )}
+              </View>
+              <Text style={st.heroAuthorText}>
+                par {plan.author.displayName}
+                {plan.city ? ` · ${plan.city}` : ''}
+              </Text>
+            </TouchableOpacity>
           </View>
           {allPhotos.length > 1 && (
             <View style={st.heroDots} pointerEvents="none">
@@ -589,48 +609,45 @@ export const PlanDetailModal: React.FC = () => {
           )}
         </View>
 
-        {/* ===== IDENTITY CARD ===== */}
-        <View style={[st.idCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
-          <View style={st.idTop}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: plan.author.id })} activeOpacity={0.7}>
-              <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
-            </TouchableOpacity>
-            <View style={st.idInfo}>
-              <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: plan.author.id })} activeOpacity={0.7}>
-                <Text style={[st.idName, { color: Colors.textPrimary }]}>{plan.author.displayName}</Text>
+        {/* ===== METRICS ROW ===== Divider-separated, mirrors ImmersiveCard detail.
+            The author identity card was removed — author moved into the hero overlay. */}
+        <View style={st.metricsRow}>
+          {plan.price ? (
+            <View style={st.metricItem}>
+              <Ionicons name="wallet-outline" size={16} color={Colors.primary} />
+              <Text style={st.metricText}>{plan.price}</Text>
+            </View>
+          ) : null}
+          {plan.price && plan.duration ? <View style={st.metricSep} /> : null}
+          {plan.duration ? (
+            <View style={st.metricItem}>
+              <Ionicons name="time-outline" size={16} color={Colors.primary} />
+              <Text style={st.metricText}>{plan.duration}</Text>
+            </View>
+          ) : null}
+          {(plan.price || plan.duration) && plan.places?.length > 0 ? <View style={st.metricSep} /> : null}
+          {plan.places?.length > 0 ? (
+            <View style={st.metricItem}>
+              <Ionicons name="location-outline" size={16} color={Colors.primary} />
+              <Text style={st.metricText}>{plan.places.length} lieu{plan.places.length > 1 ? 'x' : ''}</Text>
+            </View>
+          ) : null}
+          {plan.transport ? <View style={st.metricSep} /> : null}
+          {plan.transport ? (
+            <View style={st.metricItem}>
+              <Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={16} color={Colors.primary} />
+              <Text style={st.metricText}>{plan.transport}</Text>
+            </View>
+          ) : null}
+          {hasMapPlaces ? (
+            <>
+              <View style={st.metricSep} />
+              <TouchableOpacity style={st.metricItem} onPress={() => setShowMap(true)} activeOpacity={0.7}>
+                <Ionicons name="map-outline" size={16} color={Colors.primary} />
+                <Text style={[st.metricText, { color: Colors.primary }]}>Map</Text>
               </TouchableOpacity>
-              <View style={st.idMeta}>
-                <UserBadge type={plan.author.badgeType} small />
-                <Text style={[st.idRank, { color: Colors.textSecondary }]}>{plan.author.rank}</Text>
-                <View style={[st.idDot, { backgroundColor: Colors.textTertiary }]} />
-                <Text style={[st.idTime, { color: Colors.textSecondary }]}>{plan.timeAgo}</Text>
-              </View>
-            </View>
-          </View>
-          <View style={st.pillsRow}>
-            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
-              <Ionicons name="cash-outline" size={13} color={Colors.primary} />
-              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.price}</Text>
-            </View>
-            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
-              <Ionicons name="hourglass-outline" size={13} color={Colors.primary} />
-              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.duration}</Text>
-            </View>
-            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
-              <Ionicons name={(TRANSPORT_ICONS[plan.transport] || 'walk-outline') as any} size={13} color={Colors.primary} />
-              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.transport}</Text>
-            </View>
-            <View style={[st.pill, { backgroundColor: Colors.terracotta100 }]}>
-              <Ionicons name="location-outline" size={13} color={Colors.primary} />
-              <Text style={[st.pillText, { color: Colors.terracotta700 }]}>{plan.places.length} étapes</Text>
-            </View>
-            {hasMapPlaces && (
-              <TouchableOpacity style={[st.pill, { backgroundColor: Colors.primary + '20' }]} onPress={() => setShowMap(true)} activeOpacity={0.7}>
-                <Ionicons name="map-outline" size={13} color={Colors.primary} />
-                <Text style={[st.pillText, { color: Colors.primary }]}>Map</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+            </>
+          ) : null}
         </View>
 
         {/* ===== LIKED BY ===== */}
@@ -747,19 +764,22 @@ export const PlanDetailModal: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {/* ===== CREATOR'S TIP ===== */}
+        {/* ===== CREATOR'S TIP ===== Editorial pull-quote (mirrors ImmersiveCard) */}
         {creatorTip && (
-          <View style={st.tipWrap}>
-            <View style={st.tipBar} />
-            <View style={st.tipBody}>
-              <Text style={[st.tipLabel, { color: Colors.textSecondary }]}>Conseil du créateur</Text>
-              <Text style={[st.tipText, { color: Colors.textPrimary }]}>"{creatorTip}"</Text>
-            </View>
+          <View style={st.tipSection}>
+            <Text style={st.tipQuoteMark}>&ldquo;</Text>
+            <Text style={st.tipQuote}>{creatorTip}</Text>
+            <Text style={st.tipAttribution}>— {plan.author?.displayName || 'Créateur'}, créateur</Text>
           </View>
         )}
 
         {/* ===== ITINERARY ===== */}
-        <Text style={[st.sectionLabel, { color: Colors.textSecondary }]}>{t.plan_full}</Text>
+        <View style={st.itineraryHeader}>
+          <Text style={st.itineraryTitle}>Itinéraire</Text>
+          {plan.duration ? (
+            <Text style={st.itineraryMeta}>{plan.places?.length || 0} étapes · {plan.duration}</Text>
+          ) : null}
+        </View>
 
         <View style={st.itinerary}>
           {plan.places.map((place, index) => {
@@ -1145,7 +1165,43 @@ const st = StyleSheet.create({
   heroContent: { position: 'absolute', bottom: 28, left: 20, right: 20 },
   heroBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(44, 36, 32, 0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 },
   heroBadgeText: { fontSize: 11, fontFamily: Fonts.bodySemiBold, color: '#FFF', textTransform: 'uppercase', letterSpacing: 0.5 },
+  // Editorial overline (replaces heroBadge in the new layout — mirrors ImmersiveCard)
+  heroOverline: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: 'rgba(255, 248, 240, 0.85)',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
   heroTitle: { fontSize: 26, fontFamily: Fonts.displayBold, color: '#FFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  // Author row in the hero overlay (mirrors ImmersiveCard detail)
+  heroAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  } as any,
+  heroAuthorAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAuthorAvatarImg: {
+    width: '100%',
+    height: '100%',
+  } as any,
+  heroAuthorInitials: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyBold,
+  },
+  heroAuthorText: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: 'rgba(255, 248, 240, 0.92)',
+  },
   heroDots: { position: 'absolute', bottom: 12, alignSelf: 'center', flexDirection: 'row', gap: 5 },
   heroDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(44, 36, 32, 0.35)' },
   heroDotActive: { backgroundColor: '#FFF', width: 18 },
@@ -1163,6 +1219,33 @@ const st = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
   pillText: { fontSize: 12, fontFamily: Fonts.bodySemiBold },
 
+  // Metrics row — divider-separated text (mirrors ImmersiveCard detail)
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 6,
+    gap: 10,
+  } as any,
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  } as any,
+  metricText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  metricSep: {
+    width: 1,
+    height: 12,
+    backgroundColor: Colors.borderMedium,
+    marginHorizontal: 4,
+  },
+
   // Tags
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 18, marginTop: 14, gap: 6 },
 
@@ -1170,12 +1253,53 @@ const st = StyleSheet.create({
   proofBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 14, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
   proofBannerText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
-  // Creator tip
-  tipWrap: { flexDirection: 'row', marginHorizontal: 18, marginTop: 18 },
-  tipBar: { width: 3, borderRadius: 1.5, backgroundColor: Colors.primary, marginRight: 12 },
-  tipBody: { flex: 1 },
-  tipLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
-  tipText: { fontSize: 14, fontFamily: Fonts.displayItalic, lineHeight: 20 },
+  // Creator tip — editorial pull-quote (mirrors ImmersiveCard detail)
+  tipSection: {
+    paddingHorizontal: 18,
+    paddingTop: 22,
+    paddingBottom: 6,
+  },
+  tipQuoteMark: {
+    fontSize: 36,
+    fontFamily: Fonts.displayBold,
+    color: Colors.primary,
+    lineHeight: 30,
+    marginBottom: -4,
+  },
+  tipQuote: {
+    fontSize: 17,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textPrimary,
+    lineHeight: 24,
+    letterSpacing: -0.1,
+  },
+  tipAttribution: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 10,
+  },
+
+  // Itinerary header — title + meta (mirrors ImmersiveCard detail)
+  itineraryHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 24,
+    paddingBottom: 10,
+  },
+  itineraryTitle: {
+    fontSize: 22,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+  },
+  itineraryMeta: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
 
   // Section label
   sectionLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 18, marginTop: 22, marginBottom: 12 },
