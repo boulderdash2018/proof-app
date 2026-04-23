@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
@@ -246,13 +246,14 @@ interface MessageRowProps {
   onPlanPress: (planId: string) => void;
   onJoinSession: () => void;
   onPhotoPress: (url: string) => void;
+  onOpenAlbum: () => void;
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
   item, prevMsg, nextMsg, userId, senderUser, isGroupContext, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
-  onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress,
+  onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress, onOpenAlbum,
 }) => {
   const isMine = item.senderId === userId;
   const showDate = shouldShowDateSeparator(item, prevMsg);
@@ -264,6 +265,7 @@ const MessageRow = React.memo<MessageRowProps>(({
     const ev = item.systemEvent;
     const text = item.content || renderSystemEventText(ev);
     const isSessionStart = ev?.kind === 'session_started' && ev.actorId !== userId;
+    const isSessionComplete = ev?.kind === 'session_completed';
     return (
       <View>
         {showDate && (
@@ -281,6 +283,16 @@ const MessageRow = React.memo<MessageRowProps>(({
             >
               <Ionicons name="arrow-forward-circle" size={14} color={Colors.textOnAccent} />
               <Text style={styles.systemJoinText}>Rejoindre la session</Text>
+            </TouchableOpacity>
+          )}
+          {isSessionComplete && (
+            <TouchableOpacity
+              style={[styles.systemJoinBtn, { backgroundColor: Colors.textPrimary }]}
+              onPress={onOpenAlbum}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="images" size={14} color={Colors.textOnAccent} />
+              <Text style={styles.systemJoinText}>Voir l{'\u2019'}album</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -859,6 +871,7 @@ export const ConversationScreen: React.FC = () => {
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [renameSheetOpen, setRenameSheetOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+  const [albumOpen, setAlbumOpen] = useState(false);
 
   // Only the creator can hard-delete a group — others leave.
   const isGroupCreator = isGroup && activeConv?.createdBy === user?.id;
@@ -1140,6 +1153,7 @@ export const ConversationScreen: React.FC = () => {
       onPlanPress={handlePlanPress}
       onJoinSession={handleJoinSession}
       onPhotoPress={setLightboxUrl}
+      onOpenAlbum={() => setAlbumOpen(true)}
     />
     );
   }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession]);
@@ -1505,6 +1519,19 @@ export const ConversationScreen: React.FC = () => {
                 style={kebabStyles.action}
                 onPress={() => {
                   setKebabOpen(false);
+                  setTimeout(() => setAlbumOpen(true), 200);
+                }}
+                activeOpacity={0.6}
+              >
+                <Ionicons name="images-outline" size={20} color={Colors.textPrimary} />
+                <Text style={kebabStyles.actionText}>Voir l{'\u2019'}album</Text>
+              </TouchableOpacity>
+            )}
+            {isGroup && (
+              <TouchableOpacity
+                style={kebabStyles.action}
+                onPress={() => {
+                  setKebabOpen(false);
                   setRenameValue(groupDisplayName);
                   setTimeout(() => setRenameSheetOpen(true), 200);
                 }}
@@ -1640,6 +1667,15 @@ export const ConversationScreen: React.FC = () => {
           onClose={() => setAddSheetOpen(false)}
           existingParticipantIds={activeConv?.participants || []}
           onAdd={(participant) => addToGroup(conversationId, participant)}
+        />
+      )}
+
+      {/* Group album sheet */}
+      {isGroup && (
+        <GroupAlbumSheet
+          visible={albumOpen}
+          onClose={() => setAlbumOpen(false)}
+          conversationId={conversationId}
         />
       )}
 

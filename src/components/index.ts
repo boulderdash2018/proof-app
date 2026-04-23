@@ -22,4 +22,5 @@ export { GroupMosaicAvatar } from './GroupMosaicAvatar';
 export { AddParticipantsSheet } from './AddParticipantsSheet';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
+export { GroupAlbumSheet } from './GroupAlbumSheet';
 export { FloatingAvatars } from './FloatingAvatars';
