@@ -609,6 +609,60 @@ export const PlanDetailModal: React.FC = () => {
           )}
         </View>
 
+        {/* ===== INLINE ACTION BAR ===== Heart, comment, save, share (terracotta
+            icons row, mirrors ImmersiveCard detail). Replaces the previous
+            sticky-bottom action bar. */}
+        <View style={st.inlineActions}>
+          <TouchableOpacity
+            style={st.inlineActionBtn}
+            onPress={handleLike}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isLiked ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isLiked ? Colors.primary : Colors.textSecondary}
+            />
+            {localLikesCount > 0 && (
+              <Text style={[st.inlineActionCount, isLiked && { color: Colors.primary }]}>
+                {localLikesCount}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={st.inlineActionBtn}
+            onPress={() => setShowCommentSheet(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chatbubble-outline" size={21} color={Colors.textSecondary} />
+            {localCommentsCount > 0 && (
+              <Text style={st.inlineActionCount}>{localCommentsCount}</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={st.inlineActionBtn}
+            onPress={handleSave}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isSaved ? 'bookmark' : 'bookmark-outline'}
+              size={21}
+              color={isSaved ? Colors.primary : Colors.textSecondary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={st.inlineActionBtn}
+            onPress={() => { if (isGuest) { setShowAccountPrompt(true); return; } setShowShareSheet(true); }}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="paper-plane-outline" size={21} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* ===== METRICS ROW ===== Divider-separated, mirrors ImmersiveCard detail.
             The author identity card was removed — author moved into the hero overlay. */}
         <View style={st.metricsRow}>
@@ -923,40 +977,29 @@ export const PlanDetailModal: React.FC = () => {
         )}
       </Animated.ScrollView>
 
-      {/* ===== STICKY BOTTOM BAR ===== */}
-      <View style={[st.bottomBar, { paddingBottom: insets.bottom + 6, backgroundColor: Colors.bgSecondary, borderTopColor: Colors.borderMedium }]}>
-        {!isGuest && hasMapPlaces && (
+      {/* ===== STICKY 'Do it now' ===== Identical to FeedScreen sticky CTA.
+          The action icons (heart/comment/save/share) live INLINE under the
+          hero now (mirrors ImmersiveCard detail), so the sticky bar contains
+          only the launch action. */}
+      {!isGuest && hasMapPlaces && (
+        <View style={[st.stickyCtaBar, { paddingBottom: insets.bottom + 12 }]} pointerEvents="box-none">
           <TouchableOpacity
-            style={[st.doItNowBtn, { backgroundColor: isDone ? Colors.bgTertiary : Colors.primary }]}
+            style={[st.stickyCtaButton, isDone && { backgroundColor: Colors.bgTertiary }]}
             onPress={isDone ? undefined : () => setShowTransportChooser(true)}
-            activeOpacity={isDone ? 1 : 0.8}
+            activeOpacity={isDone ? 1 : 0.85}
             disabled={isDone}
           >
-            <Ionicons name={isDone ? 'checkmark-circle' : 'navigate'} size={18} color={isDone ? Colors.textSecondary : Colors.textOnAccent} />
-            <Text style={[st.doItNowText, isDone && { color: Colors.textSecondary }]}>
+            <Ionicons
+              name={isDone ? 'checkmark-circle' : 'compass'}
+              size={18}
+              color={isDone ? Colors.textSecondary : Colors.textOnAccent}
+            />
+            <Text style={[st.stickyCtaText, isDone && { color: Colors.textSecondary }]}>
               {isDone ? 'Déjà fait ✓' : 'Do it now'}
             </Text>
           </TouchableOpacity>
-        )}
-        <View style={st.actionsRow}>
-          <TouchableOpacity style={st.actionBtn} onPress={handleLike} activeOpacity={0.7}>
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? Colors.primary : Colors.textSecondary} />
-            <Text style={[st.actionText, { color: isLiked ? Colors.primary : Colors.textPrimary }]}>{localLikesCount}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={st.actionBtn} onPress={() => setShowCommentSheet(true)} activeOpacity={0.7}>
-            <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
-            <Text style={[st.actionText, { color: Colors.textPrimary }]}>{localCommentsCount}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={st.actionBtn} onPress={handleSave} activeOpacity={isSaved && isDone ? 1 : 0.7}>
-            <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={isSaved ? Colors.primary : Colors.textSecondary} />
-            <Text style={[st.actionText, { color: isSaved ? Colors.primary : Colors.textPrimary }]}>{isSaved ? t.plan_saved : t.plan_save}</Text>
-            {isSaved && isDone && <Ionicons name="lock-closed" size={10} color={Colors.textTertiary} style={{ marginLeft: 2 }} />}
-          </TouchableOpacity>
-          <TouchableOpacity style={st.actionBtn} onPress={() => { if (isGuest) { setShowAccountPrompt(true); return; } setShowShareSheet(true); }} activeOpacity={0.7}>
-            <Ionicons name="paper-plane-outline" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
         </View>
-      </View>
+      )}
 
       {/* ===== COMMENT SHEET ===== */}
       <Modal visible={showCommentSheet} transparent animationType="slide">
@@ -1367,12 +1410,64 @@ const st = StyleSheet.create({
   similarAuthor: { fontSize: 11, fontFamily: Fonts.body },
 
   // Bottom bar
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, paddingTop: 8, paddingHorizontal: 16 },
-  doItNowBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, marginBottom: 8 },
-  doItNowText: { color: Colors.textOnAccent, fontSize: 15, fontFamily: Fonts.bodySemiBold },
-  actionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8 },
-  actionText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  // (Old bottomBar / doItNowBtn / actionsRow / actionBtn styles removed —
+  //  superseded by inlineActions + stickyCtaBar below.)
+
+  // Inline action bar — heart, comment, save, share. Sits right under the
+  // hero, mirrors ImmersiveCard detail layout.
+  inlineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  } as any,
+  inlineActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  } as any,
+  inlineActionCount: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+
+  // Sticky 'Do it now' — identical visual to FeedScreen's feedStickyCta*.
+  stickyCtaBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: Colors.bgSecondary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    zIndex: 50,
+  } as any,
+  stickyCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  } as any,
+  stickyCtaText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.2,
+  },
 
   // Comment sheet
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
