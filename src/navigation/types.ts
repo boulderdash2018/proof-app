@@ -18,6 +18,7 @@ export type ExploreStackParamList = {
   Explore: undefined;
   ExploreSearch: { contentMode?: 'tous' | 'plans' | 'lieux' } | undefined;
   OtherProfile: { userId: string };
+  FriendRequests: undefined;
 };
 
 export type CreateStackParamList = {

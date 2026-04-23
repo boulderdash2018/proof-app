@@ -52,6 +52,10 @@ const ExploreStackNavigator: React.FC = () => (
     <ExploreStack.Screen name="Explore" component={ExploreScreen} />
     <ExploreStack.Screen name="ExploreSearch" component={SearchScreen} options={{ animation: 'slide_from_bottom' }} />
     <ExploreStack.Screen name="OtherProfile" component={OtherProfileScreen} />
+    {/* FriendRequests was previously only reachable from the profile tab.
+        Moved here too so the people icon in the Explore header can navigate
+        without hopping tabs (which would reset the bottom-tab indicator). */}
+    <ExploreStack.Screen name="FriendRequests" component={FriendRequestsScreen} />
   </ExploreStack.Navigator>
 );
 

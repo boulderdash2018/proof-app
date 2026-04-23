@@ -49,7 +49,9 @@ export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
-  const { incomingRequests, fetchIncomingRequests } = useFriendsStore();
+  // fetchIncomingRequests is still called below to keep the store warm —
+  // the badge/icon UI moved to ExploreScreen but the data is shared.
+  const fetchIncomingRequests = useFriendsStore((s) => s.fetchIncomingRequests);
   const { savedPlans, fetchSaves } = useSavesStore();
   const drafts = useDraftStore((s) => s.drafts);
   const deleteDraft = useDraftStore((s) => s.deleteDraft);
@@ -164,14 +166,8 @@ export const ProfileScreen: React.FC = () => {
       <View style={[styles.header, { borderBottomColor: Colors.borderSubtle }]}>
         <Text style={[styles.headerTitle, { color: Colors.textPrimary }]}>{t.profile_title}</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => navigation.navigate('FriendRequests')} style={styles.friendReqBtn}>
-            <Ionicons name="people-outline" size={22} color={Colors.textPrimary} />
-            {incomingRequests.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: Colors.primary }]}>
-                <Text style={styles.badgeText}>{incomingRequests.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          {/* Friend requests icon moved to ExploreScreen header — discovery
+              and connections live there now. */}
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
             <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>

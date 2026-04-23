@@ -20,7 +20,7 @@ import { LoadingSkeleton } from '../components';
 import { Plan, Place } from '../types';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
-import { useAuthStore, useTrendingStore } from '../store';
+import { useAuthStore, useTrendingStore, useFriendsStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { fetchPublicPlansByTags, fetchPublicPlansNearby } from '../services/plansService';
 import { FriendsMapView } from './FriendsMapView';
@@ -65,6 +65,14 @@ export const ExploreScreen: React.FC = () => {
 
   // Fetch trending on mount (5-min cache in store)
   useEffect(() => { fetchTrending(cityConfig.name); }, [cityConfig.name]);
+
+  // ── Friend requests badge (for the people icon in the header) ──
+  // Lifted from ProfileScreen — discovery / connections live here now.
+  const incomingRequests = useFriendsStore((s) => s.incomingRequests);
+  const fetchIncomingRequests = useFriendsStore((s) => s.fetchIncomingRequests);
+  useEffect(() => {
+    if (currentUser?.id) fetchIncomingRequests(currentUser.id);
+  }, [currentUser?.id, fetchIncomingRequests]);
 
   const [showSubcategories, setShowSubcategories] = useState(false);
   const voirPlusOpacity = useRef(new Animated.Value(0)).current;
@@ -533,7 +541,31 @@ export const ExploreScreen: React.FC = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
       <View style={styles.headerRow}>
-        <Text style={[styles.pageTitle, { color: Colors.textPrimary }]}>{t.explore_title}</Text>
+        {/* LEFT — friend requests / discovery */}
+        <TouchableOpacity
+          style={[styles.filterBtn, { backgroundColor: Colors.bgTertiary }]}
+          onPress={() => {
+            if (!isAuthenticated) { setShowAccountPrompt(true); return; }
+            navigation.navigate('FriendRequests');
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="people-outline" size={18} color={Colors.textSecondary} />
+          {incomingRequests.length > 0 && (
+            <View style={[styles.headerBadge, { backgroundColor: Colors.primary }]}>
+              <Text style={styles.headerBadgeText}>
+                {incomingRequests.length > 9 ? '9+' : incomingRequests.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* CENTER — title (absolute so the side icons don't push it off-axis) */}
+        <View style={styles.headerTitleAbsolute} pointerEvents="none">
+          <Text style={[styles.pageTitle, { color: Colors.textPrimary }]}>{t.explore_title}</Text>
+        </View>
+
+        {/* RIGHT — map + filters */}
         <View style={styles.headerBtns}>
           <TouchableOpacity
             style={[styles.filterBtn, { backgroundColor: Colors.bgTertiary }]}
@@ -744,10 +776,37 @@ export const ExploreScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgPrimary },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12, position: 'relative' } as any,
   headerBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Absolute centering — keeps the title perfectly on axis even though the
+  // left column has 1 icon and the right column has 2.
+  headerTitleAbsolute: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as any,
   pageTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   filterBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  headerBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBadgeText: {
+    fontSize: 9,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+  },
   filterBtnDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold },
   searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, marginHorizontal: Layout.screenPadding, paddingHorizontal: 14, height: 44, marginBottom: 8 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: Fonts.body },
