@@ -706,43 +706,27 @@ export const ChatListScreen: React.FC = () => {
 
     const filtered = conversations.filter((c) => matchesSearch(c) && matchesFilter(c));
 
-    // Sort: pinned first (by lastMessageAt desc), then by lastMessageAt desc
+    // Split pinned vs rest, both sorted by lastMessageAt desc
     const pinned: Conversation[] = [];
-    const recent: Conversation[] = []; // < 7 days
-    const older: Conversation[] = [];
-
-    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-    const now = Date.now();
+    const rest: Conversation[] = [];
 
     filtered.forEach((c) => {
-      if ((c.pinnedBy || []).includes(meId)) {
-        pinned.push(c);
-      } else {
-        const age = now - new Date(c.lastMessageAt).getTime();
-        if (age <= SEVEN_DAYS) recent.push(c);
-        else older.push(c);
-      }
+      if ((c.pinnedBy || []).includes(meId)) pinned.push(c);
+      else rest.push(c);
     });
 
     const sortDesc = (a: Conversation, b: Conversation) =>
       b.lastMessageAt.localeCompare(a.lastMessageAt);
     pinned.sort(sortDesc);
-    recent.sort(sortDesc);
-    older.sort(sortDesc);
+    rest.sort(sortDesc);
 
     const out: ListItem[] = [];
     if (pinned.length > 0) {
       out.push({ kind: 'header', id: 'h-pinned', label: 'Épinglés' });
       pinned.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
     }
-    if (recent.length > 0) {
-      out.push({ kind: 'header', id: 'h-recent', label: 'Cette semaine' });
-      recent.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
-    }
-    if (older.length > 0) {
-      out.push({ kind: 'header', id: 'h-older', label: 'Plus anciens' });
-      older.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
-    }
+    // Plain flat list for everything else — no temporal section header
+    rest.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
 
     return out;
   }, [conversations, meId, search, filter]);
