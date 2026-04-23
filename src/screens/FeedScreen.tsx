@@ -369,8 +369,6 @@ export const FeedScreen: React.FC = () => {
     });
   }, [currentPlans.length, listH, activeTab, initialIndices]);
   const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
-  const progressPercent =
-    currentPlans.length > 1 ? ((currentIndex + 1) / currentPlans.length) * 100 : 100;
 
   const getCoverPhoto = useCallback((plan: Plan): string | undefined => {
     return (
@@ -597,15 +595,6 @@ export const FeedScreen: React.FC = () => {
           />
         )}
       </View>
-
-      {/* ─── Progress bar ─── */}
-      {currentPlans.length > 1 && (
-        <View style={[styles.progressBar, { top: insets.top + 4 }]} pointerEvents="none">
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-          </View>
-        </View>
-      )}
 
       {/* ─── Sticky "Do it now" CTA — visible only when a card is in detail
             mode. Lives at screen level (not inside the card) so it never gets
@@ -938,25 +927,6 @@ const styles = StyleSheet.create({
   },
   listArea: {
     flex: 1,
-  },
-
-  // ── Progress bar ───────────────────────────────────────────
-  progressBar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 15,
-  },
-  progressTrack: {
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(44,36,32,0.15)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 1,
-    backgroundColor: 'rgba(44,36,32,0.5)',
   },
 
   // ── Loading / Empty ────────────────────────────────────────
