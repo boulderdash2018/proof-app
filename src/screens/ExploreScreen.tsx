@@ -493,13 +493,13 @@ export const ExploreScreen: React.FC = () => {
             onPress={() => setActiveSheet('person')}
             accessibilityLabel={`Changer la personne: ${personLabel}`}
           />
-          <Text>, plut\u00f4t </Text>
+          <Text>, plutôt </Text>
           <SlotChip
             label={themeLabel}
             onPress={() => setActiveSheet('theme')}
             accessibilityLabel={`Changer le thème: ${themeLabel}`}
           />
-          <Text>, et plus pr\u00e9cis\u00e9ment </Text>
+          <Text>, et plus précisément </Text>
           <SlotChip
             label={subLabel}
             onPress={() => {
@@ -528,7 +528,7 @@ export const ExploreScreen: React.FC = () => {
           ou tape un quartier, une vibe…
         </Text>
         {Platform.OS === 'web' && (
-          <Text style={styles.hintBarShortcut}>\u2318K</Text>
+          <Text style={styles.hintBarShortcut}>⌘K</Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity
@@ -563,7 +563,7 @@ export const ExploreScreen: React.FC = () => {
     return (
       <View>
         <View style={styles.listHeaderRow}>
-          <Text style={styles.eyebrow}>{items.length} cat\u00e9gories correspondent</Text>
+          <Text style={styles.eyebrow}>{items.length} catégories correspondent</Text>
         </View>
         <View>
           {items.map((item, i) => {
