@@ -11,7 +11,7 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
@@ -88,6 +88,7 @@ for (const group of EXPLORE_GROUPS) {
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -171,6 +172,17 @@ export const ExploreScreen: React.FC = () => {
     });
   }, [cityConfig.name]);
 
+  // Apply a filter pushed by another screen (e.g. SearchScreen tapping a
+  // trending category) via route params. Clear the param immediately so the
+  // effect doesn't re-fire on subsequent renders.
+  useEffect(() => {
+    const pending = route.params?.applyFilter;
+    if (typeof pending === 'string' && pending.length > 0) {
+      toggleFilter(pending);
+      navigation.setParams({ applyFilter: undefined } as any);
+    }
+  }, [route.params?.applyFilter, toggleFilter, navigation]);
+
   // ── "Dans ton quartier" handler ──
   const handleNearbyFilter = async () => {
     const currentTheme = selectedFilters.find(f => !PERSON_LABELS.has(f));
@@ -182,7 +194,6 @@ export const ExploreScreen: React.FC = () => {
       const next = currentPerson ? [currentPerson] : [];
       setSelectedFilters(next);
       setLocationDenied(false);
-      setShowSubcategories(false);
       if (currentPerson) {
         setIsFilterLoading(true);
         fetchPublicPlansByTags([currentPerson], cityConfig.name).then(plans => {
@@ -204,7 +215,6 @@ export const ExploreScreen: React.FC = () => {
     }
 
     setLocationDenied(false);
-    setShowSubcategories(false);
 
     const next: string[] = [];
     if (currentPerson) next.push(currentPerson);

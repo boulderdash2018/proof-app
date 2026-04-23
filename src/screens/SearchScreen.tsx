@@ -100,6 +100,13 @@ export const SearchScreen: React.FC = () => {
     handleSearch(term);
   };
 
+  /** Trending category tap — pop back to Explore and apply the filter
+   *  via route params. Explore reads `applyFilter` on focus and calls its
+   *  own toggleFilter (which fires the search + flips into results view). */
+  const handleSelectCategory = (name: string) => {
+    navigation.navigate('Explore', { applyFilter: name } as any);
+  };
+
   const handlePlacePress = (place: GooglePlaceDetails) => {
     addSearch(query);
     navigation.navigate('PlaceDetail', { googlePlaceId: place.placeId });
@@ -303,10 +310,7 @@ export const SearchScreen: React.FC = () => {
                         key={cat.name}
                         style={[s.trendingRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }]}
                         activeOpacity={0.7}
-                        onPress={() => {
-                          navigation.goBack();
-                          // Small delay to let the screen close, then the ExploreScreen can handle the filter
-                        }}
+                        onPress={() => handleSelectCategory(cat.name)}
                       >
                         {/* Mini gradient tile — same palette as the Explore grid */}
                         <View style={s.trendingTile}>
