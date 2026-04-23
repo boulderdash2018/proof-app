@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
@@ -156,6 +156,25 @@ export const ExploreScreen: React.FC = () => {
   // Fetch trending on mount (5-min cache in store)
   useEffect(() => { fetchTrending(cityConfig.name); }, [cityConfig.name]);
 
+  // ── Stale-reset: clear all slots if the user has been away from this
+  //    screen for more than 5 minutes. App reload (= remount) is naturally
+  //    handled by the null defaults above. ──
+  const SLOTS_STALE_MS = 5 * 60 * 1000;
+  const lastBlurAtRef = useRef<number | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const lastBlur = lastBlurAtRef.current;
+      if (lastBlur && Date.now() - lastBlur > SLOTS_STALE_MS) {
+        setSlotPerson(null);
+        setSlotTheme(null);
+        setSlotSubcategory(null);
+      }
+      return () => {
+        lastBlurAtRef.current = Date.now();
+      };
+    }, []),
+  );
+
   // ── Friend requests badge (for the people icon in the header) ──
   // Lifted from ProfileScreen — discovery / connections live here now.
   const incomingRequests = useFriendsStore((s) => s.incomingRequests);
@@ -169,8 +188,11 @@ export const ExploreScreen: React.FC = () => {
   // précisément [sous-catégorie]". Slots 1 & 2 filter the list visually.
   // Slot 3 is the COMMIT action — picking a sub-category fires the actual
   // filter set and drops the user into the plans-only results view.
-  const [slotPerson, setSlotPerson] = useState<string | null>('Solo');
-  const [slotTheme, setSlotTheme] = useState<string | null>('Food & Drinks');
+  // Defaults to null so the screen opens with placeholder labels
+  // ("quelqu'un", "quelque chose", "quoi") and shows trending categories.
+  // The user picks slots to refine; that switches the list to matching plans.
+  const [slotPerson, setSlotPerson] = useState<string | null>(null);
+  const [slotTheme, setSlotTheme] = useState<string | null>(null);
   const [slotSubcategory, setSlotSubcategory] = useState<string | null>(null);
   // Which slot bottom sheet is open
   type SheetKey = 'person' | 'theme' | 'subcategoryFromSlot' | 'subcategory' | null;
@@ -249,30 +271,28 @@ export const ExploreScreen: React.FC = () => {
   useEffect(() => { setContentMode('plans'); }, []);
 
   // Auto-sync the sentence slots to selectedFilters and re-fetch plans
-  // whenever a slot changes. The sentence IS the live filter — no commit
-  // step, no browse/results dichotomy. Empty slots = show all plans.
+  // whenever a slot changes. When ALL slots are empty, we don't fetch plans
+  // at all — the screen falls back to the editorial trending-categories list
+  // (handled in JSX below).
   useEffect(() => {
     const filters = [slotPerson, slotTheme, slotSubcategory].filter(
       (f): f is string => typeof f === 'string' && f.length > 0,
     );
     setSelectedFilters(filters);
 
+    if (filters.length === 0) {
+      setFilteredPlans([]);
+      setIsFilterLoading(false);
+      return;
+    }
+
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterLoading(true);
-    const fetchPromise = filters.length === 0
-      ? fetchFeedPlans(cityConfig.name)
-      : fetchPublicPlansByTags(filters, cityConfig.name);
-
-    fetchPromise
+    fetchPublicPlansByTags(filters, cityConfig.name)
       .then((plans) => {
-        let result = plans;
-        if (filters.length > 1) {
-          result = plans.filter((p) => filters.every((tag) => p.tags.includes(tag)));
-        }
-        if (filters.length === 0) {
-          // No constraint — most-liked first so the screen still feels curated.
-          result = [...plans].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
-        }
+        const result = filters.length > 1
+          ? plans.filter((p) => filters.every((tag) => p.tags.includes(tag)))
+          : plans;
         setFilteredPlans(result);
       })
       .catch(() => {})
@@ -516,38 +536,52 @@ export const ExploreScreen: React.FC = () => {
   // ─── Categories list (52x52 mini-tile + name + meta + arrow) ───
   // Source: items of slotTheme's group, enriched with trending data (hot, planCount).
   // If no slotTheme is set, show ALL categories from all groups.
-  const renderCategoryList = () => {
-    const trendingByName = new Map(trendingCategories.map((t) => [t.name, t]));
-    const top3Names = new Set(trendingCategories.slice(0, 3).map((t) => t.name));
-    const group = slotTheme ? THEME_GROUPS.find((g) => g.label === slotTheme) : null;
-    const items: ExploreCategoryItem[] = group
-      ? group.sections.flatMap((s) => s.items)
-      : THEME_GROUPS.filter((g) => g.key !== 'nearby').flatMap((g) => g.sections.flatMap((s) => s.items));
+  // Tap on a trending category from the empty-state list → auto-fill the
+  // theme + sub-category slots so the sentence reads naturally and the plans
+  // list refreshes instantly via the slot-sync useEffect.
+  const handleTrendingCategoryTap = useCallback((catName: string) => {
+    const themeKey = TAG_TO_THEME_KEY.get(catName);
+    if (themeKey) {
+      const theme = THEME_GROUPS.find((g) => g.key === themeKey)?.label;
+      if (theme) setSlotTheme(theme);
+    }
+    setSlotSubcategory(catName);
+  }, []);
 
+  // Editorial trending categories list — shown in the empty state only.
+  // Source: trendingCategories from the store (top trending in city).
+  // Tap a row → auto-fills theme + sub-cat slots → switches to plans list.
+  const renderCategoryList = () => {
+    const top3Names = new Set(trendingCategories.slice(0, 3).map((t) => t.name));
+    // Build display items from the store; enrich with the curated gradient
+    // from EXPLORE_GROUPS when available (fallback: a neutral terracotta).
+    const itemMeta = new Map<string, ExploreCategoryItem>();
+    for (const g of THEME_GROUPS) {
+      for (const s of g.sections) for (const it of s.items) itemMeta.set(it.name, it);
+    }
     return (
       <View>
         <View style={styles.listHeaderRow}>
-          <Text style={styles.eyebrow}>{items.length} catégories correspondent</Text>
+          <Text style={styles.eyebrow}>{trendingCategories.length} catégories en tendance</Text>
         </View>
         <View>
-          {items.map((item, i) => {
-            const trend = trendingByName.get(item.name);
-            const isHot = !!(trend?.hot) || top3Names.has(item.name) || !!item.hot;
-            const planCount = trend?.planCount ?? item.planCount ?? 0;
+          {trendingCategories.map((cat, i) => {
+            const item = itemMeta.get(cat.name);
+            const gradient: readonly [string, string] = item?.gradient ?? [Colors.terracotta400, Colors.terracotta700];
+            const isHot = cat.hot || top3Names.has(cat.name);
+            const planCount = cat.planCount ?? 0;
             const metaParts: string[] = [];
             if (planCount > 0) metaParts.push(`${planCount} plan${planCount > 1 ? 's' : ''}`);
-            if (slotPerson) metaParts.push(slotPerson);
-            if (slotTheme) metaParts.push(slotTheme);
             return (
               <TouchableOpacity
-                key={item.name}
+                key={cat.name}
                 style={[styles.catRow, i > 0 && styles.catRowDivider]}
-                onPress={() => applyCategoryFilter(item.name)}
+                onPress={() => handleTrendingCategoryTap(cat.name)}
                 activeOpacity={0.7}
               >
                 <View style={styles.catRowTile}>
                   <LinearGradient
-                    colors={expandGradient3(item.gradient)}
+                    colors={expandGradient3(gradient)}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
@@ -555,7 +589,7 @@ export const ExploreScreen: React.FC = () => {
                 </View>
                 <View style={styles.catRowBody}>
                   <View style={styles.catRowNameLine}>
-                    <Text style={styles.catRowName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.catRowName} numberOfLines={1}>{cat.name}</Text>
                     {isHot && (
                       <View style={styles.catRowHotBadge}>
                         <Text style={styles.catRowHotBadgeText}>HOT</Text>
@@ -563,7 +597,7 @@ export const ExploreScreen: React.FC = () => {
                     )}
                   </View>
                   {metaParts.length > 0 && (
-                    <Text style={styles.catRowMeta} numberOfLines={1}>{metaParts.join(' \u00b7 ')}</Text>
+                    <Text style={styles.catRowMeta} numberOfLines={1}>{metaParts.join(' · ')}</Text>
                   )}
                 </View>
                 <Ionicons name="arrow-forward" size={16} color={Colors.textTertiary} />
@@ -810,9 +844,13 @@ export const ExploreScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Plans matching the sentence — always shown, updates live */}
+      {/* Body — trending categories when slots are empty (default state),
+          matching plans once any slot is filled. */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {isFilterLoading ? (
+        {selectedFilters.length === 0 ? (
+          // Empty-state: editorial trending categories list
+          renderCategoryList()
+        ) : isFilterLoading ? (
           <LoadingSkeleton variant="list" />
         ) : displayedPlans.length === 0 ? (
           <View style={{ alignItems: 'center', paddingTop: 40 }}>
