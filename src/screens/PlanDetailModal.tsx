@@ -851,8 +851,9 @@ export const PlanDetailModal: React.FC = () => {
                 <View style={st.placeRow}>
                   <View style={st.tlCol}>
                     <View style={[st.tlLineTop, index === 0 && { backgroundColor: 'transparent' }]} />
-                    <View style={[st.tlCircle, { backgroundColor: Colors.primary }]}>
-                      <Text style={st.tlNum}>{index + 1}</Text>
+                    {/* Terracotta dot with halo (mirrors ImmersiveCard detail) */}
+                    <View style={st.tlNodeHalo}>
+                      <View style={st.tlNode} />
                     </View>
                     <View style={[st.tlLineBot, isLast && !travelToNext && { backgroundColor: 'transparent' }]} />
                   </View>
@@ -1352,11 +1353,28 @@ const st = StyleSheet.create({
 
   // Timeline
   tlCol: { width: 40, alignItems: 'center' },
-  tlLineTop: { width: 2, height: 16, backgroundColor: Colors.primary + '40' },
-  tlLineBot: { width: 2, flex: 1, backgroundColor: Colors.primary + '40' },
+  tlLineTop: { width: 2, height: 16, backgroundColor: Colors.terracotta200 },
+  tlLineBot: { width: 2, flex: 1, backgroundColor: Colors.terracotta200, minHeight: 12 },
+  // Marker = halo around a small terracotta dot (mirrors ImmersiveCard detail)
+  tlNodeHalo: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(196, 112, 75, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  tlNode: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.primary,
+    borderWidth: 3,
+    borderColor: Colors.bgPrimary,
+  },
   tlLineFull: { width: 2, flex: 1, minHeight: 20, backgroundColor: Colors.primary + '40' },
-  tlCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  tlNum: { fontSize: 13, fontWeight: '700', color: Colors.textOnAccent },
+  // (tlCircle / tlNum removed — replaced by tlNodeHalo + tlNode dot markers)
 
   // Place card
   placeRow: { flexDirection: 'row' },
