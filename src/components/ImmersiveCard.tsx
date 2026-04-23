@@ -1042,6 +1042,23 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
             <View style={{ height: 140 }} />
           </View>
         </Animated.ScrollView>
+
+        {/* ═══════ Sticky "Do it now" CTA (visible only in detail mode) ═══════
+            Sits inside the card frame, anchored bottom, above the scrollable
+            content. Same UX as PlanDetailModal — the user always has the
+            launch action available regardless of scroll position. */}
+        {isDetailOpen && (
+          <View style={styles.stickyCtaBar} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.stickyCtaButton}
+              onPress={onDoItNow}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="compass" size={18} color={Colors.textOnAccent} />
+              <Text style={styles.stickyCtaText}>Do it now</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
     </Animated.View>
@@ -1669,6 +1686,40 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   } as any,
+  // Sticky bottom CTA — shown only when isDetailOpen, anchored to the
+  // bottom of the card frame so the launch action follows the user.
+  stickyCtaBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 14,
+    backgroundColor: Colors.bgSecondary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+  } as any,
+  stickyCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  } as any,
+  stickyCtaText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.2,
+  },
   ctaButtonText: {
     fontSize: 16,
     fontFamily: Fonts.bodyBold,
