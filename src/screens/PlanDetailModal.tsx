@@ -652,6 +652,65 @@ export const PlanDetailModal: React.FC = () => {
           </TouchableOpacity>
         )}
 
+        {/* ===== SOCIAL PROOF ===== Moved up from below the itinerary so the
+            community-validation signal sits in the same hierarchy as Liked By,
+            not buried under the places list. Hidden when nobody (incl. you)
+            has proofed yet — the PROOF STATUS BANNER below covers the empty CTA. */}
+        {(localProofCount > 0 || isProofedByUser) && (
+          <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+            <View style={st.socialProofTop}>
+              <MiniStampIcon type="proof" size={18} />
+              <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
+                {localProofCount} {localProofCount === 1 ? "personne l'a" : "personnes l'ont"} vérifié sur Proof.
+                {isProofedByUser ? '  (toi inclus ✓)' : ''}
+              </Text>
+              {(plan.declinedCount ?? 0) > 0 && (
+                <>
+                  <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
+                  <MiniStampIcon type="declined" size={18} />
+                  <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
+                </>
+              )}
+            </View>
+            {prooferUsers.length > 0 && (
+              <View style={st.proofersRow}>
+                <View style={st.proofersAvatarsStack}>
+                  {prooferUsers.slice(0, 3).map((u, i) => (
+                    <View
+                      key={u.id}
+                      style={[
+                        st.proofersAvatarWrap,
+                        {
+                          marginLeft: i === 0 ? 0 : -10,
+                          zIndex: 3 - i,
+                          borderColor: Colors.bgSecondary,
+                        },
+                      ]}
+                    >
+                      <Avatar
+                        initials={u.initials}
+                        bg={u.avatarBg}
+                        color={u.avatarColor}
+                        size="XS"
+                        avatarUrl={u.avatarUrl || undefined}
+                      />
+                    </View>
+                  ))}
+                </View>
+                <Text style={[st.proofersText, { color: Colors.textSecondary }]} numberOfLines={2}>
+                  {(() => {
+                    const names = prooferUsers.slice(0, 2).map((u) => u.displayName.split(' ')[0]);
+                    const remaining = prooferUsers.length - 2;
+                    if (prooferUsers.length === 1) return `${names[0]} a fait ce plan`;
+                    if (prooferUsers.length === 2) return `${names[0]} et ${names[1]} ont fait ce plan`;
+                    return `${names[0]}, ${names[1]} et ${remaining} autre${remaining > 1 ? 's' : ''} ont fait ce plan`;
+                  })()}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* ===== EXTRA TAGS ===== */}
         {plan.tags.length > 1 && (
           <View style={st.tagsRow}>
@@ -811,61 +870,6 @@ export const PlanDetailModal: React.FC = () => {
         {plan.places.some((p) => p.reservationRecommended) && (
           <Text style={[st.reservationLegend, { color: Colors.textSecondary }]}>﹡ Reservation recommended</Text>
         )}
-
-        {/* ===== SOCIAL PROOF ===== Always visible so the user can see the count update live after proofing */}
-        <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
-          <View style={st.socialProofTop}>
-            <MiniStampIcon type="proof" size={18} />
-            <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
-              {localProofCount} {localProofCount === 1 ? "personne l'a" : "personnes l'ont"} vérifié sur Proof.
-              {isProofedByUser ? '  (toi inclus ✓)' : ''}
-            </Text>
-            {(plan.declinedCount ?? 0) > 0 && (
-              <>
-                <View style={[st.socialDot, { backgroundColor: Colors.textTertiary }]} />
-                <MiniStampIcon type="declined" size={18} />
-                <Text style={[st.socialDeclined, { color: Colors.textSecondary }]}>{plan.declinedCount}</Text>
-              </>
-            )}
-          </View>
-          {/* Avatars empilés + texte "Marie, Paul et N autres ont fait ce plan" */}
-          {prooferUsers.length > 0 && (
-            <View style={st.proofersRow}>
-              <View style={st.proofersAvatarsStack}>
-                {prooferUsers.slice(0, 3).map((u, i) => (
-                  <View
-                    key={u.id}
-                    style={[
-                      st.proofersAvatarWrap,
-                      {
-                        marginLeft: i === 0 ? 0 : -10,
-                        zIndex: 3 - i,
-                        borderColor: Colors.bgSecondary,
-                      },
-                    ]}
-                  >
-                    <Avatar
-                      initials={u.initials}
-                      bg={u.avatarBg}
-                      color={u.avatarColor}
-                      size="XS"
-                      avatarUrl={u.avatarUrl || undefined}
-                    />
-                  </View>
-                ))}
-              </View>
-              <Text style={[st.proofersText, { color: Colors.textSecondary }]} numberOfLines={2}>
-                {(() => {
-                  const names = prooferUsers.slice(0, 2).map((u) => u.displayName.split(' ')[0]);
-                  const remaining = prooferUsers.length - 2;
-                  if (prooferUsers.length === 1) return `${names[0]} a fait ce plan`;
-                  if (prooferUsers.length === 2) return `${names[0]} et ${names[1]} ont fait ce plan`;
-                  return `${names[0]}, ${names[1]} et ${remaining} autre${remaining > 1 ? 's' : ''} ont fait ce plan`;
-                })()}
-              </Text>
-            </View>
-          )}
-        </View>
 
         {/* ===== SIMILAR PLANS ===== */}
         {similarPlans.length > 0 && (
