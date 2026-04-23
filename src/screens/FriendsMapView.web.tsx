@@ -16,17 +16,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useCity } from '../hooks/useCity';
 import { useSocialProofStore } from '../store/socialProofStore';
+import { useAuthStore, useSavedPlacesStore } from '../store';
 import { fetchFriendsMapPlans } from '../services/plansService';
+import { fetchMyPlansForMap } from '../services/myPlacesService';
 import { Avatar } from '../components/Avatar';
-import { Plan } from '../types';
+import { Plan, Place } from '../types';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
 import type { MinimalUser } from '../store/socialProofStore';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-// ── Map region type (kept identical to the native version so the helpers
-// stay consistent — easy future de-duplication) ──
+// ── Map region type (mirrors native FriendsMapView for shared helper logic) ──
 interface MapRegion {
   latitude: number;
   longitude: number;
@@ -34,8 +35,7 @@ interface MapRegion {
   longitudeDelta: number;
 }
 
-// ── Warm cream map style — must match native FriendsMapView so the visual
-// feel is consistent across platforms ──
+// ── Cream-terracotta map style — must stay in sync with native FriendsMapView ──
 const MAP_STYLE = [
   {"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#6B5D52"}]},
   {"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#FAF7F2"},{"weight":2}]},
@@ -56,30 +56,36 @@ const MAP_STYLE = [
   {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4DEE6"}]},
 ];
 
-// ── Types (mirrored from native) ──
+// ────────────────────────────────────────────────────────────
+// ── Domain types ──
+// ────────────────────────────────────────────────────────────
 
-interface FriendPlace {
-  friendId: string;
-  friend: MinimalUser;
-  placeName: string;
-  latitude: number;
-  longitude: number;
+type MapMode = 'mine' | 'friends';
+
+interface PlanRef {
   planId: string;
   planTitle: string;
   planCover?: string;
+}
+
+/** A unique place on the map, with all the plans that pass through it
+ * (and the friends associated, in `friends` mode). */
+interface MapPlace {
+  placeId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  photoUrl?: string;
+  plans: PlanRef[];
+  friends: MinimalUser[]; // empty in 'mine' mode
+  isFavorite: boolean;
 }
 
 interface MarkerCluster {
   id: string;
   latitude: number;
   longitude: number;
-  items: FriendPlace[];
-  uniqueFriends: MinimalUser[];
-}
-
-interface SheetFriendEntry {
-  friend: MinimalUser;
-  plans: { planId: string; planTitle: string; planCover?: string }[];
+  places: MapPlace[];
 }
 
 interface Props {
@@ -87,46 +93,83 @@ interface Props {
   onClose: () => void;
 }
 
-// ── Helpers (mirrored from native FriendsMapView; intentionally duplicated
-// for Phase 0. Will be lifted to a shared module when Phase 1 lands.) ──
+// ────────────────────────────────────────────────────────────
+// ── Helpers ──
+// ────────────────────────────────────────────────────────────
 
-const extractFriendPlaces = (
+const placeKey = (p: Place): string => p.googlePlaceId || p.id;
+
+/** Pick the best photo for a place. Prefer the user's customPhoto, then the
+ * first Google photo, else fallback to the plan cover. */
+const pickPhotoUrl = (place: Place, planCover?: string): string | undefined =>
+  place.customPhoto || place.photoUrls?.[0] || planCover;
+
+/** Build deduped MapPlace[] from a list of plans.
+ *
+ * In 'friends' mode we additionally attach the list of friends associated
+ * with each plan (author + recreatedByIds intersected with friend set).
+ */
+const buildMapPlaces = (
   plans: Plan[],
-  friendIdSet: Set<string>,
-  getUser: (id: string) => MinimalUser | undefined,
-): FriendPlace[] => {
-  const result: FriendPlace[] = [];
+  favoriteSet: Set<string>,
+  mode: MapMode,
+  friendIdSet?: Set<string>,
+  getUser?: (id: string) => MinimalUser | undefined,
+): MapPlace[] => {
+  const byKey = new Map<string, MapPlace>();
+
   for (const plan of plans) {
-    const associated = new Set<string>();
-    if (friendIdSet.has(plan.authorId)) associated.add(plan.authorId);
-    plan.recreatedByIds?.forEach((id) => {
-      if (friendIdSet.has(id)) associated.add(id);
-    });
     const planCover =
       plan.coverPhotos?.[0] ||
       plan.places?.find((p) => p.photoUrls?.length)?.photoUrls?.[0];
-    for (const friendId of associated) {
-      const friend = getUser(friendId);
-      if (!friend) continue;
-      for (const place of plan.places) {
-        if (place.latitude == null || place.longitude == null) continue;
-        result.push({
-          friendId,
-          friend,
-          placeName: place.name,
+
+    // Friends linked to this plan (only in 'friends' mode)
+    let planFriends: MinimalUser[] = [];
+    if (mode === 'friends' && friendIdSet && getUser) {
+      const ids = new Set<string>();
+      if (friendIdSet.has(plan.authorId)) ids.add(plan.authorId);
+      plan.recreatedByIds?.forEach((id) => { if (friendIdSet.has(id)) ids.add(id); });
+      planFriends = Array.from(ids)
+        .map((id) => getUser(id))
+        .filter((u): u is MinimalUser => !!u);
+      if (planFriends.length === 0) continue; // skip plans not actually associated with a known friend
+    }
+
+    const planRef: PlanRef = { planId: plan.id, planTitle: plan.title, planCover };
+
+    for (const place of plan.places) {
+      if (place.latitude == null || place.longitude == null) continue;
+      const key = placeKey(place);
+      const existing = byKey.get(key);
+      if (existing) {
+        // Merge — same place across multiple plans
+        if (!existing.plans.some((p) => p.planId === plan.id)) existing.plans.push(planRef);
+        if (mode === 'friends') {
+          for (const f of planFriends) {
+            if (!existing.friends.some((x) => x.id === f.id)) existing.friends.push(f);
+          }
+        }
+        // Prefer a photo if we didn't have one
+        if (!existing.photoUrl) existing.photoUrl = pickPhotoUrl(place, planCover);
+      } else {
+        byKey.set(key, {
+          placeId: key,
+          name: place.name,
           latitude: place.latitude,
           longitude: place.longitude,
-          planId: plan.id,
-          planTitle: plan.title,
-          planCover,
+          photoUrl: pickPhotoUrl(place, planCover),
+          plans: [planRef],
+          friends: mode === 'friends' ? [...planFriends] : [],
+          isFavorite: favoriteSet.has(key),
         });
       }
     }
   }
-  return result;
+
+  return Array.from(byKey.values());
 };
 
-const filterByBounds = (places: FriendPlace[], region: MapRegion): FriendPlace[] => {
+const filterByBounds = (places: MapPlace[], region: MapRegion): MapPlace[] => {
   const latH = region.latitudeDelta / 2;
   const lngH = region.longitudeDelta / 2;
   return places.filter(
@@ -138,10 +181,12 @@ const filterByBounds = (places: FriendPlace[], region: MapRegion): FriendPlace[]
   );
 };
 
-const clusterMarkers = (places: FriendPlace[], region: MapRegion): MarkerCluster[] => {
-  const cellSize = Math.max(region.latitudeDelta, region.longitudeDelta) * 0.06;
+const clusterPlaces = (places: MapPlace[], region: MapRegion): MarkerCluster[] => {
+  // Smaller cell than friend-cluster — we want each photo marker to feel
+  // distinct unless they're truly on top of each other.
+  const cellSize = Math.max(region.latitudeDelta, region.longitudeDelta) * 0.035;
   if (cellSize <= 0) return [];
-  const grid = new Map<string, FriendPlace[]>();
+  const grid = new Map<string, MapPlace[]>();
   for (const p of places) {
     const key = `${Math.floor(p.latitude / cellSize)}_${Math.floor(p.longitude / cellSize)}`;
     if (!grid.has(key)) grid.set(key, []);
@@ -150,49 +195,177 @@ const clusterMarkers = (places: FriendPlace[], region: MapRegion): MarkerCluster
   return Array.from(grid.entries()).map(([key, items]) => {
     const lat = items.reduce((s, i) => s + i.latitude, 0) / items.length;
     const lng = items.reduce((s, i) => s + i.longitude, 0) / items.length;
-    const friendMap = new Map<string, MinimalUser>();
-    items.forEach((i) => friendMap.set(i.friendId, i.friend));
-    return {
-      id: key,
-      latitude: lat,
-      longitude: lng,
-      items,
-      uniqueFriends: Array.from(friendMap.values()),
-    };
+    return { id: key, latitude: lat, longitude: lng, places: items };
   });
 };
 
-const buildSheetData = (cluster: MarkerCluster): SheetFriendEntry[] => {
-  const map = new Map<
-    string,
-    { friend: MinimalUser; plans: Map<string, { planId: string; planTitle: string; planCover?: string }> }
-  >();
-  for (const item of cluster.items) {
-    if (!map.has(item.friendId)) {
-      map.set(item.friendId, { friend: item.friend, plans: new Map() });
-    }
-    const e = map.get(item.friendId)!;
-    if (!e.plans.has(item.planId)) {
-      e.plans.set(item.planId, {
-        planId: item.planId,
-        planTitle: item.planTitle,
-        planCover: item.planCover,
-      });
-    }
-  }
-  return Array.from(map.values()).map(({ friend, plans }) => ({
-    friend,
-    plans: Array.from(plans.values()),
-  }));
-};
-
-// ── Zoom ↔ region delta heuristic. Google Maps gives us a zoom level (0-21);
-// the helpers above expect a latitudeDelta/longitudeDelta. We approximate.
 const zoomToDelta = (zoom: number): number => 360 / Math.pow(2, zoom);
 
-// ══════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────────
+// ── HTML marker (Google Maps OverlayView) ──
+// ────────────────────────────────────────────────────────────
+
+/** Build an HTMLDivElement that renders a Zenly-style photo marker.
+ *  The DOM is hand-rolled (not React) because OverlayView appends raw
+ *  elements to the map's pane — using React here would require a portal
+ *  per marker which adds far more complexity than the gain. */
+function buildMarkerNode(
+  cluster: MarkerCluster,
+  onClick: () => void,
+): HTMLDivElement {
+  // Use the most-favorited or simply the first place to source the visual.
+  const lead = cluster.places.find((p) => p.isFavorite) || cluster.places[0];
+  const totalPlanCount = cluster.places.reduce((sum, p) => sum + p.plans.length, 0);
+  const isFavorite = cluster.places.some((p) => p.isFavorite);
+
+  const root = document.createElement('div');
+  root.style.cssText = `
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.22,1,0.36,1);
+    will-change: transform;
+  `;
+  root.onmouseenter = () => { root.style.transform = 'translate(-50%, -50%) scale(1.08)'; };
+  root.onmouseleave = () => { root.style.transform = 'translate(-50%, -50%) scale(1)'; };
+  root.onclick = (e) => { e.stopPropagation(); onClick(); };
+
+  // Outer frame — gold for favorites, cream otherwise
+  const frame = document.createElement('div');
+  frame.style.cssText = `
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: ${isFavorite ? Colors.gold : Colors.bgSecondary};
+    padding: 3px;
+    box-shadow: 0 4px 12px rgba(44, 36, 32, 0.2), 0 1px 2px rgba(44, 36, 32, 0.12);
+    box-sizing: border-box;
+  `;
+
+  // Inner photo or fallback
+  if (lead.photoUrl) {
+    const img = document.createElement('img');
+    img.src = lead.photoUrl;
+    img.alt = lead.name;
+    img.style.cssText = `
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      background: ${Colors.bgTertiary};
+    `;
+    img.onerror = () => { img.style.display = 'none'; };
+    frame.appendChild(img);
+  } else {
+    const fallback = document.createElement('div');
+    fallback.style.cssText = `
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: ${Colors.terracotta100};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: ${Colors.terracotta700};
+      font-family: -apple-system, system-ui, sans-serif;
+    `;
+    fallback.textContent = '◌';
+    frame.appendChild(fallback);
+  }
+  root.appendChild(frame);
+
+  // Favorite star — top right corner
+  if (isFavorite) {
+    const star = document.createElement('div');
+    star.style.cssText = `
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: ${Colors.gold};
+      color: white;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(44, 36, 32, 0.25);
+      font-family: -apple-system, system-ui, sans-serif;
+      line-height: 1;
+    `;
+    star.textContent = '★';
+    root.appendChild(star);
+  }
+
+  // Plan count badge — bottom right
+  if (totalPlanCount > 1) {
+    const badge = document.createElement('div');
+    badge.style.cssText = `
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      background: ${Colors.primary};
+      color: ${Colors.textOnAccent};
+      padding: 0 6px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(44, 36, 32, 0.2);
+      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      line-height: 1;
+      box-sizing: border-box;
+    `;
+    badge.textContent = String(totalPlanCount);
+    root.appendChild(badge);
+  }
+
+  return root;
+}
+
+/** Factory that builds an OverlayView subclass at runtime — needed because
+ *  google.maps.OverlayView only exists once the script is loaded. */
+function createHtmlMarker(gm: any, position: any, node: HTMLDivElement): any {
+  const Overlay = class extends gm.OverlayView {
+    private node: HTMLDivElement;
+    private pos: any;
+    constructor(p: any, n: HTMLDivElement) {
+      super();
+      this.pos = p;
+      this.node = n;
+    }
+    onAdd() {
+      const panes = this.getPanes();
+      if (panes) panes.overlayMouseTarget.appendChild(this.node);
+    }
+    draw() {
+      const projection = this.getProjection();
+      if (!projection) return;
+      const point = projection.fromLatLngToDivPixel(this.pos);
+      if (point) {
+        this.node.style.left = `${point.x}px`;
+        this.node.style.top = `${point.y}px`;
+      }
+    }
+    onRemove() {
+      if (this.node.parentNode) this.node.parentNode.removeChild(this.node);
+    }
+  };
+  return new Overlay(position, node);
+}
+
+// ────────────────────────────────────────────────────────────
 // ── Map renderer (imperative Google Maps JS) ──
-// ══════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────────
 
 interface MapRendererProps {
   initialRegion: MapRegion;
@@ -209,7 +382,7 @@ const MapRenderer: React.FC<MapRendererProps> = ({
 }) => {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  const overlaysRef = useRef<any[]>([]);
   const onClusterClickRef = useRef(onClusterClick);
   const onRegionChangeRef = useRef(onRegionChange);
   onClusterClickRef.current = onClusterClick;
@@ -231,62 +404,39 @@ const MapRenderer: React.FC<MapRendererProps> = ({
         clickableIcons: false,
       });
       mapRef.current = map;
-
-      // Bridge Google's `idle` event back to React-land as a region change.
       map.addListener('idle', () => {
         const center = map.getCenter();
         const bounds = map.getBounds();
         if (!center || !bounds) return;
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
-        const region: MapRegion = {
+        onRegionChangeRef.current({
           latitude: center.lat(),
           longitude: center.lng(),
           latitudeDelta: Math.abs(ne.lat() - sw.lat()),
           longitudeDelta: Math.abs(ne.lng() - sw.lng()),
-        };
-        onRegionChangeRef.current(region);
+        });
       });
     });
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync markers when clusters change
+  // Sync markers on cluster change
   useEffect(() => {
     if (!mapRef.current || !(window as any).google?.maps) return;
     const gm = (window as any).google.maps;
-
-    // Tear down previous markers
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
-
-    // Create new markers
+    overlaysRef.current.forEach((o) => o.setMap(null));
+    overlaysRef.current = [];
     for (const cluster of clusters) {
-      const count = cluster.uniqueFriends.length;
-      const marker = new gm.Marker({
-        position: { lat: cluster.latitude, lng: cluster.longitude },
-        map: mapRef.current,
-        icon: {
-          path: gm.SymbolPath.CIRCLE,
-          fillColor: Colors.primary,
-          fillOpacity: 1,
-          strokeColor: '#FFF',
-          strokeWeight: 2,
-          scale: count > 1 ? 14 : 10,
-        },
-        label: count > 1
-          ? {
-              text: String(count),
-              color: '#FFF',
-              fontFamily: 'Inter',
-              fontSize: '11px',
-              fontWeight: '700',
-            }
-          : undefined,
-      });
-      marker.addListener('click', () => onClusterClickRef.current(cluster));
-      markersRef.current.push(marker);
+      const node = buildMarkerNode(cluster, () => onClusterClickRef.current(cluster));
+      const overlay = createHtmlMarker(
+        gm,
+        new gm.LatLng(cluster.latitude, cluster.longitude),
+        node,
+      );
+      overlay.setMap(mapRef.current);
+      overlaysRef.current.push(overlay);
     }
   }, [clusters]);
 
@@ -298,20 +448,28 @@ const MapRenderer: React.FC<MapRendererProps> = ({
   );
 };
 
-// ══════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────────
 // ── Main component ──
-// ══════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────────
 
 export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const cityConfig = useCity();
+  const currentUser = useAuthStore((s) => s.user);
 
   const followingIds = useSocialProofStore((s) => s.followingIds);
   const ensureUsers = useSocialProofStore((s) => s.ensureUsers);
+  const savedPlaces = useSavedPlacesStore((s) => s.places);
 
+  const favoriteSet = useMemo(
+    () => new Set(savedPlaces.map((p) => p.placeId)),
+    [savedPlaces],
+  );
+
+  const [mode, setMode] = useState<MapMode>('mine');
   const [isLoading, setIsLoading] = useState(true);
-  const [allPlaces, setAllPlaces] = useState<FriendPlace[]>([]);
+  const [allPlaces, setAllPlaces] = useState<MapPlace[]>([]);
   const [clusters, setClusters] = useState<MarkerCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<MarkerCluster | null>(null);
 
@@ -328,43 +486,58 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
   const regionRef = useRef<MapRegion>(initialRegion);
   const sheetAnim = useRef(new Animated.Value(SCREEN_H)).current;
 
-  // ── Fetch friend plans ──
+  // ── Fetch on visibility / mode / city change ──
   useEffect(() => {
     if (!visible) return;
-    if (followingIds.length === 0) {
-      setIsLoading(false);
-      setAllPlaces([]);
-      setClusters([]);
-      return;
-    }
-
     let cancelled = false;
     setIsLoading(true);
 
     (async () => {
       try {
-        const plans = await fetchFriendsMapPlans(followingIds, cityConfig.name);
-        if (cancelled) return;
+        let plans: Plan[] = [];
 
-        const idsNeeded = new Set<string>();
-        for (const plan of plans) {
-          if (followingIds.includes(plan.authorId)) idsNeeded.add(plan.authorId);
-          plan.recreatedByIds?.forEach((id) => {
-            if (followingIds.includes(id)) idsNeeded.add(id);
-          });
+        if (mode === 'friends') {
+          if (followingIds.length === 0) {
+            if (!cancelled) {
+              setAllPlaces([]);
+              setClusters([]);
+              setIsLoading(false);
+            }
+            return;
+          }
+          plans = await fetchFriendsMapPlans(followingIds, cityConfig.name);
+          // Cache friend profiles for marker rendering
+          const ids = new Set<string>();
+          for (const p of plans) {
+            if (followingIds.includes(p.authorId)) ids.add(p.authorId);
+            p.recreatedByIds?.forEach((id) => { if (followingIds.includes(id)) ids.add(id); });
+          }
+          await ensureUsers(Array.from(ids));
+        } else {
+          if (!currentUser?.id) {
+            if (!cancelled) {
+              setAllPlaces([]);
+              setClusters([]);
+              setIsLoading(false);
+            }
+            return;
+          }
+          plans = await fetchMyPlansForMap(currentUser.id);
         }
-        await ensureUsers(Array.from(idsNeeded));
+
         if (cancelled) return;
 
         const friendIdSet = new Set(followingIds);
-        const places = extractFriendPlaces(
+        const places = buildMapPlaces(
           plans,
-          friendIdSet,
-          useSocialProofStore.getState().getUser,
+          favoriteSet,
+          mode,
+          mode === 'friends' ? friendIdSet : undefined,
+          mode === 'friends' ? useSocialProofStore.getState().getUser : undefined,
         );
         setAllPlaces(places);
         const vis = filterByBounds(places, regionRef.current);
-        setClusters(clusterMarkers(vis, regionRef.current));
+        setClusters(clusterPlaces(vis, regionRef.current));
       } catch (err) {
         console.error('[FriendsMapView.web] fetch error:', err);
       } finally {
@@ -374,14 +547,14 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, followingIds.length, cityConfig.name]);
+  }, [visible, mode, followingIds.length, cityConfig.name, currentUser?.id, favoriteSet]);
 
   const handleRegionChange = useCallback(
     (region: MapRegion) => {
       regionRef.current = region;
       if (allPlaces.length > 0) {
         const vis = filterByBounds(allPlaces, region);
-        setClusters(clusterMarkers(vis, region));
+        setClusters(clusterPlaces(vis, region));
       }
     },
     [allPlaces],
@@ -427,16 +600,20 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
     [navigation, onClose, closeSheet],
   );
 
-  const sheetData = useMemo(
-    () => (selectedCluster ? buildSheetData(selectedCluster) : []),
-    [selectedCluster],
-  );
-
-  const clusterTitle = useMemo(() => {
+  const sheetTitle = useMemo(() => {
     if (!selectedCluster) return '';
-    const names = new Set(selectedCluster.items.map((i) => i.placeName));
-    return names.size === 1 ? Array.from(names)[0] : `${names.size} lieux`;
+    if (selectedCluster.places.length === 1) return selectedCluster.places[0].name;
+    return `${selectedCluster.places.length} lieux`;
   }, [selectedCluster]);
+
+  const emptyMessage = useMemo(() => {
+    if (mode === 'friends') {
+      return followingIds.length === 0
+        ? 'Suis des amis pour voir leurs lieux apparaître ici.'
+        : `Tes amis n'ont pas encore exploré ${cityConfig.name}.`;
+    }
+    return `Tu n'as pas encore exploré ${cityConfig.name}. Lance ton premier plan. ✦`;
+  }, [mode, followingIds.length, cityConfig.name]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -451,14 +628,31 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
           />
         </View>
 
-        {/* Close button */}
-        <TouchableOpacity
-          style={[styles.closeBtn, { top: insets.top + 12 }]}
-          onPress={onClose}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="close" size={18} color={Colors.textOnAccent} />
-        </TouchableOpacity>
+        {/* Top toolbar — toggle (left) + close (right) */}
+        <View style={[styles.topBar, { top: insets.top + 12 }]} pointerEvents="box-none">
+          <View style={styles.toggle} pointerEvents="auto">
+            <ToggleSegment
+              icon="person"
+              label="Mes lieux"
+              active={mode === 'mine'}
+              onPress={() => setMode('mine')}
+            />
+            <ToggleSegment
+              icon="people"
+              label="Amis"
+              active={mode === 'friends'}
+              onPress={() => setMode('friends')}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={onClose}
+            activeOpacity={0.85}
+            pointerEvents="auto"
+          >
+            <Ionicons name="close" size={18} color={Colors.textOnAccent} />
+          </TouchableOpacity>
+        </View>
 
         {/* Loading overlay */}
         {isLoading && (
@@ -473,9 +667,7 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
         {!isLoading && allPlaces.length === 0 && (
           <View style={styles.emptyOverlay} pointerEvents="none">
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                Tes amis n'ont pas encore exploré {cityConfig.name}. Invite-les. ✦
-              </Text>
+              <Text style={styles.emptyText}>{emptyMessage}</Text>
             </View>
           </View>
         )}
@@ -497,45 +689,73 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
               <View style={styles.sheetHandle} />
               <View style={styles.sheetHeader}>
                 <Ionicons name="location" size={15} color={Colors.primary} />
-                <Text style={styles.sheetTitle} numberOfLines={1}>{clusterTitle}</Text>
+                <Text style={styles.sheetTitle} numberOfLines={1}>{sheetTitle}</Text>
+                {selectedCluster.places.some((p) => p.isFavorite) && (
+                  <View style={styles.favBadge}>
+                    <Text style={styles.favBadgeStar}>★</Text>
+                    <Text style={styles.favBadgeText}>Favori</Text>
+                  </View>
+                )}
               </View>
               <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
-                {sheetData.map((entry, idx) => (
+                {selectedCluster.places.map((place, pIdx) => (
                   <View
-                    key={entry.friend.id}
-                    style={[styles.sheetFriendBlock, idx < sheetData.length - 1 && styles.sheetFriendDivider]}
+                    key={place.placeId}
+                    style={[
+                      styles.placeBlock,
+                      pIdx < selectedCluster.places.length - 1 && styles.placeDivider,
+                    ]}
                   >
-                    <TouchableOpacity
-                      style={styles.sheetFriendRow}
-                      onPress={() => handleViewProfile(entry.friend.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Avatar
-                        initials={entry.friend.initials}
-                        bg={entry.friend.avatarBg}
-                        color={entry.friend.avatarColor}
-                        size="S"
-                        avatarUrl={entry.friend.avatarUrl ?? undefined}
-                      />
-                      <Text style={styles.sheetFriendName}>{entry.friend.displayName}</Text>
-                    </TouchableOpacity>
-                    {entry.plans.map((plan) => (
+                    {/* Place header (only when cluster has multiple places) */}
+                    {selectedCluster.places.length > 1 && (
+                      <Text style={styles.placeName} numberOfLines={1}>
+                        {place.isFavorite ? '★ ' : ''}{place.name}
+                      </Text>
+                    )}
+
+                    {/* Friends row (amis mode only) */}
+                    {mode === 'friends' && place.friends.length > 0 && (
+                      <View style={styles.friendsRow}>
+                        {place.friends.slice(0, 4).map((f) => (
+                          <TouchableOpacity
+                            key={f.id}
+                            onPress={() => handleViewProfile(f.id)}
+                            activeOpacity={0.7}
+                            style={styles.friendChip}
+                          >
+                            <Avatar
+                              initials={f.initials}
+                              bg={f.avatarBg}
+                              color={f.avatarColor}
+                              size="XS"
+                              avatarUrl={f.avatarUrl ?? undefined}
+                            />
+                            <Text style={styles.friendName} numberOfLines={1}>
+                              {f.displayName.split(' ')[0]}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Plans at this place */}
+                    {place.plans.map((plan) => (
                       <TouchableOpacity
                         key={plan.planId}
-                        style={styles.sheetPlanRow}
+                        style={styles.planRow}
                         onPress={() => handleViewPlan(plan.planId)}
                         activeOpacity={0.7}
                       >
                         {plan.planCover ? (
-                          <Image source={{ uri: plan.planCover }} style={styles.sheetPlanThumb} />
+                          <Image source={{ uri: plan.planCover }} style={styles.planThumb} />
                         ) : (
-                          <View style={[styles.sheetPlanThumb, styles.sheetPlanThumbEmpty]}>
+                          <View style={[styles.planThumb, styles.planThumbEmpty]}>
                             <Ionicons name="map-outline" size={14} color={Colors.textTertiary} />
                           </View>
                         )}
-                        <Text style={styles.sheetPlanTitle} numberOfLines={1}>{plan.planTitle}</Text>
-                        <View style={styles.sheetPlanBtn}>
-                          <Text style={styles.sheetPlanBtnText}>Voir</Text>
+                        <Text style={styles.planTitle} numberOfLines={1}>{plan.planTitle}</Text>
+                        <View style={styles.planBtn}>
+                          <Text style={styles.planBtnText}>Voir</Text>
                           <Ionicons name="chevron-forward" size={12} color={Colors.primary} />
                         </View>
                       </TouchableOpacity>
@@ -552,24 +772,89 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
   );
 };
 
-// ══════════════════════════════════════════════════════════
-// ── Styles (mirror native; small loading-card variant since we can't
-// stack a spinner & text over the map div the same way) ──
-// ══════════════════════════════════════════════════════════
+// ── Toggle segment sub-component ──
+const ToggleSegment: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}> = ({ icon, label, active, onPress }) => (
+  <TouchableOpacity
+    style={[styles.toggleSeg, active && styles.toggleSegActive]}
+    onPress={onPress}
+    activeOpacity={0.85}
+  >
+    <Ionicons
+      name={icon}
+      size={14}
+      color={active ? Colors.textOnAccent : Colors.textSecondary}
+    />
+    <Text style={[styles.toggleSegText, active && styles.toggleSegTextActive]}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
+// ────────────────────────────────────────────────────────────
+// ── Styles ──
+// ────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgPrimary },
   map: { flex: 1 } as any,
 
-  closeBtn: {
+  topBar: {
     position: 'absolute',
-    right: 14,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    zIndex: 10,
+  } as any,
+
+  // Toggle pill
+  toggle: {
+    flexDirection: 'row',
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 24,
+    padding: 4,
+    gap: 2,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  } as any,
+  toggleSeg: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+  } as any,
+  toggleSegActive: {
+    backgroundColor: Colors.primary,
+  },
+  toggleSegText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+    letterSpacing: 0.2,
+  },
+  toggleSegTextActive: {
+    color: Colors.textOnAccent,
+  },
+
+  closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
     shadowColor: '#2C2420',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -607,7 +892,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
     paddingVertical: 20,
     borderRadius: 16,
-    maxWidth: 280,
+    maxWidth: 320,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     shadowColor: '#2C2420',
@@ -623,7 +908,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
-  // Bottom sheet — same layout as native
+  // Bottom sheet
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
@@ -638,7 +923,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 10,
-    maxHeight: SCREEN_H * 0.45,
+    maxHeight: SCREEN_H * 0.5,
     zIndex: 20,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
@@ -669,49 +954,88 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     flex: 1,
   },
+  favBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: Colors.gold + '22',
+  } as any,
+  favBadgeStar: {
+    fontSize: 10,
+    color: Colors.gold,
+  },
+  favBadgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.gold,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+
   sheetScroll: { paddingHorizontal: 20 },
-  sheetFriendBlock: { paddingBottom: 16 },
-  sheetFriendDivider: {
+
+  placeBlock: { paddingBottom: 14 },
+  placeDivider: {
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  sheetFriendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  } as any,
-  sheetFriendName: {
-    fontSize: 14,
+  placeName: {
+    fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
+    marginBottom: 10,
   },
-  sheetPlanRow: {
+
+  friendsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  } as any,
+  friendChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    backgroundColor: Colors.bgPrimary,
+  } as any,
+  friendName: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    maxWidth: 80,
+  },
+
+  planRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingLeft: 42,
     marginBottom: 8,
   } as any,
-  sheetPlanThumb: {
+  planThumb: {
     width: 38,
     height: 38,
     borderRadius: 8,
     overflow: 'hidden',
   },
-  sheetPlanThumbEmpty: {
+  planThumbEmpty: {
     backgroundColor: Colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetPlanTitle: {
+  planTitle: {
     flex: 1,
     fontSize: 13,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
   },
-  sheetPlanBtn: {
+  planBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
@@ -720,7 +1044,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: Colors.primary + '18',
   } as any,
-  sheetPlanBtnText: {
+  planBtnText: {
     fontSize: 11,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,
