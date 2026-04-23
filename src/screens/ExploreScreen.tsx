@@ -371,7 +371,7 @@ export const ExploreScreen: React.FC = () => {
   // ── "Avec qui ?" — thin pills, single-select (Atlas refonte) ──
   const renderPersonRow = () => (
     <View style={styles.personSection}>
-      <Text style={styles.eyebrow}>AVEC QUI ?</Text>
+      <Text style={[styles.eyebrow, styles.eyebrowPerson]}>AVEC QUI ?</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.personChipsContainer}>
         {FILTERED_PERSONS.map((p) => {
           const isActive = selectedFilters.includes(p.label);
@@ -825,16 +825,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: Colors.textTertiary,
   },
-  personSection: { marginTop: 4, marginBottom: 4 },
+  // The "Avec qui ?" eyebrow lives outside the scrollContent wrapper so it
+  // needs its own horizontal inset to align with the rest of the page.
+  eyebrowPerson: { paddingHorizontal: Layout.screenPadding },
+  personSection: { marginTop: 6, marginBottom: 4 },
   personChipsContainer: {
     paddingHorizontal: Layout.screenPadding,
-    paddingTop: 8,
+    paddingTop: 10,
     paddingBottom: 6,
-    gap: 6,
+    gap: 8,
   } as any,
   personPill: {
-    height: 30,
-    paddingHorizontal: 12,
+    height: 34,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
@@ -849,12 +852,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   personPillText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
     letterSpacing: -0.05,
   },
   personPillTextInactive: { color: Colors.textPrimary },
-  personPillTextActive: { color: Colors.textOnAccent, fontWeight: '600' },
+  personPillTextActive: {
+    color: Colors.textOnAccent,
+    fontFamily: Fonts.bodySemiBold,
+  },
 
   // Theme tabs (segmented underlined nav)
   themeTabsContainer: {
