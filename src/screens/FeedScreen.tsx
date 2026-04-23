@@ -408,6 +408,10 @@ export const FeedScreen: React.FC = () => {
         onComment={() => handleOpenComment(item)}
         onShare={() => handleShare(item)}
         onDoItNow={() => handleDoItNow(item)}
+        onGroupPlan={() => {
+          if (requireAuth()) return;
+          setGroupPlan(item);
+        }}
         onMapPress={() => handleMapPress(item)}
       />
     ),

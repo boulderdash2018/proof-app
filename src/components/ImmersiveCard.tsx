@@ -54,6 +54,7 @@ interface ImmersiveCardProps {
   onComment: () => void;
   onShare: () => void;
   onDoItNow: () => void;
+  onGroupPlan?: () => void;
   onMapPress: () => void;
 }
 
@@ -102,6 +103,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onComment,
   onShare,
   onDoItNow,
+  onGroupPlan,
   onMapPress,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
@@ -960,6 +962,17 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                 <Ionicons name="compass" size={18} color={Colors.textOnAccent} />
                 <Text style={styles.ctaButtonText}>Do it now</Text>
               </TouchableOpacity>
+              {/* Secondary CTA — invite friends (creates a group bound to this plan) */}
+              {onGroupPlan ? (
+                <TouchableOpacity
+                  style={styles.ctaGroupButton}
+                  onPress={onGroupPlan}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="people-outline" size={17} color={Colors.primary} />
+                  <Text style={styles.ctaGroupButtonText}>Le faire à plusieurs</Text>
+                </TouchableOpacity>
+              ) : null}
               {plan.duration ? (
                 <Text style={styles.ctaSubtext}>⏱ Ce plan prend environ {plan.duration}</Text>
               ) : null}
@@ -1517,6 +1530,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
     color: Colors.textOnAccent,
     letterSpacing: 0.2,
+  },
+  // Secondary "à plusieurs" CTA — outline terracotta, lives below the primary Do it now
+  ctaGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: Colors.primary,
+    marginTop: 10,
+  } as any,
+  ctaGroupButtonText: {
+    fontSize: 14.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    letterSpacing: -0.1,
   },
   ctaSubtext: {
     marginTop: 14,
