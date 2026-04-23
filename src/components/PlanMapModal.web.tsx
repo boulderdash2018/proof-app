@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useColors } from '../hooks/useColors';
-
-const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
+import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
 interface PlaceCoord {
   name: string;
@@ -38,33 +37,6 @@ const PROOF_MAP_STYLE = [
   {"featureType":"transit.line","elementType":"all","stylers":[{"visibility":"off"}]},
   {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4DEE6"}]},
 ];
-
-let googleMapsLoaded = false;
-let googleMapsLoading = false;
-const loadCallbacks: (() => void)[] = [];
-
-function loadGoogleMaps(callback: () => void) {
-  if (googleMapsLoaded && (window as any).google?.maps) {
-    callback();
-    return;
-  }
-  loadCallbacks.push(callback);
-  if (googleMapsLoading) return;
-  googleMapsLoading = true;
-
-  (window as any).__gmCallback = () => {
-    googleMapsLoaded = true;
-    googleMapsLoading = false;
-    loadCallbacks.forEach(cb => cb());
-    loadCallbacks.length = 0;
-  };
-
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=__gmCallback`;
-  script.async = true;
-  script.defer = true;
-  document.head.appendChild(script);
-}
 
 const MapRenderer: React.FC<{ places: PlaceCoord[] }> = ({ places }) => {
   const mapDivRef = useRef<HTMLDivElement>(null);
