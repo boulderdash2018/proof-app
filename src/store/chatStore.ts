@@ -9,6 +9,8 @@ import {
   sendTextMessage,
   sendPlanMessage,
   sendPhotoMessage,
+  sendPollMessage,
+  voteOnPoll,
   toggleReaction as toggleReactionService,
   resetUnreadCount,
   getOrCreateConversation,
@@ -58,6 +60,8 @@ interface ChatStore {
   sendText: (text: string, replyTo?: ReplyTo) => Promise<void>;
   sendPlan: (plan: { id: string; title: string; coverPhoto?: string; authorName: string }) => Promise<void>;
   sendPhoto: (opts: { imageDataUrl: string; width?: number; height?: number; caption?: string; sessionId?: string }) => Promise<void>;
+  sendPoll: (opts: { question: string; options: string[] }) => Promise<void>;
+  votePoll: (messageId: string, optionIndex: number) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string) => void;
   setTyping: (isTyping: boolean) => void;
 
@@ -286,6 +290,37 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       await sendPhotoMessage(activeConversationId, _userId, opts);
     } catch (err) {
       console.warn('[chatStore] sendPhoto error:', err);
+    }
+  },
+
+  // ── Send poll ──
+  sendPoll: async (opts) => {
+    const { activeConversationId, _userId } = get();
+    if (!activeConversationId || !_userId) return;
+    try {
+      await sendPollMessage(activeConversationId, _userId, opts);
+    } catch (err) {
+      console.warn('[chatStore] sendPoll error:', err);
+    }
+  },
+
+  // ── Vote on poll (optimistic: update local messages then persist) ──
+  votePoll: async (messageId, optionIndex) => {
+    const { activeConversationId, _userId, messages } = get();
+    if (!activeConversationId || !_userId) return;
+    // Optimistic
+    const updated = messages.map((m) => {
+      if (m.id !== messageId) return m;
+      const votes = { ...(m.pollVotes || {}) };
+      if (votes[_userId] === optionIndex) delete votes[_userId];
+      else votes[_userId] = optionIndex;
+      return { ...m, pollVotes: votes };
+    });
+    set({ messages: updated });
+    try {
+      await voteOnPoll(activeConversationId, messageId, _userId, optionIndex);
+    } catch (err) {
+      console.warn('[chatStore] votePoll error:', err);
     }
   },
 

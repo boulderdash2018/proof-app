@@ -23,4 +23,5 @@ export { AddParticipantsSheet } from './AddParticipantsSheet';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';
+export { PollComposerSheet } from './PollComposerSheet';
 export { FloatingAvatars } from './FloatingAvatars';

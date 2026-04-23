@@ -570,6 +570,88 @@ export const sendPhotoMessage = async (
 };
 
 // ═══════════════════════════════════════════════
+// Polls
+// ═══════════════════════════════════════════════
+
+export interface SendPollOptions {
+  question: string;
+  options: string[]; // 2..5 options
+}
+
+/**
+ * Creates a `poll` message. Single vote per user, option index stored in
+ * `pollVotes[userId]`. Results are derived client-side from the map.
+ */
+export const sendPollMessage = async (
+  conversationId: string,
+  senderId: string,
+  { question, options }: SendPollOptions,
+): Promise<string> => {
+  const cleanQuestion = question.trim();
+  const cleanOptions = options.map((o) => o.trim()).filter((o) => o.length > 0);
+  if (cleanQuestion.length === 0 || cleanOptions.length < 2) {
+    throw new Error('Poll needs a question and at least 2 options');
+  }
+  const msgRef = await addDoc(
+    collection(db, CONVERSATIONS, conversationId, MESSAGES),
+    {
+      conversationId,
+      senderId,
+      type: 'poll',
+      content: cleanQuestion,
+      pollQuestion: cleanQuestion,
+      pollOptions: cleanOptions.slice(0, 5),
+      pollVotes: {},
+      reactions: [],
+      readBy: [senderId],
+      createdAt: serverTimestamp(),
+    },
+  );
+
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const convSnap = await getDoc(convRef);
+  if (convSnap.exists()) {
+    const data = convSnap.data();
+    const newUnread: Record<string, number> = { ...data.unreadCount };
+    (data.participants as string[]).forEach((uid) => {
+      if (uid !== senderId) newUnread[uid] = (newUnread[uid] || 0) + 1;
+    });
+    await updateDoc(convRef, {
+      lastMessage: `📊 ${cleanQuestion}`,
+      lastMessageType: 'poll',
+      lastMessageSenderId: senderId,
+      lastMessageAt: serverTimestamp(),
+      unreadCount: newUnread,
+      [`typing.${senderId}`]: 0,
+    });
+  }
+
+  return msgRef.id;
+};
+
+/** Casts (or changes) the current user's vote for a poll. Single vote per user. */
+export const voteOnPoll = async (
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  optionIndex: number,
+): Promise<void> => {
+  const ref = doc(db, CONVERSATIONS, conversationId, MESSAGES, messageId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  if (data.type !== 'poll') return;
+  const votes = { ...(data.pollVotes || {}) };
+  // Toggle off if same vote, else overwrite.
+  if (votes[userId] === optionIndex) {
+    delete votes[userId];
+  } else {
+    votes[userId] = optionIndex;
+  }
+  await updateDoc(ref, { pollVotes: votes });
+};
+
+// ═══════════════════════════════════════════════
 // Groups
 // ═══════════════════════════════════════════════
 

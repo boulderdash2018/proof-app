@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
@@ -219,6 +219,153 @@ const PhotoBubble: React.FC<PhotoBubbleProps> = ({ url, width, height, caption, 
 };
 
 // ═══════════════════════════════════════════════
+// Poll Bubble — shows question + options + live results
+// ═══════════════════════════════════════════════
+
+interface PollBubbleProps {
+  question: string;
+  options: string[];
+  votes: Record<string, number>;
+  userId: string | undefined;
+  isMine: boolean;
+  onVote: (optionIndex: number) => void;
+}
+
+const PollBubble: React.FC<PollBubbleProps> = ({
+  question, options, votes, userId, isMine, onVote,
+}) => {
+  const totalVotes = Object.keys(votes).length;
+  const myVote = userId ? votes[userId] : undefined;
+  const counts = options.map((_, i) => Object.values(votes).filter((v) => v === i).length);
+
+  return (
+    <View style={{ width: 240, paddingVertical: 2 }}>
+      <Text style={[pollBubbleStyles.eyebrow, { color: isMine ? 'rgba(255,248,240,0.7)' : Colors.primary }]}>
+        SONDAGE
+      </Text>
+      <Text style={[pollBubbleStyles.question, { color: isMine ? Colors.textOnAccent : Colors.textPrimary }]}>
+        {question}
+      </Text>
+      <View style={{ gap: 6, marginTop: 10 }}>
+        {options.map((opt, i) => {
+          const count = counts[i];
+          const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+          const isMyChoice = myVote === i;
+          return (
+            <TouchableOpacity
+              key={i}
+              onPress={() => onVote(i)}
+              activeOpacity={0.85}
+              style={[
+                pollBubbleStyles.optionRow,
+                isMine
+                  ? { backgroundColor: 'rgba(255,248,240,0.12)', borderColor: 'rgba(255,248,240,0.2)' }
+                  : { backgroundColor: Colors.bgPrimary, borderColor: Colors.borderSubtle },
+                isMyChoice && (isMine
+                  ? { borderColor: Colors.textOnAccent }
+                  : { borderColor: Colors.primary, backgroundColor: Colors.terracotta50 }),
+              ]}
+            >
+              {/* Progress fill */}
+              {totalVotes > 0 && (
+                <View
+                  style={[
+                    pollBubbleStyles.fill,
+                    {
+                      width: `${pct}%`,
+                      backgroundColor: isMine
+                        ? 'rgba(255,248,240,0.18)'
+                        : isMyChoice
+                          ? Colors.terracotta100
+                          : Colors.bgTertiary,
+                    },
+                  ]}
+                />
+              )}
+              <Text
+                style={[
+                  pollBubbleStyles.optionText,
+                  {
+                    color: isMine ? Colors.textOnAccent : Colors.textPrimary,
+                    fontFamily: isMyChoice ? Fonts.bodySemiBold : Fonts.body,
+                  },
+                ]}
+                numberOfLines={2}
+              >
+                {opt}
+              </Text>
+              {totalVotes > 0 && (
+                <Text
+                  style={[
+                    pollBubbleStyles.optionPct,
+                    { color: isMine ? 'rgba(255,248,240,0.85)' : Colors.textSecondary },
+                  ]}
+                >
+                  {pct}%
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Text style={[pollBubbleStyles.footer, { color: isMine ? 'rgba(255,248,240,0.65)' : Colors.textTertiary }]}>
+        {totalVotes > 0
+          ? `${totalVotes} vote${totalVotes > 1 ? 's' : ''}`
+          : 'Sois le premier à voter'}
+      </Text>
+    </View>
+  );
+};
+
+const pollBubbleStyles = StyleSheet.create({
+  eyebrow: {
+    fontSize: 9,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 3,
+  },
+  question: {
+    fontSize: 15,
+    fontFamily: Fonts.displaySemiBold,
+    letterSpacing: -0.2,
+    lineHeight: 19,
+  },
+  optionRow: {
+    position: 'relative',
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth + 0.3,
+    minHeight: 38,
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+  },
+  optionText: {
+    flex: 1,
+    fontSize: 13,
+    letterSpacing: -0.05,
+  },
+  optionPct: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    marginLeft: 8,
+  },
+  footer: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    marginTop: 8,
+  },
+});
+
+// ═══════════════════════════════════════════════
 // Swipeable Message Row
 // ═══════════════════════════════════════════════
 
@@ -247,13 +394,14 @@ interface MessageRowProps {
   onJoinSession: () => void;
   onPhotoPress: (url: string) => void;
   onOpenAlbum: () => void;
+  onVotePoll: (messageId: string, optionIndex: number) => void;
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
   item, prevMsg, nextMsg, userId, senderUser, isGroupContext, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
-  onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress, onOpenAlbum,
+  onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress, onOpenAlbum, onVotePoll,
 }) => {
   const isMine = item.senderId === userId;
   const showDate = shouldShowDateSeparator(item, prevMsg);
@@ -536,10 +684,12 @@ const MessageRow = React.memo<MessageRowProps>(({
                     borderWidth: StyleSheet.hairlineWidth,
                     borderColor: Colors.borderSubtle,
                   },
-              // Plan / photo messages get a tighter padding so the inner card breathes
-              (item.type === 'plan' || item.type === 'photo') && styles.bubblePlanPadding,
+              // Plan / photo / poll messages get a tighter padding so the inner card breathes
+              (item.type === 'plan' || item.type === 'photo' || item.type === 'poll') && styles.bubblePlanPadding,
               // Photo bubbles have no bg / border — the image fills.
               item.type === 'photo' && { backgroundColor: 'transparent', borderWidth: 0 },
+              // Poll bubbles keep the mine/other bg but add more horizontal padding.
+              item.type === 'poll' && { paddingHorizontal: 12, paddingVertical: 10 },
               bubbleRadii,
               // When there's a quoted reply on top, flatten the bubble's top corners
               // so the preview + bubble merge into a single rounded block.
@@ -558,6 +708,15 @@ const MessageRow = React.memo<MessageRowProps>(({
                     isMine={isMine}
                   />
                 </TouchableOpacity>
+              ) : item.type === 'poll' ? (
+                <PollBubble
+                  question={item.pollQuestion || item.content}
+                  options={item.pollOptions || []}
+                  votes={item.pollVotes || {}}
+                  userId={userId}
+                  isMine={isMine}
+                  onVote={(idx) => onVotePoll(item.id, idx)}
+                />
               ) : item.type === 'plan' ? (
                 <TouchableOpacity
                   onPress={() => item.planId && onPlanPress(item.planId)}
@@ -795,6 +954,8 @@ export const ConversationScreen: React.FC = () => {
   const leaveGroupConv = useChatStore((s) => s.leaveGroupConv);
   const renameGroupConv = useChatStore((s) => s.renameGroupConv);
   const sendPhoto = useChatStore((s) => s.sendPhoto);
+  const sendPoll = useChatStore((s) => s.sendPoll);
+  const votePoll = useChatStore((s) => s.votePoll);
 
   // Active conversation (looked up once, used for status + kebab actions)
   const activeConv = useMemo(
@@ -881,6 +1042,7 @@ export const ConversationScreen: React.FC = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
 
   const handlePickPhoto = useCallback(async () => {
     setAttachMenuOpen(false);
@@ -1154,9 +1316,10 @@ export const ConversationScreen: React.FC = () => {
       onJoinSession={handleJoinSession}
       onPhotoPress={setLightboxUrl}
       onOpenAlbum={() => setAlbumOpen(true)}
+      onVotePoll={votePoll}
     />
     );
-  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession]);
+  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession, votePoll]);
 
   // ── Typing indicator grouping with last received message ──
   const typingIsGrouped = useMemo(() => {
@@ -1439,6 +1602,19 @@ export const ConversationScreen: React.FC = () => {
                 </View>
                 <Text style={styles.attachMenuText}>Photo</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.attachMenuItem}
+                onPress={() => {
+                  setAttachMenuOpen(false);
+                  setPollComposerOpen(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.attachMenuIcon}>
+                  <Ionicons name="bar-chart" size={18} color={Colors.primary} />
+                </View>
+                <Text style={styles.attachMenuText}>Sondage</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -1678,6 +1854,14 @@ export const ConversationScreen: React.FC = () => {
           conversationId={conversationId}
         />
       )}
+
+      {/* Poll composer sheet */}
+      <PollComposerSheet
+        visible={pollComposerOpen}
+        onClose={() => setPollComposerOpen(false)}
+        onSubmit={(question, options) => sendPoll({ question, options })}
+      />
+
 
       {/* Rename modal (groups only) */}
       {isGroup && (
