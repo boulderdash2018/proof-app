@@ -26,6 +26,7 @@ import { Colors, Fonts } from '../constants';
 import { ImmersiveCard } from '../components/ImmersiveCard';
 import { LoadingSkeleton, EmptyState, Avatar } from '../components';
 import { SharePlanSheet } from '../components/SharePlanSheet';
+import { GroupPlanSheet } from '../components/GroupPlanSheet';
 import { TransportChooser } from '../components/TransportChooser';
 import { ClosedPlacesSheet } from '../components/ClosedPlacesSheet';
 import { PlanMapModal } from '../components/PlanMapModal';
@@ -98,6 +99,7 @@ export const FeedScreen: React.FC = () => {
   const hasRestoredScrollRef = useRef(false);
   const [friendsFetched, setFriendsFetched] = useState(false);
   const [sharePlan, setSharePlan] = useState<Plan | null>(null);
+  const [groupPlan, setGroupPlan] = useState<Plan | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const flatListRef = useRef<FlatList<Plan>>(null);
@@ -596,14 +598,26 @@ export const FeedScreen: React.FC = () => {
         )}
       </View>
 
-      {/* ─── Sticky "Do it now" CTA — visible only when a card is in detail
+      {/* ─── Sticky CTA bar — visible only when a card is in detail
             mode. Lives at screen level (not inside the card) so it never gets
-            clipped by the card's overflow:hidden + borderRadius. */}
+            clipped by the card's overflow:hidden + borderRadius.
+            Two actions: solo "Do it now" (primary) + "À plusieurs" (outline). */}
       {isDetailOpen && currentPlans[currentIndex] && (
         <View
           style={[styles.feedStickyCtaBar, { paddingBottom: insets.bottom + 12 }]}
           pointerEvents="box-none"
         >
+          <TouchableOpacity
+            style={styles.feedStickyCtaGroupBtn}
+            onPress={() => {
+              if (requireAuth()) return;
+              setGroupPlan(currentPlans[currentIndex]);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="people-outline" size={17} color={Colors.primary} />
+            <Text style={styles.feedStickyCtaGroupText}>À plusieurs</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.feedStickyCtaButton}
             onPress={() => handleDoItNow(currentPlans[currentIndex])}
@@ -624,6 +638,31 @@ export const FeedScreen: React.FC = () => {
           planTitle={sharePlan.title}
           planCover={getCoverPhoto(sharePlan)}
           planAuthorName={sharePlan.author.displayName}
+        />
+      )}
+
+      {/* ─── Group plan sheet — creates a new group conversation bound to a plan ─── */}
+      {groupPlan && (
+        <GroupPlanSheet
+          visible={!!groupPlan}
+          onClose={() => setGroupPlan(null)}
+          planId={groupPlan.id}
+          planTitle={groupPlan.title}
+          planCover={getCoverPhoto(groupPlan)}
+          planAuthorName={groupPlan.author.displayName}
+          onCreated={(conversationId) => {
+            // Open the freshly-created group conversation straight away.
+            const otherUserStub = {
+              userId: '',
+              displayName: '',
+              username: '',
+              avatarUrl: null,
+              avatarBg: Colors.primary,
+              avatarColor: Colors.textOnAccent,
+              initials: '',
+            };
+            navigation.navigate('Conversation', { conversationId, otherUser: otherUserStub });
+          }}
         />
       )}
 
@@ -892,12 +931,16 @@ const styles = StyleSheet.create({
   },
 
   // ── FlatList area ──────────────────────────────────────────
-  // Sticky "Do it now" CTA — overlays the bottom of the feed when in detail
+  // Sticky CTA bar — overlays the bottom of the feed when in detail.
+  // Row layout: "À plusieurs" (outline, compact) + "Do it now" (solid, flex 1).
   feedStickyCtaBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
     paddingTop: 10,
     backgroundColor: Colors.bgSecondary,
@@ -905,7 +948,26 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderSubtle,
     zIndex: 50,
   } as any,
+  feedStickyCtaGroupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 50,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.bgSecondary,
+  } as any,
+  feedStickyCtaGroupText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    letterSpacing: -0.1,
+  } as any,
   feedStickyCtaButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
