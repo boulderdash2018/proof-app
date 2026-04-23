@@ -9,6 +9,7 @@ import {
   Image,
   Modal,
   Animated,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -85,6 +86,43 @@ for (const group of EXPLORE_GROUPS) {
   }
 }
 
+// ─── Inline slot chip used in the conversational sentence ───
+// Wraps Touchable behavior in a Text-like layout so the phrase wraps naturally.
+const SlotChip: React.FC<{ label: string; onPress: () => void; accessibilityLabel?: string }> = ({
+  label,
+  onPress,
+  accessibilityLabel,
+}) => (
+  <Text
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={accessibilityLabel}
+    style={slotChipStyles.chip}
+    suppressHighlighting
+  >
+    {' '}
+    <Text style={slotChipStyles.chipLabel}>{label}</Text>
+    <Text style={slotChipStyles.chipChevron}> {'\u25BE'}</Text>
+    {' '}
+  </Text>
+);
+
+const slotChipStyles = StyleSheet.create({
+  chip: {
+    backgroundColor: Colors.terracotta100,
+    borderRadius: 8,
+  },
+  chipLabel: {
+    color: Colors.terracotta700,
+    fontFamily: Fonts.displaySemiBold,
+  },
+  chipChevron: {
+    color: Colors.terracotta700,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
+});
+
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -109,10 +147,17 @@ export const ExploreScreen: React.FC = () => {
     if (currentUser?.id) fetchIncomingRequests(currentUser.id);
   }, [currentUser?.id, fetchIncomingRequests]);
 
-  // Active theme tab — purely a navigation state (which categories the grid
-  // shows). NOT a filter — selectedFilters stays untouched until the user
-  // taps a tile. Defaults to "food-drinks" so the screen opens populated.
-  const [activeTheme, setActiveTheme] = useState<string>('food-drinks');
+  // ─── Conversational sentence slots (browse-mode local state) ──────
+  // The 3 slots in "Je cherche un plan [Solo], plutôt [Food & Drinks], pour [Ce soir]".
+  // Slots filter the categories list LIVE but do NOT enter selectedFilters
+  // until the user taps a category — that's when we transition to results view.
+  type WhenOption = 'Ce soir' | 'Ce weekend' | 'Cette semaine' | 'Peu importe';
+  const [slotPerson, setSlotPerson] = useState<string | null>('Solo');
+  const [slotTheme, setSlotTheme] = useState<string | null>('Food & Drinks');
+  const [slotWhen, setSlotWhen] = useState<WhenOption>('Ce soir');
+  // Which slot bottom sheet is open (also drives the sub-category sheet in results view)
+  type SheetKey = 'person' | 'theme' | 'when' | 'subcategory' | null;
+  const [activeSheet, setActiveSheet] = useState<SheetKey>(null);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
@@ -182,6 +227,28 @@ export const ExploreScreen: React.FC = () => {
       navigation.setParams({ applyFilter: undefined } as any);
     }
   }, [route.params?.applyFilter, toggleFilter, navigation]);
+
+  // Tap on a category from the conversational list → cumulate the active
+  // person slot (if any) with the category as the active filters, then drop
+  // straight into results view. Bypasses toggleFilter (which is single-select)
+  // because we want both filters applied at once atomically.
+  const applyCategoryFilter = useCallback(async (catName: string) => {
+    const filters = [slotPerson, catName].filter(
+      (f): f is string => typeof f === 'string' && f.length > 0,
+    );
+    setSelectedFilters(filters);
+    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+    setIsFilterLoading(true);
+    try {
+      const plans = await fetchPublicPlansByTags(filters, cityConfig.name);
+      const filtered = filters.length > 1
+        ? plans.filter((p) => filters.every((tag) => p.tags.includes(tag)))
+        : plans;
+      setFilteredPlans(filtered);
+    } finally {
+      setIsFilterLoading(false);
+    }
+  }, [slotPerson, cityConfig.name]);
 
   // ── "Dans ton quartier" handler ──
   const handleNearbyFilter = async () => {
@@ -368,157 +435,255 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [hasActiveFilters]);
 
-  // ── "Avec qui ?" — thin pills, single-select (Atlas refonte) ──
-  const renderPersonRow = () => (
-    <View style={styles.personSection}>
-      <Text style={[styles.eyebrow, styles.eyebrowPerson]}>AVEC QUI ?</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.personChipsContainer}>
-        {FILTERED_PERSONS.map((p) => {
-          const isActive = selectedFilters.includes(p.label);
-          return (
-            <TouchableOpacity
-              key={p.key}
-              style={[styles.personPill, isActive ? styles.personPillActive : styles.personPillInactive]}
-              onPress={() => toggleFilter(p.label)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.personPillText, isActive ? styles.personPillTextActive : styles.personPillTextInactive]}>
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-
-  // ── Theme tabs — segmented + underline. "Dans ton quartier" lives here as
-  //    the last tab with a small pin to signal its action-y nature; tap fires
-  //    handleNearbyFilter instead of changing activeTheme. ──
-  const renderThemeTabs = () => (
-    <View style={styles.themeTabsContainer}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.themeTabsScroll}
-      >
-        {THEME_GROUPS.map((group) => {
-          const isNearby = group.key === 'nearby';
-          const isActive = !isNearby && activeTheme === group.key;
-          return (
-            <TouchableOpacity
-              key={group.key}
-              style={styles.themeTab}
-              onPress={() => {
-                if (isNearby) handleNearbyFilter();
-                else setActiveTheme(group.key);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.themeTabContent}>
-                {isNearby && (
-                  <Ionicons name="location" size={13} color={Colors.textTertiary} style={{ marginRight: 4 }} />
-                )}
-                <Text style={[
-                  styles.themeTabLabel,
-                  isActive ? { color: Colors.textPrimary } : { color: Colors.textTertiary },
-                ]}>
-                  {group.label}
-                </Text>
-              </View>
-              {isActive && <View style={styles.themeTabUnderline} />}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-
-  // ── Category tile (Pinterest-style staggered grid) ──
-  const renderCategoryTile = (item: ExploreCategoryItem, isTall: boolean, isHot: boolean, planCount: number) => {
-    const tileWidth = (width - Layout.screenPadding * 2 - 10) / 2;
-    const tileHeight = isTall ? Math.round(tileWidth * (4 / 3)) : tileWidth;
-    const grad = expandGradient3(item.gradient);
-    const subtitle = planCount > 0
-      ? `${planCount} plan${planCount > 1 ? 's' : ''}`
-      : 'À découvrir';
-
+  // ─── Conversational sentence (3 slots inline) ───
+  // The Text wraps naturally because nested <Text> in RN respects the parent's
+  // wrap. TouchableOpacity with `accessible accessibilityRole="button"` wraps
+  // each slot — kept as Pressable-like inline to keep the sentence reading flow.
+  const renderSentence = () => {
+    const personLabel = slotPerson || 'quelqu\u2019un';
+    const themeLabel = slotTheme || 'quelque chose';
     return (
-      <TouchableOpacity
-        key={item.name}
-        style={[styles.tile, { width: tileWidth, height: tileHeight }]}
-        onPress={() => toggleFilter(item.name)}
-        activeOpacity={0.88}
-      >
-        <LinearGradient
-          colors={grad}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Bottom darkening so the title pops */}
-        <LinearGradient
-          colors={['transparent', 'rgba(44, 36, 32, 0.65)']}
-          locations={[0.35, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        {isHot && (
-          <View style={styles.tileHotBadge}>
-            <Ionicons name="sparkles" size={10} color={Colors.gold} />
-            <Text style={styles.tileHotBadgeText}>Tendance</Text>
-          </View>
-        )}
-        <View style={styles.tileBottom}>
-          <Text style={styles.tileTitle} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.tileSubtitle}>{subtitle}</Text>
-        </View>
-      </TouchableOpacity>
+      <View style={styles.sentenceBlock}>
+        <Text style={styles.sentenceText}>
+          <Text>Je cherche un plan </Text>
+          <SlotChip
+            label={personLabel}
+            onPress={() => setActiveSheet('person')}
+            accessibilityLabel={`Changer la personne: ${personLabel}`}
+          />
+          <Text>, plut\u00f4t </Text>
+          <SlotChip
+            label={themeLabel}
+            onPress={() => setActiveSheet('theme')}
+            accessibilityLabel={`Changer le thème: ${themeLabel}`}
+          />
+          <Text>, pour </Text>
+          <SlotChip
+            label={slotWhen}
+            onPress={() => setActiveSheet('when')}
+            accessibilityLabel={`Changer le moment: ${slotWhen}`}
+          />
+          <Text>.</Text>
+        </Text>
+      </View>
     );
   };
 
-  /** Build the grid items for the active theme tab.
-   *  Source = EXPLORE_GROUPS[activeTheme].sections[*].items (so the user
-   *  sees the full curated list, not just trending picks).
-   *  Overlay = trending data (hot flag + planCount) when available. */
-  const renderCategoryGrid = () => {
-    const group = THEME_GROUPS.find((g) => g.key === activeTheme);
-    if (!group) return null;
+  // ─── Hint bar (mock search + sliders aligned right) ───
+  const renderHintBar = () => (
+    <View style={styles.hintBarRow}>
+      <TouchableOpacity
+        style={styles.hintBar}
+        onPress={() => navigation.navigate('ExploreSearch', { contentMode })}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="search-outline" size={14} color={Colors.textTertiary} style={{ marginRight: 8 }} />
+        <Text style={styles.hintBarText} numberOfLines={1}>
+          ou tape un quartier, une vibe…
+        </Text>
+        {Platform.OS === 'web' && (
+          <Text style={styles.hintBarShortcut}>\u2318K</Text>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.slidersBtn,
+          hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: Colors.bgTertiary },
+        ]}
+        onPress={() => setShowFiltersModal(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name="options-outline"
+          size={18}
+          color={hasAdvancedFilters ? Colors.textOnAccent : Colors.textSecondary}
+        />
+        {hasAdvancedFilters && <View style={styles.slidersBtnDot} />}
+      </TouchableOpacity>
+    </View>
+  );
 
-    const items = group.sections.flatMap((s) => s.items);
+  // ─── Categories list (52x52 mini-tile + name + meta + arrow) ───
+  // Source: items of slotTheme's group, enriched with trending data (hot, planCount).
+  // If no slotTheme is set, show ALL categories from all groups.
+  const renderCategoryList = () => {
     const trendingByName = new Map(trendingCategories.map((t) => [t.name, t]));
     const top3Names = new Set(trendingCategories.slice(0, 3).map((t) => t.name));
-
-    // Split into two columns; index 0 (left) and index 3 (right) are tall —
-    // global indices [0,2,4,...] go left, [1,3,5,...] go right.
-    const leftCol = items.filter((_, i) => i % 2 === 0);
-    const rightCol = items.filter((_, i) => i % 2 === 1);
-
-    const enrich = (item: ExploreCategoryItem, globalIndex: number) => {
-      const trend = trendingByName.get(item.name);
-      const isHot = !!(trend?.hot) || top3Names.has(item.name) || !!item.hot;
-      const planCount = trend?.planCount ?? item.planCount ?? 0;
-      const isTall = globalIndex === 0 || globalIndex === 3;
-      return renderCategoryTile(item, isTall, isHot, planCount);
-    };
+    const group = slotTheme ? THEME_GROUPS.find((g) => g.label === slotTheme) : null;
+    const items: ExploreCategoryItem[] = group
+      ? group.sections.flatMap((s) => s.items)
+      : THEME_GROUPS.filter((g) => g.key !== 'nearby').flatMap((g) => g.sections.flatMap((s) => s.items));
 
     return (
       <View>
-        <View style={styles.gridHeaderRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.eyebrow, styles.eyebrowGridHeader]}>TENDANCE CETTE SEMAINE</Text>
-            <Text style={styles.gridTitle}>{group.label}</Text>
-          </View>
-          <Text style={styles.gridCount}>{items.length} catégories</Text>
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.eyebrow}>{items.length} cat\u00e9gories correspondent</Text>
         </View>
-        <View style={styles.gridRow}>
-          <View style={styles.gridColumn}>
-            {leftCol.map((item, lI) => enrich(item, lI * 2))}
-          </View>
-          <View style={styles.gridColumn}>
-            {rightCol.map((item, rI) => enrich(item, rI * 2 + 1))}
-          </View>
+        <View>
+          {items.map((item, i) => {
+            const trend = trendingByName.get(item.name);
+            const isHot = !!(trend?.hot) || top3Names.has(item.name) || !!item.hot;
+            const planCount = trend?.planCount ?? item.planCount ?? 0;
+            const metaParts: string[] = [];
+            if (planCount > 0) metaParts.push(`${planCount} plan${planCount > 1 ? 's' : ''}`);
+            if (slotPerson) metaParts.push(slotPerson);
+            if (slotTheme) metaParts.push(slotTheme);
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={[styles.catRow, i > 0 && styles.catRowDivider]}
+                onPress={() => applyCategoryFilter(item.name)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.catRowTile}>
+                  <LinearGradient
+                    colors={expandGradient3(item.gradient)}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
+                <View style={styles.catRowBody}>
+                  <View style={styles.catRowNameLine}>
+                    <Text style={styles.catRowName} numberOfLines={1}>{item.name}</Text>
+                    {isHot && (
+                      <View style={styles.catRowHotBadge}>
+                        <Text style={styles.catRowHotBadgeText}>HOT</Text>
+                      </View>
+                    )}
+                  </View>
+                  {metaParts.length > 0 && (
+                    <Text style={styles.catRowMeta} numberOfLines={1}>{metaParts.join(' \u00b7 ')}</Text>
+                  )}
+                </View>
+                <Ionicons name="arrow-forward" size={16} color={Colors.textTertiary} />
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
+    );
+  };
+
+  // ─── Bottom sheet for slot picking (person / theme / when / subcategory) ───
+  // Uses the same Modal pattern as showFiltersModal for visual consistency.
+  const renderSlotSheet = () => {
+    if (!activeSheet) return null;
+    let title = '';
+    let options: { label: string; key: string; isNearby?: boolean }[] = [];
+    let currentValue: string | null = null;
+    let onSelect: (label: string) => void = () => {};
+    let allowClear = true;
+
+    if (activeSheet === 'person') {
+      title = 'Avec qui ?';
+      options = FILTERED_PERSONS.map((p) => ({ label: p.label, key: p.key }));
+      currentValue = slotPerson;
+      onSelect = (label) => { setSlotPerson(label); setActiveSheet(null); };
+    } else if (activeSheet === 'theme') {
+      title = 'Quel th\u00e8me ?';
+      options = THEME_GROUPS.map((g) => ({
+        label: g.label,
+        key: g.key,
+        isNearby: g.key === 'nearby',
+      }));
+      currentValue = slotTheme;
+      onSelect = (label) => {
+        const opt = options.find((o) => o.label === label);
+        if (opt?.isNearby) {
+          setActiveSheet(null);
+          handleNearbyFilter();
+        } else {
+          setSlotTheme(label);
+          setActiveSheet(null);
+        }
+      };
+    } else if (activeSheet === 'when') {
+      title = 'Pour quand ?';
+      options = (['Ce soir', 'Ce weekend', 'Cette semaine', 'Peu importe'] as WhenOption[]).map((w) => ({
+        label: w,
+        key: w,
+      }));
+      currentValue = slotWhen;
+      onSelect = (label) => { setSlotWhen(label as WhenOption); setActiveSheet(null); };
+      allowClear = false; // 'when' always has a value (Peu importe is the neutral state)
+    } else if (activeSheet === 'subcategory') {
+      title = 'Affiner par sous-cat\u00e9gorie';
+      // Only show subcategories of the active theme in selectedFilters
+      const activeTheme = selectedFilters.find((f) => !PERSON_LABELS.has(f) && THEME_GROUPS.some((g) => g.label === f));
+      const themeGroup = activeTheme ? THEME_GROUPS.find((g) => g.label === activeTheme) : null;
+      const items = themeGroup ? themeGroup.sections.flatMap((s) => s.items) : [];
+      options = items.map((it) => ({ label: it.name, key: it.name }));
+      currentValue = selectedFilters.find((f) => items.some((i) => i.name === f)) || null;
+      onSelect = (label) => {
+        // Replace any existing subcategory in selectedFilters with the new one
+        const next = selectedFilters.filter((f) => !items.some((i) => i.name === f));
+        next.push(label);
+        setSelectedFilters(next);
+        setActiveSheet(null);
+        // Re-fetch with the new filter set
+        setIsFilterLoading(true);
+        fetchPublicPlansByTags(next, cityConfig.name).then((plans) => {
+          const filtered = next.length > 1 ? plans.filter((p) => next.every((tag) => p.tags.includes(tag))) : plans;
+          setFilteredPlans(filtered);
+          setIsFilterLoading(false);
+        });
+      };
+    }
+
+    return (
+      <Modal
+        visible={!!activeSheet}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setActiveSheet(null)}
+      >
+        <TouchableOpacity
+          style={styles.sheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setActiveSheet(null)}
+        />
+        <View style={[styles.sheetContent, { paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>{title}</Text>
+          <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+            {options.map((opt) => {
+              const isSelected = currentValue === opt.label;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={styles.sheetRow}
+                  onPress={() => onSelect(opt.label)}
+                  activeOpacity={0.7}
+                >
+                  {opt.isNearby && (
+                    <Ionicons name="location" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+                  )}
+                  <Text style={[styles.sheetRowLabel, isSelected && { color: Colors.primary, fontFamily: Fonts.bodySemiBold }]}>
+                    {opt.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={18} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            {allowClear && currentValue !== null && (
+              <TouchableOpacity
+                style={[styles.sheetRow, styles.sheetRowClear]}
+                onPress={() => {
+                  if (activeSheet === 'person') setSlotPerson(null);
+                  else if (activeSheet === 'theme') setSlotTheme(null);
+                  setActiveSheet(null);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.sheetRowClearText}>Peu importe</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     );
   };
 
@@ -582,8 +747,9 @@ export const ExploreScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
+      {/* ── Top bar — only friend requests (left) + map (right). Sliders
+            moved down to be aligned with the search hint bar. ── */}
       <View style={styles.headerRow}>
-        {/* LEFT — friend requests / discovery */}
         <TouchableOpacity
           style={[styles.filterBtn, { backgroundColor: Colors.bgTertiary }]}
           onPress={() => {
@@ -601,45 +767,22 @@ export const ExploreScreen: React.FC = () => {
             </View>
           )}
         </TouchableOpacity>
-
-        {/* CENTER — title (absolute so the side icons don't push it off-axis) */}
-        <View style={styles.headerTitleAbsolute} pointerEvents="none">
-          <Text style={[styles.pageTitle, { color: Colors.textPrimary }]}>{t.explore_title}</Text>
-        </View>
-
-        {/* RIGHT — map + filters */}
-        <View style={styles.headerBtns}>
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: Colors.bgTertiary }]}
-            onPress={handleMapOpen}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="map-outline" size={17} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterBtn, hasAdvancedFilters ? { backgroundColor: Colors.primary } : { backgroundColor: Colors.bgTertiary }]}
-            onPress={() => setShowFiltersModal(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="options-outline" size={18} color={hasAdvancedFilters ? Colors.textOnAccent : Colors.textSecondary} />
-            {hasAdvancedFilters && <View style={styles.filterBtnDot} />}
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.headerEyebrow}>EXPLORER</Text>
+        <TouchableOpacity
+          style={[styles.filterBtn, { backgroundColor: Colors.bgTertiary }]}
+          onPress={handleMapOpen}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="map-outline" size={17} color={Colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Search bar — tapping opens dedicated SearchScreen */}
-      <TouchableOpacity
-        style={[styles.searchBar, { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderSubtle }]}
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('ExploreSearch', { contentMode })}
-      >
-        <Ionicons name="search-outline" size={16} color={Colors.textTertiary} style={{ marginRight: 8 }} />
-        <Text style={[styles.searchInput, { color: Colors.textTertiary }]}>{t.explore_search_placeholder}</Text>
-      </TouchableOpacity>
+      {/* Conversational sentence — the new hero */}
+      {!hasActiveFilters && renderSentence()}
 
-      {/* "Avec qui ?" pills + Theme nav tabs (Atlas refonte) */}
-      {renderPersonRow()}
-      {renderThemeTabs()}
+      {/* Hint search bar + sliders aligned (always visible so the user can
+          jump into search or tweak advanced filters from any state) */}
+      {!hasActiveFilters && renderHintBar()}
 
       {/* Location denied message */}
       {locationDenied && (
@@ -650,13 +793,13 @@ export const ExploreScreen: React.FC = () => {
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Browse view — theme grid (always visible until a filter is tapped) */}
+        {/* Browse view — categories list filtered by the sentence slots */}
         {showBrowse && !hasActiveFilters && (
           <Animated.View style={{ opacity: browseOpacity }}>
             {trendingLoading && trendingCategories.length === 0 ? (
               <LoadingSkeleton variant="list" />
             ) : (
-              renderCategoryGrid()
+              renderCategoryList()
             )}
           </Animated.View>
         )}
@@ -677,6 +820,28 @@ export const ExploreScreen: React.FC = () => {
                 </TouchableOpacity>
               )}
             </View>
+            {/* Sub-category dropdown — appears once a theme is filtering. Lets
+                the user narrow down to a specific sub-category of that theme. */}
+            {(() => {
+              const themeInFilters = selectedFilters.find((f) => !PERSON_LABELS.has(f) && THEME_GROUPS.some((g) => g.label === f));
+              if (!themeInFilters) return null;
+              const group = THEME_GROUPS.find((g) => g.label === themeInFilters);
+              const items = group ? group.sections.flatMap((s) => s.items) : [];
+              if (items.length === 0) return null;
+              const currentSub = selectedFilters.find((f) => items.some((i) => i.name === f));
+              return (
+                <TouchableOpacity
+                  style={styles.subCatDropdown}
+                  onPress={() => setActiveSheet('subcategory')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.subCatDropdownLabel}>
+                    {currentSub || 'Sous-cat\u00e9gorie'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              );
+            })()}
                 {isFilterLoading ? (
                   <LoadingSkeleton variant="list" />
                 ) : (
@@ -770,12 +935,234 @@ export const ExploreScreen: React.FC = () => {
 
       {/* Friends Map overlay */}
       <FriendsMapView visible={showMap} onClose={() => setShowMap(false)} />
+
+      {/* Slot bottom sheets — person / theme / when / subcategory */}
+      {renderSlotSheet()}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgPrimary },
+
+  // ─── Conversational refonte styles ───
+  headerEyebrow: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    fontWeight: '600',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
+  },
+
+  // The hero sentence — Fraunces serif, wraps naturally across lines
+  sentenceBlock: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 22,
+    paddingBottom: 18,
+  },
+  sentenceText: {
+    fontFamily: Fonts.displaySemiBold,
+    fontWeight: '500',
+    fontSize: 26,
+    lineHeight: 26 * 1.35,
+    letterSpacing: -0.5,
+    color: Colors.textPrimary,
+  },
+
+  // Hint search bar (mock) + sliders aligned right
+  hintBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: Layout.screenPadding,
+    marginBottom: 4,
+  } as any,
+  hintBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 44,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    borderRadius: 12,
+  } as any,
+  hintBarText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 12.5,
+    color: Colors.textSecondary,
+    letterSpacing: 0.05,
+  },
+  hintBarShortcut: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textTertiary,
+    letterSpacing: 0.8,
+    fontFamily: Fonts.bodySemiBold,
+    textTransform: 'uppercase',
+  },
+  slidersBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slidersBtnDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.gold,
+  },
+
+  // Section header above the categories list
+  listHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingTop: 18,
+    paddingBottom: 10,
+  } as any,
+
+  // Category list rows (52x52 mini-tile + name + meta + arrow)
+  catRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 13,
+  } as any,
+  catRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+  },
+  catRowTile: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: Colors.bgTertiary,
+  },
+  catRowBody: {
+    flex: 1,
+    minWidth: 0,
+  } as any,
+  catRowNameLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  } as any,
+  catRowName: {
+    fontFamily: Fonts.displaySemiBold,
+    fontWeight: '500',
+    fontSize: 16,
+    letterSpacing: -0.25,
+    color: Colors.textPrimary,
+    flexShrink: 1,
+  },
+  catRowHotBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: Colors.terracotta100,
+  },
+  catRowHotBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: Colors.terracotta700,
+    letterSpacing: 0.4,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  catRowMeta: {
+    fontSize: 10.5,
+    color: Colors.textTertiary,
+    marginTop: 4,
+    letterSpacing: 0.2,
+    fontFamily: Fonts.body,
+  },
+
+  // Sub-category dropdown (results view)
+  subCatDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginTop: 10,
+    borderRadius: 999,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderMedium,
+  } as any,
+  subCatDropdownLabel: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+
+  // Bottom sheet (slot pickers + sub-category)
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(44, 36, 32, 0.4)',
+  },
+  sheetContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.bgSecondary,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '70%',
+  } as any,
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.borderMedium,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    letterSpacing: -0.2,
+  },
+  sheetScroll: { paddingHorizontal: 12 },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    minHeight: 52,
+  } as any,
+  sheetRowLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+  },
+  sheetRowClear: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    marginTop: 4,
+  },
+  sheetRowClearText: {
+    fontSize: 14,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textSecondary,
+  },
+
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 12, position: 'relative' } as any,
   headerBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   // Absolute centering — keeps the title perfectly on axis even though the
