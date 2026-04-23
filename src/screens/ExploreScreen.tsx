@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
-import { ExploreCategoryItem, ExploreSection, ExploreLayout } from '../constants/exploreCategories';
+import { ExploreCategoryItem } from '../constants/exploreCategories';
 import { LoadingSkeleton } from '../components';
 import { Plan, Place } from '../types';
 import { useCity } from '../hooks/useCity';
@@ -51,6 +51,40 @@ for (const group of EXPLORE_GROUPS) {
   }
 }
 
+// ─── Refonte "Atlas" : utilitaires gradient + mapping catégorie → thème ───
+
+/** Darken a hex color toward black by `factor` ∈ [0,1]. */
+const darkenHex = (hex: string, factor: number): string => {
+  const clean = hex.replace('#', '');
+  const num = parseInt(clean.length === 3
+    ? clean.split('').map((c) => c + c).join('')
+    : clean, 16);
+  const r = Math.max(0, Math.floor((num >> 16) * (1 - factor)));
+  const g = Math.max(0, Math.floor(((num >> 8) & 0xff) * (1 - factor)));
+  const b = Math.max(0, Math.floor((num & 0xff) * (1 - factor)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+};
+
+/** Extend a 2-stop curated gradient into a 3-stop gradient with a deeper
+ *  bottom — gives the tile more visual depth, makes the title pop. */
+const expandGradient3 = (stops: readonly [string, string]): [string, string, string] => [
+  stops[0],
+  stops[1],
+  darkenHex(stops[1], 0.4),
+];
+
+/** Map each subcategory NAME → its parent theme key (food-drinks, sports, ...).
+ *  Lets us filter trendingCategories by the active theme tab. */
+const TAG_TO_THEME_KEY = new Map<string, string>();
+for (const group of EXPLORE_GROUPS) {
+  if (group.key === 'trending') continue;
+  for (const section of group.sections) {
+    for (const item of section.items) {
+      if (!TAG_TO_THEME_KEY.has(item.name)) TAG_TO_THEME_KEY.set(item.name, group.key);
+    }
+  }
+}
+
 export const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -74,11 +108,10 @@ export const ExploreScreen: React.FC = () => {
     if (currentUser?.id) fetchIncomingRequests(currentUser.id);
   }, [currentUser?.id, fetchIncomingRequests]);
 
-  const [showSubcategories, setShowSubcategories] = useState(false);
-  const voirPlusOpacity = useRef(new Animated.Value(0)).current;
-  const [voirPlusMounted, setVoirPlusMounted] = useState(false);
-  const subcatOpacity = useRef(new Animated.Value(0)).current;
-  const [subcatMounted, setSubcatMounted] = useState(false);
+  // Active theme tab — purely a navigation state (which categories the grid
+  // shows). NOT a filter — selectedFilters stays untouched until the user
+  // taps a tile. Defaults to "food-drinks" so the screen opens populated.
+  const [activeTheme, setActiveTheme] = useState<string>('food-drinks');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
@@ -100,11 +133,9 @@ export const ExploreScreen: React.FC = () => {
   const LIKES_STEPS = [1, 5, 10, 25, 50];
   const PROOFS_STEPS = [1, 3, 5, 10, 25];
 
-  // Derive active theme group from selected filters
+  // Derive active theme group from selected filters (still used by the
+  // results-view branch when a filter is active).
   const activeThemeFilter = selectedFilters.find(f => !PERSON_LABELS.has(f));
-  const hasActiveThemeChip = !!activeThemeFilter && THEME_GROUPS.some(g => g.label === activeThemeFilter);
-  const activeThemeGroup = hasActiveThemeChip ? THEME_GROUPS.find(g => g.label === activeThemeFilter)! : null;
-  const showVoirPlusForTheme = hasActiveThemeChip && activeThemeFilter !== MOOD_LABEL && activeThemeFilter !== NEARBY_LABEL;
 
   const toggleFilter = useCallback((label: string) => {
     setSelectedFilters((prev) => {
@@ -119,15 +150,6 @@ export const ExploreScreen: React.FC = () => {
       const next: string[] = [];
       if (newPerson) next.push(newPerson);
       if (newTheme) next.push(newTheme);
-
-      // Auto-open subcategories for Mood, close for everything else
-      if (!isPerson) {
-        if (newTheme === MOOD_LABEL) {
-          setShowSubcategories(true);
-        } else {
-          setShowSubcategories(false);
-        }
-      }
 
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       if (next.length > 0) {
@@ -307,24 +329,26 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Trending / results fade ──
+  // ── Browse vs results: cross-fade between the default theme grid and the
+  // active-filter results view. The "Voir +" subcategory expansion was
+  // removed — themes are now navigation tabs and the grid below them is
+  // always visible, so there's nothing to gate on subcategory state.
   const hasActiveFilters = selectedFilters.length > 0;
-  const shouldHideTrending = showSubcategories || hasActiveFilters;
-  const [showTrending, setShowTrending] = useState(true);
-  const trendingOpacity = useRef(new Animated.Value(1)).current;
+  const [showBrowse, setShowBrowse] = useState(true);
+  const browseOpacity = useRef(new Animated.Value(1)).current;
   const resultsOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (shouldHideTrending) {
-      Animated.timing(trendingOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-        setShowTrending(false);
+    if (hasActiveFilters) {
+      Animated.timing(browseOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+        setShowBrowse(false);
       });
     } else {
-      setShowTrending(true);
-      trendingOpacity.setValue(0);
-      Animated.timing(trendingOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+      setShowBrowse(true);
+      browseOpacity.setValue(0);
+      Animated.timing(browseOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     }
-  }, [shouldHideTrending]);
+  }, [hasActiveFilters]);
 
   // Fade in results when filters become active
   useEffect(() => {
@@ -334,52 +358,23 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [hasActiveFilters]);
 
-  // Close subcategories when no theme is active
-  useEffect(() => {
-    if (!hasActiveThemeChip) setShowSubcategories(false);
-  }, [hasActiveThemeChip]);
-
-  // Fade "Voir +" button in/out (excluded for Mood & Nearby)
-  useEffect(() => {
-    if (showVoirPlusForTheme) {
-      setVoirPlusMounted(true);
-      voirPlusOpacity.setValue(0);
-      Animated.timing(voirPlusOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    } else {
-      Animated.timing(voirPlusOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-        setVoirPlusMounted(false);
-      });
-    }
-  }, [showVoirPlusForTheme]);
-
-  // Fade subcategories panel in/out
-  useEffect(() => {
-    if (showSubcategories) {
-      setSubcatMounted(true);
-      subcatOpacity.setValue(0);
-      Animated.timing(subcatOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    } else {
-      Animated.timing(subcatOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-        setSubcatMounted(false);
-      });
-    }
-  }, [showSubcategories]);
-
-  // ── Row 1: Person filters (single-select) ──
+  // ── "Avec qui ?" — thin pills, single-select (Atlas refonte) ──
   const renderPersonRow = () => (
-    <View style={styles.filterSection}>
-      <Text style={[styles.filterLabel, { color: Colors.textTertiary }]}>Par personne</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
+    <View style={styles.personSection}>
+      <Text style={styles.eyebrow}>AVEC QUI ?</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.personChipsContainer}>
         {FILTERED_PERSONS.map((p) => {
           const isActive = selectedFilters.includes(p.label);
           return (
             <TouchableOpacity
               key={p.key}
-              style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderMedium }]}
+              style={[styles.personPill, isActive ? styles.personPillActive : styles.personPillInactive]}
               onPress={() => toggleFilter(p.label)}
               activeOpacity={0.8}
             >
-              <Text style={[styles.chipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{p.emoji} {p.label}</Text>
+              <Text style={[styles.personPillText, isActive ? styles.personPillTextActive : styles.personPillTextInactive]}>
+                {p.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -387,21 +382,41 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Row 2: Theme chips (always single-select filter mode) ──
-  const renderThemeRow = () => (
-    <View style={styles.filterSection}>
-      <Text style={[styles.filterLabel, { color: Colors.textTertiary }]}>Par theme</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
+  // ── Theme tabs — segmented + underline. "Dans ton quartier" lives here as
+  //    the last tab with a small pin to signal its action-y nature; tap fires
+  //    handleNearbyFilter instead of changing activeTheme. ──
+  const renderThemeTabs = () => (
+    <View style={styles.themeTabsContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.themeTabsScroll}
+      >
         {THEME_GROUPS.map((group) => {
-          const isActive = selectedFilters.includes(group.label);
+          const isNearby = group.key === 'nearby';
+          const isActive = !isNearby && activeTheme === group.key;
           return (
             <TouchableOpacity
               key={group.key}
-              style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderMedium }]}
-              onPress={() => group.key === 'nearby' ? handleNearbyFilter() : toggleFilter(group.label)}
-              activeOpacity={0.8}
+              style={styles.themeTab}
+              onPress={() => {
+                if (isNearby) handleNearbyFilter();
+                else setActiveTheme(group.key);
+              }}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.chipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{group.emoji} {group.label}</Text>
+              <View style={styles.themeTabContent}>
+                {isNearby && (
+                  <Ionicons name="location" size={13} color={Colors.textTertiary} style={{ marginRight: 4 }} />
+                )}
+                <Text style={[
+                  styles.themeTabLabel,
+                  isActive ? { color: Colors.textPrimary } : { color: Colors.textTertiary },
+                ]}>
+                  {group.label}
+                </Text>
+              </View>
+              {isActive && <View style={styles.themeTabUnderline} />}
             </TouchableOpacity>
           );
         })}
@@ -409,76 +424,93 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Renderers ──
-  const renderCategoryItem = (item: ExploreCategoryItem, index: number, totalItems: number) => {
-    const isSelected = selectedFilters.includes(item.name);
-    const isLast = index === totalItems - 1;
+  // ── Category tile (Pinterest-style staggered grid) ──
+  const renderCategoryTile = (item: ExploreCategoryItem, isTall: boolean, isHot: boolean, planCount: number) => {
+    const tileWidth = (width - Layout.screenPadding * 2 - 10) / 2;
+    const tileHeight = isTall ? Math.round(tileWidth * (4 / 3)) : tileWidth;
+    const grad = expandGradient3(item.gradient);
+    const subtitle = planCount > 0
+      ? `${planCount} plan${planCount > 1 ? 's' : ''}`
+      : 'À découvrir';
+
     return (
       <TouchableOpacity
         key={item.name}
-        style={[styles.flatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }, isSelected && { backgroundColor: Colors.terracotta50 }]}
-        activeOpacity={0.7}
+        style={[styles.tile, { width: tileWidth, height: tileHeight }]}
         onPress={() => toggleFilter(item.name)}
+        activeOpacity={0.88}
       >
-        <Text style={styles.flatEmoji}>{item.emoji}</Text>
-        <View style={styles.flatTextCol}>
-          <Text style={[styles.flatName, { color: Colors.textPrimary }]}>{item.name}</Text>
-          {item.subtitle ? <Text style={[styles.flatSub, { color: Colors.textSecondary }]}>{item.subtitle}</Text> : null}
-        </View>
-        {isSelected ? (
-          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-        ) : item.hot ? (
-          <View style={[styles.hotBadge, { backgroundColor: Colors.terracotta100 }]}>
-            <Text style={[styles.hotBadgeText, { color: Colors.terracotta700 }]}>🔥</Text>
+        <LinearGradient
+          colors={grad}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Bottom darkening so the title pops */}
+        <LinearGradient
+          colors={['transparent', 'rgba(44, 36, 32, 0.65)']}
+          locations={[0.35, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        {isHot && (
+          <View style={styles.tileHotBadge}>
+            <Ionicons name="sparkles" size={10} color={Colors.gold} />
+            <Text style={styles.tileHotBadgeText}>Tendance</Text>
           </View>
-        ) : null}
+        )}
+        <View style={styles.tileBottom}>
+          <Text style={styles.tileTitle} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.tileSubtitle}>{subtitle}</Text>
+        </View>
       </TouchableOpacity>
     );
   };
 
-  const renderRankedItem = (item: ExploreCategoryItem, rank: number) => {
-    const isSelected = selectedFilters.includes(item.name);
+  /** Build the grid items for the active theme tab.
+   *  Source = EXPLORE_GROUPS[activeTheme].sections[*].items (so the user
+   *  sees the full curated list, not just trending picks).
+   *  Overlay = trending data (hot flag + planCount) when available. */
+  const renderCategoryGrid = () => {
+    const group = THEME_GROUPS.find((g) => g.key === activeTheme);
+    if (!group) return null;
+
+    const items = group.sections.flatMap((s) => s.items);
+    const trendingByName = new Map(trendingCategories.map((t) => [t.name, t]));
+    const top3Names = new Set(trendingCategories.slice(0, 3).map((t) => t.name));
+
+    // Split into two columns; index 0 (left) and index 3 (right) are tall —
+    // global indices [0,2,4,...] go left, [1,3,5,...] go right.
+    const leftCol = items.filter((_, i) => i % 2 === 0);
+    const rightCol = items.filter((_, i) => i % 2 === 1);
+
+    const enrich = (item: ExploreCategoryItem, globalIndex: number) => {
+      const trend = trendingByName.get(item.name);
+      const isHot = !!(trend?.hot) || top3Names.has(item.name) || !!item.hot;
+      const planCount = trend?.planCount ?? item.planCount ?? 0;
+      const isTall = globalIndex === 0 || globalIndex === 3;
+      return renderCategoryTile(item, isTall, isHot, planCount);
+    };
+
     return (
-      <TouchableOpacity key={item.name} style={[styles.rankedRow, { borderBottomColor: Colors.borderMedium, backgroundColor: isSelected ? Colors.terracotta50 : 'transparent' }]} activeOpacity={0.7} onPress={() => toggleFilter(item.name)}>
-        <Text style={[styles.rankNumber, { color: Colors.primary }]}>{rank}</Text>
-        <View style={[styles.rankEmojiCircle, { backgroundColor: Colors.bgTertiary }]}>
-          <Text style={styles.rankEmoji}>{item.emoji}</Text>
+      <View>
+        <View style={styles.gridHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.eyebrow, styles.eyebrowGridHeader]}>TENDANCE CETTE SEMAINE</Text>
+            <Text style={styles.gridTitle}>{group.label}</Text>
+          </View>
+          <Text style={styles.gridCount}>{items.length} catégories</Text>
         </View>
-        <View style={styles.rankTextCol}>
-          <Text style={[styles.rankName, { color: Colors.textPrimary }]}>{item.name}</Text>
-          {item.subtitle ? <Text style={[styles.rankSub, { color: Colors.textSecondary }]}>{item.subtitle}</Text> : null}
+        <View style={styles.gridRow}>
+          <View style={styles.gridColumn}>
+            {leftCol.map((item, lI) => enrich(item, lI * 2))}
+          </View>
+          <View style={styles.gridColumn}>
+            {rightCol.map((item, rI) => enrich(item, rI * 2 + 1))}
+          </View>
         </View>
-        {isSelected ? (
-          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-        ) : item.badgeLabel ? (
-          <View style={[styles.hotBadge, { backgroundColor: item.hot ? Colors.terracotta100 : '#22C55E18' }]}>
-            <Text style={[styles.hotBadgeText, { color: item.hot ? Colors.terracotta700 : '#22C55E' }]}>{item.badgeLabel}</Text>
-          </View>
-        ) : item.hot ? (
-          <View style={[styles.hotBadge, { backgroundColor: Colors.terracotta100 }]}>
-            <Text style={[styles.hotBadgeText, { color: Colors.terracotta700 }]}>🔥 Cette semaine</Text>
-          </View>
-        ) : item.planCount ? (
-          <View style={[styles.planCountBadge, { backgroundColor: Colors.bgTertiary }]}>
-            <Text style={[styles.planCountText, { color: Colors.textSecondary }]}>{item.planCount} plans</Text>
-          </View>
-        ) : null}
-      </TouchableOpacity>
+      </View>
     );
   };
-
-  const renderSection = (section: ExploreSection, idx: number, layout: ExploreLayout) => (
-    <View key={`${section.title}-${idx}`} style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: Colors.textSecondary }]}>{section.title}</Text>
-      {layout === 'mood-list' ? (
-        <View>{section.items.map((item, i) => renderCategoryItem(item, i, section.items.length))}</View>
-      ) : layout === 'ranked-list' ? (
-        <View>{section.items.map((item, i) => renderRankedItem(item, i + 1))}</View>
-      ) : (
-        <View>{section.items.map((item, i) => renderCategoryItem(item, i, section.items.length))}</View>
-      )}
-    </View>
-  );
 
   // ── Search result renderers ──
   const getPlanPhoto = (plan: Plan): string | null => {
@@ -595,23 +627,9 @@ export const ExploreScreen: React.FC = () => {
         <Text style={[styles.searchInput, { color: Colors.textTertiary }]}>{t.explore_search_placeholder}</Text>
       </TouchableOpacity>
 
-      {/* Filter rows */}
+      {/* "Avec qui ?" pills + Theme nav tabs (Atlas refonte) */}
       {renderPersonRow()}
-      {renderThemeRow()}
-
-      {/* "Voir +" button — only for themes with subcategories (not Mood/Nearby) */}
-      {voirPlusMounted && (
-        <Animated.View style={[styles.voirPlusRow, { opacity: voirPlusOpacity }]}>
-          <TouchableOpacity
-            style={[styles.voirPlusBtn, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderMedium }]}
-            onPress={() => setShowSubcategories(!showSubcategories)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.voirPlusText, { color: showSubcategories ? Colors.textOnAccent : Colors.textPrimary }]}>Voir +</Text>
-            <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={14} color={showSubcategories ? Colors.textOnAccent : Colors.textPrimary} />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      {renderThemeTabs()}
 
       {/* Location denied message */}
       {locationDenied && (
@@ -622,61 +640,33 @@ export const ExploreScreen: React.FC = () => {
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Subcategories when "Voir +" is open */}
-            {subcatMounted && activeThemeGroup && (
-              <Animated.View style={{ opacity: subcatOpacity }}>
-                {activeThemeGroup.sections.map((section, idx) => renderSection(section, idx, activeThemeGroup.layout))}
-              </Animated.View>
+        {/* Browse view — theme grid (always visible until a filter is tapped) */}
+        {showBrowse && !hasActiveFilters && (
+          <Animated.View style={{ opacity: browseOpacity }}>
+            {trendingLoading && trendingCategories.length === 0 ? (
+              <LoadingSkeleton variant="list" />
+            ) : (
+              renderCategoryGrid()
             )}
+          </Animated.View>
+        )}
 
-            {/* Trending categories list — hidden when any filter is active */}
-            {showTrending && !hasActiveFilters && (
-              <Animated.View style={{ opacity: trendingOpacity }}>
-                <Text style={[styles.trendingLabel, { color: Colors.textSecondary }]}>CATEGORIES EN TENDANCE</Text>
-                {trendingLoading ? (
-                  <LoadingSkeleton variant="list" />
-                ) : (
-                  <View>
-                    {trendingCategories.map((cat, i) => {
-                      const isSelected = selectedFilters.includes(cat.name);
-                      const isLast = i === trendingCategories.length - 1;
-                      return (
-                        <TouchableOpacity
-                          key={cat.name}
-                          style={[styles.trendingRow, !isLast && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }]}
-                          activeOpacity={0.7}
-                          onPress={() => toggleFilter(cat.name)}
-                        >
-                          <Text style={styles.trendingEmoji}>{cat.emoji}</Text>
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.trendingName, { color: Colors.textPrimary }]}>{cat.name}</Text>
-                            <Text style={[styles.trendingCount, { color: Colors.textSecondary }]}>{cat.planCount} plan{cat.planCount > 1 ? 's' : ''}</Text>
-                          </View>
-                          {isSelected && <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </Animated.View>
-            )}
-
-            {/* Selected filter pills + results */}
-            {hasActiveFilters && (
-              <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
-                <View style={styles.activeFiltersRow}>
-                  {selectedFilters.map((f) => (
-                    <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }]} onPress={() => f === NEARBY_LABEL ? handleNearbyFilter() : toggleFilter(f)}>
-                      <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
-                      <Ionicons name="close" size={13} color={Colors.primary} />
-                    </TouchableOpacity>
-                  ))}
-                  {selectedFilters.length > 1 && (
-                    <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); setLocationDenied(false); setShowSubcategories(false); }}>
-                      <Text style={[styles.clearFiltersText, { color: Colors.textSecondary }]}>Tout effacer</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+        {/* Selected filter pills + results */}
+        {hasActiveFilters && (
+          <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
+            <View style={styles.activeFiltersRow}>
+              {selectedFilters.map((f) => (
+                <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }]} onPress={() => f === NEARBY_LABEL ? handleNearbyFilter() : toggleFilter(f)}>
+                  <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
+                  <Ionicons name="close" size={13} color={Colors.primary} />
+                </TouchableOpacity>
+              ))}
+              {selectedFilters.length > 1 && (
+                <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); setLocationDenied(false); }}>
+                  <Text style={[styles.clearFiltersText, { color: Colors.textSecondary }]}>Tout effacer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
                 {isFilterLoading ? (
                   <LoadingSkeleton variant="list" />
                 ) : (
@@ -816,39 +806,162 @@ const styles = StyleSheet.create({
   modePill: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
   modePillText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
 
-  // Filter rows
-  filterSection: { marginBottom: 4, paddingLeft: Layout.screenPadding },
-  filterLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontFamily: Fonts.bodySemiBold },
-  chipsContainer: { paddingRight: Layout.screenPadding, gap: 8, paddingBottom: 4 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  chipText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  // ─── Atlas refonte : "Avec qui ?" pills ───
+  eyebrow: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    fontWeight: '600',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
+  },
+  personSection: { marginTop: 4, marginBottom: 4 },
+  personChipsContainer: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 8,
+    paddingBottom: 6,
+    gap: 6,
+  } as any,
+  personPill: {
+    height: 30,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as any,
+  personPillInactive: {
+    borderColor: Colors.borderMedium,
+    backgroundColor: 'transparent',
+  },
+  personPillActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+  },
+  personPillText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    letterSpacing: -0.05,
+  },
+  personPillTextInactive: { color: Colors.textPrimary },
+  personPillTextActive: { color: Colors.textOnAccent, fontWeight: '600' },
 
-  // "Voir +" standalone button
-  voirPlusRow: { alignItems: 'flex-end', paddingHorizontal: Layout.screenPadding, paddingTop: 2, paddingBottom: 6 },
-  voirPlusBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  voirPlusText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, fontWeight: '700' },
+  // Theme tabs (segmented underlined nav)
+  themeTabsContainer: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.borderSubtle,
+    paddingLeft: Layout.screenPadding,
+    marginTop: 14,
+  },
+  themeTabsScroll: {
+    paddingRight: Layout.screenPadding,
+    alignItems: 'flex-end',
+  } as any,
+  themeTab: {
+    paddingVertical: 8,
+    marginRight: 22,
+    position: 'relative',
+  } as any,
+  themeTabContent: { flexDirection: 'row', alignItems: 'center' } as any,
+  themeTabLabel: {
+    fontFamily: Fonts.displaySemiBold,
+    fontWeight: '500',
+    fontSize: 17,
+    letterSpacing: -0.2,
+  },
+  themeTabUnderline: {
+    position: 'absolute',
+    left: 0,
+    right: 22,
+    bottom: -StyleSheet.hairlineWidth,
+    height: 1.5,
+    backgroundColor: Colors.primary,
+    borderRadius: 1,
+  } as any,
 
   // Location denied
   locationDeniedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Layout.screenPadding, paddingVertical: 8 },
   locationDeniedText: { fontSize: 12, fontFamily: Fonts.body },
 
-  // Trending section
-  trendingLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, marginTop: 6, fontFamily: Fonts.bodySemiBold },
-  trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
-  trendingEmoji: { fontSize: 28 },
-  trendingName: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
-  trendingCount: { fontSize: 12, marginTop: 2, fontFamily: Fonts.body },
+  // Browse / scroll content
+  scrollContent: { paddingHorizontal: Layout.screenPadding, paddingBottom: 30 },
 
-  // Category sections
-  scrollContent: { paddingHorizontal: Layout.screenPadding },
-  section: { marginTop: 18 },
-  sectionTitle: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, fontFamily: Fonts.bodySemiBold },
-  // Flat list items
-  flatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-  flatEmoji: { fontSize: 28, width: 40, textAlign: 'center', marginRight: 12 },
-  flatTextCol: { flex: 1 },
-  flatName: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
-  flatSub: { fontSize: 11, marginTop: 2, fontFamily: Fonts.body },
+  // Section header above grid
+  gridHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingTop: 20,
+    paddingBottom: 14,
+  } as any,
+  eyebrowGridHeader: { marginBottom: 3 },
+  gridTitle: {
+    fontFamily: Fonts.displaySemiBold,
+    fontWeight: '500',
+    fontSize: 20,
+    letterSpacing: -0.3,
+    color: Colors.textPrimary,
+  },
+  gridCount: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    fontFamily: Fonts.body,
+  },
+
+  // Pinterest-style 2-col staggered grid
+  gridRow: { flexDirection: 'row', gap: 10 } as any,
+  gridColumn: { flex: 1, gap: 10 } as any,
+
+  // Tile
+  tile: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#2C2420',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  } as any,
+  tileHotBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 248, 240, 0.92)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  } as any,
+  tileHotBadgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    letterSpacing: 0.3,
+  },
+  tileBottom: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 11,
+  },
+  tileTitle: {
+    fontFamily: Fonts.displaySemiBold,
+    fontWeight: '500',
+    fontSize: 17,
+    lineHeight: 19,
+    letterSpacing: -0.3,
+    color: Colors.textOnAccent,
+  },
+  tileSubtitle: {
+    fontSize: 10.5,
+    color: 'rgba(255, 248, 240, 0.8)',
+    marginTop: 3,
+    letterSpacing: 0.2,
+    fontFamily: Fonts.body,
+  },
 
   // Results
   resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, fontFamily: Fonts.bodySemiBold },
@@ -861,20 +974,8 @@ const styles = StyleSheet.create({
   compactMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactMetaText: { fontSize: 12, fontFamily: Fonts.body },
 
-  // (mood-list now uses flatRow renderer)
-
-  // Ranked
-  rankedRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },
-  rankNumber: { fontSize: 20, fontFamily: Fonts.displayBold, width: 32 },
-  rankEmojiCircle: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  rankEmoji: { fontSize: 24 },
-  rankTextCol: { flex: 1 },
-  rankName: { fontSize: 14, fontFamily: Fonts.displayBold },
-  rankSub: { fontSize: 12, marginTop: 2, fontFamily: Fonts.body },
-  hotBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 8 },
-  hotBadgeText: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.bodySemiBold },
-  planCountBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 8 },
-  planCountText: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.bodyMedium },
+  // (Ranked / mood-list / hotBadge / planCountBadge styles removed —
+  //  superseded by the Atlas grid above.)
 
   // Active filters
   activeFiltersWrap: { marginTop: 14 },
