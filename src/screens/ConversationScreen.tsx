@@ -15,6 +15,8 @@ import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
 import { ChatMessage, ConversationParticipant, resetUnreadCount } from '../services/chatService';
+import { createGroupSession } from '../services/planSessionService';
+import { fetchPlanById } from '../services/plansService';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
 const HEART_EMOJI = '❤️';
@@ -171,13 +173,14 @@ interface MessageRowProps {
   onReaction: (emoji: string) => void;
   onScrollToQuote: (msgId: string) => void;
   onPlanPress: (planId: string) => void;
+  onJoinSession: () => void;
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
   item, prevMsg, nextMsg, userId, senderUser, isGroupContext, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
-  onScrollToQuote, onPlanPress,
+  onScrollToQuote, onPlanPress, onJoinSession,
 }) => {
   const isMine = item.senderId === userId;
   const showDate = shouldShowDateSeparator(item, prevMsg);
@@ -186,7 +189,9 @@ const MessageRow = React.memo<MessageRowProps>(({
 
   // ── System event: rendered as centered gray italic line, no bubble, no swipe, no reactions ──
   if (item.type === 'system') {
-    const text = item.content || renderSystemEventText(item.systemEvent);
+    const ev = item.systemEvent;
+    const text = item.content || renderSystemEventText(ev);
+    const isSessionStart = ev?.kind === 'session_started' && ev.actorId !== userId;
     return (
       <View>
         {showDate && (
@@ -196,6 +201,16 @@ const MessageRow = React.memo<MessageRowProps>(({
         )}
         <View style={styles.systemEventWrap}>
           <Text style={styles.systemEventText}>{text}</Text>
+          {isSessionStart && (
+            <TouchableOpacity
+              style={styles.systemJoinBtn}
+              onPress={onJoinSession}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="arrow-forward-circle" size={14} color={Colors.textOnAccent} />
+              <Text style={styles.systemJoinText}>Rejoindre la session</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -760,6 +775,59 @@ export const ConversationScreen: React.FC = () => {
   // Only the creator can hard-delete a group — others leave.
   const isGroupCreator = isGroup && activeConv?.createdBy === user?.id;
 
+  // ── Session handlers (multi-user DoItNow) ──
+  const [isStartingSession, setIsStartingSession] = useState(false);
+
+  const handleStartSession = useCallback(async () => {
+    if (!user?.id || !activeConv?.linkedPlanId || isStartingSession) return;
+    setIsStartingSession(true);
+    try {
+      const plan = await fetchPlanById(activeConv.linkedPlanId);
+      if (!plan) {
+        setIsStartingSession(false);
+        return;
+      }
+      const creator: ConversationParticipant = activeConv.participantDetails[user.id] || {
+        userId: user.id,
+        displayName: user.displayName,
+        username: user.username,
+        avatarUrl: user.avatarUrl || null,
+        avatarBg: user.avatarBg,
+        avatarColor: user.avatarColor,
+        initials: user.initials,
+      };
+      const sessionId = await createGroupSession({
+        plan: {
+          id: plan.id,
+          title: plan.title,
+          coverPhoto: activeConv.linkedPlanCover ?? null,
+          placeIds: plan.places.map((p) => p.id),
+        },
+        conversationId: conversationId,
+        creator,
+      });
+      // Navigate to DoItNow with the session context.
+      navigation.navigate('DoItNow', {
+        planId: plan.id,
+        sessionId,
+        conversationId: conversationId,
+      });
+    } catch (err) {
+      console.warn('[ConversationScreen] start session error:', err);
+    } finally {
+      setIsStartingSession(false);
+    }
+  }, [user, activeConv, conversationId, isStartingSession, navigation]);
+
+  const handleJoinSession = useCallback(async () => {
+    if (!user?.id || !activeConv?.activeSessionId || !activeConv.linkedPlanId) return;
+    navigation.navigate('DoItNow', {
+      planId: activeConv.linkedPlanId,
+      sessionId: activeConv.activeSessionId,
+      conversationId: conversationId,
+    });
+  }, [user, activeConv, conversationId, navigation]);
+
   const isMuted = useMemo(
     () => Boolean(activeConv && user?.id && (activeConv.mutedBy || []).includes(user.id)),
     [activeConv, user?.id],
@@ -959,9 +1027,10 @@ export const ConversationScreen: React.FC = () => {
       onReaction={handleReaction}
       onScrollToQuote={handleScrollToQuote}
       onPlanPress={handlePlanPress}
+      onJoinSession={handleJoinSession}
     />
     );
-  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
+  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession]);
 
   // ── Typing indicator grouping with last received message ──
   const typingIsGrouped = useMemo(() => {
@@ -1088,35 +1157,61 @@ export const ConversationScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             ListHeaderComponent={isGroup && activeConv?.linkedPlanId ? (
-              <TouchableOpacity
-                style={styles.pinnedPlanCard}
-                onPress={() => navigation.navigate('PlanDetail', { planId: activeConv.linkedPlanId! })}
-                activeOpacity={0.85}
-              >
-                {activeConv.linkedPlanCover ? (
-                  <Image source={{ uri: activeConv.linkedPlanCover }} style={styles.pinnedPlanCover} />
-                ) : (
-                  <View style={[styles.pinnedPlanCover, { backgroundColor: Colors.terracotta400 }]} />
-                )}
-                <View style={styles.pinnedPlanBody}>
-                  <Text style={styles.pinnedPlanEyebrow}>PLAN ÉPINGLÉ</Text>
-                  <Text style={styles.pinnedPlanTitle} numberOfLines={2}>
-                    {activeConv.linkedPlanTitle || 'Plan'}
-                  </Text>
-                  <View style={styles.pinnedPlanMeta}>
-                    <Ionicons name="calendar-outline" size={11} color={Colors.textSecondary} />
-                    <Text style={styles.pinnedPlanMetaText}>
-                      {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
+              <View style={styles.pinnedPlanWrap}>
+                <TouchableOpacity
+                  style={styles.pinnedPlanCard}
+                  onPress={() => navigation.navigate('PlanDetail', { planId: activeConv.linkedPlanId! })}
+                  activeOpacity={0.85}
+                >
+                  {activeConv.linkedPlanCover ? (
+                    <Image source={{ uri: activeConv.linkedPlanCover }} style={styles.pinnedPlanCover} />
+                  ) : (
+                    <View style={[styles.pinnedPlanCover, { backgroundColor: Colors.terracotta400 }]} />
+                  )}
+                  <View style={styles.pinnedPlanBody}>
+                    <Text style={styles.pinnedPlanEyebrow}>PLAN ÉPINGLÉ</Text>
+                    <Text style={styles.pinnedPlanTitle} numberOfLines={2}>
+                      {activeConv.linkedPlanTitle || 'Plan'}
                     </Text>
-                    <Text style={styles.pinnedPlanMetaSep}>·</Text>
-                    <Ionicons name="people-outline" size={11} color={Colors.textSecondary} />
-                    <Text style={styles.pinnedPlanMetaText}>
-                      {activeConv.participants.length} amis
-                    </Text>
+                    <View style={styles.pinnedPlanMeta}>
+                      <Ionicons name="calendar-outline" size={11} color={Colors.textSecondary} />
+                      <Text style={styles.pinnedPlanMetaText}>
+                        {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
+                      </Text>
+                      <Text style={styles.pinnedPlanMetaSep}>·</Text>
+                      <Ionicons name="people-outline" size={11} color={Colors.textSecondary} />
+                      <Text style={styles.pinnedPlanMetaText}>
+                        {activeConv.participants.length} amis
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-              </TouchableOpacity>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+                </TouchableOpacity>
+                {/* Session CTA — Start if none active, Join if one is live */}
+                {activeConv.activeSessionId ? (
+                  <TouchableOpacity
+                    style={styles.sessionActiveBtn}
+                    onPress={handleJoinSession}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.sessionActiveDot} />
+                    <Text style={styles.sessionActiveText}>Session en cours — rejoindre</Text>
+                    <Ionicons name="arrow-forward" size={15} color={Colors.textOnAccent} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.sessionStartBtn, { opacity: isStartingSession ? 0.6 : 1 }]}
+                    onPress={handleStartSession}
+                    activeOpacity={0.85}
+                    disabled={isStartingSession}
+                  >
+                    <Ionicons name="compass" size={16} color={Colors.primary} />
+                    <Text style={styles.sessionStartText}>
+                      {isStartingSession ? 'Démarrage…' : 'Démarrer la session'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : null}
             ListFooterComponent={!isGroup && otherTyping && otherUser ? (
               <TypingIndicator
@@ -1705,16 +1800,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
-
-  // ── Pinned plan card (group list header) ──
-  pinnedPlanCard: {
+  systemJoinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+    marginTop: 8,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  systemJoinText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.1,
+  },
+
+  // ── Pinned plan card (group list header) ──
+  pinnedPlanWrap: {
     marginHorizontal: 12,
     marginTop: 4,
     marginBottom: 10,
-    padding: 10,
     borderRadius: 14,
     backgroundColor: Colors.bgSecondary,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1724,6 +1836,51 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 1,
+    overflow: 'hidden',
+  },
+  pinnedPlanCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+  },
+  // Session CTA (start) — outline terracotta
+  sessionStartBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgPrimary,
+  },
+  sessionStartText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    letterSpacing: -0.1,
+  },
+  // Session CTA (active) — solid terracotta with live dot
+  sessionActiveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    backgroundColor: Colors.primary,
+  },
+  sessionActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.textOnAccent,
+  },
+  sessionActiveText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.1,
   },
   pinnedPlanCover: {
     width: 52,

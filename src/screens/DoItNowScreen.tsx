@@ -21,9 +21,12 @@ import { Colors, Fonts, Layout } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { useSavedPlacesStore } from '../store/savedPlacesStore';
+import { useAuthStore } from '../store';
 import { getDirections, decodePolyline, RouteResult } from '../services/directionsService';
+import { fetchPlanById } from '../services/plansService';
 import { Plan, DoItNowTransport } from '../types';
 import { useCity } from '../hooks/useCity';
+import { GroupSessionLayer } from '../components';
 
 // Quick-word chips shown on the editorial review screen.
 const QUICK_WORDS: { key: string; label: string }[] = [
@@ -91,10 +94,35 @@ interface PlaceModeState {
 export const DoItNowScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const navRoute = useRoute<any>();
   const C = useColors();
   const cityConfig = useCity();
+  const user = useAuthStore((s) => s.user);
 
-  const { session, plan, arriveAtPlace, nextStop, completeSession } = useDoItNowStore();
+  // Route params — for multi-user sessions coming from a group "Rejoindre" tap.
+  const routeSessionId: string | undefined = navRoute.params?.sessionId;
+
+  const { session, plan, arriveAtPlace, nextStop, completeSession, startSession } = useDoItNowStore();
+
+  // ── Multi-user bootstrap: if we arrived via "Rejoindre" and have no local session,
+  //    fetch the plan and start a local session so the rest of the screen just works.
+  const hasBootstrappedRef = useRef(false);
+  useEffect(() => {
+    if (!routeSessionId || !user?.id || hasBootstrappedRef.current) return;
+    if (session && session.planId === navRoute.params?.planId) {
+      hasBootstrappedRef.current = true;
+      return;
+    }
+    const planId: string | undefined = navRoute.params?.planId;
+    if (!planId) return;
+    hasBootstrappedRef.current = true;
+    fetchPlanById(planId)
+      .then((fetched) => {
+        if (!fetched) return;
+        startSession(fetched, 'walking', user.id);
+      })
+      .catch((err) => console.warn('[DoItNow] bootstrap error:', err));
+  }, [routeSessionId, user?.id, session, navRoute.params?.planId, startSession]);
 
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -483,6 +511,12 @@ export const DoItNowScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: C.white }]}>
+      {/* Group session strip — only when we arrived with a sessionId route param */}
+      {routeSessionId && (
+        <View style={{ paddingTop: insets.top + 4 }}>
+          <GroupSessionLayer sessionId={routeSessionId} placesCount={plan.places.length} />
+        </View>
+      )}
       {/* Progress bar */}
       <View style={[styles.progressBar, { paddingTop: insets.top + 6 }]}>
         <View style={styles.progressInfo}>

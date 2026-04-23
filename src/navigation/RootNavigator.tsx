@@ -21,6 +21,7 @@ import { DoItNowScreen } from '../screens/DoItNowScreen';
 import { DoItNowCompleteScreen } from '../screens/DoItNowCompleteScreen';
 import { OrganizeCompleteScreen } from '../screens/OrganizeCompleteScreen';
 import { AccountPromptModal } from '../components/AccountPromptModal';
+import { SessionInviteToast } from '../components/SessionInviteToast';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -88,6 +89,8 @@ export const RootNavigator: React.FC = () => {
       </Stack.Navigator>
       {/* Global account prompt modal for guest mode */}
       <AccountPromptModal />
+      {/* Cross-screen toast for incoming multi-user sessions (auth only). */}
+      {isAuthenticated && <SessionInviteToast />}
     </>
   );
 };
