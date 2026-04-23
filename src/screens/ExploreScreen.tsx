@@ -23,7 +23,7 @@ import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuthStore, useTrendingStore, useFriendsStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
-import { fetchPublicPlansByTags, fetchPublicPlansNearby } from '../services/plansService';
+import { fetchPublicPlansByTags, fetchPublicPlansNearby, fetchFeedPlans } from '../services/plansService';
 import { FriendsMapView } from './FriendsMapView';
 import * as Location from 'expo-location';
 
@@ -245,50 +245,39 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [route.params?.applyFilter, toggleFilter, navigation]);
 
-  // Tap on a category from the conversational list → cumulate the active
-  // person slot (if any) with the category as the active filters, then drop
-  // straight into results view. Bypasses toggleFilter (which is single-select)
-  // because we want both filters applied at once atomically.
-  const applyCategoryFilter = useCallback(async (catName: string) => {
-    const filters = [slotPerson, catName].filter(
-      (f): f is string => typeof f === 'string' && f.length > 0,
-    );
-    setSelectedFilters(filters);
-    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
-    setIsFilterLoading(true);
-    try {
-      const plans = await fetchPublicPlansByTags(filters, cityConfig.name);
-      const filtered = filters.length > 1
-        ? plans.filter((p) => filters.every((tag) => p.tags.includes(tag)))
-        : plans;
-      setFilteredPlans(filtered);
-    } finally {
-      setIsFilterLoading(false);
-    }
-  }, [slotPerson, cityConfig.name]);
+  // Force plans-only — the conversational view is a plans query, not places.
+  useEffect(() => { setContentMode('plans'); }, []);
 
-  // Commit the conversational sentence: cumulate [person, theme, sub-category]
-  // as the active filter set and drop into plans-only results view. Triggered
-  // when the user picks a sub-category from the 3rd slot of the sentence.
-  const applyConversationalFilters = useCallback(async (subcategoryName: string) => {
-    const filters = [slotPerson, slotTheme, subcategoryName].filter(
+  // Auto-sync the sentence slots to selectedFilters and re-fetch plans
+  // whenever a slot changes. The sentence IS the live filter — no commit
+  // step, no browse/results dichotomy. Empty slots = show all plans.
+  useEffect(() => {
+    const filters = [slotPerson, slotTheme, slotSubcategory].filter(
       (f): f is string => typeof f === 'string' && f.length > 0,
     );
     setSelectedFilters(filters);
-    setSlotSubcategory(subcategoryName);
-    setContentMode('plans'); // Force plans-only — the sentence implies a curated plan query
+
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterLoading(true);
-    try {
-      const plans = await fetchPublicPlansByTags(filters, cityConfig.name);
-      const filtered = filters.length > 1
-        ? plans.filter((p) => filters.every((tag) => p.tags.includes(tag)))
-        : plans;
-      setFilteredPlans(filtered);
-    } finally {
-      setIsFilterLoading(false);
-    }
-  }, [slotPerson, slotTheme, cityConfig.name]);
+    const fetchPromise = filters.length === 0
+      ? fetchFeedPlans(cityConfig.name)
+      : fetchPublicPlansByTags(filters, cityConfig.name);
+
+    fetchPromise
+      .then((plans) => {
+        let result = plans;
+        if (filters.length > 1) {
+          result = plans.filter((p) => filters.every((tag) => p.tags.includes(tag)));
+        }
+        if (filters.length === 0) {
+          // No constraint — most-liked first so the screen still feels curated.
+          result = [...plans].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+        }
+        setFilteredPlans(result);
+      })
+      .catch(() => {})
+      .finally(() => setIsFilterLoading(false));
+  }, [slotPerson, slotTheme, slotSubcategory, cityConfig.name]);
 
   // ── "Dans ton quartier" handler ──
   const handleNearbyFilter = async () => {
@@ -446,34 +435,9 @@ export const ExploreScreen: React.FC = () => {
     </View>
   );
 
-  // ── Browse vs results: cross-fade between the default theme grid and the
-  // active-filter results view. The "Voir +" subcategory expansion was
-  // removed — themes are now navigation tabs and the grid below them is
-  // always visible, so there's nothing to gate on subcategory state.
-  const hasActiveFilters = selectedFilters.length > 0;
-  const [showBrowse, setShowBrowse] = useState(true);
-  const browseOpacity = useRef(new Animated.Value(1)).current;
-  const resultsOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (hasActiveFilters) {
-      Animated.timing(browseOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-        setShowBrowse(false);
-      });
-    } else {
-      setShowBrowse(true);
-      browseOpacity.setValue(0);
-      Animated.timing(browseOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    }
-  }, [hasActiveFilters]);
-
-  // Fade in results when filters become active
-  useEffect(() => {
-    if (hasActiveFilters) {
-      resultsOpacity.setValue(0);
-      Animated.timing(resultsOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    }
-  }, [hasActiveFilters]);
+  // (Browse-vs-results cross-fade and showBrowse / browseOpacity / hasActiveFilters
+  //  removed — the screen has a single mode now: sentence + matching plans.
+  //  selectedFilters is auto-synced from the slots by the useEffect above.)
 
   // ─── Conversational sentence (3 slots inline) ───
   // The Text wraps naturally because nested <Text> in RN respects the parent's
@@ -652,8 +616,9 @@ export const ExploreScreen: React.FC = () => {
       options = items.map((it) => ({ label: it.name, key: it.name }));
       currentValue = slotSubcategory;
       onSelect = (label) => {
+        setSlotSubcategory(label);
         setActiveSheet(null);
-        applyConversationalFilters(label);
+        // The slot-sync useEffect picks it up and re-fetches plans automatically.
       };
     } else if (activeSheet === 'subcategory') {
       title = 'Affiner par sous-cat\u00e9gorie';
@@ -829,99 +794,40 @@ export const ExploreScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Conversational sentence — the new hero */}
-      {!hasActiveFilters && renderSentence()}
+      {/* Conversational sentence — the live filter UI */}
+      {renderSentence()}
 
-      {/* Hint search bar + sliders aligned (always visible so the user can
-          jump into search or tweak advanced filters from any state) */}
-      {!hasActiveFilters && renderHintBar()}
+      {/* Hint search bar + sliders aligned (always visible) */}
+      {renderHintBar()}
 
       {/* Location denied message */}
       {locationDenied && (
         <View style={styles.locationDeniedRow}>
           <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-          <Text style={[styles.locationDeniedText, { color: Colors.textSecondary }]}>Active ta localisation pour voir les plans pres de toi</Text>
+          <Text style={[styles.locationDeniedText, { color: Colors.textSecondary }]}>
+            Active ta localisation pour voir les plans près de toi
+          </Text>
         </View>
       )}
 
+      {/* Plans matching the sentence — always shown, updates live */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Browse view — categories list filtered by the sentence slots */}
-        {showBrowse && !hasActiveFilters && (
-          <Animated.View style={{ opacity: browseOpacity }}>
-            {trendingLoading && trendingCategories.length === 0 ? (
-              <LoadingSkeleton variant="list" />
-            ) : (
-              renderCategoryList()
-            )}
-          </Animated.View>
+        {isFilterLoading ? (
+          <LoadingSkeleton variant="list" />
+        ) : displayedPlans.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingTop: 40 }}>
+            <Text style={[styles.noResultText, { color: Colors.textSecondary }]}>
+              Aucun plan ne correspond. Essaye d'élargir un slot.
+            </Text>
+          </View>
+        ) : (
+          <View style={{ marginHorizontal: -Layout.screenPadding, paddingTop: 8 }}>
+            <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary, paddingHorizontal: Layout.screenPadding }]}>
+              {displayedPlans.length} plan{displayedPlans.length > 1 ? 's' : ''}
+            </Text>
+            {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
+          </View>
         )}
-
-        {/* Selected filter pills + results */}
-        {hasActiveFilters && (
-          <Animated.View style={[styles.activeFiltersWrap, { opacity: resultsOpacity }]}>
-            <View style={styles.activeFiltersRow}>
-              {selectedFilters.map((f) => (
-                <TouchableOpacity key={f} style={[styles.activeFilterChip, { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }]} onPress={() => f === NEARBY_LABEL ? handleNearbyFilter() : toggleFilter(f)}>
-                  <Text style={[styles.activeFilterText, { color: Colors.primary }]}>{f}</Text>
-                  <Ionicons name="close" size={13} color={Colors.primary} />
-                </TouchableOpacity>
-              ))}
-              {selectedFilters.length > 1 && (
-                <TouchableOpacity onPress={() => { setSelectedFilters([]); setFilteredPlans([]); setLocationDenied(false); }}>
-                  <Text style={[styles.clearFiltersText, { color: Colors.textSecondary }]}>Tout effacer</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {/* Sub-category dropdown — appears once a theme is filtering. Lets
-                the user narrow down to a specific sub-category of that theme. */}
-            {(() => {
-              const themeInFilters = selectedFilters.find((f) => !PERSON_LABELS.has(f) && THEME_GROUPS.some((g) => g.label === f));
-              if (!themeInFilters) return null;
-              const group = THEME_GROUPS.find((g) => g.label === themeInFilters);
-              const items = group ? group.sections.flatMap((s) => s.items) : [];
-              if (items.length === 0) return null;
-              const currentSub = selectedFilters.find((f) => items.some((i) => i.name === f));
-              return (
-                <TouchableOpacity
-                  style={styles.subCatDropdown}
-                  onPress={() => setActiveSheet('subcategory')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.subCatDropdownLabel}>
-                    {currentSub || 'Sous-cat\u00e9gorie'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              );
-            })()}
-                {isFilterLoading ? (
-                  <LoadingSkeleton variant="list" />
-                ) : (
-                  <>
-                    {/* Plans section */}
-                    {contentMode !== 'lieux' && displayedPlans.length > 0 && (
-                      <View style={{ marginTop: 12, marginHorizontal: -Layout.screenPadding }}>
-                        <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary, paddingHorizontal: Layout.screenPadding }]}>Plans ({displayedPlans.length})</Text>
-                        {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
-                      </View>
-                    )}
-                    {/* Lieux section */}
-                    {contentMode !== 'plans' && displayedPlaces.length > 0 && (
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary }]}>Lieux ({displayedPlaces.length})</Text>
-                        {displayedPlaces.map((place, i) => renderCompactPlace(place, i, displayedPlaces.length))}
-                      </View>
-                    )}
-                    {/* Empty */}
-                    {displayedPlans.length === 0 && displayedPlaces.length === 0 && (
-                      <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                        <Text style={[styles.noResultText, { color: Colors.textSecondary }]}>Aucun resultat pour ces filtres</Text>
-                      </View>
-                    )}
-                  </>
-                )}
-              </Animated.View>
-            )}
         <View style={{ height: 30 }} />
       </ScrollView>
 
