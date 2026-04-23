@@ -40,6 +40,12 @@ export interface Conversation {
   lastMessageAt: string;
   unreadCount: Record<string, number>;
   typing: Record<string, number>;          // { userId: timestamp }
+  /** ISO timestamp per user — written when the user opens the conversation. Used for "vu" receipts. */
+  lastReadAt: Record<string, string>;
+  /** User IDs that have pinned this conversation. */
+  pinnedBy: string[];
+  /** User IDs that have muted this conversation. */
+  mutedBy: string[];
   createdAt: string;
 }
 
@@ -100,6 +106,10 @@ export const findConversation = async (
       return {
         id: d.id,
         ...data,
+        typing: data.typing || {},
+        lastReadAt: data.lastReadAt || {},
+        pinnedBy: Array.isArray(data.pinnedBy) ? data.pinnedBy : [],
+        mutedBy: Array.isArray(data.mutedBy) ? data.mutedBy : [],
         lastMessageAt: toISO(data.lastMessageAt),
         createdAt: toISO(data.createdAt),
       } as Conversation;
@@ -127,6 +137,9 @@ export const createConversation = async (
     lastMessageAt: serverTimestamp(),
     unreadCount,
     typing: {},
+    lastReadAt: {},
+    pinnedBy: [],
+    mutedBy: [],
     createdAt: serverTimestamp(),
   });
   return docRef.id;
@@ -269,17 +282,52 @@ export const toggleReaction = async (
   await updateDoc(msgRef, { reactions });
 };
 
-/** Lightweight: reset unread count only (no message-level readBy writes) */
+/** Lightweight: reset unread count + stamp lastReadAt for "vu" receipts */
 export const resetUnreadCount = async (
   conversationId: string,
   userId: string,
 ): Promise<void> => {
   try {
     const convRef = doc(db, CONVERSATIONS, conversationId);
-    await updateDoc(convRef, { [`unreadCount.${userId}`]: 0 });
+    await updateDoc(convRef, {
+      [`unreadCount.${userId}`]: 0,
+      [`lastReadAt.${userId}`]: new Date().toISOString(),
+    });
   } catch {
     // Silently ignore
   }
+};
+
+/** Toggle pin state for a user on a conversation. */
+export const togglePinConversation = async (
+  conversationId: string,
+  userId: string,
+): Promise<void> => {
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const snap = await getDoc(convRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const pinned: string[] = Array.isArray(data.pinnedBy) ? [...data.pinnedBy] : [];
+  const idx = pinned.indexOf(userId);
+  if (idx >= 0) pinned.splice(idx, 1);
+  else pinned.push(userId);
+  await updateDoc(convRef, { pinnedBy: pinned });
+};
+
+/** Toggle mute state for a user on a conversation. */
+export const toggleMuteConversation = async (
+  conversationId: string,
+  userId: string,
+): Promise<void> => {
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const snap = await getDoc(convRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const muted: string[] = Array.isArray(data.mutedBy) ? [...data.mutedBy] : [];
+  const idx = muted.indexOf(userId);
+  if (idx >= 0) muted.splice(idx, 1);
+  else muted.push(userId);
+  await updateDoc(convRef, { mutedBy: muted });
 };
 
 /** Set typing status */
@@ -324,6 +372,9 @@ export const subscribeConversations = (
           id: d.id,
           ...data,
           typing: data.typing || {},
+          lastReadAt: data.lastReadAt || {},
+          pinnedBy: Array.isArray(data.pinnedBy) ? data.pinnedBy : [],
+          mutedBy: Array.isArray(data.mutedBy) ? data.mutedBy : [],
           lastMessageAt: toISO(data.lastMessageAt),
           createdAt: toISO(data.createdAt),
         } as Conversation;

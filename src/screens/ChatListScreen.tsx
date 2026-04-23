@@ -1,6 +1,19 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+  Animated,
+  Easing,
+  Modal,
+  Pressable,
+  Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -9,164 +22,1074 @@ import { Colors, Fonts } from '../constants';
 import { Avatar, EmptyState } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
-import { useColors } from '../hooks/useColors';
 import { Conversation } from '../services/chatService';
+
+// ──────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────
 
 const formatTimeAgo = (dateStr: string): string => {
   const now = Date.now();
   const date = new Date(dateStr).getTime();
   const diff = now - date;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
+  if (diff < 60_000) return 'à l\u2019instant';
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins} min`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
+  if (hrs < 24) return `${hrs} h`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}j`;
+  if (days < 7) return `${days} j`;
   const weeks = Math.floor(days / 7);
-  return `${weeks}sem`;
+  return `${weeks} sem`;
 };
 
-export const ChatListScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
-  const C = useColors();
-  const user = useAuthStore((s) => s.user);
-  const { conversations, totalUnread, isLoading, subscribe } = useChatStore();
+const truncate = (s: string, n: number): string =>
+  s.length > n ? s.slice(0, n) + '\u2026' : s;
+
+type FilterKey = 'all' | 'unread';
+
+type RowKind = 'header' | 'conv';
+interface SectionHeaderItem {
+  kind: 'header';
+  id: string;
+  label: string;
+}
+interface ConvRowItem {
+  kind: 'conv';
+  id: string;
+  conv: Conversation;
+}
+type ListItem = SectionHeaderItem | ConvRowItem;
+
+// ──────────────────────────────────────────────────────────────
+// Typing dots — shared little animated dots component
+// ──────────────────────────────────────────────────────────────
+
+const TypingDots: React.FC<{ color: string }> = ({ color }) => {
+  const a1 = useRef(new Animated.Value(0)).current;
+  const a2 = useRef(new Animated.Value(0)).current;
+  const a3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (user?.id) subscribe(user.id);
-  }, [user?.id]);
+    const make = (v: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(v, { toValue: 1, duration: 400, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(v, { toValue: 0, duration: 400, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.delay(400 - delay),
+        ]),
+      );
+    const anim = Animated.parallel([make(a1, 0), make(a2, 150), make(a3, 300)]);
+    anim.start();
+    return () => anim.stop();
+  }, [a1, a2, a3]);
 
-  const getOtherParticipant = (conv: Conversation) => {
-    const otherId = conv.participants.find((id) => id !== user?.id);
-    if (!otherId) return null;
-    return conv.participantDetails[otherId] || null;
-  };
-
-  const renderItem = ({ item }: { item: Conversation }) => {
-    const other = getOtherParticipant(item);
-    if (!other) return null;
-
-    const unread = user?.id ? (item.unreadCount[user.id] || 0) : 0;
-    const isMyLastMsg = item.lastMessageSenderId === user?.id;
-    const preview = item.lastMessage
-      ? (isMyLastMsg ? `Toi : ${item.lastMessage}` : item.lastMessage)
-      : 'Nouvelle conversation';
-
-    return (
-      <TouchableOpacity
-        style={[styles.row, { backgroundColor: unread > 0 ? C.primary + '08' : 'transparent' }]}
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('Conversation', { conversationId: item.id, otherUser: other })}
-      >
-        <Avatar
-          initials={other.initials}
-          bg={other.avatarBg}
-          color={other.avatarColor}
-          size="M"
-          avatarUrl={other.avatarUrl || undefined}
-        />
-        <View style={styles.rowContent}>
-          <View style={styles.rowTop}>
-            <Text style={[styles.name, { color: C.black }, unread > 0 && styles.nameBold]} numberOfLines={1}>
-              {other.displayName}
-            </Text>
-            <Text style={[styles.time, { color: C.gray600 }]}>{formatTimeAgo(item.lastMessageAt)}</Text>
-          </View>
-          <View style={styles.rowBottom}>
-            <Text
-              style={[styles.preview, { color: unread > 0 ? C.black : C.gray600 }, unread > 0 && styles.previewBold]}
-              numberOfLines={1}
-            >
-              {preview}
-            </Text>
-            {unread > 0 && (
-              <View style={[styles.badge, { backgroundColor: C.primary }]}>
-                <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const dotStyle = (v: Animated.Value) => ({
+    opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+    transform: [
+      { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -2] }) },
+    ],
+  });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.borderLight }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="chevron-back" size={24} color={C.black} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: C.black }]}>Messages</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('NewConversation')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="create-outline" size={22} color={C.black} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      {isLoading && conversations.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={C.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={conversations}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <EmptyState
-              icon="💬"
-              title="Aucun message"
-              subtitle="Envoie un message ou partage un plan avec un ami"
-              ctaLabel="Nouveau message"
-              onCtaPress={() => navigation.navigate('NewConversation')}
-            />
-          }
-        />
-      )}
+    <View style={dotsStyles.row}>
+      <Animated.View style={[dotsStyles.dot, { backgroundColor: color }, dotStyle(a1)]} />
+      <Animated.View style={[dotsStyles.dot, { backgroundColor: color }, dotStyle(a2)]} />
+      <Animated.View style={[dotsStyles.dot, { backgroundColor: color }, dotStyle(a3)]} />
     </View>
   );
 };
 
+const dotsStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', marginLeft: 4, gap: 2 },
+  dot: { width: 3, height: 3, borderRadius: 1.5 },
+});
+
+// ──────────────────────────────────────────────────────────────
+// Conversation row
+// ──────────────────────────────────────────────────────────────
+
+interface RowProps {
+  conv: Conversation;
+  meId: string;
+  onPress: () => void;
+  onLongPress: () => void;
+}
+
+const ConversationRow: React.FC<RowProps> = ({ conv, meId, onPress, onLongPress }) => {
+  const otherId = conv.participants.find((id) => id !== meId);
+  const other = otherId ? conv.participantDetails[otherId] : null;
+  if (!other || !otherId) return null;
+
+  const unread = conv.unreadCount[meId] || 0;
+  const isMyLastMsg = conv.lastMessageSenderId === meId;
+  const muted = (conv.mutedBy || []).includes(meId);
+  const pinned = (conv.pinnedBy || []).includes(meId);
+  const showUnreadAccent = unread > 0 && !isMyLastMsg && !muted;
+
+  // Typing detection
+  const typingTs = (conv.typing && conv.typing[otherId]) || 0;
+  const isTyping = typingTs > 0 && Date.now() - typingTs < 5000;
+
+  // "Vu" — the other party has read my last message
+  let theyHaveRead = false;
+  if (isMyLastMsg && conv.lastMessageAt && conv.lastReadAt) {
+    const theirLastReadAt = conv.lastReadAt[otherId];
+    if (theirLastReadAt) {
+      theyHaveRead = new Date(theirLastReadAt).getTime() >= new Date(conv.lastMessageAt).getTime();
+    }
+  }
+
+  // ── Build preview content ──
+  let previewNode: React.ReactNode;
+
+  if (isTyping) {
+    previewNode = (
+      <View style={rowStyles.previewLine}>
+        <Text style={[rowStyles.typingText, { color: Colors.primary }]} numberOfLines={1}>
+          en train d{'\u2019'}écrire
+        </Text>
+        <TypingDots color={Colors.primary} />
+      </View>
+    );
+  } else if (!conv.lastMessage) {
+    previewNode = (
+      <Text
+        style={[rowStyles.preview, { color: Colors.textTertiary, fontStyle: 'italic' }]}
+        numberOfLines={1}
+      >
+        Nouvelle conversation
+      </Text>
+    );
+  } else if (conv.lastMessageType === 'plan') {
+    // Plan-share micro-pill
+    const swatch = other.avatarBg || Colors.primary;
+    previewNode = (
+      <View style={rowStyles.previewLine}>
+        {isMyLastMsg && (
+          <Text
+            style={[
+              rowStyles.receipt,
+              { color: theyHaveRead ? Colors.primary : Colors.textTertiary },
+            ]}
+          >
+            Toi{theyHaveRead ? ' · vu' : ' · '}
+          </Text>
+        )}
+        <View
+          style={[
+            rowStyles.planPill,
+            {
+              backgroundColor: Colors.terracotta50,
+              borderColor: Colors.terracotta100,
+            },
+            isMyLastMsg && { marginLeft: 6 },
+          ]}
+        >
+          <View style={[rowStyles.planSwatch, { backgroundColor: swatch }]} />
+          <Text
+            style={[rowStyles.planPillText, { color: Colors.primaryDeep }]}
+            numberOfLines={1}
+          >
+            {truncate(conv.lastMessage || 'Plan partagé', 28)}
+          </Text>
+        </View>
+      </View>
+    );
+  } else {
+    // Text message
+    const previewColor = muted
+      ? Colors.textTertiary
+      : showUnreadAccent
+        ? Colors.textPrimary
+        : Colors.textSecondary;
+    const previewWeight = showUnreadAccent ? Fonts.bodySemiBold : Fonts.body;
+
+    if (isMyLastMsg) {
+      previewNode = (
+        <Text
+          style={[rowStyles.preview, { color: previewColor, fontFamily: previewWeight }]}
+          numberOfLines={1}
+        >
+          <Text
+            style={[
+              rowStyles.receipt,
+              { color: theyHaveRead ? Colors.primary : Colors.textTertiary },
+            ]}
+          >
+            Toi{theyHaveRead ? ' · vu  ' : ' · '}
+          </Text>
+          {conv.lastMessage}
+        </Text>
+      );
+    } else {
+      previewNode = (
+        <Text
+          style={[rowStyles.preview, { color: previewColor, fontFamily: previewWeight }]}
+          numberOfLines={1}
+        >
+          {conv.lastMessage}
+        </Text>
+      );
+    }
+  }
+
+  // ── Right-side meta (badge / mute icon / pin) ──
+  const rightMeta: React.ReactNode[] = [];
+
+  if (muted) {
+    rightMeta.push(
+      <Ionicons
+        key="mute"
+        name="notifications-off-outline"
+        size={14}
+        color={Colors.textTertiary}
+        style={{ marginRight: unread > 0 ? 6 : 0 }}
+      />,
+    );
+  }
+
+  if (unread > 0) {
+    rightMeta.push(
+      <View
+        key="badge"
+        style={[
+          rowStyles.badge,
+          { backgroundColor: muted ? Colors.gray400 : Colors.primary },
+        ]}
+      >
+        <Text style={rowStyles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+      </View>,
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.65}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={[
+        rowStyles.row,
+        showUnreadAccent && {
+          backgroundColor: 'rgba(196, 112, 75, 0.06)',
+        },
+      ]}
+    >
+      {/* Left accent bar (unread, non-muted only) */}
+      {showUnreadAccent && <View style={[rowStyles.accentBar, { backgroundColor: Colors.primary }]} />}
+
+      <Avatar
+        initials={other.initials}
+        bg={other.avatarBg}
+        color={other.avatarColor}
+        size="ML"
+        avatarUrl={other.avatarUrl || undefined}
+      />
+
+      <View style={rowStyles.body}>
+        <View style={rowStyles.topLine}>
+          <View style={rowStyles.nameWrap}>
+            <Text
+              style={[
+                rowStyles.name,
+                {
+                  color: muted ? Colors.textSecondary : Colors.textPrimary,
+                  fontFamily: showUnreadAccent ? Fonts.bodyBold : Fonts.bodySemiBold,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {other.displayName}
+            </Text>
+            {pinned && (
+              <Ionicons
+                name="pin"
+                size={11}
+                color={Colors.textTertiary}
+                style={{ marginLeft: 5, transform: [{ rotate: '45deg' }] }}
+              />
+            )}
+          </View>
+          <Text
+            style={[
+              rowStyles.time,
+              {
+                color: showUnreadAccent ? Colors.primary : Colors.textTertiary,
+                fontFamily: showUnreadAccent ? Fonts.bodySemiBold : Fonts.bodyMedium,
+              },
+            ]}
+          >
+            {formatTimeAgo(conv.lastMessageAt)}
+          </Text>
+        </View>
+
+        <View style={rowStyles.bottomLine}>
+          <View style={rowStyles.previewWrap}>{previewNode}</View>
+          {rightMeta.length > 0 && (
+            <View style={rowStyles.metaWrap}>{rightMeta}</View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const rowStyles = StyleSheet.create({
+  row: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  accentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+  },
+  body: { flex: 1, justifyContent: 'center' },
+  topLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  nameWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  name: {
+    fontSize: 14.5,
+    letterSpacing: -0.1,
+  },
+  time: {
+    fontSize: 11,
+    letterSpacing: 0.1,
+  },
+  bottomLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  previewWrap: { flex: 1, marginRight: 8 },
+  previewLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  preview: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  receipt: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+  },
+  typingText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodyMedium,
+    fontStyle: 'italic',
+  },
+  metaWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+    lineHeight: 13,
+  },
+  planPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    maxWidth: 200,
+  },
+  planSwatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+  },
+  planPillText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    flexShrink: 1,
+  },
+});
+
+// ──────────────────────────────────────────────────────────────
+// Action sheet (long-press menu)
+// ──────────────────────────────────────────────────────────────
+
+interface ActionSheetProps {
+  visible: boolean;
+  conv: Conversation | null;
+  meId: string;
+  onClose: () => void;
+  onTogglePin: (id: string) => void;
+  onToggleMute: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+const ActionSheet: React.FC<ActionSheetProps> = ({
+  visible,
+  conv,
+  meId,
+  onClose,
+  onTogglePin,
+  onToggleMute,
+  onDelete,
+}) => {
+  if (!conv) return null;
+  const otherId = conv.participants.find((id) => id !== meId);
+  const other = otherId ? conv.participantDetails[otherId] : null;
+  const pinned = (conv.pinnedBy || []).includes(meId);
+  const muted = (conv.mutedBy || []).includes(meId);
+
+  const askDelete = () => {
+    onClose();
+    Alert.alert(
+      'Supprimer la conversation\u00a0?',
+      'Cette action est définitive et concerne tous les participants.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => onDelete(conv.id),
+        },
+      ],
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={sheetStyles.backdrop} onPress={onClose}>
+        <Pressable style={sheetStyles.sheet} onPress={() => {}}>
+          {other && (
+            <View style={sheetStyles.header}>
+              <Avatar
+                initials={other.initials}
+                bg={other.avatarBg}
+                color={other.avatarColor}
+                size="M"
+                avatarUrl={other.avatarUrl || undefined}
+              />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={sheetStyles.headerName} numberOfLines={1}>
+                  {other.displayName}
+                </Text>
+                <Text style={sheetStyles.headerHandle} numberOfLines={1}>
+                  @{other.username}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <View style={sheetStyles.divider} />
+
+          <TouchableOpacity
+            style={sheetStyles.action}
+            onPress={() => {
+              onTogglePin(conv.id);
+              onClose();
+            }}
+            activeOpacity={0.6}
+          >
+            <Ionicons
+              name={pinned ? 'pin' : 'pin-outline'}
+              size={20}
+              color={Colors.textPrimary}
+              style={pinned ? { transform: [{ rotate: '45deg' }] } : undefined}
+            />
+            <Text style={sheetStyles.actionText}>
+              {pinned ? 'Désépingler' : 'Épingler en haut'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={sheetStyles.action}
+            onPress={() => {
+              onToggleMute(conv.id);
+              onClose();
+            }}
+            activeOpacity={0.6}
+          >
+            <Ionicons
+              name={muted ? 'notifications-outline' : 'notifications-off-outline'}
+              size={20}
+              color={Colors.textPrimary}
+            />
+            <Text style={sheetStyles.actionText}>
+              {muted ? 'Réactiver les notifications' : 'Mettre en sourdine'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={sheetStyles.divider} />
+
+          <TouchableOpacity
+            style={sheetStyles.action}
+            onPress={askDelete}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="trash-outline" size={20} color={Colors.error} />
+            <Text style={[sheetStyles.actionText, { color: Colors.error }]}>
+              Supprimer la conversation
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={sheetStyles.cancel}
+            onPress={onClose}
+            activeOpacity={0.6}
+          >
+            <Text style={sheetStyles.cancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+};
+
+const sheetStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: Colors.bgSecondary,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingTop: 6,
+    paddingBottom: 28,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerName: {
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  headerHandle: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+    marginTop: 1,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.borderSubtle,
+    marginHorizontal: 4,
+  },
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 14,
+  },
+  actionText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textPrimary,
+  },
+  cancel: {
+    marginTop: 6,
+    marginHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: Colors.bgTertiary,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+});
+
+// ──────────────────────────────────────────────────────────────
+// Main screen
+// ──────────────────────────────────────────────────────────────
+
+export const ChatListScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const user = useAuthStore((s) => s.user);
+  const {
+    conversations,
+    isLoading,
+    subscribe,
+    togglePin,
+    toggleMute,
+    deleteConv,
+  } = useChatStore();
+
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<FilterKey>('all');
+  const [sheetConvId, setSheetConvId] = useState<string | null>(null);
+
+  // ── Periodic re-render so "à l'instant / 5 min" updates without new data ──
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) subscribe(user.id);
+  }, [user?.id, subscribe]);
+
+  const meId = user?.id || '';
+
+  // ── Compute the unread total (for the chip badge) ──
+  const totalUnreadConvs = useMemo(() => {
+    if (!meId) return 0;
+    return conversations.filter((c) => (c.unreadCount[meId] || 0) > 0).length;
+  }, [conversations, meId]);
+
+  // ── Filter + search + section ──
+  const items = useMemo<ListItem[]>(() => {
+    if (!meId) return [];
+
+    const q = search.trim().toLowerCase();
+    const matchesSearch = (c: Conversation) => {
+      if (!q) return true;
+      const otherId = c.participants.find((id) => id !== meId);
+      const other = otherId ? c.participantDetails[otherId] : null;
+      const name = other?.displayName?.toLowerCase() || '';
+      const username = other?.username?.toLowerCase() || '';
+      const last = (c.lastMessage || '').toLowerCase();
+      return name.includes(q) || username.includes(q) || last.includes(q);
+    };
+
+    const matchesFilter = (c: Conversation) => {
+      if (filter === 'all') return true;
+      if (filter === 'unread') {
+        const unread = c.unreadCount[meId] || 0;
+        const isMine = c.lastMessageSenderId === meId;
+        return unread > 0 && !isMine;
+      }
+      return true;
+    };
+
+    const filtered = conversations.filter((c) => matchesSearch(c) && matchesFilter(c));
+
+    // Sort: pinned first (by lastMessageAt desc), then by lastMessageAt desc
+    const pinned: Conversation[] = [];
+    const recent: Conversation[] = []; // < 7 days
+    const older: Conversation[] = [];
+
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    filtered.forEach((c) => {
+      if ((c.pinnedBy || []).includes(meId)) {
+        pinned.push(c);
+      } else {
+        const age = now - new Date(c.lastMessageAt).getTime();
+        if (age <= SEVEN_DAYS) recent.push(c);
+        else older.push(c);
+      }
+    });
+
+    const sortDesc = (a: Conversation, b: Conversation) =>
+      b.lastMessageAt.localeCompare(a.lastMessageAt);
+    pinned.sort(sortDesc);
+    recent.sort(sortDesc);
+    older.sort(sortDesc);
+
+    const out: ListItem[] = [];
+    if (pinned.length > 0) {
+      out.push({ kind: 'header', id: 'h-pinned', label: 'Épinglés' });
+      pinned.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
+    }
+    if (recent.length > 0) {
+      out.push({ kind: 'header', id: 'h-recent', label: 'Cette semaine' });
+      recent.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
+    }
+    if (older.length > 0) {
+      out.push({ kind: 'header', id: 'h-older', label: 'Plus anciens' });
+      older.forEach((c) => out.push({ kind: 'conv', id: c.id, conv: c }));
+    }
+
+    return out;
+  }, [conversations, meId, search, filter]);
+
+  const sheetConv = useMemo(
+    () => conversations.find((c) => c.id === sheetConvId) || null,
+    [conversations, sheetConvId],
+  );
+
+  // ──────────────────────────────────────────────────────────
+  // Render
+  // ──────────────────────────────────────────────────────────
+
+  const renderItem = ({ item, index }: { item: ListItem; index: number }) => {
+    if (item.kind === 'header') {
+      return (
+        <View
+          style={[
+            styles.sectionHeader,
+            index > 0 && { marginTop: 18 },
+          ]}
+        >
+          <Text style={styles.sectionLabel}>{item.label}</Text>
+        </View>
+      );
+    }
+
+    // Show separator above row if previous item is also a conv (not a section header)
+    const prev = items[index - 1];
+    const showSep = prev && prev.kind === 'conv';
+
+    return (
+      <View>
+        {showSep && <View style={styles.rowSeparator} />}
+        <ConversationRow
+          conv={item.conv}
+          meId={meId}
+          onPress={() => {
+            const otherId = item.conv.participants.find((id) => id !== meId);
+            const other = otherId ? item.conv.participantDetails[otherId] : null;
+            if (!other) return;
+            navigation.navigate('Conversation', {
+              conversationId: item.conv.id,
+              otherUser: other,
+            });
+          }}
+          onLongPress={() => setSheetConvId(item.conv.id)}
+        />
+      </View>
+    );
+  };
+
+  const showLoading = isLoading && conversations.length === 0;
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {Platform.OS === 'android' && (
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={Colors.bgPrimary}
+          translucent={false}
+        />
+      )}
+
+      {/* ── Header ─────────────────────────────────────────── */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => navigation.navigate('NewConversation')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="create-outline" size={20} color={Colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Search bar ─────────────────────────────────────── */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={16} color={Colors.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Rechercher"
+            placeholderTextColor={Colors.textTertiary}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearch('')}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* ── Filter chips ───────────────────────────────────── */}
+      <View style={styles.chipsRow}>
+        <FilterChip
+          label="Tous"
+          active={filter === 'all'}
+          onPress={() => setFilter('all')}
+        />
+        <FilterChip
+          label="Non-lus"
+          active={filter === 'unread'}
+          count={totalUnreadConvs}
+          onPress={() => setFilter('unread')}
+        />
+      </View>
+
+      {/* ── Body ───────────────────────────────────────────── */}
+      {showLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={Colors.primary} />
+        </View>
+      ) : items.length === 0 && conversations.length === 0 ? (
+        <EmptyState
+          icon="💬"
+          title="Aucun message"
+          subtitle="Envoie un message ou partage un plan avec un ami."
+          ctaLabel="Nouveau message"
+          onCtaPress={() => navigation.navigate('NewConversation')}
+        />
+      ) : items.length === 0 ? (
+        <View style={styles.emptyFiltered}>
+          <Text style={styles.emptyFilteredTitle}>
+            {search ? 'Aucun résultat' : 'Tout est lu'}
+          </Text>
+          <Text style={styles.emptyFilteredSub}>
+            {search
+              ? 'Essaie un autre mot-clé.'
+              : 'Tu es à jour sur toutes tes conversations.'}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
+
+      <ActionSheet
+        visible={sheetConvId !== null}
+        conv={sheetConv}
+        meId={meId}
+        onClose={() => setSheetConvId(null)}
+        onTogglePin={togglePin}
+        onToggleMute={toggleMute}
+        onDelete={deleteConv}
+      />
+    </View>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────
+// Filter chip
+// ──────────────────────────────────────────────────────────────
+
+interface ChipProps {
+  label: string;
+  active: boolean;
+  count?: number;
+  onPress: () => void;
+}
+
+const FilterChip: React.FC<ChipProps> = ({ label, active, count, onPress }) => {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[
+        chipStyles.chip,
+        active
+          ? { backgroundColor: Colors.textPrimary, borderColor: Colors.textPrimary }
+          : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderSubtle },
+      ]}
+    >
+      <Text
+        style={[
+          chipStyles.chipText,
+          { color: active ? Colors.textOnAccent : Colors.textPrimary },
+        ]}
+      >
+        {label}
+      </Text>
+      {typeof count === 'number' && count > 0 && (
+        <View style={[chipStyles.chipBadge, { backgroundColor: Colors.primary }]}>
+          <Text style={chipStyles.chipBadgeText}>{count > 9 ? '9+' : count}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const chipStyles = StyleSheet.create({
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 99,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  chipText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.1,
+  },
+  chipBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipBadgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+    lineHeight: 12,
+  },
+});
+
+// ──────────────────────────────────────────────────────────────
+// Top-level styles
+// ──────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.bgPrimary,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  headerBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: Fonts.displaySemiBold,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
+    color: Colors.textPrimary,
   },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list: { paddingBottom: 20 },
-  row: {
+  searchWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.bgTertiary,
+    borderRadius: 13,
+    paddingHorizontal: 12,
+    height: 38,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    padding: 0,
+    margin: 0,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
-  rowContent: { flex: 1 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
-  rowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  name: { fontSize: 14, fontFamily: Fonts.bodySemiBold, flex: 1, marginRight: 8 },
-  nameBold: { fontFamily: Fonts.bodyBold },
-  time: { fontSize: 11, fontFamily: Fonts.body },
-  preview: { fontSize: 13, fontFamily: Fonts.body, flex: 1, marginRight: 8 },
-  previewBold: { fontFamily: Fonts.bodySemiBold },
-  badge: {
-    minWidth: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+  list: {
+    paddingTop: 6,
+    paddingBottom: 30,
   },
-  badgeText: { fontSize: 10, fontWeight: '800', color: Colors.textOnAccent },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
+  },
+  rowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.borderSubtle,
+    marginLeft: 70, // after 50px avatar + 12px gap + 8px row padding-left ≈ 70
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyFiltered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 80,
+  },
+  emptyFilteredTitle: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptyFilteredSub: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
 });

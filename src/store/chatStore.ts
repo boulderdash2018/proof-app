@@ -12,6 +12,9 @@ import {
   resetUnreadCount,
   getOrCreateConversation,
   setTypingStatus,
+  togglePinConversation,
+  toggleMuteConversation,
+  deleteConversation as deleteConversationService,
 } from '../services/chatService';
 
 interface ReplyTo {
@@ -55,6 +58,11 @@ interface ChatStore {
 
   // Actions — start new chat
   startChat: (me: ConversationParticipant, other: ConversationParticipant) => Promise<string>;
+
+  // Actions — conversation management
+  togglePin: (conversationId: string) => Promise<void>;
+  toggleMute: (conversationId: string) => Promise<void>;
+  deleteConv: (conversationId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -313,5 +321,56 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   // ── Start new chat ──
   startChat: async (me, other) => {
     return getOrCreateConversation(me, other);
+  },
+
+  // ── Pin / Mute / Delete (optimistic) ──
+  togglePin: async (conversationId: string) => {
+    const { _userId, conversations } = get();
+    if (!_userId) return;
+    // Optimistic
+    const updated = conversations.map((c) => {
+      if (c.id !== conversationId) return c;
+      const pinned = [...(c.pinnedBy || [])];
+      const idx = pinned.indexOf(_userId);
+      if (idx >= 0) pinned.splice(idx, 1);
+      else pinned.push(_userId);
+      return { ...c, pinnedBy: pinned };
+    });
+    set({ conversations: updated });
+    try {
+      await togglePinConversation(conversationId, _userId);
+    } catch (err) {
+      console.warn('[chatStore] togglePin error:', err);
+    }
+  },
+
+  toggleMute: async (conversationId: string) => {
+    const { _userId, conversations } = get();
+    if (!_userId) return;
+    const updated = conversations.map((c) => {
+      if (c.id !== conversationId) return c;
+      const muted = [...(c.mutedBy || [])];
+      const idx = muted.indexOf(_userId);
+      if (idx >= 0) muted.splice(idx, 1);
+      else muted.push(_userId);
+      return { ...c, mutedBy: muted };
+    });
+    set({ conversations: updated });
+    try {
+      await toggleMuteConversation(conversationId, _userId);
+    } catch (err) {
+      console.warn('[chatStore] toggleMute error:', err);
+    }
+  },
+
+  deleteConv: async (conversationId: string) => {
+    const { conversations } = get();
+    // Optimistic: remove from list
+    set({ conversations: conversations.filter((c) => c.id !== conversationId) });
+    try {
+      await deleteConversationService(conversationId);
+    } catch (err) {
+      console.warn('[chatStore] delete error:', err);
+    }
   },
 }));
