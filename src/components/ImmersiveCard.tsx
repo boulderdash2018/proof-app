@@ -19,10 +19,8 @@ import { Colors, Fonts, getRankForProofs } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
 import { MiniStampIcon } from './MiniStampIcon';
-import { Plan, TravelSegment, TransportMode, Comment, Place } from '../types';
-import { fetchComments } from '../services/plansService';
+import { Plan, TravelSegment, TransportMode, Place } from '../types';
 import { useSavedPlacesStore } from '../store';
-import { tokenizeComment } from '../utils';
 
 /* ================================================================
    ImmersiveCard — pull-down to reveal plan detail
@@ -71,18 +69,6 @@ const fmtMin = (m: number): string => {
   return r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
 };
 
-const getCommentTimeAgo = (dateStr: string): string => {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}j`;
-};
 
 // ── Layout ───────────────────────────────────────────────────
 const CARD_H_PAD = 14;
@@ -132,14 +118,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const [hasScrolled, setHasScrolled] = useState(false);
   const headerHiddenRef = useRef(false);
   const HEADER_HIDE_THRESHOLD = 30; // px — past this, header starts its hide animation
-
-  // ── Inline comments (fetched when detail opens) ─────────────
-  const [inlineComments, setInlineComments] = useState<Comment[]>([]);
-  useEffect(() => {
-    if (isDetailOpen) {
-      fetchComments(plan.id).then(setInlineComments).catch(() => {});
-    }
-  }, [isDetailOpen, plan.id]);
 
   // ── Favorites (saved places) ────────────────────────────────
   // Subscribe to the array for reactivity so the star toggles visually.
@@ -451,7 +429,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d1 = makeDetailAnim(1);
   const d2 = makeDetailAnim(2);
   const d3 = makeDetailAnim(3);
-  const d4 = makeDetailAnim(4);
   const d5 = makeDetailAnim(5);
 
   return (
@@ -972,57 +949,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               {plan.places?.some((p) => p.reservationRecommended) ? (
                 <Text style={styles.reservationLegend}>﹡ Réservation recommandée</Text>
               ) : null}
-            </Animated.View>
-
-            {/* ═══════ SECTION 6 — Comments (inline last 3 + see all link) ═══════ */}
-            <Animated.View
-              style={[styles.commentsSection, { opacity: d4.opacity, transform: [{ translateY: d4.translateY }] }]}
-            >
-              <View style={styles.commentsHeader}>
-                <Text style={styles.commentsTitle}>Commentaires</Text>
-                {(plan.commentsCount || 0) > 0 ? (
-                  <Text style={styles.commentsCountBadge}>{plan.commentsCount}</Text>
-                ) : null}
-              </View>
-              {inlineComments.length > 0 ? (
-                inlineComments.slice(0, 3).map((c, idx, arr) => (
-                  <View key={c.id} style={[styles.commentRow, idx < arr.length - 1 && styles.commentRowDivider]}>
-                    <View style={[styles.commentAvatar, { backgroundColor: c.authorAvatarBg || Colors.gray300 }]}>
-                      {c.authorAvatarUrl ? (
-                        <Image source={{ uri: c.authorAvatarUrl }} style={styles.commentAvatarImg} />
-                      ) : (
-                        <Text style={[styles.commentAvatarInitials, { color: c.authorAvatarColor || Colors.textPrimary }]}>
-                          {c.authorInitials}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.commentBody}>
-                      <View style={styles.commentHeadRow}>
-                        <Text style={styles.commentAuthor}>{c.authorName}</Text>
-                        <Text style={styles.commentTime}>{getCommentTimeAgo(c.createdAt)}</Text>
-                      </View>
-                      <Text style={styles.commentText}>
-                        {tokenizeComment(c.text).map((seg, i) =>
-                          seg.type === 'mention' ? (
-                            <Text key={i} style={styles.mentionInText}>{seg.raw}</Text>
-                          ) : (
-                            <Text key={i}>{seg.value}</Text>
-                          ),
-                        )}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.commentsEmpty}>Sois le premier à commenter</Text>
-              )}
-              <TouchableOpacity onPress={onComment} style={styles.commentsSeeAll} activeOpacity={0.7}>
-                <Text style={styles.commentsSeeAllText}>
-                  {(plan.commentsCount || 0) > 3
-                    ? `Voir tous les ${plan.commentsCount} commentaires →`
-                    : 'Ajouter un commentaire →'}
-                </Text>
-              </TouchableOpacity>
             </Animated.View>
 
             {/* ═══════ SECTION 7 — Final CTA "Do it now" (emotional climax) ═══════ */}
@@ -1553,93 +1479,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: Fonts.bodyMedium,
     color: Colors.terracotta700,
-  },
-
-  // ── SECTION 6: Comments ──
-  commentsSection: {
-    paddingHorizontal: 24,
-    paddingBottom: 36,
-  },
-  commentsHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  commentsTitle: {
-    fontSize: 20,
-    fontFamily: Fonts.displayBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.3,
-  },
-  commentsCountBadge: {
-    fontSize: 13,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textSecondary,
-  },
-  commentRow: {
-    flexDirection: 'row',
-    paddingVertical: 14,
-  },
-  commentRowDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderSubtle,
-  },
-  commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  commentAvatarImg: { width: 36, height: 36, borderRadius: 18 },
-  commentAvatarInitials: { fontSize: 13, fontFamily: Fonts.bodyBold },
-  commentBody: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  commentHeadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  commentAuthor: {
-    fontSize: 13,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-  },
-  commentTime: {
-    fontSize: 11,
-    fontFamily: Fonts.body,
-    color: Colors.textTertiary,
-  },
-  commentText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: Fonts.body,
-    color: Colors.textPrimary,
-  },
-  mentionInText: {
-    color: Colors.primary,
-    fontFamily: Fonts.bodySemiBold,
-  },
-  commentsEmpty: {
-    fontSize: 13,
-    fontFamily: Fonts.body,
-    fontStyle: 'italic',
-    color: Colors.textTertiary,
-    paddingVertical: 12,
-  },
-  commentsSeeAll: {
-    marginTop: 12,
-    paddingVertical: 6,
-  },
-  commentsSeeAllText: {
-    fontSize: 14,
-    fontFamily: Fonts.bodyMedium,
-    color: Colors.primary,
   },
 
   // ── SECTION 7: Final CTA ──
