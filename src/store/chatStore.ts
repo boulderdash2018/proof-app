@@ -21,7 +21,7 @@ interface ReplyTo {
   id: string;
   senderId: string;
   content: string;
-  type: 'text' | 'plan';
+  type: 'text' | 'plan' | 'photo' | 'poll';
 }
 
 interface ChatStore {

@@ -734,11 +734,12 @@ export const ConversationScreen: React.FC = () => {
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    const reply = replyTo ? {
+    // Skip system messages — they are not quoteable.
+    const reply = replyTo && replyTo.type !== 'system' ? {
       id: replyTo.id,
       senderId: replyTo.senderId,
       content: replyTo.type === 'plan' ? `\ud83d\udccd ${replyTo.planTitle || 'Plan'}` : replyTo.content,
-      type: replyTo.type,
+      type: replyTo.type as 'text' | 'plan' | 'photo' | 'poll',
     } : undefined;
     setText('');
     setReplyTo(null);
