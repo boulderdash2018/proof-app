@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
-import { Avatar, EmptyState } from '../components';
+import { Avatar, EmptyState, GroupMosaicAvatar } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { Conversation } from '../services/chatService';
@@ -105,108 +105,6 @@ const TypingDots: React.FC<{ color: string }> = ({ color }) => {
 const dotsStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', marginLeft: 4, gap: 2 },
   dot: { width: 3, height: 3, borderRadius: 1.5 },
-});
-
-// ──────────────────────────────────────────────────────────────
-// Mosaic avatar — stacks 2 participants' avatars (for groups)
-// ──────────────────────────────────────────────────────────────
-
-interface MosaicAvatarProps {
-  participants: Array<{ initials: string; avatarBg: string; avatarColor: string; avatarUrl: string | null }>;
-  size?: number;
-}
-
-const GroupMosaicAvatar: React.FC<MosaicAvatarProps> = ({ participants, size = 50 }) => {
-  // Show first 2 non-self participants. If only 1, render single avatar centered.
-  const shown = participants.slice(0, 2);
-  const subSize = Math.round(size * 0.68);
-
-  if (shown.length === 0) {
-    return (
-      <View style={[mosaicStyles.frame, { width: size, height: size, borderRadius: size / 2, backgroundColor: Colors.bgTertiary }]}>
-        <Ionicons name="people" size={20} color={Colors.textTertiary} />
-      </View>
-    );
-  }
-
-  if (shown.length === 1) {
-    const p = shown[0];
-    return (
-      <View style={[mosaicStyles.frame, { width: size, height: size, borderRadius: size / 2, backgroundColor: p.avatarBg }]}>
-        {p.avatarUrl ? (
-          <Image source={{ uri: p.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-        ) : (
-          <Text style={[mosaicStyles.initials, { color: p.avatarColor, fontSize: size * 0.38 }]}>{p.initials}</Text>
-        )}
-      </View>
-    );
-  }
-
-  const [a, b] = shown;
-  return (
-    <View style={{ width: size, height: size, position: 'relative' }}>
-      {/* Back avatar — top-left */}
-      <View
-        style={[
-          mosaicStyles.subAvatar,
-          {
-            top: 0,
-            left: 0,
-            width: subSize,
-            height: subSize,
-            borderRadius: subSize / 2,
-            backgroundColor: a.avatarBg,
-            borderColor: Colors.bgPrimary,
-          },
-        ]}
-      >
-        {a.avatarUrl ? (
-          <Image source={{ uri: a.avatarUrl }} style={{ width: subSize, height: subSize, borderRadius: subSize / 2 }} />
-        ) : (
-          <Text style={[mosaicStyles.initials, { color: a.avatarColor, fontSize: subSize * 0.4 }]}>{a.initials}</Text>
-        )}
-      </View>
-      {/* Front avatar — bottom-right, overlaps */}
-      <View
-        style={[
-          mosaicStyles.subAvatar,
-          {
-            top: size - subSize,
-            left: size - subSize,
-            width: subSize,
-            height: subSize,
-            borderRadius: subSize / 2,
-            backgroundColor: b.avatarBg,
-            borderColor: Colors.bgPrimary,
-          },
-        ]}
-      >
-        {b.avatarUrl ? (
-          <Image source={{ uri: b.avatarUrl }} style={{ width: subSize, height: subSize, borderRadius: subSize / 2 }} />
-        ) : (
-          <Text style={[mosaicStyles.initials, { color: b.avatarColor, fontSize: subSize * 0.4 }]}>{b.initials}</Text>
-        )}
-      </View>
-    </View>
-  );
-};
-
-const mosaicStyles = StyleSheet.create({
-  frame: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  subAvatar: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 2,
-  },
-  initials: {
-    fontFamily: Fonts.bodyBold,
-  },
 });
 
 // ──────────────────────────────────────────────────────────────

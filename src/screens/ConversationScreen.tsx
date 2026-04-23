@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar } from '../components';
+import { Avatar, GroupMosaicAvatar } from '../components';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
@@ -154,7 +154,10 @@ interface MessageRowProps {
   prevMsg: ChatMessage | undefined;
   nextMsg: ChatMessage | undefined;
   userId: string | undefined;
-  otherUser: ConversationParticipant;
+  /** Participant that SENT this message (the visible "other" — avatar, receipt). For DMs this is constant; for groups it varies per message. */
+  senderUser: ConversationParticipant | null;
+  /** Display group-aware context (show sender name header above bubble on first-in-group). */
+  isGroupContext: boolean;
   C: any;
   isLastSent: boolean;
   otherHasRead: boolean;
@@ -171,7 +174,7 @@ interface MessageRowProps {
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
-  item, prevMsg, nextMsg, userId, otherUser, C, isLastSent, otherHasRead,
+  item, prevMsg, nextMsg, userId, senderUser, isGroupContext, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
   onScrollToQuote, onPlanPress,
@@ -180,6 +183,28 @@ const MessageRow = React.memo<MessageRowProps>(({
   const showDate = shouldShowDateSeparator(item, prevMsg);
   const myReaction = item.reactions.find((r) => r.userId === userId);
   const hasReply = !!item.replyToId;
+
+  // ── System event: rendered as centered gray italic line, no bubble, no swipe, no reactions ──
+  if (item.type === 'system') {
+    const text = item.content || renderSystemEventText(item.systemEvent);
+    return (
+      <View>
+        {showDate && (
+          <View style={styles.dateSeparator}>
+            <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+          </View>
+        )}
+        <View style={styles.systemEventWrap}>
+          <Text style={styles.systemEventText}>{text}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ── Group: show sender name above bubble for the FIRST message of a run by a non-self sender ──
+  const showSenderLabel =
+    isGroupContext && !isMine && senderUser &&
+    (prevMsg == null || prevMsg.senderId !== item.senderId || prevMsg.type === 'system');
 
   // ── Bubble grouping ──
   const bubblePos = getBubblePos(item, prevMsg, nextMsg);
@@ -343,8 +368,8 @@ const MessageRow = React.memo<MessageRowProps>(({
           ]}
         >
           {/* Avatar (other only, last in group) */}
-          {!isMine && showAvatar && (
-            <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XSM" avatarUrl={otherUser.avatarUrl || undefined} />
+          {!isMine && showAvatar && senderUser && (
+            <Avatar initials={senderUser.initials} bg={senderUser.avatarBg} color={senderUser.avatarColor} size="XSM" avatarUrl={senderUser.avatarUrl ?? undefined} />
           )}
           {!isMine && !showAvatar && <View style={styles.avatarSpacer} />}
 
@@ -355,6 +380,10 @@ const MessageRow = React.memo<MessageRowProps>(({
             delayLongPress={400}
             style={{ maxWidth: '78%' }}
           >
+            {/* Group sender label — shows first name above the first bubble of a run */}
+            {showSenderLabel && senderUser && (
+              <Text style={styles.groupSenderLabel}>{senderUser.displayName}</Text>
+            )}
             {/* Quoted reply preview — colors flip based on bubble side */}
             {hasReply && (
               <TouchableOpacity
@@ -380,7 +409,7 @@ const MessageRow = React.memo<MessageRowProps>(({
                   ]}
                   numberOfLines={1}
                 >
-                  {item.replyToSenderId === userId ? 'Toi' : otherUser.displayName}
+                  {item.replyToSenderId === userId ? 'Toi' : (senderUser?.displayName ?? '')}
                 </Text>
                 <Text
                   style={[
@@ -492,12 +521,12 @@ const MessageRow = React.memo<MessageRowProps>(({
               </View>
             )}
 
-            {/* Read receipt — only under last sent message by me */}
-            {isMine && isLastSent && (
+            {/* Read receipt — only under last sent message by me (DM only — noisy in groups) */}
+            {isMine && isLastSent && !isGroupContext && (
               <View style={styles.readReceipt}>
-                {otherHasRead ? (
+                {otherHasRead && senderUser ? (
                   <View style={styles.readReceiptInner}>
-                    <Avatar initials={otherUser.initials} bg={otherUser.avatarBg} color={otherUser.avatarColor} size="XS" avatarUrl={otherUser.avatarUrl || undefined} />
+                    <Avatar initials={senderUser.initials} bg={senderUser.avatarBg} color={senderUser.avatarColor} size="XS" avatarUrl={senderUser.avatarUrl ?? undefined} />
                     <Text style={[styles.readReceiptText, { color: Colors.primary, fontFamily: Fonts.bodyMedium }]}>
                       Vu · {formatTime(item.createdAt)}
                     </Text>
@@ -551,6 +580,43 @@ const formatTime = (dateStr: string): string => {
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 };
 
+/** Fallback text for system events missing a content string. */
+const renderSystemEventText = (ev: ChatMessage['systemEvent'] | undefined): string => {
+  if (!ev) return '';
+  switch (ev.kind) {
+    case 'group_created':
+      return `Groupe « ${ev.payload || ''} » créé`;
+    case 'joined':
+      return `Un participant a rejoint le groupe`;
+    case 'left':
+      return `Un participant a quitté le groupe`;
+    case 'renamed':
+      return `Groupe renommé « ${ev.payload || ''} »`;
+    case 'session_started':
+      return `La session a démarré`;
+    case 'session_completed':
+      return `Session terminée`;
+    default:
+      return '';
+  }
+};
+
+/** Compact meetup date formatter for group header sub-line. */
+const formatMeetupShort = (iso: string): string => {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  if (sameDay) return `ce soir \u00b7 ${time}`;
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (d.toDateString() === tomorrow.toDateString()) return `demain \u00b7 ${time}`;
+  const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000);
+  if (diffDays >= 0 && diffDays < 7) {
+    return `${d.toLocaleDateString('fr-FR', { weekday: 'long' })} \u00b7 ${time}`;
+  }
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+};
+
 /** Compact "il y a X" for header status */
 const formatRelativeShort = (dateStr: string): string => {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -594,9 +660,9 @@ export const ConversationScreen: React.FC = () => {
   const C = useColors();
   const user = useAuthStore((s) => s.user);
 
-  const { conversationId, otherUser } = route.params as {
+  const { conversationId, otherUser: routeOtherUser } = route.params as {
     conversationId: string;
-    otherUser: ConversationParticipant;
+    otherUser: ConversationParticipant | null;
   };
 
   const messages = useChatStore((s) => s.messages);
@@ -612,24 +678,68 @@ export const ConversationScreen: React.FC = () => {
   const toggleMute = useChatStore((s) => s.toggleMute);
   const deleteConv = useChatStore((s) => s.deleteConv);
 
-  // Derive read status from conversation-level unreadCount
-  const otherHasRead = useMemo(() => {
-    const conv = conversations.find((c) => c.id === conversationId);
-    return (conv?.unreadCount[otherUser.userId] || 0) === 0;
-  }, [conversations, conversationId, otherUser.userId]);
-
   // Active conversation (looked up once, used for status + kebab actions)
   const activeConv = useMemo(
     () => conversations.find((c) => c.id === conversationId) || null,
     [conversations, conversationId],
   );
 
-  // Is the other user "fresh" (last seen < 5min) — approximate presence
-  const otherLastSeenAt = activeConv?.lastReadAt?.[otherUser.userId];
+  const isGroup = activeConv?.isGroup === true;
+
+  // For groups, the single "otherUser" concept doesn't apply — we pick the primary other
+  // participant for DMs and use null for groups (derived per-message via senderParticipant).
+  const otherUser: ConversationParticipant | null = useMemo(() => {
+    if (isGroup) return null;
+    if (routeOtherUser) return routeOtherUser;
+    if (activeConv && user?.id) {
+      const otherId = activeConv.participants.find((id) => id !== user.id);
+      if (otherId) return activeConv.participantDetails[otherId] || null;
+    }
+    return null;
+  }, [isGroup, routeOtherUser, activeConv, user?.id]);
+
+  // Derive read status from conversation-level unreadCount (DM only — groups use per-participant signals)
+  const otherHasRead = useMemo(() => {
+    if (!otherUser || isGroup) return false;
+    const conv = conversations.find((c) => c.id === conversationId);
+    return (conv?.unreadCount[otherUser.userId] || 0) === 0;
+  }, [conversations, conversationId, otherUser, isGroup]);
+
+  // Is the other user "fresh" (last seen < 5min) — approximate presence (DM only)
+  const otherLastSeenAt = otherUser ? activeConv?.lastReadAt?.[otherUser.userId] : undefined;
   const otherIsFresh = useMemo(() => {
     if (!otherLastSeenAt) return false;
     return Date.now() - new Date(otherLastSeenAt).getTime() < PRESENCE_FRESH_MS;
   }, [otherLastSeenAt]);
+
+  // ── Group derivations ──
+  const otherParticipants = useMemo(() => {
+    if (!activeConv || !user?.id || !isGroup) return [];
+    return activeConv.participants
+      .filter((id) => id !== user.id)
+      .map((id) => activeConv.participantDetails[id])
+      .filter(Boolean);
+  }, [activeConv, user?.id, isGroup]);
+
+  const groupDisplayName = useMemo(() => {
+    if (!isGroup || !activeConv) return '';
+    return activeConv.groupName || activeConv.linkedPlanTitle || 'Groupe';
+  }, [isGroup, activeConv]);
+
+  // Any non-self participant currently typing (group awareness)
+  const groupTypingName = useMemo(() => {
+    if (!isGroup || !activeConv) return null;
+    const now = Date.now();
+    for (const pid of activeConv.participants) {
+      if (pid === user?.id) continue;
+      const ts = (activeConv.typing || {})[pid] || 0;
+      if (ts > 0 && now - ts < 5000) {
+        const p = activeConv.participantDetails[pid];
+        if (p) return p.displayName.split(' ')[0];
+      }
+    }
+    return null;
+  }, [isGroup, activeConv, user?.id]);
 
   // Periodic re-render so status freshness updates without new data
   const [, setStatusTick] = useState(0);
@@ -813,13 +923,20 @@ export const ConversationScreen: React.FC = () => {
       : undefined;
     const effectiveNext = index < msgs.length - 1 ? msgs[index + 1] : virtualNext;
 
+    // For groups, resolve the sender for this specific message (may differ per row).
+    // For DMs, fall back to the constant otherUser.
+    const senderForThisMsg: ConversationParticipant | null = isGroup
+      ? (activeConv?.participantDetails[item.senderId] || null)
+      : otherUser;
+
     return (
     <MessageRow
       item={item}
       prevMsg={index > 0 ? msgs[index - 1] : undefined}
       nextMsg={effectiveNext}
       userId={user?.id}
-      otherUser={otherUser}
+      senderUser={senderForThisMsg}
+      isGroupContext={isGroup}
       C={C}
       isLastSent={item.id === lastSentMsgId}
       otherHasRead={otherHasRead}
@@ -835,7 +952,7 @@ export const ConversationScreen: React.FC = () => {
       onPlanPress={handlePlanPress}
     />
     );
-  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
+  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress]);
 
   // ── Typing indicator grouping with last received message ──
   const typingIsGrouped = useMemo(() => {
@@ -859,46 +976,82 @@ export const ConversationScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.headerCenter}
-          onPress={() => navigation.navigate('OtherProfile', { userId: otherUser.userId })}
-          activeOpacity={0.7}
-        >
-          <View style={styles.headerAvWrap}>
-            <Avatar
-              initials={otherUser.initials}
-              bg={otherUser.avatarBg}
-              color={otherUser.avatarColor}
-              size="M"
-              avatarUrl={otherUser.avatarUrl || undefined}
+        {isGroup ? (
+          <TouchableOpacity
+            style={styles.headerCenter}
+            onPress={() => setKebabOpen(true)}
+            activeOpacity={0.7}
+          >
+            <GroupMosaicAvatar
+              participants={otherParticipants.map((p) => ({
+                initials: p.initials,
+                avatarBg: p.avatarBg,
+                avatarColor: p.avatarColor,
+                avatarUrl: p.avatarUrl,
+              }))}
+              size={36}
+              borderColor={Colors.bgSecondary}
             />
-            {(otherTyping || otherIsFresh) && (
-              <View style={styles.headerPresenceDot} />
-            )}
-          </View>
-          <View style={styles.headerTxt}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {otherUser.displayName}
-            </Text>
-            {otherTyping ? (
-              <Text style={[styles.headerStatus, { color: Colors.primary }]} numberOfLines={1}>
-                en train d{'\u2019'}écrire{'\u2026'}
+            <View style={styles.headerTxt}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {groupDisplayName}
               </Text>
-            ) : otherIsFresh ? (
-              <Text style={[styles.headerStatus, { color: Colors.success }]} numberOfLines={1}>
-                En ligne
+              {groupTypingName ? (
+                <Text style={[styles.headerStatus, { color: Colors.primary }]} numberOfLines={1}>
+                  {groupTypingName} écrit{'\u2026'}
+                </Text>
+              ) : (
+                <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
+                  {activeConv?.participants.length ?? 0} participants
+                  {activeConv?.meetupAt ? `  \u00b7  ${formatMeetupShort(activeConv.meetupAt)}` : ''}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        ) : otherUser ? (
+          <TouchableOpacity
+            style={styles.headerCenter}
+            onPress={() => navigation.navigate('OtherProfile', { userId: otherUser.userId })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.headerAvWrap}>
+              <Avatar
+                initials={otherUser.initials}
+                bg={otherUser.avatarBg}
+                color={otherUser.avatarColor}
+                size="M"
+                avatarUrl={otherUser.avatarUrl ?? undefined}
+              />
+              {(otherTyping || otherIsFresh) && (
+                <View style={styles.headerPresenceDot} />
+              )}
+            </View>
+            <View style={styles.headerTxt}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {otherUser.displayName}
               </Text>
-            ) : otherLastSeenAt ? (
-              <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
-                Vu {formatRelativeShort(otherLastSeenAt)}
-              </Text>
-            ) : (
-              <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
-                @{otherUser.username}
-              </Text>
-            )}
-          </View>
-        </TouchableOpacity>
+              {otherTyping ? (
+                <Text style={[styles.headerStatus, { color: Colors.primary }]} numberOfLines={1}>
+                  en train d{'\u2019'}écrire{'\u2026'}
+                </Text>
+              ) : otherIsFresh ? (
+                <Text style={[styles.headerStatus, { color: Colors.success }]} numberOfLines={1}>
+                  En ligne
+                </Text>
+              ) : otherLastSeenAt ? (
+                <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
+                  Vu {formatRelativeShort(otherLastSeenAt)}
+                </Text>
+              ) : (
+                <Text style={[styles.headerStatus, { color: Colors.textTertiary }]} numberOfLines={1}>
+                  @{otherUser.username}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerCenter} />
+        )}
 
         <TouchableOpacity
           onPress={() => setKebabOpen(true)}
@@ -925,7 +1078,38 @@ export const ConversationScreen: React.FC = () => {
             contentContainerStyle={[styles.messagesList, { paddingBottom: 10 }]}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            ListFooterComponent={otherTyping ? (
+            ListHeaderComponent={isGroup && activeConv?.linkedPlanId ? (
+              <TouchableOpacity
+                style={styles.pinnedPlanCard}
+                onPress={() => navigation.navigate('PlanDetail', { planId: activeConv.linkedPlanId! })}
+                activeOpacity={0.85}
+              >
+                {activeConv.linkedPlanCover ? (
+                  <Image source={{ uri: activeConv.linkedPlanCover }} style={styles.pinnedPlanCover} />
+                ) : (
+                  <View style={[styles.pinnedPlanCover, { backgroundColor: Colors.terracotta400 }]} />
+                )}
+                <View style={styles.pinnedPlanBody}>
+                  <Text style={styles.pinnedPlanEyebrow}>PLAN ÉPINGLÉ</Text>
+                  <Text style={styles.pinnedPlanTitle} numberOfLines={2}>
+                    {activeConv.linkedPlanTitle || 'Plan'}
+                  </Text>
+                  <View style={styles.pinnedPlanMeta}>
+                    <Ionicons name="calendar-outline" size={11} color={Colors.textSecondary} />
+                    <Text style={styles.pinnedPlanMetaText}>
+                      {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
+                    </Text>
+                    <Text style={styles.pinnedPlanMetaSep}>·</Text>
+                    <Ionicons name="people-outline" size={11} color={Colors.textSecondary} />
+                    <Text style={styles.pinnedPlanMetaText}>
+                      {activeConv.participants.length} amis
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+              </TouchableOpacity>
+            ) : null}
+            ListFooterComponent={!isGroup && otherTyping && otherUser ? (
               <TypingIndicator
                 otherUser={otherUser}
                 isGrouped={typingIsGrouped}
@@ -953,7 +1137,9 @@ export const ConversationScreen: React.FC = () => {
           <View style={styles.replyBar}>
             <View style={styles.replyBarPreview}>
               <Text style={styles.replyBarName} numberOfLines={1}>
-                {replyTo.senderId === user?.id ? 'Toi' : otherUser.displayName}
+                {replyTo.senderId === user?.id
+                  ? 'Toi'
+                  : (activeConv?.participantDetails[replyTo.senderId]?.displayName || otherUser?.displayName || '')}
               </Text>
               <Text style={styles.replyBarText} numberOfLines={1}>
                 {replyTo.type === 'plan' ? 'Plan partagé ✦' : replyTo.content}
@@ -1005,34 +1191,50 @@ export const ConversationScreen: React.FC = () => {
         <Pressable style={kebabStyles.backdrop} onPress={() => setKebabOpen(false)}>
           <Pressable style={kebabStyles.sheet} onPress={() => {}}>
             <View style={kebabStyles.header}>
-              <Avatar
-                initials={otherUser.initials}
-                bg={otherUser.avatarBg}
-                color={otherUser.avatarColor}
-                size="M"
-                avatarUrl={otherUser.avatarUrl || undefined}
-              />
+              {isGroup ? (
+                <GroupMosaicAvatar
+                  participants={otherParticipants.map((p) => ({
+                    initials: p.initials,
+                    avatarBg: p.avatarBg,
+                    avatarColor: p.avatarColor,
+                    avatarUrl: p.avatarUrl,
+                  }))}
+                  size={40}
+                />
+              ) : otherUser ? (
+                <Avatar
+                  initials={otherUser.initials}
+                  bg={otherUser.avatarBg}
+                  color={otherUser.avatarColor}
+                  size="M"
+                  avatarUrl={otherUser.avatarUrl ?? undefined}
+                />
+              ) : null}
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={kebabStyles.headerName} numberOfLines={1}>
-                  {otherUser.displayName}
+                  {isGroup ? groupDisplayName : (otherUser?.displayName || '')}
                 </Text>
                 <Text style={kebabStyles.headerHandle} numberOfLines={1}>
-                  @{otherUser.username}
+                  {isGroup
+                    ? `${activeConv?.participants.length ?? 0} participants${activeConv?.meetupAt ? '  \u00b7  ' + formatMeetupShort(activeConv.meetupAt) : ''}`
+                    : (otherUser ? `@${otherUser.username}` : '')}
                 </Text>
               </View>
             </View>
             <View style={kebabStyles.divider} />
-            <TouchableOpacity
-              style={kebabStyles.action}
-              onPress={() => {
-                setKebabOpen(false);
-                navigation.navigate('OtherProfile', { userId: otherUser.userId });
-              }}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="person-outline" size={20} color={Colors.textPrimary} />
-              <Text style={kebabStyles.actionText}>Voir le profil</Text>
-            </TouchableOpacity>
+            {!isGroup && otherUser && (
+              <TouchableOpacity
+                style={kebabStyles.action}
+                onPress={() => {
+                  setKebabOpen(false);
+                  navigation.navigate('OtherProfile', { userId: otherUser.userId });
+                }}
+                activeOpacity={0.6}
+              >
+                <Ionicons name="person-outline" size={20} color={Colors.textPrimary} />
+                <Text style={kebabStyles.actionText}>Voir le profil</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={kebabStyles.action}
               onPress={() => {
@@ -1270,6 +1472,88 @@ const styles = StyleSheet.create({
   },
   bubblePlanPadding: { padding: 5 },
   msgText: { fontSize: 15, fontFamily: Fonts.body, lineHeight: 20, letterSpacing: -0.1 },
+
+  // ── Group sender label (shown above first bubble of a run) ──
+  groupSenderLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    marginBottom: 3,
+    marginLeft: 4,
+    letterSpacing: 0.1,
+  },
+
+  // ── System event (centered line, no bubble) ──
+  systemEventWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 6,
+    marginVertical: 4,
+  },
+  systemEventText: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+
+  // ── Pinned plan card (group list header) ──
+  pinnedPlanCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    shadowColor: 'rgba(44,36,32,1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  pinnedPlanCover: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+  },
+  pinnedPlanBody: { flex: 1 },
+  pinnedPlanEyebrow: {
+    fontSize: 9,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  pinnedPlanTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+    lineHeight: 17,
+  },
+  pinnedPlanMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  pinnedPlanMetaText: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+  },
+  pinnedPlanMetaSep: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    marginHorizontal: 3,
+  },
 
   // ── Reaction overlay ──
   reactionOverlay: {
