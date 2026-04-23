@@ -607,6 +607,25 @@ export const FeedScreen: React.FC = () => {
         </View>
       )}
 
+      {/* ─── Sticky "Do it now" CTA — visible only when a card is in detail
+            mode. Lives at screen level (not inside the card) so it never gets
+            clipped by the card's overflow:hidden + borderRadius. */}
+      {isDetailOpen && currentPlans[currentIndex] && (
+        <View
+          style={[styles.feedStickyCtaBar, { paddingBottom: insets.bottom + 12 }]}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity
+            style={styles.feedStickyCtaButton}
+            onPress={() => handleDoItNow(currentPlans[currentIndex])}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="compass" size={18} color={Colors.textOnAccent} />
+            <Text style={styles.feedStickyCtaText}>Do it now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ─── Share plan sheet ─── */}
       {sharePlan && (
         <SharePlanSheet
@@ -884,6 +903,39 @@ const styles = StyleSheet.create({
   },
 
   // ── FlatList area ──────────────────────────────────────────
+  // Sticky "Do it now" CTA — overlays the bottom of the feed when in detail
+  feedStickyCtaBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: Colors.bgSecondary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    zIndex: 50,
+  } as any,
+  feedStickyCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  } as any,
+  feedStickyCtaText: {
+    fontSize: 15,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.2,
+  },
   listArea: {
     flex: 1,
   },
