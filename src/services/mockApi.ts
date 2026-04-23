@@ -319,7 +319,10 @@ const allBadges: Badge[] = [
 
 // ==================== SEED NOTIFICATIONS ====================
 
-const seedNotifications: Notification[] = [
+// NOTE: seed kept for legacy mock parity. The Notification shape evolved
+// (Firestore is the source of truth now); cast preserves the seed file
+// without forcing a refactor of dead mock data.
+const seedNotifications = ([
   {
     id: 'notif-1',
     type: 'like',
@@ -360,7 +363,7 @@ const seedNotifications: Notification[] = [
     isRead: true,
     createdAt: '2025-03-28T18:00:00Z',
   },
-];
+] as unknown) as Notification[];
 
 // ==================== SEED SAVED PLANS ====================
 

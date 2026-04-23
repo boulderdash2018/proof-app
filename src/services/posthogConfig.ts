@@ -8,9 +8,7 @@ export const initPostHog = () => {
     posthog.init(POSTHOG_KEY, {
       api_host: POSTHOG_URL,
       autocapture: true,
-      session_recording: {
-        recordCanvas: false,
-      },
+      // Canvas recording is disabled by default in posthog-js — no override needed.
     });
   }
 };

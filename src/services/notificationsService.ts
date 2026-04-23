@@ -1,7 +1,8 @@
 import {
   collection, query, where,
   getDocs, addDoc, updateDoc, doc, writeBatch,
-  QueryDocumentSnapshot,
+  onSnapshot, orderBy, limit,
+  QueryDocumentSnapshot, type DocumentData, type QuerySnapshot,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Notification, NotificationType, User, Plan } from '../types';
@@ -42,7 +43,7 @@ export const subscribeToUnreadCount = (
     where('recipientId', '==', userId),
     where('read', '==', false)
   );
-  return onSnapshot(q, (snap) => {
+  return onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
     callback(snap.size);
   });
 };
@@ -58,7 +59,7 @@ export const subscribeToNotifications = (
     orderBy('createdAt', 'desc'),
     limit(PAGE_SIZE)
   );
-  return onSnapshot(q, (snap) => {
+  return onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
     const notifications: Notification[] = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),

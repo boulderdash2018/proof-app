@@ -648,7 +648,6 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
             style={styles.closeBtn}
             onPress={onClose}
             activeOpacity={0.85}
-            pointerEvents="auto"
           >
             <Ionicons name="close" size={18} color={Colors.textOnAccent} />
           </TouchableOpacity>

@@ -241,7 +241,7 @@ export const OtherProfileScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Profile header - always visible */}
         <View style={styles.profileHeader}>
-          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={C.primary} />
+          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl ?? undefined} borderColor={C.primary} />
           <View style={styles.statsContainer}>
             <View style={styles.statsRow}>
               <View style={styles.stat}>

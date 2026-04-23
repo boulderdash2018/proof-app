@@ -1021,7 +1021,7 @@ export const PlanDetailModal: React.FC = () => {
                     ) : (
                       comments.map((comment) => (
                         <View key={comment.id} style={[st.commentRow, { borderBottomColor: Colors.borderSubtle }]}>
-                          <Avatar initials={comment.authorInitials} bg={comment.authorAvatarBg} color={comment.authorAvatarColor} size="S" avatarUrl={comment.authorAvatarUrl} />
+                          <Avatar initials={comment.authorInitials} bg={comment.authorAvatarBg} color={comment.authorAvatarColor} size="S" avatarUrl={comment.authorAvatarUrl ?? undefined} />
                           <View style={st.commentBody}>
                             <View style={st.commentHead}>
                               <Text style={[st.commentAuthor, { color: Colors.textPrimary }]}>{comment.authorName}</Text>

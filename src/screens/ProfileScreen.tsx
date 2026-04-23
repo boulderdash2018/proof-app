@@ -176,7 +176,7 @@ export const ProfileScreen: React.FC = () => {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={[styles.hero, { borderBottomColor: Colors.borderSubtle }]}>
-          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl} borderColor={Colors.primary} />
+          <Avatar initials={user.initials} bg={user.avatarBg} color={user.avatarColor} size="L" avatarUrl={user.avatarUrl ?? undefined} borderColor={Colors.primary} />
           <Text style={[styles.displayName, { color: Colors.textPrimary }]}>{user.displayName}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
             {user.isFounder && <FounderBadge />}

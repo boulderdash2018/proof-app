@@ -36,7 +36,7 @@ export const FollowingScreen: React.FC = () => {
       onPress={() => navigation.push('OtherProfile', { userId: item.id })}
       activeOpacity={0.7}
     >
-      <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl} />
+      <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl ?? undefined} />
       <View style={styles.info}>
         <Text style={[styles.name, { color: C.textPrimary }]}>{item.displayName}</Text>
         <Text style={[styles.username, { color: C.textSecondary }]}>@{item.username}</Text>

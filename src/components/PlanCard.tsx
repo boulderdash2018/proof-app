@@ -219,7 +219,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     <View style={[styles.card, { backgroundColor: C.white }]}>
       <View style={[styles.postSeparator, { backgroundColor: C.border }]} />
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
-        <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl} />
+        <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl ?? undefined} />
         <View style={styles.userInfo}>
           <Text style={[styles.displayName, { color: C.black }]}>{plan.author.displayName}</Text>
           <Text style={[styles.timeAgo, { color: C.gray600 }]}>{plan.timeAgo}</Text>

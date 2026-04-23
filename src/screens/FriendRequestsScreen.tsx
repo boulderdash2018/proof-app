@@ -79,7 +79,7 @@ export const FriendRequestsScreen: React.FC = () => {
       activeOpacity={0.7}
       onPress={() => navigation.navigate('OtherProfile', { userId: item.id })}
     >
-      <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl} />
+      <Avatar initials={item.initials} bg={item.avatarBg} color={item.avatarColor} size="M" avatarUrl={item.avatarUrl ?? undefined} />
       <View style={styles.rowInfo}>
         <Text style={[styles.rowName, { color: C.textPrimary }]}>{item.displayName}</Text>
         <Text style={[styles.rowUsername, { color: C.textSecondary }]}>@{item.username}</Text>
@@ -93,7 +93,7 @@ export const FriendRequestsScreen: React.FC = () => {
     return (
       <View style={[styles.row, { borderBottomColor: C.borderSubtle }]}>
         <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => navigation.navigate('OtherProfile', { userId: sender.id })}>
-          <Avatar initials={sender.initials} bg={sender.avatarBg} color={sender.avatarColor} size="M" avatarUrl={sender.avatarUrl} />
+          <Avatar initials={sender.initials} bg={sender.avatarBg} color={sender.avatarColor} size="M" avatarUrl={sender.avatarUrl ?? undefined} />
           <View style={styles.rowInfo}>
             <Text style={[styles.rowName, { color: C.textPrimary }]}>{sender.displayName}</Text>
             <Text style={[styles.rowUsername, { color: C.textSecondary }]}>@{sender.username}</Text>
@@ -118,7 +118,7 @@ export const FriendRequestsScreen: React.FC = () => {
         activeOpacity={0.7}
         onPress={() => navigation.navigate('OtherProfile', { userId: recipient.id })}
       >
-        <Avatar initials={recipient.initials} bg={recipient.avatarBg} color={recipient.avatarColor} size="M" avatarUrl={recipient.avatarUrl} />
+        <Avatar initials={recipient.initials} bg={recipient.avatarBg} color={recipient.avatarColor} size="M" avatarUrl={recipient.avatarUrl ?? undefined} />
         <View style={styles.rowInfo}>
           <Text style={[styles.rowName, { color: C.textPrimary }]}>{recipient.displayName}</Text>
           <Text style={[styles.rowUsername, { color: C.textSecondary }]}>@{recipient.username}</Text>
