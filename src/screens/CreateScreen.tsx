@@ -678,12 +678,6 @@ export const CreateScreen: React.FC = () => {
     // The old draft remains saved in Drafts for manual retrieval from the profile
   };
 
-  const discardDraft = () => {
-    resetForm();
-    useDraftStore.getState().deleteDraft(draftIdRef.current);
-    useDraftStore.getState().deleteDraft(draftIdRef.current + '-fresh');
-  };
-
   // ========== PREVIEW ==========
   const [showPreview, setShowPreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<'card' | 'detail'>('card');
@@ -1919,18 +1913,6 @@ export const CreateScreen: React.FC = () => {
         </Animated.View>
 
         <View style={[styles.scroll, styles.scrollContent, { flex: 1 }]}>
-          {/* Draft indicator with discard option */}
-          {(title.length > 0 || places.length > 0 || coverPhotos.length > 0) && useDraftStore.getState().getDraft(draftIdRef.current) && (
-            <View style={[styles.draftBanner, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}>
-              <View style={styles.draftBannerLeft}>
-                <Ionicons name="document-text-outline" size={16} color={C.gold} />
-                <Text style={[styles.draftBannerText, { color: C.gold }]}>Brouillon en cours</Text>
-              </View>
-              <TouchableOpacity onPress={discardDraft} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={[styles.draftBannerDiscard, { color: C.gray600 }]}>Supprimer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
           {/* ═══════ STEP 1: Title only — editorial composer ═══════ */}
           {step === 1 && (
             <View style={styles.s0Container}>
@@ -3532,10 +3514,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: Layout.screenPadding, paddingBottom: 40 },
   // Draft banner
-  draftBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
-  draftBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  draftBannerText: { fontSize: 13, fontWeight: '600', fontFamily: Fonts.body },
-  draftBannerDiscard: { fontSize: 12, fontWeight: '600' },
   // Draft toast
   draftToast: { position: 'absolute', bottom: 30, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EDE8E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, shadowColor: 'rgba(44,36,32,1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
   draftToastText: { fontSize: 11, fontWeight: '600', color: '#8B7B6B', letterSpacing: 0.3 },
