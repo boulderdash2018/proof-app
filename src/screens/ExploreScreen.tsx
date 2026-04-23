@@ -88,21 +88,25 @@ for (const group of EXPLORE_GROUPS) {
 
 // ─── Inline slot chip used in the conversational sentence ───
 // Wraps Touchable behavior in a Text-like layout so the phrase wraps naturally.
-const SlotChip: React.FC<{ label: string; onPress: () => void; accessibilityLabel?: string }> = ({
-  label,
-  onPress,
-  accessibilityLabel,
-}) => (
+// `muted` greys out the chip when the slot is gated on another (e.g. the
+// sub-category slot is disabled until a theme is picked).
+const SlotChip: React.FC<{
+  label: string;
+  onPress: () => void;
+  accessibilityLabel?: string;
+  muted?: boolean;
+}> = ({ label, onPress, accessibilityLabel, muted }) => (
   <Text
-    onPress={onPress}
+    onPress={muted ? undefined : onPress}
     accessibilityRole="button"
     accessibilityLabel={accessibilityLabel}
-    style={slotChipStyles.chip}
+    accessibilityState={{ disabled: !!muted }}
+    style={muted ? slotChipStyles.chipMuted : slotChipStyles.chip}
     suppressHighlighting
   >
     {' '}
-    <Text style={slotChipStyles.chipLabel}>{label}</Text>
-    <Text style={slotChipStyles.chipChevron}> {'\u25BE'}</Text>
+    <Text style={muted ? slotChipStyles.chipLabelMuted : slotChipStyles.chipLabel}>{label}</Text>
+    <Text style={muted ? slotChipStyles.chipChevronMuted : slotChipStyles.chipChevron}> {'\u25BE'}</Text>
     {' '}
   </Text>
 );
@@ -112,12 +116,25 @@ const slotChipStyles = StyleSheet.create({
     backgroundColor: Colors.terracotta100,
     borderRadius: 8,
   },
+  chipMuted: {
+    backgroundColor: Colors.bgTertiary,
+    borderRadius: 8,
+  },
   chipLabel: {
     color: Colors.terracotta700,
     fontFamily: Fonts.displaySemiBold,
   },
+  chipLabelMuted: {
+    color: Colors.textTertiary,
+    fontFamily: Fonts.displaySemiBold,
+  },
   chipChevron: {
     color: Colors.terracotta700,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+  },
+  chipChevronMuted: {
+    color: Colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
   },
@@ -148,15 +165,15 @@ export const ExploreScreen: React.FC = () => {
   }, [currentUser?.id, fetchIncomingRequests]);
 
   // ─── Conversational sentence slots (browse-mode local state) ──────
-  // The 3 slots in "Je cherche un plan [Solo], plutôt [Food & Drinks], pour [Ce soir]".
-  // Slots filter the categories list LIVE but do NOT enter selectedFilters
-  // until the user taps a category — that's when we transition to results view.
-  type WhenOption = 'Ce soir' | 'Ce weekend' | 'Cette semaine' | 'Peu importe';
+  // 3 slots in "Je cherche un plan [Solo], plutôt [Food & Drinks], et plus
+  // précisément [sous-catégorie]". Slots 1 & 2 filter the list visually.
+  // Slot 3 is the COMMIT action — picking a sub-category fires the actual
+  // filter set and drops the user into the plans-only results view.
   const [slotPerson, setSlotPerson] = useState<string | null>('Solo');
   const [slotTheme, setSlotTheme] = useState<string | null>('Food & Drinks');
-  const [slotWhen, setSlotWhen] = useState<WhenOption>('Ce soir');
-  // Which slot bottom sheet is open (also drives the sub-category sheet in results view)
-  type SheetKey = 'person' | 'theme' | 'when' | 'subcategory' | null;
+  const [slotSubcategory, setSlotSubcategory] = useState<string | null>(null);
+  // Which slot bottom sheet is open
+  type SheetKey = 'person' | 'theme' | 'subcategoryFromSlot' | 'subcategory' | null;
   const [activeSheet, setActiveSheet] = useState<SheetKey>(null);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
@@ -249,6 +266,29 @@ export const ExploreScreen: React.FC = () => {
       setIsFilterLoading(false);
     }
   }, [slotPerson, cityConfig.name]);
+
+  // Commit the conversational sentence: cumulate [person, theme, sub-category]
+  // as the active filter set and drop into plans-only results view. Triggered
+  // when the user picks a sub-category from the 3rd slot of the sentence.
+  const applyConversationalFilters = useCallback(async (subcategoryName: string) => {
+    const filters = [slotPerson, slotTheme, subcategoryName].filter(
+      (f): f is string => typeof f === 'string' && f.length > 0,
+    );
+    setSelectedFilters(filters);
+    setSlotSubcategory(subcategoryName);
+    setContentMode('plans'); // Force plans-only — the sentence implies a curated plan query
+    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+    setIsFilterLoading(true);
+    try {
+      const plans = await fetchPublicPlansByTags(filters, cityConfig.name);
+      const filtered = filters.length > 1
+        ? plans.filter((p) => filters.every((tag) => p.tags.includes(tag)))
+        : plans;
+      setFilteredPlans(filtered);
+    } finally {
+      setIsFilterLoading(false);
+    }
+  }, [slotPerson, slotTheme, cityConfig.name]);
 
   // ── "Dans ton quartier" handler ──
   const handleNearbyFilter = async () => {
@@ -437,11 +477,13 @@ export const ExploreScreen: React.FC = () => {
 
   // ─── Conversational sentence (3 slots inline) ───
   // The Text wraps naturally because nested <Text> in RN respects the parent's
-  // wrap. TouchableOpacity with `accessible accessibilityRole="button"` wraps
-  // each slot — kept as Pressable-like inline to keep the sentence reading flow.
+  // wrap. Slot 3 (sub-category) is the COMMIT — picking one fires the actual
+  // filters and drops the user into the plans-only results view.
   const renderSentence = () => {
     const personLabel = slotPerson || 'quelqu\u2019un';
     const themeLabel = slotTheme || 'quelque chose';
+    const subLabel = slotSubcategory || 'quoi';
+    const subDisabled = !slotTheme; // can't pick a sub-category without a theme
     return (
       <View style={styles.sentenceBlock}>
         <Text style={styles.sentenceText}>
@@ -457,11 +499,15 @@ export const ExploreScreen: React.FC = () => {
             onPress={() => setActiveSheet('theme')}
             accessibilityLabel={`Changer le thème: ${themeLabel}`}
           />
-          <Text>, pour </Text>
+          <Text>, et plus pr\u00e9cis\u00e9ment </Text>
           <SlotChip
-            label={slotWhen}
-            onPress={() => setActiveSheet('when')}
-            accessibilityLabel={`Changer le moment: ${slotWhen}`}
+            label={subLabel}
+            onPress={() => {
+              if (subDisabled) return;
+              setActiveSheet('subcategoryFromSlot');
+            }}
+            accessibilityLabel={`Changer la sous-cat\u00e9gorie: ${subLabel}`}
+            muted={subDisabled}
           />
           <Text>.</Text>
         </Text>
@@ -598,15 +644,17 @@ export const ExploreScreen: React.FC = () => {
           setActiveSheet(null);
         }
       };
-    } else if (activeSheet === 'when') {
-      title = 'Pour quand ?';
-      options = (['Ce soir', 'Ce weekend', 'Cette semaine', 'Peu importe'] as WhenOption[]).map((w) => ({
-        label: w,
-        key: w,
-      }));
-      currentValue = slotWhen;
-      onSelect = (label) => { setSlotWhen(label as WhenOption); setActiveSheet(null); };
-      allowClear = false; // 'when' always has a value (Peu importe is the neutral state)
+    } else if (activeSheet === 'subcategoryFromSlot') {
+      title = 'Pr\u00e9cise ta recherche';
+      // Sub-categories of the active slot theme — what the user wants exactly
+      const themeGroup = slotTheme ? THEME_GROUPS.find((g) => g.label === slotTheme) : null;
+      const items = themeGroup ? themeGroup.sections.flatMap((s) => s.items) : [];
+      options = items.map((it) => ({ label: it.name, key: it.name }));
+      currentValue = slotSubcategory;
+      onSelect = (label) => {
+        setActiveSheet(null);
+        applyConversationalFilters(label);
+      };
     } else if (activeSheet === 'subcategory') {
       title = 'Affiner par sous-cat\u00e9gorie';
       // Only show subcategories of the active theme in selectedFilters
@@ -673,7 +721,11 @@ export const ExploreScreen: React.FC = () => {
                 style={[styles.sheetRow, styles.sheetRowClear]}
                 onPress={() => {
                   if (activeSheet === 'person') setSlotPerson(null);
-                  else if (activeSheet === 'theme') setSlotTheme(null);
+                  else if (activeSheet === 'theme') {
+                    setSlotTheme(null);
+                    setSlotSubcategory(null); // theme cleared = sub-category gated
+                  }
+                  else if (activeSheet === 'subcategoryFromSlot') setSlotSubcategory(null);
                   setActiveSheet(null);
                 }}
                 activeOpacity={0.7}
