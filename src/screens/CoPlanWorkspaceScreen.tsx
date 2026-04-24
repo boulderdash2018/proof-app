@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -183,9 +183,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           label="TRAJET"
           title="Parcours optimisé"
           subtitle="Ordre le plus court calculé à partir de vos lieux"
-          placeholder
-          muted
-        />
+        >
+          <CoPlanRouteSection />
+        </SectionBlock>
         <SectionBlock
           icon="lock-closed-outline"
           label="VERROUILLER"
