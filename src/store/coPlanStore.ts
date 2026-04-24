@@ -123,6 +123,9 @@ interface CoPlanStore {
 function postCoPlanMirror(
   kind: SystemEvent['kind'],
   detail: string,
+  /** Optional place id — set for `coplan_place_added` so the chat can
+   *  render inline vote buttons that drive the workspace vote count. */
+  placeId?: string,
 ): void {
   // Read latest state — important: this fires AFTER the optimistic
   // update so `get().draft` already reflects the change.
@@ -143,11 +146,15 @@ function postCoPlanMirror(
     default:                        preview = `${firstName} a modifié le brouillon`;
   }
 
-  postSystemEvent(
-    convId,
-    { kind, actorId: _userId, payload: detail },
-    preview,
-  ).catch((err) => {
+  const event: SystemEvent = {
+    kind,
+    actorId: _userId,
+    payload: detail,
+    draftId: draft.id,
+    ...(placeId ? { placeId } : null),
+  };
+
+  postSystemEvent(convId, event, preview).catch((err) => {
     console.warn('[coPlanStore] postSystemEvent failed:', err);
   });
 }
@@ -288,7 +295,8 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       await svcProposePlace(draftId, newPlace);
       // Mirror the action into the linked chat thread so participants
       // not currently in the workspace get a "Léa a proposé X" entry.
-      postCoPlanMirror('coplan_place_added', newPlace.name);
+      // The placeId lets the chat-side render inline pour/contre buttons.
+      postCoPlanMirror('coplan_place_added', newPlace.name, newPlace.id);
     } catch (err) {
       console.warn('[coPlanStore] proposePlace error:', err);
     }

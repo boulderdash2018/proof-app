@@ -56,6 +56,13 @@ export interface SystemEvent {
   targetId?: string;
   /** Free-form payload for rename (new name) or session id. */
   payload?: string;
+  // ── Co-plan extensions ────────────────────────────────────────
+  /** Originating draft id — lets the chat-side render link/vote affordances
+   *  without an extra lookup. Set on all `coplan_*` events. */
+  draftId?: string;
+  /** Proposed place id, set on `coplan_place_added` so the chat can render
+   *  inline "Pour/Contre" buttons that toggle the place's vote count. */
+  placeId?: string;
 }
 
 export interface Conversation {

@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanLensSwitcher } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanLensSwitcher, CoPlanInlineVote } from '../components';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
@@ -419,6 +419,12 @@ const MessageRow = React.memo<MessageRowProps>(({
     const text = item.content || renderSystemEventText(ev, participants);
     const isSessionStart = ev?.kind === 'session_started' && ev.actorId !== userId;
     const isSessionComplete = ev?.kind === 'session_completed';
+    // Co-plan: inline vote affordance on a fresh place proposal — only
+    // shown to OTHER participants (the proposer auto-upvoted).
+    const showInlineVote =
+      ev?.kind === 'coplan_place_added' &&
+      !!ev.draftId && !!ev.placeId &&
+      !!userId && ev.actorId !== userId;
     return (
       <View>
         {showDate && (
@@ -447,6 +453,13 @@ const MessageRow = React.memo<MessageRowProps>(({
               <Ionicons name="images" size={14} color={Colors.textOnAccent} />
               <Text style={styles.systemJoinText}>Voir l{'\u2019'}album</Text>
             </TouchableOpacity>
+          )}
+          {showInlineVote && (
+            <CoPlanInlineVote
+              draftId={ev!.draftId!}
+              placeId={ev!.placeId!}
+              voterUserId={userId!}
+            />
           )}
         </View>
       </View>
