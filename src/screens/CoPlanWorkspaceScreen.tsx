@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar, CoPlanPlacesSection } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -172,8 +172,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           label="QUAND"
           title="Marquez vos dispos"
           subtitle="L'app repère le créneau commun automatiquement"
-          placeholder
-        />
+        >
+          <CoPlanAvailabilitySection participants={draft.participantDetails} />
+        </SectionBlock>
         <SectionBlock
           icon="walk-outline"
           label="TRAJET"
