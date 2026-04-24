@@ -1805,7 +1805,7 @@ export const CreateScreen: React.FC = () => {
                     <Text style={styles.tlMetaSep}>·</Text>
                     {place.priceRangeIndex >= 0 ? (
                       <View style={styles.tlMetaItem}>
-                        <Text style={styles.tlMetaEmoji}>💰</Text>
+                        <Ionicons name="wallet-outline" size={11} color={Colors.terracotta500} />
                         <Text style={styles.tlMetaText}>
                           {(() => {
                             const r = PRICE_RANGES[place.priceRangeIndex];
@@ -1816,7 +1816,7 @@ export const CreateScreen: React.FC = () => {
                     ) : (
                       <View style={styles.tlMetaAddPill}>
                         <Ionicons name="add" size={11} color={Colors.terracotta600} />
-                        <Text style={styles.tlMetaEmoji}>💰</Text>
+                        <Ionicons name="wallet-outline" size={11} color={Colors.terracotta600} />
                         <Text style={styles.tlMetaAddText}>Prix</Text>
                       </View>
                     )}
@@ -3940,7 +3940,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 99,
     borderWidth: 1,
-    borderStyle: 'dashed',
     borderColor: Colors.terracotta400,
     backgroundColor: Colors.terracotta50,
   },
