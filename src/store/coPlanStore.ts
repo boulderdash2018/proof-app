@@ -142,7 +142,7 @@ function postCoPlanMirror(
     case 'coplan_place_removed':    preview = `${firstName} a retiré ${detail}`; break;
     case 'coplan_place_voted':      preview = `${firstName} a voté pour ${detail}`; break;
     case 'coplan_availability_set': preview = `${firstName} a marqué ${detail}`; break;
-    case 'coplan_locked':           preview = `Plan verrouillé : ${detail}`; break;
+    case 'coplan_locked':           preview = `Plan lancé : ${detail}`; break;
     default:                        preview = `${firstName} a modifié le brouillon`;
   }
 

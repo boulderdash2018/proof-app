@@ -906,7 +906,7 @@ const renderSystemEventText = (
     case 'coplan_availability_set':
       return `${firstNameOf(ev.actorId)} a marqué ${ev.payload || 'ses dispos'}`;
     case 'coplan_locked':
-      return `Plan verrouillé : ${ev.payload || ''}`;
+      return `Plan lancé : ${ev.payload || ''}`;
     default:
       return '';
   }

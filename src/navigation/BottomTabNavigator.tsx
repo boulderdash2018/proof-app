@@ -331,7 +331,7 @@ export const BottomTabNavigator: React.FC = () => {
                 </View>
                 <View style={styles.createModalText}>
                   <Text style={styles.createModalTitle}>Organiser avec mes amis</Text>
-                  <Text style={styles.createModalDesc}>Proposez des lieux + dispos, verrouillez ensemble</Text>
+                  <Text style={styles.createModalDesc}>Proposez des lieux + dispos, lancez ensemble</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
               </TouchableOpacity>

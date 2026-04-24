@@ -257,10 +257,10 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         <CoPlanSummaryFooter />
 
         <SectionBlock
-          icon="lock-closed-outline"
-          label="VERROUILLER"
-          title="Figer le plan"
-          subtitle="Transforme le brouillon en vrai plan + conv de groupe"
+          icon="rocket-outline"
+          label="LANCER LE PLAN"
+          title="Quand le groupe est prêt"
+          subtitle="Le brouillon devient le plan officiel — visible par tout le monde dans la conv et utilisable en session live."
           muted={!canLock}
         >
           <TouchableOpacity
@@ -270,7 +270,7 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
             disabled={!canLock}
           >
             <Ionicons
-              name="lock-closed"
+              name="rocket"
               size={16}
               color={canLock ? Colors.textOnAccent : Colors.textTertiary}
             />
@@ -280,7 +280,7 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
                 !canLock && styles.lockBtnTextDisabled,
               ]}
             >
-              Verrouiller le plan
+              Lancer le plan
             </Text>
           </TouchableOpacity>
           {lockMissingHint && (

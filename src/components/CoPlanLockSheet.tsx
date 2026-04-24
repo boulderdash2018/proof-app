@@ -59,11 +59,11 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
         <Pressable style={styles.card} onPress={() => {}}>
           <View style={styles.header}>
             <View style={styles.lockIcon}>
-              <Ionicons name="lock-closed" size={18} color={Colors.primary} />
+              <Ionicons name="rocket" size={18} color={Colors.primary} />
             </View>
             <View>
-              <Text style={styles.eyebrow}>VERROUILLER LE PLAN</Text>
-              <Text style={styles.title}>Prêts à figer ensemble ?</Text>
+              <Text style={styles.eyebrow}>LANCER LE PLAN</Text>
+              <Text style={styles.title}>Le groupe est OK ?</Text>
             </View>
           </View>
 
@@ -127,8 +127,8 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
                 <ActivityIndicator size="small" color={Colors.textOnAccent} />
               ) : (
                 <>
-                  <Ionicons name="lock-closed" size={14} color={Colors.textOnAccent} />
-                  <Text style={styles.btnConfirmText}>Verrouiller</Text>
+                  <Ionicons name="rocket" size={14} color={Colors.textOnAccent} />
+                  <Text style={styles.btnConfirmText}>Lancer le plan</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -136,7 +136,7 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
 
           {!canLock && (
             <Text style={styles.missingHint}>
-              Ajoute au moins 1 lieu avant de verrouiller.
+              Ajoute au moins 1 lieu avant de lancer le plan.
             </Text>
           )}
         </Pressable>
