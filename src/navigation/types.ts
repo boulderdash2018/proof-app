@@ -59,10 +59,11 @@ export type RootStackParamList = {
   Notifications: undefined;
   ChatList: undefined;
   NewConversation: undefined;
-  Conversation: { conversationId: string; otherUser: { userId: string; displayName: string; username: string; avatarUrl: string | null; avatarBg: string; avatarColor: string; initials: string } };
-  DoItNow: { planId: string };
+  Conversation: { conversationId: string; otherUser: { userId: string; displayName: string; username: string; avatarUrl: string | null; avatarBg: string; avatarColor: string; initials: string } | null };
+  DoItNow: { planId: string; sessionId?: string; conversationId?: string };
   DoItNowComplete: undefined;
   OrganizeComplete: undefined;
+  CoPlanWorkspace: { draftId: string };
 };
 
 export type BottomTabParamList = {

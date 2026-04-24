@@ -18,6 +18,7 @@ import { ChatListScreen } from '../screens/ChatListScreen';
 import { NewConversationScreen } from '../screens/NewConversationScreen';
 import { ConversationScreen } from '../screens/ConversationScreen';
 import { DoItNowScreen } from '../screens/DoItNowScreen';
+import { CoPlanWorkspaceScreen } from '../screens/CoPlanWorkspaceScreen';
 import { DoItNowCompleteScreen } from '../screens/DoItNowCompleteScreen';
 import { OrganizeCompleteScreen } from '../screens/OrganizeCompleteScreen';
 import { AccountPromptModal } from '../components/AccountPromptModal';
@@ -62,6 +63,7 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="NewConversation" component={NewConversationScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="Conversation" component={ConversationScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="DoItNow" component={DoItNowScreen} options={{ animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="CoPlanWorkspace" component={CoPlanWorkspaceScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="DoItNowComplete" component={DoItNowCompleteScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="OrganizeComplete" component={OrganizeCompleteScreen} options={{ animation: 'slide_from_right' }} />
             </>

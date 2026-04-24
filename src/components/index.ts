@@ -20,6 +20,7 @@ export { SharePlanSheet } from './SharePlanSheet';
 export { GroupPlanSheet } from './GroupPlanSheet';
 export { GroupMosaicAvatar } from './GroupMosaicAvatar';
 export { AddParticipantsSheet } from './AddParticipantsSheet';
+export { CoPlanInviteSheet } from './CoPlanInviteSheet';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';
