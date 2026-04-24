@@ -179,12 +179,33 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const shareTransX = useRef(new Animated.Value(0)).current;
   const shareRot = useRef(new Animated.Value(0)).current;
 
+  // ── Card-level heart anim (separate from detail action bar heart) ──
+  const cardLikeScale = useRef(new Animated.Value(1)).current;
+
   const animPop = useCallback((scale: Animated.Value, peak = 1.3) => {
     Animated.sequence([
       Animated.timing(scale, { toValue: peak, duration: 150, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 1, duration: 150, easing: Easing.bezier(0.34, 1.56, 0.64, 1), useNativeDriver: true }),
     ]).start();
   }, []);
+
+  // Heart animation : bigger overshoot when LIKING (outline -> filled),
+  // softer squeeze when UN-LIKING (filled -> outline). The distinction gives
+  // liking a celebratory feel without being cartoonish.
+  const animHeart = useCallback((willLike: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (willLike) {
+      Animated.sequence([
+        Animated.timing(cardLikeScale, { toValue: 0.8, duration: 70, useNativeDriver: true }),
+        Animated.spring(cardLikeScale, { toValue: 1, useNativeDriver: true, friction: 3.5, tension: 180 }),
+      ]).start();
+    } else {
+      Animated.sequence([
+        Animated.timing(cardLikeScale, { toValue: 0.85, duration: 90, useNativeDriver: true }),
+        Animated.spring(cardLikeScale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 160 }),
+      ]).start();
+    }
+  }, [cardLikeScale]);
 
   const shareRotStr = shareRot.interpolate({
     inputRange: [0, 15], outputRange: ['0deg', '15deg'],
@@ -586,16 +607,21 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               pointerEvents={isDetailOpen ? 'none' : 'auto'}
             >
               <TouchableOpacity
-                onPress={onLike}
+                onPress={() => {
+                  animHeart(!isLiked);
+                  onLike();
+                }}
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons
-                  name={isLiked ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={isLiked ? '#FF4D67' : '#FFF'}
-                  style={styles.iconShadow}
-                />
+                <Animated.View style={{ transform: [{ scale: cardLikeScale }] }}>
+                  <Ionicons
+                    name={isLiked ? 'heart' : 'heart-outline'}
+                    size={24}
+                    color={isLiked ? '#FF4D67' : '#FFF'}
+                    style={styles.iconShadow}
+                  />
+                </Animated.View>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={onSave}
