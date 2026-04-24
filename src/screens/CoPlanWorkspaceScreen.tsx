@@ -18,7 +18,8 @@ import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
 import { backfillConversationForDraft } from '../services/planDraftService';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanChatBubble, CoPlanActivityToasts } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts, CoPlanLensSwitcher } from '../components';
+import { useChatStore } from '../store/chatStore';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -56,19 +57,20 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
     return () => stopObserving();
   }, [draftId, user?.id, observeDraft, stopObserving]);
 
-  // Lazy backfill — older drafts (created before we started seeding the
-  // conv at draft time) don't have `conversationId` set, so the floating
-  // chat bubble would self-hide. The first participant to open such a
-  // draft creates the conv server-side; subsequent loads see it via the
-  // live subscription. Idempotent on the service side.
+  // Lazy backfill — runs idempotently on every mount for the creator.
+  // Two cases it handles:
+  //   1. Legacy drafts without `conversationId` → creates the group conv.
+  //   2. Drafts whose conv pre-dates the `linkedDraftId` field → patches
+  //      it on the existing conv so the chat side can render the
+  //      "Brouillon en cours" banner.
+  // Only the creator triggers it to avoid duplicate convs / write races
+  // if multiple participants open the workspace at the same instant.
   useEffect(() => {
     if (!draft || !user?.id) return;
-    const hasConv = !!(draft.conversationId || draft.publishedConvId);
-    if (hasConv) return;
-    // Only the creator triggers the backfill to avoid duplicate convs
-    // if multiple participants open the workspace at the same instant.
     if (draft.createdBy !== user.id) return;
-    backfillConversationForDraft(draft.id).catch(() => {});
+    backfillConversationForDraft(draft.id).catch((err) => {
+      console.warn('[CoPlanWorkspaceScreen] backfill failed:', err);
+    });
   }, [draft, user?.id]);
 
   // Periodic re-render so "Présent · à l'instant" stays fresh even without data update.
@@ -90,6 +92,24 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
     if (!draft) return 0;
     return draft.participants.filter((id) => id !== user?.id && isPresent(id)).length;
   }, [draft, user?.id, isPresent]);
+
+  // Unread count for the linked conversation — surfaced as a badge on
+  // the "Discussion" tab of the lens switcher.
+  const conversations = useChatStore((s) => s.conversations);
+  const linkedConvId = draft?.conversationId ?? draft?.publishedConvId;
+  const linkedUnread = useMemo(() => {
+    if (!linkedConvId || !user?.id) return 0;
+    const conv = conversations.find((c) => c.id === linkedConvId);
+    return conv ? conv.unreadCount[user.id] || 0 : 0;
+  }, [conversations, linkedConvId, user?.id]);
+
+  const handleOpenChat = () => {
+    if (!linkedConvId) return;
+    navigation.navigate('Conversation', {
+      conversationId: linkedConvId,
+      otherUser: null,
+    });
+  };
 
   // Lock pre-conditions — VERROUILLER stays visible (so participants
   // understand what's coming) but is muted + disabled until the basics
@@ -163,6 +183,20 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         </View>
         <View style={styles.headerBtn} />
       </View>
+
+      {/* ── Lens switcher ──────────────────────
+          THE single, unmissable affordance to jump to the chat. Always
+          rendered in the workspace; tapping the "Discussion" tab navigates
+          to the group conv — same gesture from anywhere. */}
+      {linkedConvId && (
+        <CoPlanLensSwitcher
+          active="plan"
+          unreadCount={linkedUnread}
+          onChange={(next) => {
+            if (next === 'chat') handleOpenChat();
+          }}
+        />
+      )}
 
       {/* ── Participants strip ─────────────────── */}
       <View style={styles.participantsStrip}>
@@ -254,30 +288,16 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           )}
         </SectionBlock>
 
-        <View style={{ height: insets.bottom + 90 }} />
+        <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
 
       {/* ── Live activity toasts ──────────────────
-          Bottom-LEFT — surfaces "Léa a ajouté Café Pinson" et al. while the
-          workspace is open, so the doc feels alive even before anyone opens
-          the chat. The chat bubble owns bottom-right, no overlap. */}
+          Bottom of the workspace — surfaces "Léa a ajouté Café Pinson"
+          while the workspace is open, so the doc feels alive even before
+          anyone opens the chat. The lens switcher owns the navigation
+          affordance now (in the header), so toasts can use the full
+          bottom area without overlap. */}
       <CoPlanActivityToasts />
-
-      {/* ── Floating chat bubble ──────────────────
-          The group conv is created at draft time, so participants can keep
-          the planning doc and the conversation thread side by side instead
-          of stuffing everything into a doubled chat panel. */}
-      <CoPlanChatBubble
-        conversationId={draft.conversationId ?? draft.publishedConvId}
-        onPress={() => {
-          const convId = draft.conversationId ?? draft.publishedConvId;
-          if (!convId) return;
-          navigation.navigate('Conversation', {
-            conversationId: convId,
-            otherUser: null,
-          });
-        }}
-      />
 
       {/* ── Lock confirm sheet ────────────────── */}
       <CoPlanLockSheet

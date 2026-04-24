@@ -11,7 +11,8 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanLensSwitcher } from '../components';
+import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
@@ -964,6 +965,31 @@ export const ConversationScreen: React.FC = () => {
     [conversations, conversationId],
   );
 
+  // ── Linked co-plan draft detection ──
+  // The "Plan" lens-switcher tab needs to know if this conv is attached to
+  // an active draft. We prefer the denormalized `linkedDraftId` on the conv
+  // (set by the planDraftService when seeding the conv at draft time), and
+  // fall back to a one-shot query for legacy convs without that field.
+  const [linkedDraftId, setLinkedDraftId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    // Reset on conv change.
+    setLinkedDraftId(null);
+    if (!activeConv) return;
+    // Locked plan? No "Brouillon" tab — the plan is a real Plan now.
+    if (activeConv.linkedPlanId) return;
+    if (activeConv.linkedDraftId) {
+      setLinkedDraftId(activeConv.linkedDraftId);
+      return;
+    }
+    // Legacy: query.
+    (async () => {
+      const draft = await findDraftByConversationId(activeConv.id);
+      if (!cancelled && draft) setLinkedDraftId(draft.id);
+    })();
+    return () => { cancelled = true; };
+  }, [activeConv?.id, activeConv?.linkedDraftId, activeConv?.linkedPlanId]);
+
   const isGroup = activeConv?.isGroup === true;
 
   // For groups, the single "otherUser" concept doesn't apply — we pick the primary other
@@ -1444,33 +1470,20 @@ export const ConversationScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* ── Brouillon en cours banner ──
-          Visible whenever this conv was seeded from a co-plan draft AND the
-          plan hasn't been locked yet (no linkedPlanId). Tap → workspace.
-          Sticky between the header and the message list — never scrolls away
-          so the affordance is always one tap from anywhere in the chat. */}
-      {isGroup && activeConv?.linkedDraftId && !activeConv?.linkedPlanId && (
-        <TouchableOpacity
-          style={styles.draftBanner}
-          onPress={() => navigation.navigate('CoPlanWorkspace', { draftId: activeConv.linkedDraftId! })}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Ouvrir le brouillon en cours"
-        >
-          <View style={styles.draftBannerIconWrap}>
-            <Ionicons name="construct-outline" size={15} color={Colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.draftBannerEyebrow}>BROUILLON EN COURS</Text>
-            <Text style={styles.draftBannerTitle} numberOfLines={1}>
-              Voir & modifier le plan ensemble
-            </Text>
-          </View>
-          <View style={styles.draftBannerCta}>
-            <Text style={styles.draftBannerCtaText}>Ouvrir</Text>
-            <Ionicons name="arrow-forward" size={13} color={Colors.textOnAccent} />
-          </View>
-        </TouchableOpacity>
+      {/* ── Lens switcher ──
+          Mounted just below the conv header whenever there's a co-plan
+          draft attached AND the plan hasn't been locked yet. Same component
+          as the workspace, same gesture, same mental model — tap "Plan" to
+          jump to the editable workspace. */}
+      {isGroup && linkedDraftId && (
+        <CoPlanLensSwitcher
+          active="chat"
+          onChange={(next) => {
+            if (next === 'plan' && linkedDraftId) {
+              navigation.navigate('CoPlanWorkspace', { draftId: linkedDraftId });
+            }
+          }}
+        />
       )}
 
       {/* Messages */}
@@ -2278,60 +2291,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   systemJoinText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textOnAccent,
-    letterSpacing: -0.1,
-  },
-
-  // ── Brouillon en cours banner (sticky, between header and FlatList) ──
-  draftBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 4,
-    paddingVertical: 9,
-    paddingLeft: 10,
-    paddingRight: 8,
-    borderRadius: 12,
-    backgroundColor: Colors.terracotta50,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.terracotta200,
-  },
-  draftBannerIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: Colors.bgSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  draftBannerEyebrow: {
-    fontSize: 9,
-    fontFamily: Fonts.bodyBold,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    color: Colors.primary,
-    marginBottom: 1,
-  },
-  draftBannerTitle: {
-    fontSize: 13,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.1,
-  },
-  draftBannerCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 99,
-    backgroundColor: Colors.primary,
-  },
-  draftBannerCtaText: {
     fontSize: 12,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textOnAccent,

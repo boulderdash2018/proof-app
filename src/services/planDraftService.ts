@@ -237,6 +237,32 @@ export const fetchPlanDraft = async (draftId: string): Promise<PlanDraft | null>
   return hydrateDraft(snap.id, snap.data());
 };
 
+/**
+ * Find an active draft attached to a given conversation id. Used by the
+ * conversation screen to decide whether to render the "📋 Brouillon"
+ * lens-switcher tab. Falls back to a query when the conversation doc
+ * doesn't carry `linkedDraftId` yet (legacy convs).
+ *
+ * Returns null if no matching active draft.
+ */
+export const findDraftByConversationId = async (
+  conversationId: string,
+): Promise<PlanDraft | null> => {
+  const q = query(
+    collection(db, DRAFTS),
+    where('conversationId', '==', conversationId),
+  );
+  const snap = await getDocs(q);
+  // Pick the freshest active draft (locked drafts shouldn't surface the
+  // "Brouillon en cours" affordance — the plan is now real).
+  const drafts = snap.docs
+    .map((d) => hydrateDraft(d.id, d.data()))
+    .filter((d) => d.status === 'draft');
+  if (drafts.length === 0) return null;
+  drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return drafts[0];
+};
+
 /** List all active drafts the current user participates in, newest first. */
 export const fetchMyActiveDrafts = async (userId: string): Promise<PlanDraft[]> => {
   const q = query(
