@@ -18,6 +18,7 @@ import { useColors } from '../hooks/useColors';
 import { ChatMessage, ConversationParticipant, resetUnreadCount } from '../services/chatService';
 import { createGroupSession } from '../services/planSessionService';
 import { fetchPlanById } from '../services/plansService';
+import { useDoItNowStore } from '../store/doItNowStore';
 import { pickImage } from '../utils';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
@@ -1092,7 +1093,10 @@ export const ConversationScreen: React.FC = () => {
         conversationId: conversationId,
         creator,
       });
-      // Navigate to DoItNow with the session context.
+      // Pre-populate the local doItNowStore BEFORE navigating so DoItNow
+      // doesn't need to bootstrap on mount (avoids hooks-order violation
+      // from its early `if (!session) return null;` guard).
+      useDoItNowStore.getState().startSession(plan, 'walking', user.id);
       navigation.navigate('DoItNow', {
         planId: plan.id,
         sessionId,
@@ -1107,11 +1111,21 @@ export const ConversationScreen: React.FC = () => {
 
   const handleJoinSession = useCallback(async () => {
     if (!user?.id || !activeConv?.activeSessionId || !activeConv.linkedPlanId) return;
-    navigation.navigate('DoItNow', {
-      planId: activeConv.linkedPlanId,
-      sessionId: activeConv.activeSessionId,
-      conversationId: conversationId,
-    });
+    // Fetch the plan + pre-populate the local doItNowStore BEFORE navigating —
+    // same rationale as handleStartSession (avoids the DoItNowScreen
+    // hooks-order edge case).
+    try {
+      const plan = await fetchPlanById(activeConv.linkedPlanId);
+      if (!plan) return;
+      useDoItNowStore.getState().startSession(plan, 'walking', user.id);
+      navigation.navigate('DoItNow', {
+        planId: activeConv.linkedPlanId,
+        sessionId: activeConv.activeSessionId,
+        conversationId: conversationId,
+      });
+    } catch (err) {
+      console.warn('[ConversationScreen] join session error:', err);
+    }
   }, [user, activeConv, conversationId, navigation]);
 
   const isMuted = useMemo(
