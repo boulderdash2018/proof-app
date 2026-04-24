@@ -37,7 +37,16 @@ export type SystemEventKind =
   | 'left'
   | 'renamed'
   | 'session_started'
-  | 'session_completed';
+  | 'session_completed'
+  // ── Co-plan workspace mirror events ──────────────────────────────
+  // Posted by the planDraftService whenever a participant mutates the
+  // shared workspace, so the chat thread becomes the "fil de
+  // l'organisation" — visible without leaving the chat.
+  | 'coplan_place_added'      // payload = place name
+  | 'coplan_place_removed'    // payload = place name
+  | 'coplan_place_voted'      // payload = place name
+  | 'coplan_availability_set' // payload = "N dispos" or empty for reset
+  | 'coplan_locked';          // payload = locked plan title
 
 export interface SystemEvent {
   kind: SystemEventKind;

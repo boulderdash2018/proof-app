@@ -397,6 +397,8 @@ interface MessageRowProps {
   onPhotoPress: (url: string) => void;
   onOpenAlbum: () => void;
   onVotePoll: (messageId: string, optionIndex: number) => void;
+  /** Group participants — used to resolve actor names on co-plan system events. */
+  participants?: Record<string, ConversationParticipant>;
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
@@ -404,6 +406,7 @@ const MessageRow = React.memo<MessageRowProps>(({
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
   onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress, onOpenAlbum, onVotePoll,
+  participants,
 }) => {
   const isMine = item.senderId === userId;
   const showDate = shouldShowDateSeparator(item, prevMsg);
@@ -413,7 +416,7 @@ const MessageRow = React.memo<MessageRowProps>(({
   // ── System event: rendered as centered gray italic line, no bubble, no swipe, no reactions ──
   if (item.type === 'system') {
     const ev = item.systemEvent;
-    const text = item.content || renderSystemEventText(ev);
+    const text = item.content || renderSystemEventText(ev, participants);
     const isSessionStart = ev?.kind === 'session_started' && ev.actorId !== userId;
     const isSessionComplete = ev?.kind === 'session_completed';
     return (
@@ -856,8 +859,17 @@ const formatTime = (dateStr: string): string => {
 };
 
 /** Fallback text for system events missing a content string. */
-const renderSystemEventText = (ev: ChatMessage['systemEvent'] | undefined): string => {
+const renderSystemEventText = (
+  ev: ChatMessage['systemEvent'] | undefined,
+  participants?: Record<string, ConversationParticipant>,
+): string => {
   if (!ev) return '';
+  // First-name resolution for events that surface an actor.
+  const firstNameOf = (uid?: string): string => {
+    if (!uid || !participants) return 'Quelqu\'un';
+    const p = participants[uid];
+    return p ? p.displayName.split(' ')[0] : 'Quelqu\'un';
+  };
   switch (ev.kind) {
     case 'group_created':
       return `Groupe « ${ev.payload || ''} » créé`;
@@ -871,6 +883,17 @@ const renderSystemEventText = (ev: ChatMessage['systemEvent'] | undefined): stri
       return `La session a démarré`;
     case 'session_completed':
       return `Session terminée`;
+    // ── Co-plan workspace mirror events ──
+    case 'coplan_place_added':
+      return `${firstNameOf(ev.actorId)} a proposé ${ev.payload || 'un lieu'}`;
+    case 'coplan_place_removed':
+      return `${firstNameOf(ev.actorId)} a retiré ${ev.payload || 'un lieu'}`;
+    case 'coplan_place_voted':
+      return `${firstNameOf(ev.actorId)} a voté pour ${ev.payload || 'un lieu'}`;
+    case 'coplan_availability_set':
+      return `${firstNameOf(ev.actorId)} a marqué ${ev.payload || 'ses dispos'}`;
+    case 'coplan_locked':
+      return `Plan verrouillé : ${ev.payload || ''}`;
     default:
       return '';
   }
@@ -1357,6 +1380,7 @@ export const ConversationScreen: React.FC = () => {
       onPhotoPress={setLightboxUrl}
       onOpenAlbum={() => setAlbumOpen(true)}
       onVotePoll={votePoll}
+      participants={activeConv?.participantDetails}
     />
     );
   }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession, votePoll]);

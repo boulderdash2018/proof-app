@@ -19,7 +19,7 @@ import {
   slotKeyToMeetupAt,
 } from '../services/planDraftService';
 import { createPlan } from '../services/plansService';
-import { attachPlanToConversation, createGroupConversation, ConversationParticipant } from '../services/chatService';
+import { attachPlanToConversation, createGroupConversation, postSystemEvent, ConversationParticipant, SystemEvent } from '../services/chatService';
 import { useAuthStore } from './authStore';
 import { Place, CategoryTag, TransportMode, CoAuthor } from '../types';
 
@@ -106,6 +106,50 @@ interface CoPlanStore {
   getMySlots: () => string[];
   getBestOverlapSlot: () => { key: string; count: number } | null;
   isPresent: (otherUserId: string) => boolean;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Chat mirror helper — posts a system event in the linked group
+// conversation whenever the workspace is mutated. The event is
+// non-blocking (.catch swallow) so a failed post never breaks the
+// optimistic mutation.
+//
+// Each call infers the current draft + actor from the store state,
+// resolves the actor's first name from participantDetails, and uses
+// a stable preview text so the conversation list "lastMessage"
+// reads naturally ("Léa a proposé Café Pinson").
+// ══════════════════════════════════════════════════════════════
+
+function postCoPlanMirror(
+  kind: SystemEvent['kind'],
+  detail: string,
+): void {
+  // Read latest state — important: this fires AFTER the optimistic
+  // update so `get().draft` already reflects the change.
+  const { draft, _userId } = useCoPlanStore.getState();
+  if (!draft || !_userId) return;
+  const convId = draft.conversationId || draft.publishedConvId;
+  if (!convId) return;
+  const me = draft.participantDetails[_userId];
+  const firstName = me ? me.displayName.split(' ')[0] : 'Quelqu\'un';
+
+  let preview = '';
+  switch (kind) {
+    case 'coplan_place_added':      preview = `${firstName} a proposé ${detail}`; break;
+    case 'coplan_place_removed':    preview = `${firstName} a retiré ${detail}`; break;
+    case 'coplan_place_voted':      preview = `${firstName} a voté pour ${detail}`; break;
+    case 'coplan_availability_set': preview = `${firstName} a marqué ${detail}`; break;
+    case 'coplan_locked':           preview = `Plan verrouillé : ${detail}`; break;
+    default:                        preview = `${firstName} a modifié le brouillon`;
+  }
+
+  postSystemEvent(
+    convId,
+    { kind, actorId: _userId, payload: detail },
+    preview,
+  ).catch((err) => {
+    console.warn('[coPlanStore] postSystemEvent failed:', err);
+  });
 }
 
 export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
@@ -242,6 +286,9 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     });
     try {
       await svcProposePlace(draftId, newPlace);
+      // Mirror the action into the linked chat thread so participants
+      // not currently in the workspace get a "Léa a proposé X" entry.
+      postCoPlanMirror('coplan_place_added', newPlace.name);
     } catch (err) {
       console.warn('[coPlanStore] proposePlace error:', err);
     }
@@ -250,6 +297,8 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   removePlace: async (placeId: string) => {
     const { draftId, draft } = get();
     if (!draftId || !draft) return;
+    // Capture the name BEFORE we strip it from the optimistic state.
+    const removed = draft.proposedPlaces.find((p) => p.id === placeId);
     set({
       draft: {
         ...draft,
@@ -258,6 +307,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     });
     try {
       await svcRemovePlace(draftId, placeId);
+      if (removed) postCoPlanMirror('coplan_place_removed', removed.name);
     } catch (err) {
       console.warn('[coPlanStore] removePlace error:', err);
     }
@@ -266,17 +316,22 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   toggleVote: async (placeId: string) => {
     const { draftId, draft, _userId } = get();
     if (!draftId || !draft || !_userId) return;
+    const target = draft.proposedPlaces.find((p) => p.id === placeId);
+    if (!target) return;
+    const wasVoting = target.votes.includes(_userId);
     const next = draft.proposedPlaces.map((p) => {
       if (p.id !== placeId) return p;
-      const has = p.votes.includes(_userId);
       return {
         ...p,
-        votes: has ? p.votes.filter((u) => u !== _userId) : [...p.votes, _userId],
+        votes: wasVoting ? p.votes.filter((u) => u !== _userId) : [...p.votes, _userId],
       };
     });
     set({ draft: { ...draft, proposedPlaces: next } });
     try {
       await svcTogglePlaceVote(draftId, placeId, _userId);
+      // Only emit on the ADD direction — un-votes are silent in the chat
+      // to avoid noise from indecisive tappers.
+      if (!wasVoting) postCoPlanMirror('coplan_place_voted', target.name);
     } catch (err) {
       console.warn('[coPlanStore] toggleVote error:', err);
     }
@@ -305,6 +360,8 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   setAvailability: async (slots: string[]) => {
     const { draftId, draft, _userId } = get();
     if (!draftId || !draft || !_userId) return;
+    // Snapshot prior count to decide whether this counts as an "add".
+    const prevCount = draft.availability[_userId]?.slots.length || 0;
     // Optimistic
     const dedupSorted = Array.from(new Set(slots)).sort();
     set({
@@ -318,6 +375,15 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     });
     try {
       await svcSetAvailability(draftId, _userId, dedupSorted);
+      // Mirror only when the user's slot count INCREASES — un-checking
+      // slots is silent in the chat to keep the thread clean. Net adds
+      // are batched into one event regardless of how many slots were
+      // ticked in the same call.
+      if (dedupSorted.length > prevCount) {
+        const delta = dedupSorted.length - prevCount;
+        const detail = delta === 1 ? '1 dispo' : `${delta} dispos`;
+        postCoPlanMirror('coplan_availability_set', detail);
+      }
     } catch (err) {
       console.warn('[coPlanStore] setAvailability error:', err);
     }
