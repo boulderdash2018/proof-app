@@ -373,7 +373,14 @@ export interface PlanDraft {
   lockedAt?: string;
   /** Set after conversion to a real Plan (only if published on feed). */
   publishedPlanId?: string;
-  /** Always set on lock — id of the group conv that takes over post-lock. */
+  /**
+   * Group conversation id — created at the SAME time as the draft so
+   * participants can chat from the moment the brouillon is born. The same
+   * conversation is enriched (linkedPlanId + meetupAt) when the draft is
+   * locked. Always set after createPlanDraft.
+   */
+  conversationId?: string;
+  /** @deprecated Use `conversationId`. Kept for back-compat with old drafts. */
   publishedConvId?: string;
 
   // Live presence (userId → last-seen ms timestamp)

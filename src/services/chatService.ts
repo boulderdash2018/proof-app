@@ -866,3 +866,23 @@ export const setGroupActiveSession = async (
   const convRef = doc(db, CONVERSATIONS, conversationId);
   await updateDoc(convRef, { activeSessionId: sessionId || null });
 };
+
+/**
+ * Attach a freshly-locked Plan to an existing group conversation. Used by
+ * coPlan.lockDraft : the conv was created at draft time and now gets the
+ * Plan link + meetup date so the pinned card appears in the chat header.
+ */
+export const attachPlanToConversation = async (
+  conversationId: string,
+  plan: { id: string; title: string; coverPhoto?: string | null },
+  meetupAt?: string | null,
+): Promise<void> => {
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const payload: Record<string, any> = {
+    linkedPlanId: plan.id,
+    linkedPlanTitle: plan.title,
+  };
+  if (plan.coverPhoto) payload.linkedPlanCover = plan.coverPhoto;
+  if (meetupAt) payload.meetupAt = meetupAt;
+  await updateDoc(convRef, payload);
+};

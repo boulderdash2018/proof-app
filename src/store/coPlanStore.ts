@@ -19,7 +19,7 @@ import {
   slotKeyToMeetupAt,
 } from '../services/planDraftService';
 import { createPlan } from '../services/plansService';
-import { createGroupConversation, ConversationParticipant } from '../services/chatService';
+import { attachPlanToConversation, createGroupConversation, ConversationParticipant } from '../services/chatService';
 import { useAuthStore } from './authStore';
 import { Place, CategoryTag, TransportMode, CoAuthor } from '../types';
 
@@ -374,45 +374,60 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
         user,
       );
 
-      // 5) Create the group conversation linking the plan.
-      const me: ConversationParticipant = {
-        userId: user.id,
-        displayName: user.displayName,
-        username: user.username,
-        avatarUrl: user.avatarUrl || null,
-        avatarBg: user.avatarBg,
-        avatarColor: user.avatarColor,
-        initials: user.initials,
-      };
-      const others: ConversationParticipant[] = Object.values(draft.participantDetails)
-        .filter((p) => p.userId !== user.id)
-        .map((p) => ({
-          userId: p.userId,
-          displayName: p.displayName,
-          username: p.username,
-          avatarUrl: p.avatarUrl,
-          avatarBg: p.avatarBg,
-          avatarColor: p.avatarColor,
-          initials: p.initials,
-        }));
-
-      const convId = await createGroupConversation({
-        creator: me,
-        otherParticipants: others,
-        plan: {
-          id: plan.id,
-          title: plan.title,
-          coverPhoto: plan.coverPhotos?.[0] ?? null,
-        },
-        meetupAt: meetupAt || undefined,
-      });
+      // 5) Attach the plan to the EXISTING conversation (created at draft
+      //    creation time so participants could chat during the prep phase).
+      //    Fallback : if for some reason the draft has no conv id yet (legacy
+      //    drafts pre-this-commit), create one on the fly to keep things working.
+      let convId = draft.conversationId || draft.publishedConvId;
+      if (convId) {
+        await attachPlanToConversation(
+          convId,
+          {
+            id: plan.id,
+            title: plan.title,
+            coverPhoto: plan.coverPhotos?.[0] ?? null,
+          },
+          meetupAt,
+        );
+      } else {
+        const me: ConversationParticipant = {
+          userId: user.id,
+          displayName: user.displayName,
+          username: user.username,
+          avatarUrl: user.avatarUrl || null,
+          avatarBg: user.avatarBg,
+          avatarColor: user.avatarColor,
+          initials: user.initials,
+        };
+        const others: ConversationParticipant[] = Object.values(draft.participantDetails)
+          .filter((p) => p.userId !== user.id)
+          .map((p) => ({
+            userId: p.userId,
+            displayName: p.displayName,
+            username: p.username,
+            avatarUrl: p.avatarUrl,
+            avatarBg: p.avatarBg,
+            avatarColor: p.avatarColor,
+            initials: p.initials,
+          }));
+        convId = await createGroupConversation({
+          creator: me,
+          otherParticipants: others,
+          plan: {
+            id: plan.id,
+            title: plan.title,
+            coverPhoto: plan.coverPhotos?.[0] ?? null,
+          },
+          meetupAt: meetupAt || undefined,
+        });
+      }
 
       // 6) Mark the draft as locked + cross-linked.
       await markDraftLocked(
         draft.id,
         _userId,
         meetupAt,
-        publishOnFeed ? plan.id : null, // only record publishedPlanId if meant to be on feed (used by commit 11)
+        publishOnFeed ? plan.id : null,
         convId,
       );
 

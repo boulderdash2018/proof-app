@@ -27,6 +27,7 @@ import {
   CoPlanParticipant,
   CoPlanProposedPlace,
 } from '../types';
+import { createGroupConversation, ConversationParticipant } from './chatService';
 
 const DRAFTS = 'plan_drafts';
 
@@ -42,6 +43,8 @@ const toISO = (ts: any): string => {
 };
 
 const hydrateDraft = (id: string, data: any): PlanDraft => {
+  // Backward-compat : legacy drafts stored conv id under `publishedConvId`.
+  const conversationId = data.conversationId || data.publishedConvId;
   return {
     id,
     title: data.title || '',
@@ -55,6 +58,7 @@ const hydrateDraft = (id: string, data: any): PlanDraft => {
     lockedBy: data.lockedBy,
     lockedAt: data.lockedAt ? toISO(data.lockedAt) : undefined,
     publishedPlanId: data.publishedPlanId,
+    conversationId,
     publishedConvId: data.publishedConvId,
     presence: data.presence || {},
     createdAt: toISO(data.createdAt),
@@ -83,8 +87,10 @@ export const createPlanDraft = async (input: CreateDraftInput): Promise<string> 
   const participantDetails: Record<string, CoPlanParticipant> = {};
   all.forEach((p) => { participantDetails[p.userId] = p; });
 
+  const cleanTitle = title.trim() || 'Nouveau brouillon';
+
   const payload = {
-    title: title.trim() || 'Nouveau brouillon',
+    title: cleanTitle,
     createdBy: creator.userId,
     participants: participantIds,
     participantDetails,
@@ -96,7 +102,45 @@ export const createPlanDraft = async (input: CreateDraftInput): Promise<string> 
     updatedAt: serverTimestamp(),
   };
 
+  // 1) Create the draft doc
   const ref = await addDoc(collection(db, DRAFTS), payload);
+
+  // 2) Spin up the linked group conversation IMMEDIATELY so participants can
+  //    chat while organizing. The conv is enriched with linkedPlanId at lock
+  //    time (see lockDraft → attachPlanToConversation), but starts plan-less
+  //    so the chat UI is usable from minute one.
+  try {
+    const me: ConversationParticipant = {
+      userId: creator.userId,
+      displayName: creator.displayName,
+      username: creator.username,
+      avatarUrl: creator.avatarUrl,
+      avatarBg: creator.avatarBg,
+      avatarColor: creator.avatarColor,
+      initials: creator.initials,
+    };
+    const others: ConversationParticipant[] = invitees.map((p) => ({
+      userId: p.userId,
+      displayName: p.displayName,
+      username: p.username,
+      avatarUrl: p.avatarUrl,
+      avatarBg: p.avatarBg,
+      avatarColor: p.avatarColor,
+      initials: p.initials,
+    }));
+    const conversationId = await createGroupConversation({
+      creator: me,
+      otherParticipants: others,
+      groupName: cleanTitle,
+      // No plan + no meetupAt yet — those land at lock time.
+    });
+    // Link the conv id back onto the draft for easy retrieval.
+    await updateDoc(ref, { conversationId, updatedAt: serverTimestamp() });
+  } catch (err) {
+    // Non-fatal — draft is usable without the conv (degraded but workable).
+    console.warn('[planDraftService] could not seed conversation for draft:', err);
+  }
+
   return ref.id;
 };
 
