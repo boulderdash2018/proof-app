@@ -144,21 +144,24 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   proposePlace: async (input) => {
     const { draftId, draft, _userId } = get();
     if (!draftId || !draft || !_userId) return;
+    // Firestore rejects objects containing `undefined`. We spread optional
+    // fields conditionally so absent values simply don't exist on the doc
+    // rather than being serialised as undefined.
     const newPlace: CoPlanProposedPlace = {
       id: makeLocalId(),
       googlePlaceId: input.googlePlaceId,
       name: input.name,
       address: input.address,
-      photoUrl: input.photoUrl,
-      category: input.category,
-      priceLevel: input.priceLevel,
-      estimatedDurationMin: input.estimatedDurationMin,
-      latitude: input.latitude,
-      longitude: input.longitude,
       proposedBy: _userId,
       proposedAt: new Date().toISOString(),
       votes: [_userId],
       orderIndex: (draft.proposedPlaces.reduce((m, p) => Math.max(m, p.orderIndex), 0) + 1),
+      ...(input.photoUrl !== undefined && { photoUrl: input.photoUrl }),
+      ...(input.category !== undefined && { category: input.category }),
+      ...(input.priceLevel !== undefined && { priceLevel: input.priceLevel }),
+      ...(input.estimatedDurationMin !== undefined && { estimatedDurationMin: input.estimatedDurationMin }),
+      ...(input.latitude !== undefined && { latitude: input.latitude }),
+      ...(input.longitude !== undefined && { longitude: input.longitude }),
     };
     // Optimistic
     set({
