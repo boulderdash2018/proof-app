@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -164,8 +164,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           label="OÙ"
           title="Proposez des lieux"
           subtitle="Chacun propose, vous votez ensemble"
-          placeholder
-        />
+        >
+          <CoPlanPlacesSection participants={draft.participantDetails} />
+        </SectionBlock>
         <SectionBlock
           icon="calendar-outline"
           label="QUAND"
