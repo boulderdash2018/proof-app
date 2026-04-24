@@ -1788,26 +1788,38 @@ export const CreateScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Meta inline row */}
+                  {/* Meta inline row — pills 'add' quand vide, inline meta quand rempli */}
                   <View style={styles.tlMetaRow}>
-                    <View style={styles.tlMetaItem}>
-                      <Ionicons name="time-outline" size={11} color={Colors.terracotta500} />
-                      <Text style={[styles.tlMetaText, !place.duration && styles.tlMetaPlaceholder]}>
-                        {place.duration ? formatDurationLabel(place.duration) : 'Durée ?'}
-                      </Text>
-                    </View>
+                    {place.duration ? (
+                      <View style={styles.tlMetaItem}>
+                        <Ionicons name="time-outline" size={11} color={Colors.terracotta500} />
+                        <Text style={styles.tlMetaText}>{formatDurationLabel(place.duration)}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.tlMetaAddPill}>
+                        <Ionicons name="add" size={11} color={Colors.terracotta600} />
+                        <Ionicons name="time-outline" size={11} color={Colors.terracotta600} />
+                        <Text style={styles.tlMetaAddText}>Durée</Text>
+                      </View>
+                    )}
                     <Text style={styles.tlMetaSep}>·</Text>
-                    <View style={styles.tlMetaItem}>
-                      <Text style={styles.tlMetaEmoji}>💰</Text>
-                      <Text style={[styles.tlMetaText, place.priceRangeIndex < 0 && styles.tlMetaPlaceholder]}>
-                        {place.priceRangeIndex >= 0
-                          ? (() => {
-                              const r = PRICE_RANGES[place.priceRangeIndex];
-                              return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
-                            })()
-                          : 'Prix ?'}
-                      </Text>
-                    </View>
+                    {place.priceRangeIndex >= 0 ? (
+                      <View style={styles.tlMetaItem}>
+                        <Text style={styles.tlMetaEmoji}>💰</Text>
+                        <Text style={styles.tlMetaText}>
+                          {(() => {
+                            const r = PRICE_RANGES[place.priceRangeIndex];
+                            return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
+                          })()}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.tlMetaAddPill}>
+                        <Ionicons name="add" size={11} color={Colors.terracotta600} />
+                        <Text style={styles.tlMetaEmoji}>💰</Text>
+                        <Text style={styles.tlMetaAddText}>Prix</Text>
+                      </View>
+                    )}
                     {place.reservationRecommended && (
                       <>
                         <Text style={styles.tlMetaSep}>·</Text>
@@ -3918,6 +3930,26 @@ const styles = StyleSheet.create({
   tlMetaPlaceholder: {
     color: Colors.textTertiary,
     fontStyle: 'italic',
+  },
+  // Pill 'add' — affordance visuelle quand durée ou prix ne sont pas remplis
+  tlMetaAddPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.terracotta400,
+    backgroundColor: Colors.terracotta50,
+  },
+  tlMetaAddText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta700,
+    letterSpacing: 0.3,
+    marginLeft: 1,
   },
   tlMetaSep: {
     fontSize: 11,
