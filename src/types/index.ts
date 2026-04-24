@@ -264,3 +264,86 @@ export interface PlanPhoto {
   photoUrl: string;
   takenAt: string;
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// Co-plan (organiser avec mes amis — collaborative plan drafts)
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Participant of a draft — lightweight mirror of the chat `ConversationParticipant`. */
+export interface CoPlanParticipant {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  avatarBg: string;
+  avatarColor: string;
+  initials: string;
+}
+
+/** A place proposed by someone in the draft workspace. */
+export interface CoPlanProposedPlace {
+  /** Local uuid (generated client-side). */
+  id: string;
+  /** Google Place ID — source of truth for metadata. */
+  googlePlaceId: string;
+  name: string;
+  address: string;
+  /** Primary photo URL, optional. */
+  photoUrl?: string;
+  /** Google primary type (e.g. "restaurant", "bar"). */
+  category?: string;
+  /** 0-4 Google Places price_level. Used for budget aggregation (Tier 2). */
+  priceLevel?: number;
+  /** Rough duration-on-site, in minutes. Optional — used for total duration estimate (Tier 2). */
+  estimatedDurationMin?: number;
+  latitude?: number;
+  longitude?: number;
+  /** User id who added this place. */
+  proposedBy: string;
+  /** ISO timestamp of proposal. */
+  proposedAt: string;
+  /** User ids who upvoted. Toggle via array ops. */
+  votes: string[];
+  /** Manual order index — used for drag/tap reorder. */
+  orderIndex: number;
+}
+
+/** Availability slot key — "YYYY-MM-DD-{morning|midday|afternoon|evening}". */
+export type CoPlanAvailabilitySlotKey = string;
+
+export interface CoPlanAvailability {
+  slots: CoPlanAvailabilitySlotKey[];
+  updatedAt: string;
+}
+
+/** Top-level collaborative draft document. */
+export interface PlanDraft {
+  id: string;
+  title: string;
+  createdBy: string;
+  participants: string[];
+  participantDetails: Record<string, CoPlanParticipant>;
+
+  // Workspace — places
+  proposedPlaces: CoPlanProposedPlace[];
+
+  // Workspace — availability
+  availability: Record<string, CoPlanAvailability>;
+
+  // Lock state
+  status: 'draft' | 'locked' | 'archived';
+  /** ISO date-time picked when locking (derived from overlap pick). */
+  meetupAt?: string;
+  lockedBy?: string;
+  lockedAt?: string;
+  /** Set after conversion to a real Plan (only if published on feed). */
+  publishedPlanId?: string;
+  /** Always set on lock — id of the group conv that takes over post-lock. */
+  publishedConvId?: string;
+
+  // Live presence (userId → last-seen ms timestamp)
+  presence: Record<string, number>;
+
+  createdAt: string;
+  updatedAt: string;
+}
