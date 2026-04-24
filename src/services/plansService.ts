@@ -25,6 +25,31 @@ const LIKED_PLANS = 'likedPlans';
 
 // ==================== HELPERS ====================
 
+/**
+ * Recursively removes keys whose value is `undefined`. Firestore rejects any
+ * doc that contains `undefined` anywhere in the tree ; our Plan + Place types
+ * have many optional fields that can be absent in practice (e.g. a place
+ * added from a draft may have no priceLevel / coords).
+ *
+ * Arrays get cleaned element-by-element (for arrays of objects like Place[]).
+ * Null values are preserved (Firestore accepts null).
+ */
+const stripUndefined = <T>(value: T): T => {
+  if (value === null) return value;
+  if (Array.isArray(value)) {
+    return value.map((v) => stripUndefined(v)) as any;
+  }
+  if (typeof value === 'object') {
+    const out: Record<string, any> = {};
+    Object.keys(value as any).forEach((k) => {
+      const v = (value as any)[k];
+      if (v !== undefined) out[k] = stripUndefined(v);
+    });
+    return out as any;
+  }
+  return value;
+};
+
 const GRADIENTS = [
   'linear-gradient(135deg, #FF9A60, #FF6B35, #C94520)',
   'linear-gradient(135deg, #5ED4B4, #1D9E75, #0B5C48)',
@@ -125,7 +150,12 @@ export const createPlan = async (
     timeAgo: 'maintenant',
   };
 
-  await setDoc(doc(db, PLANS, planId), plan);
+  // Deep-strip undefined — Firestore rejects any undefined field anywhere in
+  // the tree. Optional fields on Place / User / etc. may be absent depending
+  // on the origin of the plan (Google Places sometimes omits priceLevel,
+  // lat/lng, etc.).
+  const cleaned = stripUndefined(plan);
+  await setDoc(doc(db, PLANS, planId), cleaned as any);
   return plan;
 };
 
