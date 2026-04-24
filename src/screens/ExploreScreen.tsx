@@ -474,7 +474,7 @@ export const ExploreScreen: React.FC = () => {
         <Text style={styles.sentenceText}>
           <Text>Je cherche un plan </Text>
 
-          {/* Slot 1 — Person */}
+          {/* Slot 1 — Person (toujours clickable) */}
           {slotPerson ? (
             <SlotChip
               label={slotPerson}
@@ -488,14 +488,13 @@ export const ExploreScreen: React.FC = () => {
                 label={EMPTY}
                 onPress={() => setActiveSheet('person')}
                 accessibilityLabel="Choisir la personne"
-                muted
               />
             </>
           )}
 
           <Text>, plutôt </Text>
 
-          {/* Slot 2 — Theme */}
+          {/* Slot 2 — Theme (toujours clickable) */}
           {slotTheme ? (
             <SlotChip
               label={slotTheme}
@@ -509,14 +508,13 @@ export const ExploreScreen: React.FC = () => {
                 label={EMPTY}
                 onPress={() => setActiveSheet('theme')}
                 accessibilityLabel="Choisir le thème"
-                muted
               />
             </>
           )}
 
           <Text>, et plus précisément </Text>
 
-          {/* Slot 3 — Subcategory */}
+          {/* Slot 3 — Subcategory (muted uniquement quand pas de thème sélectionné — comme avant) */}
           {slotSubcategory ? (
             <SlotChip
               label={slotSubcategory}
@@ -525,6 +523,7 @@ export const ExploreScreen: React.FC = () => {
                 setActiveSheet('subcategoryFromSlot');
               }}
               accessibilityLabel={`Changer la sous-cat\u00e9gorie: ${slotSubcategory}`}
+              muted={subDisabled}
             />
           ) : (
             <>
@@ -536,7 +535,7 @@ export const ExploreScreen: React.FC = () => {
                   setActiveSheet('subcategoryFromSlot');
                 }}
                 accessibilityLabel="Choisir la sous-catégorie"
-                muted
+                muted={subDisabled}
               />
             </>
           )}
