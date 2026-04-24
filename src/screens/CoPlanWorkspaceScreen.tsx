@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanChatBubble } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanChatBubble, CoPlanActivityToasts } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -240,6 +240,12 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
 
         <View style={{ height: insets.bottom + 90 }} />
       </ScrollView>
+
+      {/* ── Live activity toasts ──────────────────
+          Bottom-LEFT — surfaces "Léa a ajouté Café Pinson" et al. while the
+          workspace is open, so the doc feels alive even before anyone opens
+          the chat. The chat bubble owns bottom-right, no overlap. */}
+      <CoPlanActivityToasts />
 
       {/* ── Floating chat bubble ──────────────────
           The group conv is created at draft time, so participants can keep

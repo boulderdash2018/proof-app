@@ -32,6 +32,32 @@ import { Place, CategoryTag, TransportMode, CoAuthor } from '../types';
  */
 
 const PRESENCE_INTERVAL_MS = 20_000;
+/** Activity toasts auto-dismiss after this delay. */
+const ACTIVITY_TTL_MS = 5_000;
+/** Skip events older than this on a fresh snapshot — protects against
+ *  dumping a backlog when a user opens the workspace. */
+const ACTIVITY_FRESHNESS_MS = 8_000;
+
+/** Lightweight signal-of-life event surfaced as a toast in the workspace. */
+export type CoPlanActivityKind =
+  | 'place_added'
+  | 'place_removed'
+  | 'vote_added'
+  | 'availability_added';
+
+export interface CoPlanActivityEvent {
+  id: string;
+  kind: CoPlanActivityKind;
+  actorId: string;
+  actorName: string;       // first name only — kept short on the toast
+  actorAvatarBg: string;
+  actorAvatarColor: string;
+  actorAvatarUrl: string | null;
+  actorInitials: string;
+  /** Subject of the action — place name for place/vote, slot count for avail. */
+  detail: string;
+  createdAt: number;       // ms epoch
+}
 
 interface CoPlanStore {
   // ── Observation of a single draft ──
@@ -40,10 +66,17 @@ interface CoPlanStore {
   _unsub: (() => void) | null;
   _userId: string | null;
   _presenceTimer: ReturnType<typeof setInterval> | null;
+  /** Previous draft snapshot — used to compute diffs & emit activity events. */
+  _prevDraft: PlanDraft | null;
+  /** Live, capped-size queue of recent events from OTHER participants. */
+  recentActivity: CoPlanActivityEvent[];
+  _activityPruneTimer: ReturnType<typeof setInterval> | null;
 
   // ── Actions — subscription ──
   observeDraft: (draftId: string, userId: string) => void;
   stopObserving: () => void;
+  /** Remove a single activity toast (typically when the user taps it). */
+  dismissActivity: (id: string) => void;
 
   // ── Actions — mutations (optimistic) ──
   rename: (title: string) => Promise<void>;
@@ -81,6 +114,9 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   _unsub: null,
   _userId: null,
   _presenceTimer: null,
+  _prevDraft: null,
+  recentActivity: [],
+  _activityPruneTimer: null,
 
   // ── Subscribe to a draft + start presence heartbeat ──
   observeDraft: (draftId: string, userId: string) => {
@@ -92,15 +128,29 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     // Close any previous subscription + timer.
     state._unsub?.();
     if (state._presenceTimer) clearInterval(state._presenceTimer);
+    if (state._activityPruneTimer) clearInterval(state._activityPruneTimer);
 
     set({
       draftId,
       draft: null,
       _userId: userId,
+      _prevDraft: null,
+      recentActivity: [],
     });
 
-    const unsub = subscribePlanDraft(draftId, (draft) => {
-      set({ draft });
+    const unsub = subscribePlanDraft(draftId, (next) => {
+      const prev = get()._prevDraft;
+      // Diff vs. previous snapshot — first snapshot is treated as baseline.
+      if (prev && next) {
+        const events = diffDraftForActivity(prev, next, userId);
+        if (events.length > 0) {
+          set((s) => ({
+            // Keep newest first, cap at 6 in memory (UI shows top 3).
+            recentActivity: [...events, ...s.recentActivity].slice(0, 6),
+          }));
+        }
+      }
+      set({ draft: next, _prevDraft: next });
     });
 
     // Fire first heartbeat immediately, then every 20s.
@@ -109,20 +159,40 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       svcPingPresence(draftId, userId).catch(() => {});
     }, PRESENCE_INTERVAL_MS);
 
-    set({ _unsub: unsub, _presenceTimer: timer });
+    // Prune stale activity events every second.
+    const pruneTimer = setInterval(() => {
+      const now = Date.now();
+      const fresh = get().recentActivity.filter(
+        (e) => now - e.createdAt < ACTIVITY_TTL_MS,
+      );
+      if (fresh.length !== get().recentActivity.length) {
+        set({ recentActivity: fresh });
+      }
+    }, 1000);
+
+    set({ _unsub: unsub, _presenceTimer: timer, _activityPruneTimer: pruneTimer });
   },
 
   stopObserving: () => {
-    const { _unsub, _presenceTimer } = get();
+    const { _unsub, _presenceTimer, _activityPruneTimer } = get();
     _unsub?.();
     if (_presenceTimer) clearInterval(_presenceTimer);
+    if (_activityPruneTimer) clearInterval(_activityPruneTimer);
     set({
       _unsub: null,
       _presenceTimer: null,
+      _activityPruneTimer: null,
       draftId: null,
       draft: null,
       _userId: null,
+      _prevDraft: null,
+      recentActivity: [],
     });
+  },
+
+  /** Manually dismiss a single toast — used by the toast component. */
+  dismissActivity: (id: string) => {
+    set((s) => ({ recentActivity: s.recentActivity.filter((e) => e.id !== id) }));
   },
 
   // ── Mutations — each applies optimistic first, service call in background ──
@@ -446,3 +516,117 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     return Date.now() - ts < 45_000; // 45s = ~2x heartbeat
   },
 }));
+
+// ══════════════════════════════════════════════════════════════
+// Activity diff helper — pure function. Compares two consecutive
+// PlanDraft snapshots and emits one event per meaningful change
+// originating from a participant other than the current user.
+// Discards events older than ACTIVITY_FRESHNESS_MS so we never
+// flash a backlog when the workspace mounts after an action.
+// ══════════════════════════════════════════════════════════════
+
+const makeEventId = (() => {
+  let n = 0;
+  return () => `act-${Date.now().toString(36)}-${(++n).toString(36)}`;
+})();
+
+const buildActorMeta = (
+  draft: PlanDraft,
+  actorId: string,
+): Pick<
+  CoPlanActivityEvent,
+  'actorId' | 'actorName' | 'actorAvatarBg' | 'actorAvatarColor' | 'actorAvatarUrl' | 'actorInitials'
+> => {
+  const p: CoPlanParticipant | undefined = draft.participantDetails[actorId];
+  return {
+    actorId,
+    actorName: p ? p.displayName.split(' ')[0] : 'Quelqu\'un',
+    actorAvatarBg: p?.avatarBg ?? '#D5C2B0',
+    actorAvatarColor: p?.avatarColor ?? '#2C2420',
+    actorAvatarUrl: p?.avatarUrl ?? null,
+    actorInitials: p?.initials ?? '?',
+  };
+};
+
+function diffDraftForActivity(
+  prev: PlanDraft,
+  next: PlanDraft,
+  myUserId: string,
+): CoPlanActivityEvent[] {
+  const events: CoPlanActivityEvent[] = [];
+  const now = Date.now();
+
+  // 1) Places added / removed
+  const prevPlaceIds = new Set(prev.proposedPlaces.map((p) => p.id));
+  const nextPlaceIds = new Set(next.proposedPlaces.map((p) => p.id));
+
+  for (const place of next.proposedPlaces) {
+    if (prevPlaceIds.has(place.id)) continue;
+    if (place.proposedBy === myUserId) continue;
+    // Honour freshness — proposedAt is ISO; ignore if older than threshold.
+    const proposedTs = Date.parse(place.proposedAt);
+    if (!Number.isNaN(proposedTs) && now - proposedTs > ACTIVITY_FRESHNESS_MS) continue;
+    events.push({
+      id: makeEventId(),
+      kind: 'place_added',
+      detail: place.name,
+      createdAt: now,
+      ...buildActorMeta(next, place.proposedBy),
+    });
+  }
+  for (const place of prev.proposedPlaces) {
+    if (nextPlaceIds.has(place.id)) continue;
+    if (place.proposedBy === myUserId) continue;
+    // Removal doesn't carry actor metadata reliably (the writer is whoever
+    // pressed × on the row — we approximate as the original proposer).
+    events.push({
+      id: makeEventId(),
+      kind: 'place_removed',
+      detail: place.name,
+      createdAt: now,
+      ...buildActorMeta(prev, place.proposedBy),
+    });
+  }
+
+  // 2) Vote added on an existing place — actor is the user that just appeared
+  //    in the votes array. We surface only ADDS (un-votes are silent).
+  for (const place of next.proposedPlaces) {
+    const prevPlace = prev.proposedPlaces.find((p) => p.id === place.id);
+    if (!prevPlace) continue;
+    const prevVoters = new Set(prevPlace.votes);
+    for (const voter of place.votes) {
+      if (prevVoters.has(voter)) continue;
+      if (voter === myUserId) continue;
+      events.push({
+        id: makeEventId(),
+        kind: 'vote_added',
+        detail: place.name,
+        createdAt: now,
+        ...buildActorMeta(next, voter),
+      });
+    }
+  }
+
+  // 3) Availability — count NEW slots per other user, emit one toast per
+  //    user-burst regardless of how many slots they ticked at once.
+  for (const userId of Object.keys(next.availability)) {
+    if (userId === myUserId) continue;
+    const prevSlots = new Set(prev.availability[userId]?.slots || []);
+    const nextSlots = next.availability[userId]?.slots || [];
+    const added = nextSlots.filter((s) => !prevSlots.has(s));
+    if (added.length === 0) continue;
+    // Skip events for an updatedAt older than freshness — protects against
+    // a "first observation" pre-existing slots being re-emitted.
+    const ts = Date.parse(next.availability[userId].updatedAt);
+    if (!Number.isNaN(ts) && now - ts > ACTIVITY_FRESHNESS_MS) continue;
+    events.push({
+      id: makeEventId(),
+      kind: 'availability_added',
+      detail: added.length === 1 ? '1 dispo' : `${added.length} dispos`,
+      createdAt: now,
+      ...buildActorMeta(next, userId),
+    });
+  }
+
+  return events;
+}
