@@ -691,12 +691,12 @@ export const DoItNowScreen: React.FC = () => {
               <Text style={styles.reviewRatingHint}>Note ton expérience</Text>
             )}
 
-            {/* Favorite card (dark when active) */}
+            {/* Favorite card — terracotta rempli (cohérent avec la palette de l'app) */}
             <TouchableOpacity
               style={[
                 styles.favCard,
                 isCurrentPlaceFavorite
-                  ? { backgroundColor: '#2C2420' }
+                  ? { backgroundColor: Colors.terracotta100, borderWidth: 1.5, borderColor: Colors.primary }
                   : { backgroundColor: Colors.bgSecondary, borderWidth: 1, borderColor: Colors.borderMedium },
               ]}
               onPress={toggleCurrentPlaceFavorite}
@@ -705,13 +705,13 @@ export const DoItNowScreen: React.FC = () => {
               <Ionicons
                 name="star"
                 size={16}
-                color={isCurrentPlaceFavorite ? '#F2CF7A' : Colors.textPrimary}
+                color={isCurrentPlaceFavorite ? Colors.gold : Colors.textPrimary}
               />
               <View style={{ flex: 1 }}>
                 <Text
                   style={[
                     styles.favCardTitle,
-                    { color: isCurrentPlaceFavorite ? Colors.textOnAccent : Colors.textPrimary },
+                    { color: isCurrentPlaceFavorite ? Colors.terracotta700 : Colors.textPrimary },
                   ]}
                 >
                   {isCurrentPlaceFavorite ? 'Ajouté à tes favoris' : 'Ajouter aux favoris'}
@@ -719,14 +719,14 @@ export const DoItNowScreen: React.FC = () => {
                 <Text
                   style={[
                     styles.favCardHint,
-                    { color: isCurrentPlaceFavorite ? 'rgba(255, 248, 240, 0.65)' : Colors.textSecondary },
+                    { color: isCurrentPlaceFavorite ? Colors.terracotta600 : Colors.textSecondary },
                   ]}
                 >
                   Retrouve-le dans Plans → Lieux favoris
                 </Text>
               </View>
               {isCurrentPlaceFavorite && (
-                <Ionicons name="checkmark" size={16} color="#F2CF7A" />
+                <Ionicons name="checkmark" size={16} color={Colors.primary} />
               )}
             </TouchableOpacity>
 
