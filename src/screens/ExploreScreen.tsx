@@ -460,39 +460,87 @@ export const ExploreScreen: React.FC = () => {
   //  selectedFilters is auto-synced from the slots by the useEffect above.)
 
   // ─── Conversational sentence (3 slots inline) ───
-  // The Text wraps naturally because nested <Text> in RN respects the parent's
-  // wrap. Slot 3 (sub-category) is the COMMIT — picking one fires the actual
-  // filters and drops the user into the plans-only results view.
+  // Le bout de phrase change PER slot selon l'état rempli/vide :
+  //   - Person vide : "avec '…'"  |  rempli : "{person}"
+  //   - Theme  vide : "dans le thème de '…'"  |  rempli : "{theme}"
+  //   - Sub    vide : "dans '…'"  |  rempli : "{sub}"
+  // Les connecteurs fixes (", plutôt ", ", et plus précisément ") restent
+  // inchangés quel que soit l'état.
   const renderSentence = () => {
-    const personLabel = slotPerson || 'quelqu\u2019un';
-    const themeLabel = slotTheme || 'quelque chose';
-    const subLabel = slotSubcategory || 'quoi';
     const subDisabled = !slotTheme; // can't pick a sub-category without a theme
+    const EMPTY = '\u2018\u2026\u2019'; // '…' (guillemets français)
     return (
       <View style={styles.sentenceBlock}>
         <Text style={styles.sentenceText}>
           <Text>Je cherche un plan </Text>
-          <SlotChip
-            label={personLabel}
-            onPress={() => setActiveSheet('person')}
-            accessibilityLabel={`Changer la personne: ${personLabel}`}
-          />
+
+          {/* Slot 1 — Person */}
+          {slotPerson ? (
+            <SlotChip
+              label={slotPerson}
+              onPress={() => setActiveSheet('person')}
+              accessibilityLabel={`Changer la personne: ${slotPerson}`}
+            />
+          ) : (
+            <>
+              <Text>avec </Text>
+              <SlotChip
+                label={EMPTY}
+                onPress={() => setActiveSheet('person')}
+                accessibilityLabel="Choisir la personne"
+                muted
+              />
+            </>
+          )}
+
           <Text>, plutôt </Text>
-          <SlotChip
-            label={themeLabel}
-            onPress={() => setActiveSheet('theme')}
-            accessibilityLabel={`Changer le thème: ${themeLabel}`}
-          />
+
+          {/* Slot 2 — Theme */}
+          {slotTheme ? (
+            <SlotChip
+              label={slotTheme}
+              onPress={() => setActiveSheet('theme')}
+              accessibilityLabel={`Changer le thème: ${slotTheme}`}
+            />
+          ) : (
+            <>
+              <Text>dans le thème de </Text>
+              <SlotChip
+                label={EMPTY}
+                onPress={() => setActiveSheet('theme')}
+                accessibilityLabel="Choisir le thème"
+                muted
+              />
+            </>
+          )}
+
           <Text>, et plus précisément </Text>
-          <SlotChip
-            label={subLabel}
-            onPress={() => {
-              if (subDisabled) return;
-              setActiveSheet('subcategoryFromSlot');
-            }}
-            accessibilityLabel={`Changer la sous-cat\u00e9gorie: ${subLabel}`}
-            muted={subDisabled}
-          />
+
+          {/* Slot 3 — Subcategory */}
+          {slotSubcategory ? (
+            <SlotChip
+              label={slotSubcategory}
+              onPress={() => {
+                if (subDisabled) return;
+                setActiveSheet('subcategoryFromSlot');
+              }}
+              accessibilityLabel={`Changer la sous-cat\u00e9gorie: ${slotSubcategory}`}
+            />
+          ) : (
+            <>
+              <Text>dans </Text>
+              <SlotChip
+                label={EMPTY}
+                onPress={() => {
+                  if (subDisabled) return;
+                  setActiveSheet('subcategoryFromSlot');
+                }}
+                accessibilityLabel="Choisir la sous-catégorie"
+                muted
+              />
+            </>
+          )}
+
           <Text>.</Text>
         </Text>
       </View>
