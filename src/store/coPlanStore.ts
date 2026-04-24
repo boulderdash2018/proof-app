@@ -13,9 +13,15 @@ import {
   setAvailability as svcSetAvailability,
   renameDraft as svcRenameDraft,
   pingPresence as svcPingPresence,
+  markDraftLocked,
   makeLocalId,
   computeOverlapCounts,
+  slotKeyToMeetupAt,
 } from '../services/planDraftService';
+import { createPlan } from '../services/plansService';
+import { createGroupConversation, ConversationParticipant } from '../services/chatService';
+import { useAuthStore } from './authStore';
+import { Place, CategoryTag, TransportMode } from '../types';
 
 /**
  * Observes a single active draft at a time (what the workspace screen shows).
@@ -58,10 +64,14 @@ interface CoPlanStore {
   setAvailability: (slots: string[]) => Promise<void>;
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
 
+  // ── Lock → conversion to real Plan + group conv ──
+  lockDraft: (publishOnFeed: boolean) => Promise<{ conversationId: string; planId: string | null } | null>;
+
   // ── Derived helpers (pure reads, compute on demand) ──
   getSortedPlaces: () => CoPlanProposedPlace[];
   getOverlapCounts: () => Record<string, number>;
   getMySlots: () => string[];
+  getBestOverlapSlot: () => { key: string; count: number } | null;
   isPresent: (otherUserId: string) => boolean;
 }
 
@@ -269,6 +279,126 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     const { draft, _userId } = get();
     if (!draft || !_userId) return [];
     return draft.availability[_userId]?.slots || [];
+  },
+
+  getBestOverlapSlot: () => {
+    const { draft } = get();
+    if (!draft) return null;
+    const counts = computeOverlapCounts(draft.availability);
+    let bestKey: string | null = null;
+    let bestCount = 0;
+    Object.entries(counts).forEach(([k, c]) => {
+      // Highest count wins, tie-break on earliest (lexicographic works because
+      // slot keys start with YYYY-MM-DD).
+      if (c > bestCount || (c === bestCount && bestKey && k < bestKey)) {
+        bestKey = k;
+        bestCount = c;
+      }
+    });
+    return bestKey ? { key: bestKey, count: bestCount } : null;
+  },
+
+  // ── Lock → convert to real Plan + group conv ──
+  // Called from the LockConfirmSheet. Builds a Plan + group conversation
+  // doc, links them on the draft (markDraftLocked), and returns the ids.
+  lockDraft: async (publishOnFeed: boolean) => {
+    const { draft, _userId } = get();
+    if (!draft || !_userId) return null;
+    const user = useAuthStore.getState().user;
+    if (!user) return null;
+
+    try {
+      // 1) Determine meetupAt from the best overlap slot (if any).
+      const best = get().getBestOverlapSlot();
+      const meetupAt = best ? slotKeyToMeetupAt(best.key) : null;
+
+      // 2) Build places in manual order.
+      const sortedPlaces = get().getSortedPlaces();
+      const planPlaces: Place[] = sortedPlaces.map((p) => ({
+        id: `place-${p.googlePlaceId}-${Math.random().toString(36).slice(2, 8)}`,
+        googlePlaceId: p.googlePlaceId,
+        name: p.name,
+        type: p.category || 'Lieu',
+        address: p.address,
+        rating: 0,
+        reviewCount: 0,
+        ratingDistribution: [0, 0, 0, 0, 0],
+        reviews: [],
+        photoUrls: p.photoUrl ? [p.photoUrl] : [],
+        priceLevel: p.priceLevel,
+        latitude: p.latitude,
+        longitude: p.longitude,
+      }));
+
+      // 3) Coarse category tag from the first place's category.
+      const defaultTags: CategoryTag[] = sortedPlaces[0]?.category ? [sortedPlaces[0].category] : [];
+      const defaultTransport: TransportMode = 'À pied';
+
+      // 4) Create the Plan doc. We always create it — the group conv needs
+      //    a linkedPlanId to enable the "Do it now" multi-user flow.
+      //    Commit 11 will gate feed visibility based on publishOnFeed.
+      const plan = await createPlan(
+        {
+          title: draft.title,
+          tags: defaultTags,
+          places: planPlaces,
+          price: '$$',
+          duration: '',
+          transport: defaultTransport,
+          travelSegments: [],
+          coverPhotos: sortedPlaces[0]?.photoUrl ? [sortedPlaces[0].photoUrl] : [],
+          city: 'Paris',
+        },
+        user,
+      );
+
+      // 5) Create the group conversation linking the plan.
+      const me: ConversationParticipant = {
+        userId: user.id,
+        displayName: user.displayName,
+        username: user.username,
+        avatarUrl: user.avatarUrl || null,
+        avatarBg: user.avatarBg,
+        avatarColor: user.avatarColor,
+        initials: user.initials,
+      };
+      const others: ConversationParticipant[] = Object.values(draft.participantDetails)
+        .filter((p) => p.userId !== user.id)
+        .map((p) => ({
+          userId: p.userId,
+          displayName: p.displayName,
+          username: p.username,
+          avatarUrl: p.avatarUrl,
+          avatarBg: p.avatarBg,
+          avatarColor: p.avatarColor,
+          initials: p.initials,
+        }));
+
+      const convId = await createGroupConversation({
+        creator: me,
+        otherParticipants: others,
+        plan: {
+          id: plan.id,
+          title: plan.title,
+          coverPhoto: plan.coverPhotos?.[0] ?? null,
+        },
+        meetupAt: meetupAt || undefined,
+      });
+
+      // 6) Mark the draft as locked + cross-linked.
+      await markDraftLocked(
+        draft.id,
+        _userId,
+        meetupAt,
+        publishOnFeed ? plan.id : null, // only record publishedPlanId if meant to be on feed (used by commit 11)
+        convId,
+      );
+
+      return { conversationId: convId, planId: plan.id };
+    } catch (err) {
+      console.warn('[coPlanStore] lockDraft error:', err);
+      return null;
+    }
   },
 
   isPresent: (otherUserId: string) => {

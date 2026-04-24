@@ -23,6 +23,7 @@ export { AddParticipantsSheet } from './AddParticipantsSheet';
 export { CoPlanInviteSheet } from './CoPlanInviteSheet';
 export { CoPlanPlacesSection } from './CoPlanPlacesSection';
 export { CoPlanAvailabilitySection } from './CoPlanAvailabilitySection';
+export { CoPlanLockSheet } from './CoPlanLockSheet';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';

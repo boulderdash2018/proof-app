@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -44,6 +44,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   // Rename modal state
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+
+  // Lock confirm sheet state
+  const [lockOpen, setLockOpen] = useState(false);
 
   // Observe the draft while mounted — also starts presence heartbeat.
   useEffect(() => {
@@ -188,12 +191,36 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           label="VERROUILLER"
           title="Figer le plan"
           subtitle="Transforme le brouillon en vrai plan + conv de groupe"
-          placeholder
-          muted
-        />
+        >
+          <TouchableOpacity
+            style={styles.lockBtn}
+            onPress={() => setLockOpen(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="lock-closed" size={16} color={Colors.textOnAccent} />
+            <Text style={styles.lockBtnText}>Verrouiller le plan</Text>
+          </TouchableOpacity>
+        </SectionBlock>
 
         <View style={{ height: insets.bottom + 20 }} />
       </ScrollView>
+
+      {/* ── Lock confirm sheet ────────────────── */}
+      <CoPlanLockSheet
+        visible={lockOpen}
+        onClose={() => setLockOpen(false)}
+        onLocked={(conversationId) => {
+          // Navigate to the freshly-created group conversation. The flow
+          // "Do it now multi-user" + polls + album takes over from there.
+          navigation.reset({
+            index: 0,
+            routes: [
+              { name: 'Main' },
+              { name: 'Conversation', params: { conversationId, otherUser: null } },
+            ] as any,
+          });
+        }}
+      />
 
       {/* ── Rename modal ─────────────────────── */}
       <Modal
@@ -376,6 +403,29 @@ const styles = StyleSheet.create({
   // Body
   scrollContent: { padding: 14 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Lock CTA in VERROUILLER section
+  lockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  lockBtnText: {
+    fontSize: 14.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.1,
+  },
 });
 
 const sectionStyles = StyleSheet.create({
