@@ -35,6 +35,7 @@ import { useAuthStore } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { activeCreateSession } from '../store/draftStore';
 import { Colors, Fonts } from '../constants';
+import { CoPlanInviteSheet } from '../components';
 
 // Feed Stack
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
@@ -130,6 +131,7 @@ export const BottomTabNavigator: React.FC = () => {
   const setShowAccountPrompt = useGuestStore((s) => s.setShowAccountPrompt);
   const isGuest = !isAuthenticated;
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCoPlanInvite, setShowCoPlanInvite] = useState(false);
   const [showDraftExit, setShowDraftExit] = useState(false);
   const pendingTabRef = useRef<string | null>(null);
   const navigationRef = useNavigation<any>();
@@ -311,11 +313,42 @@ export const BottomTabNavigator: React.FC = () => {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
               </TouchableOpacity>
+
+              <View style={styles.createModalDivider} />
+
+              <TouchableOpacity
+                style={styles.createModalOption}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  // Slight defer so the modal close anim doesn't collide with
+                  // the sheet opening anim.
+                  setTimeout(() => setShowCoPlanInvite(true), 180);
+                }}
+              >
+                <View style={[styles.createModalIcon, { backgroundColor: Colors.terracotta50 }]}>
+                  <Ionicons name="people-outline" size={24} color={Colors.primary} />
+                </View>
+                <View style={styles.createModalText}>
+                  <Text style={styles.createModalTitle}>Organiser avec mes amis</Text>
+                  <Text style={styles.createModalDesc}>Proposez des lieux + dispos, verrouillez ensemble</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
+              </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
     </Modal>
+
+    {/* Co-plan invite sheet — opened when user picks option 3 above. */}
+    <CoPlanInviteSheet
+      visible={showCoPlanInvite}
+      onClose={() => setShowCoPlanInvite(false)}
+      onCreated={(draftId) => {
+        navigationRef.navigate('CoPlanWorkspace', { draftId });
+      }}
+    />
     </>
   );
 };

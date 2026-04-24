@@ -26,7 +26,7 @@ import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PrimaryButton, Chip, TextInput, PlanCard, CoPlanInviteSheet, CoPlanDraftsList } from '../components';
+import { PrimaryButton, Chip, TextInput, PlanCard, CoPlanDraftsList } from '../components';
 import { PhotoEditorSheet } from '../components/PhotoEditorSheet';
 import { useAuthStore, useFeedStore, useSavesStore, useDraftStore, useSavedPlacesStore } from '../store';
 import { activeCreateSession } from '../store/draftStore';
@@ -680,9 +680,6 @@ export const CreateScreen: React.FC = () => {
 
   // ========== PREVIEW ==========
   const [showPreview, setShowPreview] = useState(false);
-
-  // Co-plan entry — "Organiser avec mes amis" (3rd option, separate flow).
-  const [showCoPlanInvite, setShowCoPlanInvite] = useState(false);
   const [previewMode, setPreviewMode] = useState<'card' | 'detail'>('card');
 
   // ========== PHOTO PICKER ==========
@@ -1931,25 +1928,6 @@ export const CreateScreen: React.FC = () => {
           {/* ═══════ STEP 1: Title only — editorial composer ═══════ */}
           {step === 1 && (
             <View style={styles.s0Container}>
-              {/* ── Co-plan entry card — 3rd option distinct from the solo wizard ── */}
-              <TouchableOpacity
-                style={styles.s0CoPlanCard}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setShowCoPlanInvite(true);
-                }}
-                activeOpacity={0.85}
-              >
-                <View style={styles.s0CoPlanIcon}>
-                  <Ionicons name="people" size={18} color={Colors.primary} />
-                </View>
-                <View style={styles.s0CoPlanBody}>
-                  <Text style={styles.s0CoPlanTitle}>Organiser avec mes amis</Text>
-                  <Text style={styles.s0CoPlanSub}>Proposez des lieux + dispos, verrouillez ensemble</Text>
-                </View>
-                <Ionicons name="arrow-forward" size={18} color={Colors.primary} />
-              </TouchableOpacity>
-
               <Text style={styles.s0Prompt}>Qu'est-ce que tu proposes ?</Text>
               <Text style={styles.s0Helper}>
                 Un titre court et précis vaut mieux qu'un long descriptif.
@@ -2468,13 +2446,6 @@ export const CreateScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* ========== CO-PLAN INVITE SHEET (3rd entry option) ========== */}
-        <CoPlanInviteSheet
-          visible={showCoPlanInvite}
-          onClose={() => setShowCoPlanInvite(false)}
-          onCreated={(draftId) => navigation.navigate('CoPlanWorkspace', { draftId })}
-        />
 
         {/* ========== PLACE PICKER MODAL ========== */}
         <Modal visible={showPlacePicker} animationType="slide" presentationStyle="pageSheet">
@@ -3222,42 +3193,8 @@ const styles = StyleSheet.create({
   },
   // ── STEP 1 (pre-step): Title composer ──
   s0Container: {
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 40,
-  },
-  // Co-plan entry card — discreet but visible alt flow at the top of step 1
-  s0CoPlanCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 22,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: Colors.terracotta50,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.terracotta100,
-  },
-  s0CoPlanIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.bgSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  s0CoPlanBody: { flex: 1 },
-  s0CoPlanTitle: {
-    fontSize: 14,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.1,
-  },
-  s0CoPlanSub: {
-    fontSize: 11.5,
-    fontFamily: Fonts.body,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
   s0Prompt: {
     fontSize: 30,
