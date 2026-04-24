@@ -24,6 +24,7 @@ export { CoPlanInviteSheet } from './CoPlanInviteSheet';
 export { CoPlanPlacesSection } from './CoPlanPlacesSection';
 export { CoPlanAvailabilitySection } from './CoPlanAvailabilitySection';
 export { CoPlanLockSheet } from './CoPlanLockSheet';
+export { CoPlanDraftsList } from './CoPlanDraftsList';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';
