@@ -136,7 +136,11 @@ export const CoPlanInviteSheet: React.FC<CoPlanInviteSheetProps> = ({
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!user || !canSubmit) return;
+    console.log('[CoPlan] submit pressed — user?', !!user, 'canSubmit?', canSubmit, 'selected count:', selectedIds.size);
+    if (!user || !canSubmit) {
+      console.warn('[CoPlan] aborted — missing user or not submittable');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const me: CoPlanParticipant = {
@@ -158,16 +162,21 @@ export const CoPlanInviteSheet: React.FC<CoPlanInviteSheetProps> = ({
         avatarColor: f.avatarColor,
         initials: f.initials,
       }));
+      console.log('[CoPlan] calling createPlanDraft — title:', title.trim(), 'invitees:', invitees.length);
       const draftId = await createPlanDraft({
         title: title.trim(),
         creator: me,
         invitees,
       });
+      console.log('[CoPlan] draft created — id:', draftId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onClose();
-      setTimeout(() => onCreated?.(draftId), 180);
+      setTimeout(() => {
+        console.log('[CoPlan] firing onCreated callback — nav to workspace');
+        onCreated?.(draftId);
+      }, 180);
     } catch (err) {
-      console.warn('[CoPlanInviteSheet] submit error:', err);
+      console.error('[CoPlan] submit error:', err);
     } finally {
       setIsSubmitting(false);
     }

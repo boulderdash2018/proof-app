@@ -346,7 +346,18 @@ export const BottomTabNavigator: React.FC = () => {
       visible={showCoPlanInvite}
       onClose={() => setShowCoPlanInvite(false)}
       onCreated={(draftId) => {
-        navigationRef.navigate('CoPlanWorkspace', { draftId });
+        console.log('[CoPlan] BottomTabNavigator: onCreated fired — draftId:', draftId);
+        // CoPlanWorkspace is registered at the ROOT Stack level (sibling of Main).
+        // From inside the BottomTabNavigator, useNavigation() returns the tab nav,
+        // so we climb one level up to reach the root stack and navigate there.
+        try {
+          const rootNav = navigationRef.getParent?.() || navigationRef;
+          console.log('[CoPlan] rootNav resolved — typeof navigate:', typeof rootNav.navigate);
+          rootNav.navigate('CoPlanWorkspace', { draftId });
+          console.log('[CoPlan] navigate call returned cleanly');
+        } catch (err) {
+          console.error('[CoPlan] navigation failed:', err);
+        }
       }}
     />
     </>
