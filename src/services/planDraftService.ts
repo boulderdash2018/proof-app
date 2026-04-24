@@ -144,6 +144,79 @@ export const createPlanDraft = async (input: CreateDraftInput): Promise<string> 
   return ref.id;
 };
 
+/**
+ * Lazily attach a group conversation to a draft that was created BEFORE
+ * we started seeding convs at draft time. Idempotent — a no-op if the
+ * draft already has `conversationId` (or the legacy `publishedConvId`).
+ *
+ * Called by the workspace screen on first observe so legacy brouillons
+ * end up with a chat too. The first participant to open such a draft
+ * wins the race; subsequent calls bail out via the `existing` check.
+ *
+ * Returns the conv id (existing or newly created), or null if it failed.
+ */
+export const backfillConversationForDraft = async (
+  draftId: string,
+): Promise<string | null> => {
+  try {
+    const ref = doc(db, DRAFTS, draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data() as any;
+    // Already has one — nothing to do.
+    const existing = data.conversationId || data.publishedConvId;
+    if (existing) return existing;
+
+    const details: Record<string, CoPlanParticipant> | undefined = data.participantDetails;
+    const participants: string[] | undefined = data.participants;
+    if (!details || !participants || participants.length === 0) {
+      console.warn('[planDraftService] backfill: draft missing participantDetails');
+      return null;
+    }
+
+    const creatorId: string = data.createdBy;
+    const creator = details[creatorId];
+    if (!creator) {
+      console.warn('[planDraftService] backfill: creator details missing');
+      return null;
+    }
+
+    const me: ConversationParticipant = {
+      userId: creator.userId,
+      displayName: creator.displayName,
+      username: creator.username,
+      avatarUrl: creator.avatarUrl,
+      avatarBg: creator.avatarBg,
+      avatarColor: creator.avatarColor,
+      initials: creator.initials,
+    };
+    const others: ConversationParticipant[] = participants
+      .filter((id) => id !== creatorId)
+      .map((id) => details[id])
+      .filter(Boolean)
+      .map((p) => ({
+        userId: p.userId,
+        displayName: p.displayName,
+        username: p.username,
+        avatarUrl: p.avatarUrl,
+        avatarBg: p.avatarBg,
+        avatarColor: p.avatarColor,
+        initials: p.initials,
+      }));
+
+    const conversationId = await createGroupConversation({
+      creator: me,
+      otherParticipants: others,
+      groupName: data.title || 'Brouillon',
+    });
+    await updateDoc(ref, { conversationId, updatedAt: serverTimestamp() });
+    return conversationId;
+  } catch (err) {
+    console.warn('[planDraftService] backfill error:', err);
+    return null;
+  }
+};
+
 export const fetchPlanDraft = async (draftId: string): Promise<PlanDraft | null> => {
   const snap = await getDoc(doc(db, DRAFTS, draftId));
   if (!snap.exists()) return null;

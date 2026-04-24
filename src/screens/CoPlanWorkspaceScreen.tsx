@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
+import { backfillConversationForDraft } from '../services/planDraftService';
 import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanChatBubble, CoPlanActivityToasts } from '../components';
 
 /**
@@ -54,6 +55,21 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
     observeDraft(draftId, user.id);
     return () => stopObserving();
   }, [draftId, user?.id, observeDraft, stopObserving]);
+
+  // Lazy backfill — older drafts (created before we started seeding the
+  // conv at draft time) don't have `conversationId` set, so the floating
+  // chat bubble would self-hide. The first participant to open such a
+  // draft creates the conv server-side; subsequent loads see it via the
+  // live subscription. Idempotent on the service side.
+  useEffect(() => {
+    if (!draft || !user?.id) return;
+    const hasConv = !!(draft.conversationId || draft.publishedConvId);
+    if (hasConv) return;
+    // Only the creator triggers the backfill to avoid duplicate convs
+    // if multiple participants open the workspace at the same instant.
+    if (draft.createdBy !== user.id) return;
+    backfillConversationForDraft(draft.id).catch(() => {});
+  }, [draft, user?.id]);
 
   // Periodic re-render so "Présent · à l'instant" stays fresh even without data update.
   const [, setTick] = useState(0);

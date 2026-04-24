@@ -39,6 +39,9 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
   const entering = useRef(new Animated.Value(0)).current;
   const idle = useRef(new Animated.Value(0)).current;
   const press = useRef(new Animated.Value(1)).current;
+  /** Peek label — slides out for the first ~3.5s so the affordance is
+   *  unmissable, then collapses to the bare icon. */
+  const labelAnim = useRef(new Animated.Value(0)).current;
 
   // Enter animation
   useEffect(() => {
@@ -50,7 +53,25 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
       tension: 90,
       useNativeDriver: true,
     }).start();
-  }, [conversationId, entering]);
+
+    // Peek "Discuter" label — slide out, hold ~2.6s, slide back in.
+    Animated.sequence([
+      Animated.delay(520),
+      Animated.spring(labelAnim, {
+        toValue: 1,
+        friction: 7,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.delay(2600),
+      Animated.timing(labelAnim, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [conversationId, entering, labelAnim]);
 
   // Gentle idle pulse loop
   useEffect(() => {
@@ -87,6 +108,17 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
   const glowOpacity = idle.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.45] });
   const glowScale = idle.interpolate({ inputRange: [0, 1], outputRange: [1, 1.25] });
 
+  // Peek label transforms — opacity fades in, slides from the bubble's edge.
+  const labelOpacity = labelAnim;
+  const labelTranslateX = labelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
+  });
+  const labelScale = labelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.92, 1],
+  });
+
   return (
     <View
       style={[styles.wrap, { bottom: insets.bottom + 18 }]}
@@ -103,6 +135,21 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
           },
         ]}
       />
+
+      {/* Peek label — gives the affordance a tooltip on first appearance */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.label,
+          {
+            opacity: labelOpacity,
+            transform: [{ translateX: labelTranslateX }, { scale: labelScale }],
+          },
+        ]}
+      >
+        <Text style={styles.labelText}>Discuter</Text>
+        <View style={styles.labelTail} />
+      </Animated.View>
 
       <Animated.View style={{ transform: [{ scale }] }}>
         <TouchableOpacity
@@ -136,12 +183,50 @@ const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
     right: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     zIndex: 50,
+  },
+  // "Discuter" peek label — sits to the LEFT of the bubble.
+  label: {
+    marginRight: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  labelText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: 0.1,
+  },
+  // Small notch pointing toward the bubble — pure aesthetic.
+  labelTail: {
+    position: 'absolute',
+    right: -4,
+    top: '50%',
+    marginTop: -4,
+    width: 8,
+    height: 8,
+    transform: [{ rotate: '45deg' }],
+    backgroundColor: Colors.bgSecondary,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
   },
   glow: {
     position: 'absolute',
+    right: -9, // (BUBBLE_SIZE + 18 - BUBBLE_SIZE) / 2 — centers halo on bubble
+    top: -9,
     width: BUBBLE_SIZE + 18,
     height: BUBBLE_SIZE + 18,
     borderRadius: (BUBBLE_SIZE + 18) / 2,
