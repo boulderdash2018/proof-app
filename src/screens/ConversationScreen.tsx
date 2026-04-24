@@ -1584,7 +1584,7 @@ export const ConversationScreen: React.FC = () => {
               />
               {text.trim().length > 0 && (
                 <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
-                  <Ionicons name="arrow-up" size={18} color={Colors.textOnAccent} />
+                  <Ionicons name="arrow-up" size={14} color={Colors.textOnAccent} />
                 </TouchableOpacity>
               )}
             </View>
@@ -2561,9 +2561,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   attachBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2602,13 +2602,13 @@ const styles = StyleSheet.create({
   inputRow: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderRadius: 20,
+    alignItems: 'center',
+    borderRadius: 99,
     paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingVertical: 2,
     gap: 8,
     backgroundColor: Colors.bgTertiary,
-    minHeight: 32,
+    minHeight: 28,
   },
   input: {
     flex: 1,
@@ -2619,17 +2619,17 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   sendBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 2,
   },
 
   // ── Gradient fade overlays ──
