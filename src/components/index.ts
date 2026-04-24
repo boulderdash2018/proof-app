@@ -26,6 +26,7 @@ export { CoPlanAvailabilitySection } from './CoPlanAvailabilitySection';
 export { CoPlanLockSheet } from './CoPlanLockSheet';
 export { CoPlanDraftsList } from './CoPlanDraftsList';
 export { CoPlanRouteSection } from './CoPlanRouteSection';
+export { CoPlanSummaryFooter } from './CoPlanSummaryFooter';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';

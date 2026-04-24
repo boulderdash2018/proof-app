@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -186,6 +186,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         >
           <CoPlanRouteSection />
         </SectionBlock>
+        {/* Summary pills — estimated duration + budget, above the lock section. */}
+        <CoPlanSummaryFooter />
+
         <SectionBlock
           icon="lock-closed-outline"
           label="VERROUILLER"
