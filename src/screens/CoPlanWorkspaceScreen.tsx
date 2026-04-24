@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanChatBubble } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -74,6 +74,23 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
     if (!draft) return 0;
     return draft.participants.filter((id) => id !== user?.id && isPresent(id)).length;
   }, [draft, user?.id, isPresent]);
+
+  // Lock pre-conditions — VERROUILLER stays visible (so participants
+  // understand what's coming) but is muted + disabled until the basics
+  // are in place. This prevents accidental locks of an empty draft.
+  const placeCount = draft?.proposedPlaces.length ?? 0;
+  const someoneHasAvailability = useMemo(() => {
+    if (!draft) return false;
+    return Object.values(draft.availability).some((a) => a && a.slots.length > 0);
+  }, [draft]);
+  const canLock = placeCount > 0 && someoneHasAvailability;
+  const lockMissingHint = !canLock
+    ? placeCount === 0 && !someoneHasAvailability
+      ? 'Ajoute au moins un lieu et marque tes dispos pour activer.'
+      : placeCount === 0
+        ? 'Ajoute au moins un lieu pour activer.'
+        : 'Marque tes dispos pour activer.'
+    : null;
 
   if (!draft) {
     return (
@@ -194,19 +211,51 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           label="VERROUILLER"
           title="Figer le plan"
           subtitle="Transforme le brouillon en vrai plan + conv de groupe"
+          muted={!canLock}
         >
           <TouchableOpacity
-            style={styles.lockBtn}
-            onPress={() => setLockOpen(true)}
-            activeOpacity={0.85}
+            style={[styles.lockBtn, !canLock && styles.lockBtnDisabled]}
+            onPress={() => canLock && setLockOpen(true)}
+            activeOpacity={canLock ? 0.85 : 1}
+            disabled={!canLock}
           >
-            <Ionicons name="lock-closed" size={16} color={Colors.textOnAccent} />
-            <Text style={styles.lockBtnText}>Verrouiller le plan</Text>
+            <Ionicons
+              name="lock-closed"
+              size={16}
+              color={canLock ? Colors.textOnAccent : Colors.textTertiary}
+            />
+            <Text
+              style={[
+                styles.lockBtnText,
+                !canLock && styles.lockBtnTextDisabled,
+              ]}
+            >
+              Verrouiller le plan
+            </Text>
           </TouchableOpacity>
+          {lockMissingHint && (
+            <Text style={styles.lockHint}>{lockMissingHint}</Text>
+          )}
         </SectionBlock>
 
-        <View style={{ height: insets.bottom + 20 }} />
+        <View style={{ height: insets.bottom + 90 }} />
       </ScrollView>
+
+      {/* ── Floating chat bubble ──────────────────
+          The group conv is created at draft time, so participants can keep
+          the planning doc and the conversation thread side by side instead
+          of stuffing everything into a doubled chat panel. */}
+      <CoPlanChatBubble
+        conversationId={draft.conversationId ?? draft.publishedConvId}
+        onPress={() => {
+          const convId = draft.conversationId ?? draft.publishedConvId;
+          if (!convId) return;
+          navigation.navigate('Conversation', {
+            conversationId: convId,
+            otherUser: null,
+          });
+        }}
+      />
 
       {/* ── Lock confirm sheet ────────────────── */}
       <CoPlanLockSheet
@@ -428,6 +477,22 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textOnAccent,
     letterSpacing: -0.1,
+  },
+  lockBtnDisabled: {
+    backgroundColor: Colors.bgTertiary,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  lockBtnTextDisabled: {
+    color: Colors.textTertiary,
+  },
+  lockHint: {
+    marginTop: 8,
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+    textAlign: 'center',
   },
 });
 

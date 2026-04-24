@@ -58,16 +58,42 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
     removePlace(placeId);
   }, [removePlace]);
 
+  const isEmpty = places.length === 0;
+
   return (
     <View>
-      {places.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyText}>
-            Aucun lieu proposé. Lance le mouvement !
+      {/* Primary action — promoted to the TOP of the section so the move
+          to "propose something" feels like the natural next step, not an
+          afterthought hidden under an empty state. */}
+      <TouchableOpacity
+        style={[styles.addBtn, isEmpty && styles.addBtnPrimary]}
+        onPress={handleAdd}
+        activeOpacity={0.85}
+      >
+        <Ionicons
+          name="add"
+          size={18}
+          color={isEmpty ? Colors.textOnAccent : Colors.primary}
+        />
+        <Text style={[styles.addBtnText, isEmpty && styles.addBtnTextPrimary]}>
+          Proposer un lieu
+        </Text>
+      </TouchableOpacity>
+
+      {isEmpty ? (
+        <View style={styles.emptyCard}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="sparkles" size={20} color={Colors.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>Lance le mouvement</Text>
+          <Text style={styles.emptyBody}>
+            Café, expo, balade, restau… le premier lieu donne souvent le ton
+            de la journée. Vous pourrez voter, réordonner et en ajouter
+            d'autres ensuite.
           </Text>
         </View>
       ) : (
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 10, marginTop: 12 }}>
           {places.map((p, i) => (
             <PlaceRow
               key={p.id}
@@ -84,11 +110,6 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
           ))}
         </View>
       )}
-
-      <TouchableOpacity style={styles.addBtn} onPress={handleAdd} activeOpacity={0.7}>
-        <Ionicons name="add" size={18} color={Colors.primary} />
-        <Text style={styles.addBtnText}>Proposer un lieu</Text>
-      </TouchableOpacity>
 
       <PlacePickerModal
         visible={pickerOpen}
@@ -371,22 +392,48 @@ const PlacePickerModal: React.FC<PickerProps> = ({ visible, onClose, onPick }) =
 // ══════════════════════════════════════════════════════════════
 
 const styles = StyleSheet.create({
-  emptyWrap: {
+  // Empty state — turned into a real "card" with a soft icon + inviting copy
+  // to make the section feel like a starting point, not a void.
+  emptyCard: {
+    marginTop: 12,
     paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.terracotta200,
     alignItems: 'center',
   },
-  emptyText: {
+  emptyIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  emptyBody: {
     fontSize: 12.5,
     fontFamily: Fonts.body,
-    fontStyle: 'italic',
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    textAlign: 'center',
   },
+
+  // Default (= already has places) — outlined dashed button.
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 12,
     paddingVertical: 11,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
@@ -394,10 +441,24 @@ const styles = StyleSheet.create({
     borderColor: Colors.terracotta200,
     backgroundColor: 'transparent',
   },
+  // Empty — promoted to a solid, inviting CTA.
+  addBtnPrimary: {
+    borderStyle: 'solid',
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 3,
+  },
   addBtnText: {
     fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,
+  },
+  addBtnTextPrimary: {
+    color: Colors.textOnAccent,
   },
 });
 
