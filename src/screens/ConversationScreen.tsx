@@ -1444,6 +1444,35 @@ export const ConversationScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* ── Brouillon en cours banner ──
+          Visible whenever this conv was seeded from a co-plan draft AND the
+          plan hasn't been locked yet (no linkedPlanId). Tap → workspace.
+          Sticky between the header and the message list — never scrolls away
+          so the affordance is always one tap from anywhere in the chat. */}
+      {isGroup && activeConv?.linkedDraftId && !activeConv?.linkedPlanId && (
+        <TouchableOpacity
+          style={styles.draftBanner}
+          onPress={() => navigation.navigate('CoPlanWorkspace', { draftId: activeConv.linkedDraftId! })}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir le brouillon en cours"
+        >
+          <View style={styles.draftBannerIconWrap}>
+            <Ionicons name="construct-outline" size={15} color={Colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.draftBannerEyebrow}>BROUILLON EN COURS</Text>
+            <Text style={styles.draftBannerTitle} numberOfLines={1}>
+              Voir & modifier le plan ensemble
+            </Text>
+          </View>
+          <View style={styles.draftBannerCta}>
+            <Text style={styles.draftBannerCtaText}>Ouvrir</Text>
+            <Ionicons name="arrow-forward" size={13} color={Colors.textOnAccent} />
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Messages */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <View style={styles.flex} {...listPanResponder.panHandlers}>
@@ -2249,6 +2278,60 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   systemJoinText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.1,
+  },
+
+  // ── Brouillon en cours banner (sticky, between header and FlatList) ──
+  draftBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 9,
+    paddingLeft: 10,
+    paddingRight: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.terracotta200,
+  },
+  draftBannerIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  draftBannerEyebrow: {
+    fontSize: 9,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: Colors.primary,
+    marginBottom: 1,
+  },
+  draftBannerTitle: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  draftBannerCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  draftBannerCtaText: {
     fontSize: 12,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textOnAccent,

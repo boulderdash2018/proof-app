@@ -39,8 +39,9 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
   const entering = useRef(new Animated.Value(0)).current;
   const idle = useRef(new Animated.Value(0)).current;
   const press = useRef(new Animated.Value(1)).current;
-  /** Peek label — slides out for the first ~3.5s so the affordance is
-   *  unmissable, then collapses to the bare icon. */
+  /** "Discuter" label — animates in then stays visible permanently so the
+   *  affordance is unmissable. (Earlier iteration peeked then collapsed,
+   *  but it made the button too cryptic once the label was gone.) */
   const labelAnim = useRef(new Animated.Value(0)).current;
 
   // Enter animation
@@ -54,20 +55,13 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
       useNativeDriver: true,
     }).start();
 
-    // Peek "Discuter" label — slide out, hold ~2.6s, slide back in.
+    // Label slides out and stays — no auto-collapse.
     Animated.sequence([
       Animated.delay(520),
       Animated.spring(labelAnim, {
         toValue: 1,
         friction: 7,
         tension: 80,
-        useNativeDriver: true,
-      }),
-      Animated.delay(2600),
-      Animated.timing(labelAnim, {
-        toValue: 0,
-        duration: 260,
-        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ]).start();
@@ -136,37 +130,39 @@ export const CoPlanChatBubble: React.FC<Props> = ({ conversationId, onPress }) =
         ]}
       />
 
-      {/* Peek label — gives the affordance a tooltip on first appearance */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.label,
-          {
-            opacity: labelOpacity,
-            transform: [{ translateX: labelTranslateX }, { scale: labelScale }],
-          },
-        ]}
-      >
-        <Text style={styles.labelText}>Discuter</Text>
-        <View style={styles.labelTail} />
-      </Animated.View>
-
+      {/* The whole label+bubble is a single tappable area so the press
+          target is generous and the label is not just decorative. */}
       <Animated.View style={{ transform: [{ scale }] }}>
         <TouchableOpacity
-          activeOpacity={0.9}
+          activeOpacity={0.85}
           onPress={handlePress}
-          style={styles.button}
+          style={styles.touchRow}
           accessibilityRole="button"
           accessibilityLabel="Ouvrir le chat du groupe"
         >
-          <Ionicons name="chatbubbles" size={22} color={Colors.textOnAccent} />
-          {unread > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {unread > 9 ? '9+' : unread}
-              </Text>
-            </View>
-          )}
+          <Animated.View
+            style={[
+              styles.label,
+              {
+                opacity: labelOpacity,
+                transform: [{ translateX: labelTranslateX }, { scale: labelScale }],
+              },
+            ]}
+          >
+            <Text style={styles.labelText}>Discuter</Text>
+            <View style={styles.labelTail} />
+          </Animated.View>
+
+          <View style={styles.button}>
+            <Ionicons name="chatbubbles" size={22} color={Colors.textOnAccent} />
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unread > 9 ? '9+' : unread}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -183,12 +179,16 @@ const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
     right: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
     zIndex: 50,
   },
-  // "Discuter" peek label — sits to the LEFT of the bubble.
+  // The pressable row containing label + circle.
+  touchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // "Discuter" label — sits to the LEFT of the bubble, permanent now.
   label: {
     marginRight: 8,
     paddingHorizontal: 12,

@@ -76,6 +76,14 @@ export interface Conversation {
   linkedPlanId?: string;
   linkedPlanTitle?: string;
   linkedPlanCover?: string;
+  /**
+   * If this group was seeded from a co-plan draft, the originating draft id.
+   * Set at draft-creation time; remains set after lock so we can still link
+   * back to the draft history if needed. Used to render the "Brouillon en
+   * cours" bandeau in the conversation header so participants can hop to
+   * the workspace from the chat.
+   */
+  linkedDraftId?: string;
   /** Scheduled meet-up date/time (ISO). */
   meetupAt?: string;
   /** Id of a currently-running multi-user plan session attached to this group. */
@@ -667,6 +675,9 @@ export interface CreateGroupInput {
   groupName?: string;
   /** Optional message sent as first text after the group_created system event. */
   initialMessage?: string;
+  /** Co-plan draft this group is seeded from. Stored on the conv so the
+   *  chat UI can offer a "Voir le brouillon" affordance. */
+  linkedDraftId?: string;
 }
 
 /**
@@ -678,7 +689,7 @@ export interface CreateGroupInput {
 export const createGroupConversation = async (
   input: CreateGroupInput,
 ): Promise<string> => {
-  const { creator, otherParticipants, plan, meetupAt, groupName, initialMessage } = input;
+  const { creator, otherParticipants, plan, meetupAt, groupName, initialMessage, linkedDraftId } = input;
   const allParticipants = [creator, ...otherParticipants];
   const participantIds = allParticipants.map((p) => p.userId);
   const participantDetails: Record<string, ConversationParticipant> = {};
@@ -716,6 +727,7 @@ export const createGroupConversation = async (
     if (plan.coverPhoto) convPayload.linkedPlanCover = plan.coverPhoto;
   }
   if (meetupAt) convPayload.meetupAt = meetupAt;
+  if (linkedDraftId) convPayload.linkedDraftId = linkedDraftId;
 
   const convRef = await addDoc(collection(db, CONVERSATIONS), convPayload);
 

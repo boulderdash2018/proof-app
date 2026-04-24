@@ -133,6 +133,7 @@ export const createPlanDraft = async (input: CreateDraftInput): Promise<string> 
       otherParticipants: others,
       groupName: cleanTitle,
       // No plan + no meetupAt yet — those land at lock time.
+      linkedDraftId: ref.id,
     });
     // Link the conv id back onto the draft for easy retrieval.
     await updateDoc(ref, { conversationId, updatedAt: serverTimestamp() });
@@ -163,9 +164,21 @@ export const backfillConversationForDraft = async (
     const snap = await getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data() as any;
-    // Already has one — nothing to do.
+    // Already has one — patch its `linkedDraftId` if missing (older convs
+    // were seeded before that field existed) and bail out.
     const existing = data.conversationId || data.publishedConvId;
-    if (existing) return existing;
+    if (existing) {
+      try {
+        const convRef = doc(db, 'conversations', existing);
+        const convSnap = await getDoc(convRef);
+        if (convSnap.exists() && !convSnap.data().linkedDraftId) {
+          await updateDoc(convRef, { linkedDraftId: draftId });
+        }
+      } catch (err) {
+        console.warn('[planDraftService] could not backfill linkedDraftId on existing conv:', err);
+      }
+      return existing;
+    }
 
     const details: Record<string, CoPlanParticipant> | undefined = data.participantDetails;
     const participants: string[] | undefined = data.participants;
@@ -208,6 +221,7 @@ export const backfillConversationForDraft = async (
       creator: me,
       otherParticipants: others,
       groupName: data.title || 'Brouillon',
+      linkedDraftId: draftId,
     });
     await updateDoc(ref, { conversationId, updatedAt: serverTimestamp() });
     return conversationId;
