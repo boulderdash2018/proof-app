@@ -92,6 +92,21 @@ export interface TravelSegment {
   transport: TransportMode;
 }
 
+/**
+ * Lightweight co-author descriptor — stored on a Plan when the plan was
+ * co-created from a co-plan draft. Carries just enough data to render the
+ * multi-author byline + navigate to each co-author's profile.
+ */
+export interface CoAuthor {
+  id: string;
+  username: string;
+  displayName: string;
+  initials: string;
+  avatarUrl: string | null;
+  avatarBg: string;
+  avatarColor: string;
+}
+
 export interface Plan {
   id: string;
   authorId: string;
@@ -124,6 +139,26 @@ export interface Plan {
    * unsave we don't remove the timestamp (cheap noise, decays out within 7 days).
    */
   recentSaves?: number[];
+
+  // ── Co-plan extensions ────────────────────────────────────────────────
+  /**
+   * Co-authors (other participants of a co-plan draft that was published
+   * on the feed). Empty / absent for regular solo plans. When present, the
+   * plan appears on everyone's feed with a multi-author byline.
+   *
+   * Lightweight shape — only the fields needed for rendering the byline
+   * (name + avatar). Does NOT require a full User doc.
+   */
+  coAuthors?: CoAuthor[];
+  /**
+   * 'public' = in the feed, 'private' = group-only (not listed). Default
+   * behavior when absent is 'public' for backward compatibility with all
+   * existing plans. Co-plans that aren't published on the feed set this
+   * to 'private'.
+   */
+  visibility?: 'public' | 'private';
+  /** Back-reference to the originating draft (if the plan was born from a co-plan). */
+  sourceDraftId?: string;
 }
 
 export type BadgeId =

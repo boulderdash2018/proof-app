@@ -20,6 +20,7 @@ import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
 import { MiniStampIcon } from './MiniStampIcon';
 import { Plan, TravelSegment, TransportMode, Place } from '../types';
+import { formatAuthorByline } from './PlanCard';
 import { useSavedPlacesStore } from '../store';
 
 /* ================================================================
@@ -589,7 +590,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                   )}
                 </View>
                 <Text style={styles.authorName} numberOfLines={1}>
-                  {plan.author?.displayName || 'Inconnu'}
+                  {formatAuthorByline(plan.author?.displayName || 'Inconnu', plan.coAuthors)}
                 </Text>
                 {rank && <RankBadge rank={rank} small />}
               </TouchableOpacity>
@@ -699,7 +700,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                       )}
                     </View>
                     <Text style={styles.heroAuthorText}>
-                      par {plan.author?.displayName || 'Inconnu'}
+                      par {formatAuthorByline(plan.author?.displayName || 'Inconnu', plan.coAuthors)}
                       {plan.city ? ` · ${plan.city}` : ''}
                     </Text>
                   </TouchableOpacity>

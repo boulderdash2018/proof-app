@@ -59,6 +59,15 @@ const planMatchesCity = (plan: Plan, city?: string): boolean => {
   return planCity === city;
 };
 
+/**
+ * Public-visibility gate. Plans without `visibility` field are treated as public
+ * for backward compatibility with all pre-existing plans.
+ */
+const planIsPublic = (plan: Plan): boolean => {
+  const v = (plan as any).visibility;
+  return !v || v === 'public';
+};
+
 // ==================== PLANS CRUD ====================
 
 /** Create a plan in Firestore */
@@ -74,6 +83,13 @@ export const createPlan = async (
     coverPhotos?: string[];
     city?: string;
     authorTip?: string;
+    // ── Co-plan extensions ──
+    /** Co-authors of a co-plan — shown alongside the main author in feeds. */
+    coAuthors?: import('../types').CoAuthor[];
+    /** 'public' (default) = on feeds, 'private' = group-only (hidden from public fetches). */
+    visibility?: 'public' | 'private';
+    /** Back-reference to the source draft id. */
+    sourceDraftId?: string;
   },
   author: User
 ): Promise<Plan> => {
@@ -96,6 +112,10 @@ export const createPlan = async (
     coverPhotos: planData.coverPhotos || [],
     city: planData.city || 'Paris',
     ...(planData.authorTip && planData.authorTip.trim() && { authorTip: planData.authorTip.trim() }),
+    // Co-plan fields — included conditionally to keep Firestore docs clean.
+    ...(planData.coAuthors && planData.coAuthors.length > 0 && { coAuthors: planData.coAuthors }),
+    ...(planData.visibility && { visibility: planData.visibility }),
+    ...(planData.sourceDraftId && { sourceDraftId: planData.sourceDraftId }),
     likesCount: 0,
     commentsCount: 0,
     proofCount: 0,
@@ -148,7 +168,7 @@ export const fetchFeedPlans = async (city?: string): Promise<Plan[]> => {
     const plans = snap.docs.map((d) => {
       const data = d.data() as Plan;
       return { ...data, id: d.id, title: capitalize(data.title), timeAgo: getTimeAgo(data.createdAt) };
-    }).filter((p) => !(p as any).archived && planMatchesCity(p, city));
+    }).filter((p) => !(p as any).archived && planMatchesCity(p, city) && planIsPublic(p));
     // Sort client-side (avoids Firestore index requirement)
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans;

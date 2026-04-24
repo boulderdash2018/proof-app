@@ -16,7 +16,7 @@ import {
 import ReAnimated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Plan, TransportMode } from '../types';
+import { Plan, TransportMode, CoAuthor } from '../types';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTrendingStore } from '../store/trendingStore';
@@ -47,6 +47,26 @@ function getTransportIcon(mode: TransportMode): string {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const BANNER_HEIGHT = Math.round(SCREEN_WIDTH * 0.76); // ~4:5 aspect
+
+/**
+ * Multi-author byline formatter for co-plans.
+ *   1 author  → "baptisteqh"
+ *   2 authors → "baptisteqh & Léa"
+ *   3 authors → "baptisteqh, Léa & Sami"
+ *   4+        → "baptisteqh, Léa & 2 autres"
+ * Only first-name tokens are used to keep the byline readable on narrow cards.
+ */
+export const formatAuthorByline = (
+  authorName: string,
+  coAuthors?: CoAuthor[],
+): string => {
+  if (!coAuthors || coAuthors.length === 0) return authorName;
+  const first = authorName.split(' ')[0];
+  const others = coAuthors.map((c) => c.displayName.split(' ')[0]);
+  if (others.length === 1) return `${first} & ${others[0]}`;
+  if (others.length === 2) return `${first}, ${others[0]} & ${others[1]}`;
+  return `${first}, ${others[0]} & ${others.length - 1} autres`;
+};
 
 interface PlanCardProps {
   plan: Plan;
@@ -223,8 +243,12 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>
         <Avatar initials={plan.author.initials} bg={plan.author.avatarBg} color={plan.author.avatarColor} size="M" avatarUrl={plan.author.avatarUrl ?? undefined} />
         <View style={styles.userInfo}>
-          <Text style={[styles.displayName, { color: C.black }]}>{plan.author.displayName}</Text>
-          <Text style={[styles.timeAgo, { color: C.gray600 }]}>{plan.timeAgo}</Text>
+          <Text style={[styles.displayName, { color: C.black }]} numberOfLines={1}>
+            {formatAuthorByline(plan.author.displayName, plan.coAuthors)}
+          </Text>
+          <Text style={[styles.timeAgo, { color: C.gray600 }]}>
+            {plan.coAuthors && plan.coAuthors.length > 0 ? 'co-créé · ' : ''}{plan.timeAgo}
+          </Text>
         </View>
         {plan.author.isFounder && <FounderBadge small />}
         <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />

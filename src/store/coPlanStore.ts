@@ -21,7 +21,7 @@ import {
 import { createPlan } from '../services/plansService';
 import { createGroupConversation, ConversationParticipant } from '../services/chatService';
 import { useAuthStore } from './authStore';
-import { Place, CategoryTag, TransportMode } from '../types';
+import { Place, CategoryTag, TransportMode, CoAuthor } from '../types';
 
 /**
  * Observes a single active draft at a time (what the workspace screen shows).
@@ -334,9 +334,25 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       const defaultTags: CategoryTag[] = sortedPlaces[0]?.category ? [sortedPlaces[0].category] : [];
       const defaultTransport: TransportMode = 'À pied';
 
-      // 4) Create the Plan doc. We always create it — the group conv needs
-      //    a linkedPlanId to enable the "Do it now" multi-user flow.
-      //    Commit 11 will gate feed visibility based on publishOnFeed.
+      // 4) Build CoAuthor lite descriptors for each participant (other than me).
+      //    Only included when publishing on the feed — Q5 : "au nom de tout le monde".
+      const coAuthors: CoAuthor[] = publishOnFeed
+        ? Object.values(draft.participantDetails)
+            .filter((p) => p.userId !== user.id)
+            .map((p) => ({
+              id: p.userId,
+              username: p.username,
+              displayName: p.displayName,
+              initials: p.initials,
+              avatarUrl: p.avatarUrl,
+              avatarBg: p.avatarBg,
+              avatarColor: p.avatarColor,
+            }))
+        : [];
+
+      // 5) Create the Plan doc. Always created — the group conv needs a
+      //    linkedPlanId for "Do it now" multi-user. Visibility controls
+      //    whether the Plan appears in public feed queries.
       const plan = await createPlan(
         {
           title: draft.title,
@@ -348,6 +364,9 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
           travelSegments: [],
           coverPhotos: sortedPlaces[0]?.photoUrl ? [sortedPlaces[0].photoUrl] : [],
           city: 'Paris',
+          coAuthors,
+          visibility: publishOnFeed ? 'public' : 'private',
+          sourceDraftId: draft.id,
         },
         user,
       );
