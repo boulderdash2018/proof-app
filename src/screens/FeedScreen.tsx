@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import ReAnimated, { FadeIn } from 'react-native-reanimated';
 import { Colors, Fonts } from '../constants';
 import { ImmersiveCard } from '../components/ImmersiveCard';
 import { LoadingSkeleton, EmptyState, Avatar } from '../components';
@@ -132,13 +133,33 @@ export const FeedScreen: React.FC = () => {
   const bellPulse = useRef(new Animated.Value(1)).current;
   const prevUnreadRef = useRef(unreadCount);
 
-  // Header hide/show — slides up + fades out as soon as the active card is pulled
-  // past a small threshold (independently from the detail commit, which happens later).
+  // Header hide/show — interpolated pixel-accurate to the detail scroll.
+  // 0 = fully visible (scroll 0), 1 = fully hidden (scroll >= HIDE_RANGE).
+  // When the user isn't in a detail (no scroll signal), we fall back to the
+  // boolean `isHeaderHidden` via a quick spring, matching the previous feel.
+  const HIDE_RANGE = 80;
   const [headerH, setHeaderH] = useState(0);
   const headerSlide = useRef(new Animated.Value(0)).current; // 0 = visible, 1 = hidden
+  const isHeaderHiddenRef = useRef(false);
+  isHeaderHiddenRef.current = isHeaderHidden;
+
+  /**
+   * Live scroll update : mapped linearly to [0,1] over 0..HIDE_RANGE px.
+   * Called from ImmersiveCard on every scroll frame (JS listener).
+   * Uses setValue because we aren't going through Animated.event here —
+   * this is fine for a header transform (not 60fps critical) and works on web.
+   */
+  const handleDetailScrollY = useCallback((y: number) => {
+    const progress = Math.max(0, Math.min(1, y / HIDE_RANGE));
+    headerSlide.setValue(progress);
+  }, [headerSlide]);
+
+  // Fallback : if the detail isn't driving scroll but isHeaderHidden flipped
+  // (e.g. returned to feed), snap the header back smoothly.
   useEffect(() => {
+    if (isHeaderHidden) return; // live scroll will drive it
     Animated.timing(headerSlide, {
-      toValue: isHeaderHidden ? 1 : 0,
+      toValue: 0,
       duration: 220,
       easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: true,
@@ -413,9 +434,10 @@ export const FeedScreen: React.FC = () => {
           setGroupPlan(item);
         }}
         onMapPress={() => handleMapPress(item)}
+        onDetailScrollY={handleDetailScrollY}
       />
     ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress],
+    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress, handleDetailScrollY],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -578,27 +600,35 @@ export const FeedScreen: React.FC = () => {
             />
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            horizontal
-            pagingEnabled
-            scrollEnabled={!isDetailOpen}
-            data={currentPlans}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            windowSize={3}
-            initialNumToRender={1}
-            maxToRenderPerBatch={2}
-            getItemLayout={(_, index) => ({
-              length: SCREEN_W,
-              offset: SCREEN_W * index,
-              index,
-            })}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-            decelerationRate="fast"
-          />
+          // Keyed by activeTab so the FlatList remounts on tab switch — paired with
+          // a soft FadeIn this gives a smooth crossfade instead of a content snap.
+          <ReAnimated.View
+            key={activeTab}
+            entering={FadeIn.duration(180)}
+            style={{ flex: 1 }}
+          >
+            <FlatList
+              ref={flatListRef}
+              horizontal
+              pagingEnabled
+              scrollEnabled={!isDetailOpen}
+              data={currentPlans}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              windowSize={3}
+              initialNumToRender={1}
+              maxToRenderPerBatch={2}
+              getItemLayout={(_, index) => ({
+                length: SCREEN_W,
+                offset: SCREEN_W * index,
+                index,
+              })}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              decelerationRate="fast"
+            />
+          </ReAnimated.View>
         )}
       </View>
 

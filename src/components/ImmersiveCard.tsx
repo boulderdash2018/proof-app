@@ -56,6 +56,8 @@ interface ImmersiveCardProps {
   onDoItNow: () => void;
   onGroupPlan?: () => void;
   onMapPress: () => void;
+  /** Fires on every detail scroll frame. Parent can use this to drive pixel-accurate header fades. */
+  onDetailScrollY?: (y: number) => void;
 }
 
 // ── Transport helpers (same as PlanDetailModal) ─────────────
@@ -104,6 +106,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onShare,
   onDoItNow,
   onGroupPlan,
+  onDetailScrollY,
   onMapPress,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
@@ -389,22 +392,25 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
     [COMMIT_THRESHOLD, commitToDetail, bounceBack],
   );
 
-  // Continuous scroll listener — detect overscroll for return + early header hide
+  // Continuous scroll listener — detect overscroll for return + early header hide +
+  // emit raw scroll Y so the parent can drive a pixel-accurate header fade.
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const y = e.nativeEvent.contentOffset.y;
       if (isDetailRef.current && y < -75 && !isCommitting.current) {
         returnToFeed();
       }
-      // Toggle header visibility as soon as the user begins the pull
       if (!isActive) return;
+      // Emit raw scroll Y on the active card — parent interpolates over 0..80 for header.
+      onDetailScrollY?.(y);
+      // Toggle header visibility as soon as the user begins the pull (kept for legacy pointerEvents).
       const shouldHide = y > HEADER_HIDE_THRESHOLD;
       if (shouldHide !== headerHiddenRef.current) {
         headerHiddenRef.current = shouldHide;
         onHeaderHideChange?.(shouldHide);
       }
     },
-    [returnToFeed, isActive, onHeaderHideChange],
+    [returnToFeed, isActive, onHeaderHideChange, onDetailScrollY],
   );
 
   // Reset when card becomes inactive

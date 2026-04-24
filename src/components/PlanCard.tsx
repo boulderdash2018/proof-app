@@ -214,8 +214,10 @@ export const PlanCard: React.FC<PlanCardProps> = ({
     onSave();
   };
 
+  // Stagger cap : first 6 cards cascade 50ms each for a soft "reveal" on mount,
+  // beyond that each new card fades in directly (no long waiting for card 50).
   return (
-    <ReAnimated.View entering={index < 6 ? FadeInUp.delay(index * 60).duration(400) : undefined}>
+    <ReAnimated.View entering={FadeInUp.delay(Math.min(index, 5) * 50).duration(350)}>
     <View style={[styles.card, { backgroundColor: C.white }]}>
       <View style={[styles.postSeparator, { backgroundColor: C.border }]} />
       <TouchableOpacity style={styles.userRow} activeOpacity={0.7} onPress={onAuthorPress}>

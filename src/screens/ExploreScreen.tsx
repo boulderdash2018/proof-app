@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import ReAnimated, { FadeInUp } from 'react-native-reanimated';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
 import { ExploreCategoryItem } from '../constants/exploreCategories';
 import { LoadingSkeleton } from '../components';
@@ -794,22 +795,26 @@ export const ExploreScreen: React.FC = () => {
     return null;
   };
 
-  const renderCompactPlan = ({ item }: { item: Plan }) => {
+  const renderCompactPlan = ({ item, index = 0 }: { item: Plan; index?: number }) => {
     const colors = parseGradientColors(item.gradient);
     const photo = getPlanPhoto(item);
+    // Stagger cap : first 6 cards cascade, beyond that fade in directly.
+    const delay = Math.min(index, 5) * 50;
     return (
-      <TouchableOpacity style={[styles.compactCard, { borderBottomColor: Colors.borderMedium }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
-        <View style={styles.compactBanner}>
-          {photo ? <Image source={{ uri: photo }} style={styles.compactBannerImage} /> : <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
-          <LinearGradient colors={['transparent', 'rgba(44,36,32,0.55)']} style={styles.compactBannerOverlay} />
-          <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
-        </View>
-        <View style={styles.compactMeta}>
-          <View style={styles.compactMetaItem}><Ionicons name="cash-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.price}</Text></View>
-          <View style={styles.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.duration}</Text></View>
-          <View style={styles.compactMetaItem}><Ionicons name="heart" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.likesCount}</Text></View>
-        </View>
-      </TouchableOpacity>
+      <ReAnimated.View entering={FadeInUp.delay(delay).duration(350)}>
+        <TouchableOpacity style={[styles.compactCard, { borderBottomColor: Colors.borderMedium }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
+          <View style={styles.compactBanner}>
+            {photo ? <Image source={{ uri: photo }} style={styles.compactBannerImage} /> : <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
+            <LinearGradient colors={['transparent', 'rgba(44,36,32,0.55)']} style={styles.compactBannerOverlay} />
+            <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
+          </View>
+          <View style={styles.compactMeta}>
+            <View style={styles.compactMetaItem}><Ionicons name="cash-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.price}</Text></View>
+            <View style={styles.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.duration}</Text></View>
+            <View style={styles.compactMetaItem}><Ionicons name="heart" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.likesCount}</Text></View>
+          </View>
+        </TouchableOpacity>
+      </ReAnimated.View>
     );
   };
 
@@ -910,7 +915,9 @@ export const ExploreScreen: React.FC = () => {
             <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary, paddingHorizontal: Layout.screenPadding }]}>
               {displayedPlans.length} plan{displayedPlans.length > 1 ? 's' : ''}
             </Text>
-            {displayedPlans.map((plan) => renderCompactPlan({ item: plan }))}
+            {displayedPlans.map((plan, index) => (
+              <React.Fragment key={plan.id}>{renderCompactPlan({ item: plan, index })}</React.Fragment>
+            ))}
           </View>
         )}
         <View style={{ height: 30 }} />
