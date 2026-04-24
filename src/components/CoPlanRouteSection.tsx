@@ -145,24 +145,30 @@ export const CoPlanRouteSection: React.FC = () => {
   return (
     <View>
       {!result ? (
-        <TouchableOpacity
-          style={[styles.computeBtn, { opacity: isComputing ? 0.7 : 1 }]}
-          onPress={handleCompute}
-          disabled={isComputing}
-          activeOpacity={0.85}
-        >
-          {isComputing ? (
-            <>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.computeBtnText}>Calcul en cours…</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="sparkles-outline" size={15} color={Colors.primary} />
-              <Text style={styles.computeBtnText}>Calculer le trajet optimal</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View>
+          <Text style={styles.explainer}>
+            <Text style={{ fontFamily: Fonts.bodySemiBold }}>Ton 1er lieu reste ton point de départ.</Text>
+            {' '}L'app optimise seulement l'ordre des suivants pour minimiser les trajets à pied. Si tu veux commencer par le brunch, place-le en 1 et l'app organisera le reste autour.
+          </Text>
+          <TouchableOpacity
+            style={[styles.computeBtn, { opacity: isComputing ? 0.7 : 1 }]}
+            onPress={handleCompute}
+            disabled={isComputing}
+            activeOpacity={0.85}
+          >
+            {isComputing ? (
+              <>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.computeBtnText}>Calcul en cours…</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="sparkles-outline" size={15} color={Colors.primary} />
+                <Text style={styles.computeBtnText}>Calculer le trajet optimal</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       ) : (
         <View>
           {/* Result recap */}
@@ -247,6 +253,14 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
+  explainer: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
   // Compute button
   computeBtn: {
     flexDirection: 'row',

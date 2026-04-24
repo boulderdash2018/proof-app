@@ -1,6 +1,14 @@
+import { Platform } from 'react-native';
 import { DoItNowTransport } from '../types';
 
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
+
+// On web, call through the Vercel `/api/directions` proxy to dodge CORS
+// (Google's Directions API doesn't set an Access-Control-Allow-Origin header).
+// On native, call directly for lowest latency.
+const isWeb = Platform.OS === 'web';
+const isDev = __DEV__ || process.env.NODE_ENV === 'development';
+const API_BASE_URL = isDev ? 'https://proof-app-black.vercel.app' : '';
 
 export interface RouteStep {
   startLocation: { lat: number; lng: number };
@@ -58,7 +66,11 @@ export async function getDirections(
   mode: DoItNowTransport = 'walking'
 ): Promise<RouteResult | null> {
   try {
-    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&mode=${mode}&key=${API_KEY}`;
+    const originParam = `${origin.lat},${origin.lng}`;
+    const destParam = `${destination.lat},${destination.lng}`;
+    const url = isWeb
+      ? `${API_BASE_URL}/api/directions?origin=${originParam}&destination=${destParam}&mode=${mode}`
+      : `https://maps.googleapis.com/maps/api/directions/json?origin=${originParam}&destination=${destParam}&mode=${mode}&key=${API_KEY}`;
 
     const res = await fetch(url);
     const data = await res.json();
