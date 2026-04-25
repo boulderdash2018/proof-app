@@ -841,6 +841,7 @@ export const DoItNowScreen: React.FC = () => {
           <SessionFloatingActions
             conversationId={groupConversationId}
             friendCount={Object.keys(activeGroupSession?.participants || {}).length - 1}
+            mapSheetOpen={mapSheetOpen}
             onOpenMap={() => setMapSheetOpen(true)}
             onOpenChat={() => {
               if (groupConversationId) {

@@ -9,27 +9,34 @@ import { useAuthStore } from '../store';
 interface Props {
   /** Conv id linked to the session — for the chat shortcut. */
   conversationId?: string;
-  /** Tap "Carte" → opens the GroupLiveMapSheet. */
+  /** Tap "Le groupe" → opens the GroupLiveMapSheet. */
   onOpenMap: () => void;
-  /** Tap "Chat" → navigates to the conv screen. */
+  /** Tap "Discussion" → navigates to the conv screen. */
   onOpenChat: () => void;
   /** Number of friends visible on the map (for the badge label). */
   friendCount: number;
+  /** When the live-map sheet is open, the "Le groupe" FAB hides
+   *  (you're already viewing the group — having a button to open it
+   *  again was confusing per user feedback). */
+  mapSheetOpen?: boolean;
 }
 
 /**
  * Stacked vertical FAB cluster anchored bottom-right of the active
- * session screen. Two buttons :
- *   • Carte   → opens GroupLiveMapSheet (live positions of friends)
- *   • Chat    → navigates back to the conversation, with unread badge
+ * session screen. Up to two buttons :
+ *   • Le groupe (people-circle) → opens GroupLiveMapSheet — auto-hides
+ *     while the sheet is already open so the affordance is unique
+ *   • Discussion (chat) → navigates back to the conversation, with
+ *     unread badge
  *
  * Direction-to-place is already handled by DoItNow's existing buttons
  * (Google Maps deeplink), so we don't duplicate that here.
  *
- * Spring scale-in on mount, soft idle pulse to signal "live" state.
+ * Each button carries a permanent label to its left so the affordance
+ * is unmissable, even on first session.
  */
 export const SessionFloatingActions: React.FC<Props> = ({
-  conversationId, onOpenMap, onOpenChat, friendCount,
+  conversationId, onOpenMap, onOpenChat, friendCount, mapSheetOpen,
 }) => {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
@@ -64,37 +71,52 @@ export const SessionFloatingActions: React.FC<Props> = ({
         },
       ]}
     >
-      {/* MAP BUTTON */}
-      <TouchableOpacity
-        style={styles.btn}
-        onPress={onOpenMap}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Voir la carte du groupe"
-      >
-        <Ionicons name="map" size={20} color={Colors.textOnAccent} />
-        {friendCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{friendCount}</Text>
+      {/* "LE GROUPE" — auto-hides while the map sheet is already open
+          (no point in offering a button to open what's already on screen) */}
+      {!mapSheetOpen && (
+        <TouchableOpacity
+          style={styles.row}
+          onPress={onOpenMap}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Voir où sont mes amis"
+        >
+          <View style={styles.label}>
+            <Text style={styles.labelText}>Le groupe</Text>
+            <View style={styles.labelTail} />
           </View>
-        )}
-      </TouchableOpacity>
+          <View style={styles.btn}>
+            <Ionicons name="people" size={20} color={Colors.textOnAccent} />
+            {friendCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{friendCount}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      )}
 
-      {/* CHAT BUTTON */}
+      {/* "DISCUSSION" — always visible (works as a way out of the map sheet too) */}
       {conversationId && (
         <TouchableOpacity
-          style={[styles.btn, styles.btnChat]}
+          style={styles.row}
           onPress={onOpenChat}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Ouvrir la conversation du groupe"
         >
-          <Ionicons name="chatbubbles" size={20} color={Colors.textOnAccent} />
-          {unread > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
-            </View>
-          )}
+          <View style={styles.label}>
+            <Text style={styles.labelText}>Discussion</Text>
+            <View style={styles.labelTail} />
+          </View>
+          <View style={[styles.btn, styles.btnChat]}>
+            <Ionicons name="chatbubbles" size={20} color={Colors.textOnAccent} />
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -110,6 +132,44 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'flex-end',
     zIndex: 50,
+  },
+  // Row = label tooltip + circular FAB; the whole row is one tap target.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  label: {
+    marginRight: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  labelText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: 0.05,
+  },
+  labelTail: {
+    position: 'absolute',
+    right: -4,
+    top: '50%',
+    marginTop: -4,
+    width: 8,
+    height: 8,
+    transform: [{ rotate: '45deg' }],
+    backgroundColor: Colors.bgSecondary,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
   },
   btn: {
     width: BTN_SIZE,
