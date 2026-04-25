@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanLensSwitcher, CoPlanInlineVote } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanWorkspaceFab } from '../components';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
@@ -1516,21 +1516,6 @@ export const ConversationScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* ── Lens switcher ──
-          Mounted just below the conv header whenever there's a co-plan
-          draft attached AND the plan hasn't been locked yet. Same component
-          as the workspace, same gesture, same mental model — tap "Plan" to
-          jump to the editable workspace. */}
-      {isGroup && linkedDraftId && (
-        <CoPlanLensSwitcher
-          active="chat"
-          onChange={(next) => {
-            if (next === 'plan' && linkedDraftId) {
-              navigation.navigate('CoPlanWorkspace', { draftId: linkedDraftId });
-            }
-          }}
-        />
-      )}
 
       {/* Messages */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
@@ -1964,6 +1949,18 @@ export const ConversationScreen: React.FC = () => {
         onSubmit={(question, options) => sendPoll({ question, options })}
       />
 
+      {/* ── Floating "Modifier le plan" FAB ──
+          Only when this conv is attached to a co-plan draft. Tapping
+          navigates to the workspace; coming back uses the workspace's
+          chevron-back. The conv stays the home; the workspace is a
+          visit-and-return atelier. */}
+      <CoPlanWorkspaceFab
+        visible={!!linkedDraftId}
+        onPress={() => {
+          if (!linkedDraftId) return;
+          navigation.navigate('CoPlanWorkspace', { draftId: linkedDraftId });
+        }}
+      />
 
       {/* Rename modal (groups only) */}
       {isGroup && (

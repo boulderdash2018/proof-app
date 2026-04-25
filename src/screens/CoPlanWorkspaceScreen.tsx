@@ -18,8 +18,7 @@ import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
 import { backfillConversationForDraft } from '../services/planDraftService';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts, CoPlanLensSwitcher } from '../components';
-import { useChatStore } from '../store/chatStore';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -93,23 +92,6 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
     return draft.participants.filter((id) => id !== user?.id && isPresent(id)).length;
   }, [draft, user?.id, isPresent]);
 
-  // Unread count for the linked conversation — surfaced as a badge on
-  // the "Discussion" tab of the lens switcher.
-  const conversations = useChatStore((s) => s.conversations);
-  const linkedConvId = draft?.conversationId ?? draft?.publishedConvId;
-  const linkedUnread = useMemo(() => {
-    if (!linkedConvId || !user?.id) return 0;
-    const conv = conversations.find((c) => c.id === linkedConvId);
-    return conv ? conv.unreadCount[user.id] || 0 : 0;
-  }, [conversations, linkedConvId, user?.id]);
-
-  const handleOpenChat = () => {
-    if (!linkedConvId) return;
-    navigation.navigate('Conversation', {
-      conversationId: linkedConvId,
-      otherUser: null,
-    });
-  };
 
   // Lock pre-conditions — VERROUILLER stays visible (so participants
   // understand what's coming) but is muted + disabled until the basics
@@ -183,20 +165,6 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         </View>
         <View style={styles.headerBtn} />
       </View>
-
-      {/* ── Lens switcher ──────────────────────
-          THE single, unmissable affordance to jump to the chat. Always
-          rendered in the workspace; tapping the "Discussion" tab navigates
-          to the group conv — same gesture from anywhere. */}
-      {linkedConvId && (
-        <CoPlanLensSwitcher
-          active="plan"
-          unreadCount={linkedUnread}
-          onChange={(next) => {
-            if (next === 'chat') handleOpenChat();
-          }}
-        />
-      )}
 
       {/* ── Participants strip ─────────────────── */}
       <View style={styles.participantsStrip}>
