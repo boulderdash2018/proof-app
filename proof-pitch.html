@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>proof. — Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ────────────────────────────────────────────────────────────
+     Tokens — copiés depuis src/constants/colors.ts + typography.ts
+     pour rester strictement dans la DA de l'app.
+     ──────────────────────────────────────────────────────────── */
+  :root {
+    --bg-primary:    #F5F0E8;  /* papier non blanchi */
+    --bg-secondary:  #FAF7F2;  /* cards, panels */
+    --bg-tertiary:   #EDE5D8;  /* sunken */
+    --primary:       #C4704B;  /* terracotta */
+    --primary-deep:  #A85A38;
+    --text-primary:  #2C2420;  /* quasi-noir chaud */
+    --text-secondary:#6B5D52;
+    --text-tertiary: #A09181;
+    --text-on-accent:#FFF8F0;
+    --border-subtle: rgba(44, 36, 32, 0.08);
+    --border-medium: rgba(44, 36, 32, 0.15);
+    --success:       #7B9971;
+    --gold:          #D4A04A;
+    --t50:  #FDF5F0;
+    --t100: #F9E8DD;
+    --t200: #F0CEBC;
+    --t400: #D4885F;
+    --t700: #8C4830;
+
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Page = section A4-like. En affichage normal, scroll vertical.
+     En impression, page break entre chaque.
+     ──────────────────────────────────────────────────────────── */
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 80px 64px;
+    min-height: calc(100vh - 0px);
+    background: var(--bg-primary);
+    position: relative;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .page:last-child { border-bottom: none; }
+
+  /* ────────────────────────────────────────────────────────────
+     Typography presets — reproduisent le système de l'app.
+     ──────────────────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .eyebrow--accent { color: var(--primary); }
+
+  h1.hero {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 88px;
+    line-height: 0.95;
+    letter-spacing: -3px;
+    color: var(--text-primary);
+    margin: 24px 0 16px;
+  }
+  h1.hero .dot { color: var(--primary); }
+  h2.section-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 48px;
+    line-height: 1.05;
+    letter-spacing: -1.2px;
+    color: var(--text-primary);
+    margin: 24px 0 24px;
+  }
+  h3.sub-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: -0.4px;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+  }
+  h3.sub-title .accent { color: var(--primary); }
+  .lead {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.4;
+    letter-spacing: -0.2px;
+    color: var(--text-secondary);
+    margin-bottom: 36px;
+    max-width: 640px;
+  }
+  p {
+    font-family: var(--font-body);
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1.65;
+    max-width: 640px;
+    margin-bottom: 14px;
+  }
+  p strong, b {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  p em {
+    color: var(--text-primary);
+    font-style: italic;
+    font-family: var(--font-display);
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { color: var(--primary-deep); }
+
+  /* ────────────────────────────────────────────────────────────
+     Cover page — full-bleed editorial
+     ──────────────────────────────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 64px;
+    max-width: 100%;
+  }
+  .cover .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .cover .nav-meta {
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 1.6px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+  }
+  .cover .center {
+    margin-top: -8vh;
+    text-align: left;
+  }
+  .cover h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(96px, 15vw, 220px);
+    line-height: 0.86;
+    letter-spacing: -8px;
+    color: var(--text-primary);
+  }
+  .cover h1 .dot { color: var(--primary); }
+  .cover .tagline {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(20px, 2.6vw, 30px);
+    line-height: 1.35;
+    letter-spacing: -0.3px;
+    color: var(--text-secondary);
+    margin-top: 28px;
+    max-width: 640px;
+  }
+  .cover .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  .cover .footer .city {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Index numérique éditorial (comme dans la liste tendance)
+     ──────────────────────────────────────────────────────────── */
+  .num-index {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -1px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Components réutilisables — pills, cartes, listes
+     ──────────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    padding: 5px 11px;
+    border-radius: 99px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: var(--t100);
+    color: var(--primary);
+    border: 1px solid var(--t200);
+  }
+  .chip--success {
+    background: rgba(123,153,113,0.12);
+    color: var(--success);
+    border-color: rgba(123,153,113,0.25);
+  }
+
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 24px 22px;
+  }
+  .card .card-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: -0.2px;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .card p {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+    margin: 28px 0 12px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin: 28px 0 12px;
+  }
+
+  /* Editorial numbered list — same style as Explorer trending */
+  .ed-list { margin-top: 32px; }
+  .ed-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 22px;
+    padding: 22px 0;
+    border-top: 1px solid var(--border-subtle);
+    align-items: baseline;
+  }
+  .ed-row:last-child { border-bottom: 1px solid var(--border-subtle); }
+  .ed-row .num {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1;
+    letter-spacing: -0.5px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+  .ed-row .label {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 21px;
+    letter-spacing: -0.3px;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .ed-row .desc {
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 560px;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Comparison table — éditorial, pas Excel
+     ──────────────────────────────────────────────────────────── */
+  .compare {
+    margin-top: 32px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .compare .row {
+    display: grid;
+    grid-template-columns: 1.6fr repeat(4, 1fr);
+    gap: 0;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    align-items: center;
+  }
+  .compare .row.head {
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    padding: 14px 0;
+  }
+  .compare .row .feature {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+  .compare .row .cell {
+    text-align: center;
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--text-tertiary);
+  }
+  .compare .row .cell.proof {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .compare .row .cell.no { color: var(--text-tertiary); opacity: 0.5; }
+  .compare .row .cell.partial { color: var(--text-tertiary); }
+  .compare .row .cell.yes { color: var(--success); font-weight: 600; }
+
+  /* ────────────────────────────────────────────────────────────
+     Stats / numbers grid
+     ──────────────────────────────────────────────────────────── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin: 36px 0 20px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .stat .num {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -1.5px;
+    color: var(--primary);
+  }
+  .stat .num small {
+    font-size: 24px;
+    color: var(--text-tertiary);
+    letter-spacing: -0.5px;
+    margin-left: 4px;
+  }
+  .stat .label {
+    margin-top: 10px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Quote block — pull-quote style magazine
+     ──────────────────────────────────────────────────────────── */
+  .pull-quote {
+    margin: 48px 0;
+    padding: 28px 32px;
+    border-left: 3px solid var(--primary);
+    background: var(--t50);
+    border-radius: 0 14px 14px 0;
+  }
+  .pull-quote p {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin: 0;
+    max-width: none;
+  }
+  .pull-quote .attribution {
+    margin-top: 16px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Page footer mark — small page number
+     ──────────────────────────────────────────────────────────── */
+  .page-num {
+    position: absolute;
+    bottom: 32px;
+    right: 64px;
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+  }
+  .page-num strong {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 13px;
+    letter-spacing: -0.3px;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Print rules — pour export PDF propre
+     ──────────────────────────────────────────────────────────── */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  @media print {
+    html, body { background: var(--bg-primary) !important; }
+    .page {
+      page-break-after: always;
+      min-height: 100vh;
+      max-width: none;
+      width: 100%;
+      padding: 64px 56px;
+      border-bottom: none;
+    }
+    .cover { min-height: 100vh; padding: 56px; }
+    .page-num { position: absolute; }
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Responsive — tient sur tablette
+     ──────────────────────────────────────────────────────────── */
+  @media (max-width: 720px) {
+    .page { padding: 56px 28px; }
+    .cover { padding: 40px 28px; }
+    h1.hero { font-size: 56px; }
+    h2.section-title { font-size: 34px; letter-spacing: -0.6px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .compare .row { grid-template-columns: 1fr; gap: 4px; padding: 12px 0; }
+    .compare .row.head { display: none; }
+    .compare .row .cell { text-align: left; padding-left: 0; }
+    .stat-row { grid-template-columns: 1fr; gap: 24px; }
+    .ed-row { grid-template-columns: 50px 1fr; gap: 14px; }
+    .ed-row .num { font-size: 24px; }
+    .ed-row .label { font-size: 18px; }
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+     COVER
+     ════════════════════════════════════════════════════════════ -->
+<section class="page cover">
+  <div class="top">
+    <span class="nav-meta">Investor brief · {{ANNÉE}}</span>
+    <span class="nav-meta">Confidentiel</span>
+  </div>
+
+  <div class="center">
+    <h1>proof<span class="dot">.</span></h1>
+    <p class="tagline">
+      Le réseau social de l'IRL. Découvrir, organiser et vivre
+      tes journées en ville — ensemble.
+    </p>
+  </div>
+
+  <div class="footer">
+    <span>Pré-seed · Paris</span>
+    <span class="city">Paris &amp; au-delà</span>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     01 — LE PROBLÈME
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">01 · le problème</span>
+  <h2 class="section-title">
+    Organiser une journée à plusieurs,<br>
+    c'est devenu insupportable.
+  </h2>
+  <p class="lead">
+    Et le réflexe n'a pas changé en 10 ans : un thread WhatsApp qui s'enlise,
+    trois captures d'écran de Google Maps, et au final on commande sur Uber Eats.
+  </p>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">17 messages pour fixer un brunch</div>
+      <p>Personne ne tranche. Chacun balance un lien Maps. Le vendredi soir, le plan n'existe pas.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">La découverte est solitaire</div>
+      <p>Yelp et Maps montrent les avis du monde entier. Mais ce qu'on veut vraiment savoir : où vont mes potes ?</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Le plan ne se fait pas</div>
+      <p>Pas de date arrêtée, pas de souvenir collectif, juste un screenshot oublié dans la galerie photo.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Les souvenirs se dispersent</div>
+      <p>Photos dans 4 conv différentes, légendes nulle part. La journée est vécue mais pas <em>archivée</em>.</p>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>01</strong> &nbsp;/&nbsp; le problème</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     02 — NOTRE SOLUTION
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">02 · notre solution</span>
+  <h2 class="section-title">
+    Une seule app pour le<br>
+    cycle complet d'une journée.
+  </h2>
+  <p class="lead">
+    De l'idée du week-end à la photo de groupe au coucher. Proof réunit
+    discovery, co-organisation et live capture — pour la première fois.
+  </p>
+
+  <div class="ed-list">
+    <div class="ed-row">
+      <div class="num">01</div>
+      <div>
+        <div class="label">Découvrir</div>
+        <p class="desc">
+          Catégories curatées, plans tendance dans ta ville, recherche conversationnelle
+          (« je cherche un plan avec [mes potes], plutôt [Food &amp; Drinks], dans [Pigalle] »).
+          Pas d'algorithme black-box — éditorial assumé.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">02</div>
+      <div>
+        <div class="label">Organiser ensemble</div>
+        <p class="desc">
+          Un brouillon collaboratif où chacun propose des lieux, vote, propose une modif.
+          Les modifs hard (retirer un lieu, changer la date) passent par un vote du groupe
+          avec auto-application à la majorité. Le chat reste le QG.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">03</div>
+      <div>
+        <div class="label">Vivre la journée</div>
+        <p class="desc">
+          Map live des potes (qui est où, à combien de minutes), check-in à chaque lieu,
+          prompts photo « Souvenir à plusieurs » à des moments clés. La journée
+          est documentée sans qu'on y pense.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">04</div>
+      <div>
+        <div class="label">Garder le souvenir</div>
+        <p class="desc">
+          Album de groupe automatique, plan archivé avec ses photos, ses notes,
+          ses lieux. Ce qui était scattered devient un objet partagé.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>02</strong> &nbsp;/&nbsp; la solution</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     03 — DIFFÉRENCIATION
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">03 · différenciation</span>
+  <h2 class="section-title">
+    Personne ne couvre les<br>
+    quatre actes.
+  </h2>
+  <p class="lead">
+    On a Google Maps pour découvrir, WhatsApp pour discuter, Foursquare pour
+    noter. Aucune app n'a fait l'enchaînement complet. Proof, oui.
+  </p>
+
+  <div class="compare">
+    <div class="row head">
+      <div>capacité</div>
+      <div class="cell">Google Maps</div>
+      <div class="cell">Yelp / TripAdv.</div>
+      <div class="cell">WhatsApp</div>
+      <div class="cell">Proof</div>
+    </div>
+    <div class="row">
+      <div class="feature">Découverte sociale (mes potes)</div>
+      <div class="cell no">—</div>
+      <div class="cell no">—</div>
+      <div class="cell partial">partiel</div>
+      <div class="cell proof">●</div>
+    </div>
+    <div class="row">
+      <div class="feature">Co-organisation collaborative</div>
+      <div class="cell no">—</div>
+      <div class="cell no">—</div>
+      <div class="cell partial">via texte</div>
+      <div class="cell proof">●</div>
+    </div>
+    <div class="row">
+      <div class="feature">Vote &amp; consensus de groupe</div>
+      <div class="cell no">—</div>
+      <div class="cell no">—</div>
+      <div class="cell no">—</div>
+      <div class="cell proof">●</div>
+    </div>
+    <div class="row">
+      <div class="feature">Live map du groupe pendant la sortie</div>
+      <div class="cell partial">solo only</div>
+      <div class="cell no">—</div>
+      <div class="cell partial">share live</div>
+      <div class="cell proof">●</div>
+    </div>
+    <div class="row">
+      <div class="feature">Souvenirs collectifs structurés</div>
+      <div class="cell no">—</div>
+      <div class="cell no">—</div>
+      <div class="cell partial">média éparpillé</div>
+      <div class="cell proof">●</div>
+    </div>
+  </div>
+
+  <div class="pull-quote">
+    <p>
+      « Le marché map-discovery est mature. Le marché co-living-the-city
+      n'existe pas encore. C'est notre catégorie. »
+    </p>
+    <div class="attribution">— positionnement</div>
+  </div>
+
+  <div class="page-num"><strong>03</strong> &nbsp;/&nbsp; différenciation</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     04 — POURQUOI MAINTENANT
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">04 · pourquoi maintenant</span>
+  <h2 class="section-title">
+    Trois bascules culturelles<br>
+    qui se rencontrent.
+  </h2>
+
+  <div class="ed-list">
+    <div class="ed-row">
+      <div class="num">01</div>
+      <div>
+        <div class="label">La revanche du <em>IRL</em></div>
+        <p class="desc">
+          Post-COVID, les 18–35 ans dépensent davantage dans l'expérience
+          (concerts, restaus, sports) que dans le matériel. La sociabilité
+          urbaine a une nouvelle valeur affective.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">02</div>
+      <div>
+        <div class="label">Editorial &gt; Algorithmique</div>
+        <p class="desc">
+          La fatigue TikTok / Instagram pousse vers du contenu curaté, slow, lisible.
+          Substack, The Browser, Letterboxd, Beli — l'éditorial gagne. Proof
+          en est l'équivalent local.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">03</div>
+      <div>
+        <div class="label">Social &gt; Solo</div>
+        <p class="desc">
+          Le score de solitude des Gen Z est au plus haut. Les apps qui
+          répondent (Partiful, Posh, Sunroom) explosent. Mais elles s'arrêtent
+          à l'invitation. Proof prend le relais.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>04</strong> &nbsp;/&nbsp; timing</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     05 — MARCHÉ
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">05 · marché</span>
+  <h2 class="section-title">
+    Un marché énorme,<br>
+    un beachhead clair.
+  </h2>
+  <p class="lead">
+    On commence par Paris parce qu'on connaît la ville et que la densité
+    de spots à découvrir y est l'une des plus fortes au monde.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="num">250<small>M</small></div>
+      <div class="label"><strong>TAM mondial</strong> · Gen Z + Millennials urbains dans les 30 plus grandes villes globales.</div>
+    </div>
+    <div class="stat">
+      <div class="num">8<small>M</small></div>
+      <div class="label"><strong>SAM Europe FR</strong> · 18–40 ans urbains dans les 6 plus grandes métropoles.</div>
+    </div>
+    <div class="stat">
+      <div class="num">50<small>K</small></div>
+      <div class="label"><strong>SOM 12 mois</strong> · objectif MAU à Paris fin d'année 1.</div>
+    </div>
+  </div>
+
+  <p style="margin-top: 36px;">
+    <strong>Pourquoi Paris d'abord :</strong> la ville la plus dense en lieux culturels &amp;
+    food d'Europe, une diaspora 18–35 ultra-active sur TikTok pour partager
+    des spots, et une beta privée déjà déployée. Ensuite : Lyon, Bruxelles,
+    Marseille — puis open-EU.
+  </p>
+
+  <div class="page-num"><strong>05</strong> &nbsp;/&nbsp; marché</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     06 — TRACTION
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">06 · traction</span>
+  <h2 class="section-title">
+    L'app existe.<br>
+    Elle tourne. Elle est aimée.
+  </h2>
+  <p class="lead">
+    On n'est pas un deck. On est un produit fonctionnel, déployé sur web et iOS,
+    avec une architecture solide et une beta active.
+  </p>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">Stack production</div>
+      <p>React Native + Expo, Firebase Firestore (live snapshots), Vercel pour le web. 100% TypeScript. Auto-deploy continu.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Features livrées</div>
+      <p>Feed, search éditoriale, plans, sessions live, co-plans complets avec votes, map live des potes, prompts photo « souvenir à plusieurs ».</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Beta privée Paris</div>
+      <p>Premiers utilisateurs actifs · feedbacks positifs sur l'<em>experience layer</em> co-plan + live · itérations quotidiennes.</p>
+    </div>
+  </div>
+
+  <div class="pull-quote">
+    <p>
+      « C'est l'app qu'on aurait voulu avoir le week-end dernier
+      pour notre brunch — au lieu de notre groupe WhatsApp qui n'a abouti à rien. »
+    </p>
+    <div class="attribution">— retour beta, mars</div>
+  </div>
+
+  <div class="page-num"><strong>06</strong> &nbsp;/&nbsp; traction</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     07 — MODÈLE ÉCO
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">07 · monétisation</span>
+  <h2 class="section-title">
+    Trois leviers,<br>
+    posés mais pas activés.
+  </h2>
+  <p class="lead">
+    Free pour les utilisateurs <em>maintenant</em>. La monétisation s'active
+    quand la base est suffisante pour que les unit economics tournent.
+  </p>
+
+  <div class="ed-list">
+    <div class="ed-row">
+      <div class="num">01</div>
+      <div>
+        <div class="label">Partenariats lieux <span class="chip">post-PMF</span></div>
+        <p class="desc">
+          Commission sur les visites trackées (CPA), placements éditoriaux
+          curatés (« Plan recommandé par Proof »), pop-ups exclusifs.
+          Modèle Beli + The Infatuation.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">02</div>
+      <div>
+        <div class="label">Premium utilisateur <span class="chip">2026</span></div>
+        <p class="desc">
+          Plans curatés par éditeurs (chefs, créateurs de contenu),
+          export d'album photo professionnel post-journée, voyages multi-villes.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">03</div>
+      <div>
+        <div class="label">B2B local <span class="chip">2026+</span></div>
+        <p class="desc">
+          Marques (cosmo, mode, food) qui sponsorisent un plan thématique
+          dans une ville. Style « plan Aesop · Marais », opt-in clair.
+          Pas d'ads ; du content.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>07</strong> &nbsp;/&nbsp; modèle</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     08 — ROADMAP
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">08 · roadmap 12 mois</span>
+  <h2 class="section-title">
+    De la beta à 50K MAU<br>
+    en quatre trimestres.
+  </h2>
+
+  <div class="ed-list">
+    <div class="ed-row">
+      <div class="num">Q1</div>
+      <div>
+        <div class="label">Beta publique Paris</div>
+        <p class="desc">
+          Ouverture sur invitation puis publique. Push notifications natives.
+          Onboarding éditorial. Cibler 5K MAU. Signature avec 5 lieux pilotes
+          pour les premiers placements organiques.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">Q2</div>
+      <div>
+        <div class="label">Réseau social actif</div>
+        <p class="desc">
+          Profils enrichis, follow, notifications de plans des amis.
+          15K MAU. Premier deal partenariat lieu (commission CPA).
+          Recrutement designer + community.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">Q3</div>
+      <div>
+        <div class="label">Expansion 2 villes</div>
+        <p class="desc">
+          Lyon + Bruxelles. Templates éditoriaux par ville. 30K MAU global.
+          Premiers revenus partenariats. Préparation série A.
+        </p>
+      </div>
+    </div>
+    <div class="ed-row">
+      <div class="num">Q4</div>
+      <div>
+        <div class="label">PMF français</div>
+        <p class="desc">
+          50K MAU dans 3 villes. Premium beta. Closing série A
+          avec un fonds early-stage européen.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>08</strong> &nbsp;/&nbsp; roadmap</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     09 — L'ÉQUIPE
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">09 · l'équipe</span>
+  <h2 class="section-title">
+    Une fondation solo<br>
+    qui sait s'entourer.
+  </h2>
+  <p class="lead">
+    Build hyper-frugal jusqu'ici. Architecture, design system, features critiques —
+    tout livré par un seul cerveau augmenté. Le seed sert à faire la transition
+    vers une équipe.
+  </p>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Baptiste · Founder</div>
+      <p>
+        Vision produit + dev full-stack. Conçoit chaque détail UX. Itère
+        quotidiennement avec les beta-testeurs. Background en
+        [TODO : ton background]. Basé Paris.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">À recruter — H1 année 1</div>
+      <p>
+        <strong>Designer produit</strong> (lead UI éditorial)<br>
+        <strong>Mobile dev</strong> (RN senior, perfs natives)<br>
+        <strong>Growth / community</strong> (Paris d'abord, opérationnel terrain)
+      </p>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>09</strong> &nbsp;/&nbsp; équipe</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     10 — L'ASK
+     ════════════════════════════════════════════════════════════ -->
+<section class="page">
+  <span class="eyebrow eyebrow--accent">10 · l'ask</span>
+  <h2 class="section-title">
+    €1M en pré-seed<br>
+    pour 18 mois de runway.
+  </h2>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="num">1<small>M€</small></div>
+      <div class="label"><strong>Round</strong> · pré-seed équity, ticket lead 500–700K, suivi par 3–4 angels.</div>
+    </div>
+    <div class="stat">
+      <div class="num">18<small>m</small></div>
+      <div class="label"><strong>Runway</strong> · jusqu'à la série A (Q1 année 2) avec marge confortable.</div>
+    </div>
+    <div class="stat">
+      <div class="num">3<small>villes</small></div>
+      <div class="label"><strong>Footprint</strong> · Paris + Lyon + Bruxelles avant le closing série A.</div>
+    </div>
+  </div>
+
+  <h3 class="sub-title" style="margin-top: 48px;">Allocation</h3>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">~ 60% Équipe</div>
+      <p>3 recrutements clés (designer, dev mobile senior, growth) sur 12 mois. Salaires marché Paris.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">~ 25% Acquisition</div>
+      <p>Community (events, partenariats créateurs), content éditorial, perf marketing ciblée Paris.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">~ 15% Infra &amp; ops</div>
+      <p>Firebase scaling, Maps API, Apple Developer, SOC compliance, comptabilité, juridique.</p>
+    </div>
+  </div>
+
+  <div class="page-num"><strong>10</strong> &nbsp;/&nbsp; l'ask</div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     CLOSING
+     ════════════════════════════════════════════════════════════ -->
+<section class="page cover" style="min-height: 80vh;">
+  <div class="top">
+    <span class="nav-meta">— fin du brief</span>
+    <span class="nav-meta">parlons-en</span>
+  </div>
+
+  <div class="center">
+    <h1 style="font-size: clamp(56px, 9vw, 130px); letter-spacing: -4px; line-height: 0.95;">
+      L'app qu'on aurait voulu<br>avoir le week-end dernier<span class="dot">.</span>
+    </h1>
+    <p class="tagline" style="margin-top: 32px;">
+      Si Proof t'intrigue, écris-nous. On a le produit, le marché et l'envie.
+      Il nous manque les compagnons de route.
+    </p>
+  </div>
+
+  <div class="footer">
+    <span style="font-family: var(--font-display); font-style: italic; font-size: 16px; color: var(--primary);">
+      proof. — discover your city
+    </span>
+    <span class="city">contact@proof.app</span>
+  </div>
+</section>
+
+</body>
+</html>
