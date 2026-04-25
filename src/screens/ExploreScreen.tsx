@@ -53,27 +53,7 @@ for (const group of EXPLORE_GROUPS) {
   }
 }
 
-// ─── Refonte "Atlas" : utilitaires gradient + mapping catégorie → thème ───
-
-/** Darken a hex color toward black by `factor` ∈ [0,1]. */
-const darkenHex = (hex: string, factor: number): string => {
-  const clean = hex.replace('#', '');
-  const num = parseInt(clean.length === 3
-    ? clean.split('').map((c) => c + c).join('')
-    : clean, 16);
-  const r = Math.max(0, Math.floor((num >> 16) * (1 - factor)));
-  const g = Math.max(0, Math.floor(((num >> 8) & 0xff) * (1 - factor)));
-  const b = Math.max(0, Math.floor((num & 0xff) * (1 - factor)));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-};
-
-/** Extend a 2-stop curated gradient into a 3-stop gradient with a deeper
- *  bottom — gives the tile more visual depth, makes the title pop. */
-const expandGradient3 = (stops: readonly [string, string]): [string, string, string] => [
-  stops[0],
-  stops[1],
-  darkenHex(stops[1], 0.4),
-];
+// ─── Mapping catégorie → thème ───
 
 /** Map each subcategory NAME → its parent theme key (food-drinks, sports, ...).
  *  Lets us filter trendingCategories by the active theme tab. */
@@ -655,14 +635,12 @@ export const ExploreScreen: React.FC = () => {
   // Editorial trending categories list — shown in the empty state only.
   // Source: trendingCategories from the store (top trending in city).
   // Tap a row → auto-fills theme + sub-cat slots → switches to plans list.
+  //
+  // Refonte "numérotée éditoriale" : index 01/02/03… en Fraunces taupe,
+  // nom en Fraunces Medium, badge "hot" inline italique terracotta,
+  // chevron à droite. Plus de tuile dégradée. Lecture posée, magazine.
   const renderCategoryList = () => {
     const top3Names = new Set(trendingCategories.slice(0, 3).map((t) => t.name));
-    // Build display items from the store; enrich with the curated gradient
-    // from EXPLORE_GROUPS when available (fallback: a neutral terracotta).
-    const itemMeta = new Map<string, ExploreCategoryItem>();
-    for (const g of THEME_GROUPS) {
-      for (const s of g.sections) for (const it of s.items) itemMeta.set(it.name, it);
-    }
     return (
       <View>
         <View style={styles.listHeaderRow}>
@@ -670,41 +648,39 @@ export const ExploreScreen: React.FC = () => {
         </View>
         <View>
           {trendingCategories.map((cat, i) => {
-            const item = itemMeta.get(cat.name);
-            const gradient: readonly [string, string] = item?.gradient ?? [Colors.terracotta400, Colors.terracotta700];
             const isHot = cat.hot || top3Names.has(cat.name);
             const planCount = cat.planCount ?? 0;
-            const metaParts: string[] = [];
-            if (planCount > 0) metaParts.push(`${planCount} plan${planCount > 1 ? 's' : ''}`);
+            const planText = planCount > 0
+              ? `${planCount} plan${planCount > 1 ? 's' : ''}`
+              : null;
+            const indexLabel = String(i + 1).padStart(2, '0');
             return (
               <TouchableOpacity
                 key={cat.name}
-                style={[styles.catRow, i > 0 && styles.catRowDivider]}
+                style={styles.catRow}
                 onPress={() => handleTrendingCategoryTap(cat.name)}
                 activeOpacity={0.7}
               >
-                <View style={styles.catRowTile}>
-                  <LinearGradient
-                    colors={expandGradient3(gradient)}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                </View>
+                {/* Col 1 — index numérique éditorial */}
+                <Text style={styles.catRowIndex}>{indexLabel}</Text>
+
+                {/* Col 2 — contenu (nom + meta) */}
                 <View style={styles.catRowBody}>
-                  <View style={styles.catRowNameLine}>
-                    <Text style={styles.catRowName} numberOfLines={1}>{cat.name}</Text>
+                  <Text style={styles.catRowNameLine} numberOfLines={1}>
+                    <Text style={styles.catRowName}>{cat.name}</Text>
                     {isHot && (
-                      <View style={styles.catRowHotBadge}>
-                        <Text style={styles.catRowHotBadgeText}>HOT</Text>
-                      </View>
+                      <Text style={styles.catRowHotInline}>{'  · hot'}</Text>
                     )}
-                  </View>
-                  {metaParts.length > 0 && (
-                    <Text style={styles.catRowMeta} numberOfLines={1}>{metaParts.join(' · ')}</Text>
+                  </Text>
+                  {planText && (
+                    <Text style={styles.catRowMeta} numberOfLines={1}>
+                      {planText}
+                    </Text>
                   )}
                 </View>
-                <Ionicons name="arrow-forward" size={16} color={Colors.textTertiary} />
+
+                {/* Col 3 — chevron */}
+                <Ionicons name="arrow-forward" size={14} color={Colors.textTertiary} />
               </TouchableOpacity>
             );
           })}
@@ -1199,60 +1175,62 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   } as any,
 
-  // Category list rows (52x52 mini-tile + name + meta + arrow)
+  // ── Category list rows : "numbered editorial" layout ──
+  // 3 colonnes : 44 (index) | 1fr (contenu) | auto (chevron). Un
+  // hairline borderTop sur chaque row (y compris la première) — donne
+  // le rythme magazine.
   catRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingVertical: 13,
-  } as any,
-  catRowDivider: {
+    paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.borderSubtle,
+  } as any,
+
+  // Col 1 — index "01", "02"… en Fraunces Regular taupe.
+  catRowIndex: {
+    width: 44,
+    fontFamily: Fonts.display,        // Fraunces 400 Regular
+    fontSize: 26,
+    lineHeight: 26,
+    letterSpacing: -0.5,
+    color: Colors.textTertiary,
+    fontVariant: ['tabular-nums'],    // alignement chiffres parfait
   },
-  catRowTile: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: Colors.bgTertiary,
-  },
+
+  // Col 2 — body (nom + méta)
   catRowBody: {
     flex: 1,
     minWidth: 0,
   } as any,
+
+  // Wrap du nom + badge "hot" inline — un seul Text pour que ça wrappe
+  // naturellement et que le · hot suive la baseline du nom.
   catRowNameLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    fontSize: 17,
   } as any,
   catRowName: {
-    fontFamily: Fonts.displaySemiBold,
-    fontWeight: '500',
-    fontSize: 16,
-    letterSpacing: -0.25,
+    fontFamily: Fonts.displayMedium,  // Fraunces 500 Medium
+    fontSize: 17,
+    letterSpacing: -0.3,
     color: Colors.textPrimary,
-    flexShrink: 1,
   },
-  catRowHotBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 999,
-    backgroundColor: Colors.terracotta100,
+  // "  · hot" inline italic terracotta — pas de pill, juste du texte
+  catRowHotInline: {
+    fontFamily: Fonts.displayItalic,  // Fraunces italic
+    fontSize: 11,
+    color: Colors.primary,
+    letterSpacing: 0.1,
   },
-  catRowHotBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: Colors.terracotta700,
-    letterSpacing: 0.4,
-    fontFamily: Fonts.bodySemiBold,
-  },
+
+  // Méta sous le nom — Inter 400, dot taupe
   catRowMeta: {
-    fontSize: 10.5,
-    color: Colors.textTertiary,
-    marginTop: 4,
-    letterSpacing: 0.2,
+    fontSize: 11.5,
     fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 3,
+    letterSpacing: 0.05,
   },
 
   // Sub-category dropdown (results view)
