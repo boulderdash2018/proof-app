@@ -290,12 +290,18 @@ export const SearchScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Trending categories */}
+            {/* Trending categories — éditorial : dot bullet terracotta
+                + nom Fraunces + count + arrow. Cohérent avec le rendu
+                de la liste "tendance" sur l'Explorer principal. */}
             <View style={s.section}>
               <View style={s.sectionHeaderRow}>
-                <Text style={[s.sectionLabel, { color: C.gray600 }]}>CATÉGORIES EN TENDANCE</Text>
+                <Text style={[s.sectionLabel, { color: Colors.textTertiary }]}>
+                  {trendingCategories.length} CATÉGORIES EN TENDANCE
+                </Text>
                 {!trendingLoading && trendingCategories.length > 0 && (
-                  <Text style={[s.sectionCount, { color: C.gray500 }]}>{trendingCategories.length}</Text>
+                  <Text style={[s.sectionMeta, { color: Colors.textTertiary }]}>
+                    Mise à jour aujourd{'\u2019'}hui
+                  </Text>
                 )}
               </View>
               {trendingLoading ? (
@@ -303,38 +309,33 @@ export const SearchScreen: React.FC = () => {
               ) : (
                 <View>
                   {trendingCategories.map((cat, i) => {
-                    const isLast = i === trendingCategories.length - 1;
                     const isHot = cat.hot || i < 3;
+                    const planText = `${cat.planCount} plan${cat.planCount > 1 ? 's' : ''}`;
                     return (
                       <TouchableOpacity
                         key={cat.name}
-                        style={[s.trendingRow, !isLast && { borderBottomWidth: 1, borderBottomColor: C.borderLight }]}
+                        style={s.trendingRow}
                         activeOpacity={0.7}
                         onPress={() => handleSelectCategory(cat.name)}
                       >
-                        {/* Mini gradient tile — same palette as the Explore grid */}
-                        <View style={s.trendingTile}>
-                          <LinearGradient
-                            colors={cat.gradient as [string, string]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={StyleSheet.absoluteFill}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={s.trendingNameRow}>
-                            <Text style={[s.trendingName, { color: C.black }]} numberOfLines={1}>
-                              {cat.name}
-                            </Text>
-                            {isHot && (
-                              <Text style={[s.trendingHotPlus, { color: Colors.gold }]}>+</Text>
-                            )}
-                          </View>
-                          <Text style={[s.trendingCount, { color: C.gray600 }]}>
-                            {cat.planCount} plan{cat.planCount > 1 ? 's' : ''}
+                        {/* Col 1 — dot bullet (terracotta si hot, taupe sinon) */}
+                        <View style={[
+                          s.trendingDot,
+                          { backgroundColor: isHot ? Colors.primary : Colors.borderMedium },
+                        ]} />
+
+                        {/* Col 2 — nom + (méta optionnelle) */}
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={s.trendingName} numberOfLines={1}>
+                            {cat.name}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color={C.gray500} />
+
+                        {/* Col 3 — count + chevron */}
+                        <View style={s.trendingCountRow}>
+                          <Text style={s.trendingCount}>{planText}</Text>
+                          <Ionicons name="arrow-forward" size={13} color={Colors.textTertiary} />
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
@@ -400,9 +401,11 @@ const s = StyleSheet.create({
 
   // Sections
   section: { marginTop: 18 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, fontFamily: Fonts.bodySemiBold },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: Fonts.bodySemiBold },
   sectionCount: { fontSize: 12, fontFamily: Fonts.body },
+  // "Mise à jour aujourd'hui" italique — éditorial discret
+  sectionMeta: { fontSize: 11.5, fontFamily: Fonts.bodyMedium, fontStyle: 'italic' },
   clearText: { fontSize: 12, fontFamily: Fonts.body },
 
   // Recent searches
@@ -410,18 +413,41 @@ const s = StyleSheet.create({
   recentText: { fontSize: 14, fontFamily: Fonts.body, flex: 1 },
   recentRemoveBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' } as any,
 
-  // Trending — mini-tile gradient + name + optional gold "+" + chevron
-  trendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 } as any,
-  trendingTile: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    overflow: 'hidden',
+  // ── Trending — éditorial : dot bullet + nom Fraunces + count + arrow ──
+  // Cohérent avec la liste tendance de l'Explorer principal. Hairline
+  // borderTop sur chaque row pour le rythme magazine.
+  trendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+  } as any,
+  trendingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginLeft: 4,
+    marginRight: 4,
   },
-  trendingNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 } as any,
-  trendingName: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
-  trendingHotPlus: { fontSize: 16, fontFamily: Fonts.displayBold, marginTop: -2 },
-  trendingCount: { fontSize: 12, marginTop: 2, fontFamily: Fonts.body },
+  trendingName: {
+    fontFamily: Fonts.displayMedium,
+    fontSize: 16,
+    letterSpacing: -0.25,
+    color: Colors.textPrimary,
+  },
+  trendingCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trendingCount: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    letterSpacing: 0.05,
+  },
 
   // Place results (compact rows) — pin in cream square + name/type + star
   placeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 12 } as any,
