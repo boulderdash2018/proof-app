@@ -26,7 +26,11 @@ import { getDirections, decodePolyline, RouteResult } from '../services/directio
 import { fetchPlanById } from '../services/plansService';
 import { Plan, DoItNowTransport } from '../types';
 import { useCity } from '../hooks/useCity';
-import { GroupSessionLayer } from '../components';
+import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast } from '../components';
+import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
+import { useGroupSessionStore } from '../store/groupSessionStore';
+import { sendPhotoMessage } from '../services/chatService';
+import { pickImage } from '../utils';
 
 // Quick-word chips shown on the editorial review screen.
 const QUICK_WORDS: { key: string; label: string }[] = [
@@ -101,6 +105,13 @@ export const DoItNowScreen: React.FC = () => {
 
   // Route params — for multi-user sessions coming from a group "Rejoindre" tap.
   const routeSessionId: string | undefined = navRoute.params?.sessionId;
+  const routeConversationId: string | undefined = navRoute.params?.conversationId;
+
+  // ── Group-session UI state (only relevant when routeSessionId is set) ──
+  const [mapSheetOpen, setMapSheetOpen] = useState(false);
+  const souvenirPrompts = useSouvenirPrompts();
+  const activeGroupSession = useGroupSessionStore((s) => s.activeSession);
+  const groupConversationId = routeConversationId || activeGroupSession?.conversationId;
 
   const { session, plan, arriveAtPlace, nextStop, completeSession, startSession } = useDoItNowStore();
 
@@ -342,8 +353,17 @@ export const DoItNowScreen: React.FC = () => {
       setPlaceMode({ active: true, placeIndex: currentIndex, arrivedAt: new Date(), rating: 0 });
       setArrivedMessage(`Bienvenue chez ${currentPlace.name} !`);
       setTimeout(() => setArrivedMessage(null), 3000);
+      // Group session : fire a "souvenir à plusieurs" prompt 4s after
+      // arrival — gives the user time to settle in before suggesting
+      // a group photo.
+      if (routeSessionId) {
+        souvenirPrompts.fire({
+          key: `arrived-${currentPlace.id}`,
+          delay: 4000,
+        });
+      }
     }
-  }, [userLocation]);
+  }, [userLocation, routeSessionId, currentPlace?.id]);
 
   // Hidden timer helper — computes minutes since arrival (snapshot, not live)
   const getHiddenTimerMinutes = (): number => {
@@ -396,6 +416,36 @@ export const DoItNowScreen: React.FC = () => {
     if (prefix && rawComment) return `${prefix}\n${rawComment}`;
     return prefix || rawComment;
   };
+
+  // ── Group session : "Souvenir à plusieurs" photo handler ──
+  // Opens the image picker → uploads via the existing chat photo flow
+  // (sendPhotoMessage with the linked sessionId tag). The photo lands
+  // both in the conv thread AND in the group album sheet.
+  const handleSouvenirPhoto = useCallback(async () => {
+    if (!groupConversationId || !user?.id || !routeSessionId) {
+      souvenirPrompts.dismiss();
+      return;
+    }
+    try {
+      const picked = await pickImage();
+      if (!picked) {
+        souvenirPrompts.dismiss();
+        return;
+      }
+      const caption = souvenirPrompts.current?.copy || 'Souvenir à plusieurs';
+      await sendPhotoMessage(groupConversationId, user.id, {
+        imageDataUrl: picked.dataUrl,
+        width: picked.width,
+        height: picked.height,
+        caption,
+        sessionId: routeSessionId,
+      });
+    } catch (err) {
+      console.warn('[DoItNow] souvenir photo failed:', err);
+    } finally {
+      souvenirPrompts.dismiss();
+    }
+  }, [groupConversationId, user?.id, routeSessionId, souvenirPrompts]);
 
   const resetPlaceModeUi = () => {
     setPlaceMode(null);
@@ -850,6 +900,51 @@ export const DoItNowScreen: React.FC = () => {
 
           <Text style={[styles.quoteText, { color: C.gray500 }]}>proof. — discover your city</Text>
         </View>
+      )}
+
+      {/* ── Group session : floating actions + map sheet + souvenir toast ──
+          Only mounted when we entered via "Démarrer/Rejoindre la session"
+          on a co-plan group conv (routeSessionId is set). */}
+      {routeSessionId && (
+        <>
+          <SessionFloatingActions
+            conversationId={groupConversationId}
+            friendCount={Object.keys(activeGroupSession?.participants || {}).length - 1}
+            onOpenMap={() => setMapSheetOpen(true)}
+            onOpenChat={() => {
+              if (groupConversationId) {
+                navigation.navigate('Conversation', {
+                  conversationId: groupConversationId,
+                  otherUser: null,
+                });
+              }
+            }}
+          />
+
+          <GroupLiveMapSheet
+            visible={mapSheetOpen}
+            sessionId={routeSessionId}
+            myLocation={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : null}
+            onClose={() => setMapSheetOpen(false)}
+          />
+
+          <SouvenirPromptToast
+            prompt={souvenirPrompts.current}
+            participants={Object.values(activeGroupSession?.participants || {})
+              .filter((p) => p.userId !== user?.id)
+              .map((p) => ({
+                userId: p.userId,
+                displayName: p.displayName,
+                username: p.username,
+                avatarUrl: p.avatarUrl ?? null,
+                avatarBg: p.avatarBg,
+                avatarColor: p.avatarColor,
+                initials: p.initials,
+              }))}
+            onTakePhoto={handleSouvenirPhoto}
+            onDismiss={souvenirPrompts.dismiss}
+          />
+        </>
       )}
     </View>
   );
