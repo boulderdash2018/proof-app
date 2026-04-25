@@ -574,6 +574,31 @@ export const ExploreScreen: React.FC = () => {
 
           <Text>.</Text>
         </Text>
+
+        {/* ── Reset rapide de la phrase ──
+            Apparait uniquement quand au moins un slot est rempli.
+            Italic discret aligné à droite — dans la dna éditoriale Proof.
+            Vide les 3 slots d'un coup, sans toucher aux filtres avancés
+            ni à la barre de recherche (qui sont des contrôles séparés). */}
+        {(slotPerson || slotTheme || slotSubcategory) && (
+          <View style={styles.sentenceClearRow}>
+            <TouchableOpacity
+              onPress={() => {
+                setSlotPerson(null);
+                setSlotTheme(null);
+                setSlotSubcategory(null);
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.sentenceClearBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Tout effacer la phrase de recherche"
+            >
+              <Ionicons name="refresh" size={13} color={Colors.primary} />
+              <Text style={styles.sentenceClearText}>Tout effacer</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -1089,6 +1114,29 @@ const styles = StyleSheet.create({
     lineHeight: 26 * 1.35,
     letterSpacing: -0.5,
     color: Colors.textPrimary,
+  },
+
+  // "Tout effacer" — discret, italic Inter, terracotta. Apparaît
+  // sous la phrase quand au moins un slot est rempli. Aligné à droite
+  // pour ne pas concurrencer la lecture du début de la phrase.
+  sentenceClearRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
+  sentenceClearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  sentenceClearText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodyMedium,
+    fontStyle: 'italic',
+    color: Colors.primary,
+    letterSpacing: 0.05,
   },
 
   // Hint search bar (mock) + sliders aligned right
