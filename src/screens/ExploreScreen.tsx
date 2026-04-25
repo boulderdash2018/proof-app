@@ -301,8 +301,25 @@ export const ExploreScreen: React.FC = () => {
     setIsFilterLoading(true);
     fetchPublicPlansByTags(filters, cityConfig.name)
       .then((plans) => {
-        const result = filters.length > 1
-          ? plans.filter((p) => filters.every((tag) => p.tags.includes(tag)))
+        // ── Filter logic ──
+        // The slots are a hierarchy : person (Solo/Date/Friends...) +
+        // theme (Food & Drinks, Sports, ...) + subcategory (Cool bars,
+        // Padel...). Older logic required the plan to carry ALL active
+        // tags, which created a mismatch with the trending counter :
+        // a plan tagged "Cool bars" but not also tagged "Food & Drinks"
+        // counted in the trending stat (which only checks subcategory)
+        // but was excluded from the click result.
+        //
+        // New rule : only require the MOST SPECIFIC theme tag
+        // (subcategory if present, otherwise theme), plus the person
+        // tag if any. The parent theme is decorative when a subcategory
+        // is already set.
+        const required: string[] = [];
+        if (slotPerson) required.push(slotPerson);
+        const themeMostSpecific = slotSubcategory || slotTheme;
+        if (themeMostSpecific) required.push(themeMostSpecific);
+        const result = required.length > 0
+          ? plans.filter((p) => required.every((tag) => p.tags.includes(tag)))
           : plans;
         setFilteredPlans(result);
       })
