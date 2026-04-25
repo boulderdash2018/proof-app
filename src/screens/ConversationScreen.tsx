@@ -11,7 +11,8 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanResolutionPill, CoPlanStatusBar } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant } from '../components';
+import { useGroupSessionStore } from '../store/groupSessionStore';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
@@ -530,16 +531,16 @@ const MessageRow = React.memo<MessageRowProps>(({
     }
 
     // ── Compact event ──
-    // For all OTHER coplan_* kinds + the regular system events INSIDE a
-    // co-plan group (group_created, joined, left, renamed, session_*),
-    // use the compact one-line format with avatar + actor + verb +
-    // timestamp. We detect "co-plan group" via the presence of any
-    // coplan_* kind earlier in the conv — but as a simpler heuristic,
-    // compact format applies whenever the current event is coplan_* OR
-    // the conv has at least one coplan_* event in it.
-    // For minimal scope here : compact format applies if isCoplan, OR
-    // if it's a `group_created` event (the mockup shows it that way).
-    const useCompact = isCoplan || ev?.kind === 'group_created' || ev?.kind === 'joined' || ev?.kind === 'left' || ev?.kind === 'renamed';
+    // All non-bubble system events are rendered in the compact format
+    // (avatar + actor + verb + timestamp). This includes session_started
+    // and session_completed — the rejoin CTA moved to the floating dock,
+    // and the album button moves to the kebab menu / pinned card; the
+    // event itself is a clean audit-log line, like coplan_member_joined.
+    const COMPACT_KINDS = new Set([
+      'group_created', 'joined', 'left', 'renamed',
+      'session_started', 'session_completed',
+    ]);
+    const useCompact = isCoplan || (ev?.kind && COMPACT_KINDS.has(ev.kind));
     if (useCompact) {
       return (
         <View>
@@ -1265,6 +1266,38 @@ export const ConversationScreen: React.FC = () => {
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  // Track focus on the message input — used to hide the floating
+  // session dock while the user is typing (no CTA noise mid-message).
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // ── Subscribe to the active session (when one is running on this conv)
+  // so the floating session dock can show real "who's joined" presence
+  // without an extra query. Idempotent : if the user navigates to
+  // DoItNow which also observes the same session, the second call is
+  // a no-op (store-level dedup).
+  const observeSession = useGroupSessionStore((s) => s.observeSession);
+  const stopObservingSession = useGroupSessionStore((s) => s.stopObserving);
+  const activeGroupSession = useGroupSessionStore((s) => s.activeSession);
+  useEffect(() => {
+    if (!activeConv?.activeSessionId || !user?.id) return;
+    observeSession(activeConv.activeSessionId, user.id);
+    return () => stopObservingSession();
+  }, [activeConv?.activeSessionId, user?.id, observeSession, stopObservingSession]);
+
+  // Build the "others in session" list for the dock label.
+  const dockOthers: DockParticipant[] = useMemo(() => {
+    if (!activeGroupSession || !user?.id) return [];
+    return Object.values(activeGroupSession.participants)
+      .filter((p) => p.userId !== user.id)
+      .map((p) => ({
+        userId: p.userId,
+        displayName: p.displayName,
+        initials: p.initials,
+        avatarUrl: p.avatarUrl ?? null,
+        avatarBg: p.avatarBg,
+        avatarColor: p.avatarColor,
+      }));
+  }, [activeGroupSession, user?.id]);
 
   const handlePickPhoto = useCallback(async () => {
     setAttachMenuOpen(false);
@@ -1776,18 +1809,12 @@ export const ConversationScreen: React.FC = () => {
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
                 </TouchableOpacity>
-                {/* Session CTA — Start if none active, Join if one is live */}
-                {activeConv.activeSessionId ? (
-                  <TouchableOpacity
-                    style={styles.sessionActiveBtn}
-                    onPress={handleJoinSession}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.sessionActiveDot} />
-                    <Text style={styles.sessionActiveText}>Session en cours — rejoindre</Text>
-                    <Ionicons name="arrow-forward" size={15} color={Colors.textOnAccent} />
-                  </TouchableOpacity>
-                ) : (
+                {/* Session CTA in the pinned card — only "Démarrer" remains
+                    here. The "Rejoindre" affordance for an ACTIVE session
+                    moved to the FloatingSessionDock above the input bar
+                    (less competing with the pinned card for attention,
+                    closer to the thumb, carries social presence). */}
+                {!activeConv.activeSessionId && (
                   <TouchableOpacity
                     style={[styles.sessionStartBtn, { opacity: isStartingSession ? 0.6 : 1 }]}
                     onPress={handleStartSession}
@@ -1874,6 +1901,8 @@ export const ConversationScreen: React.FC = () => {
                 multiline
                 maxLength={2000}
                 blurOnSubmit={false}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
                 onKeyPress={(e: any) => {
                   const key = e.nativeEvent?.key ?? (e as any).key;
                   if (key === 'Enter' && !(e.nativeEvent?.shiftKey ?? (e as any).shiftKey)) {
@@ -1919,6 +1948,20 @@ export const ConversationScreen: React.FC = () => {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* ── Floating session dock ──
+          Replaces the previous double-CTA ("Rejoindre" sticky + inline
+          button on the system event). Sits just above the message input,
+          carries social presence ("Léa et Marc sont en route"), auto-hides
+          while the user is typing. Dismounts when the session ends. */}
+      {isGroup && activeConv?.activeSessionId && (
+        <FloatingSessionDock
+          others={dockOthers}
+          hidden={isInputFocused}
+          bottom={Math.max(insets.bottom, 8) + 60}
+          onPress={handleJoinSession}
+        />
+      )}
 
       {/* Kebab action sheet */}
       <Modal

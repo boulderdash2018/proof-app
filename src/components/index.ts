@@ -37,6 +37,8 @@ export { CoPlanStatusBar } from './CoPlanStatusBar';
 export { GroupLiveMapSheet } from './GroupLiveMapSheet';
 export { SouvenirPromptToast } from './SouvenirPromptToast';
 export { SessionFloatingActions } from './SessionFloatingActions';
+export { FloatingSessionDock } from './FloatingSessionDock';
+export type { DockParticipant } from './FloatingSessionDock';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';
