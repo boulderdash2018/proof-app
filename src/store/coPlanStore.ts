@@ -3,6 +3,7 @@ import {
   PlanDraft,
   CoPlanParticipant,
   CoPlanProposedPlace,
+  CoPlanProposal,
 } from '../types';
 import {
   subscribePlanDraft,
@@ -19,6 +20,8 @@ import {
   slotKeyToMeetupAt,
   createProposal as svcCreateProposal,
 } from '../services/planDraftService';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../services/firebaseConfig';
 import { createPlan } from '../services/plansService';
 import { attachPlanToConversation, createGroupConversation, postSystemEvent, ConversationParticipant, SystemEvent } from '../services/chatService';
 import { useAuthStore } from './authStore';
@@ -72,6 +75,10 @@ interface CoPlanStore {
   /** Live, capped-size queue of recent events from OTHER participants. */
   recentActivity: CoPlanActivityEvent[];
   _activityPruneTimer: ReturnType<typeof setInterval> | null;
+  /** Live list of currently-pending proposals on the observed draft.
+   *  Used by the workspace to surface "X veut le retirer" indicators. */
+  pendingProposals: CoPlanProposal[];
+  _proposalsUnsub: (() => void) | null;
 
   // ── Actions — subscription ──
   observeDraft: (draftId: string, userId: string) => void;
@@ -184,6 +191,8 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   _prevDraft: null,
   recentActivity: [],
   _activityPruneTimer: null,
+  pendingProposals: [],
+  _proposalsUnsub: null,
 
   // ── Subscribe to a draft + start presence heartbeat ──
   observeDraft: (draftId: string, userId: string) => {
@@ -194,6 +203,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     }
     // Close any previous subscription + timer.
     state._unsub?.();
+    state._proposalsUnsub?.();
     if (state._presenceTimer) clearInterval(state._presenceTimer);
     if (state._activityPruneTimer) clearInterval(state._activityPruneTimer);
 
@@ -203,6 +213,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       _userId: userId,
       _prevDraft: null,
       recentActivity: [],
+      pendingProposals: [],
     });
 
     const unsub = subscribePlanDraft(draftId, (next) => {
@@ -237,16 +248,46 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       }
     }, 1000);
 
-    set({ _unsub: unsub, _presenceTimer: timer, _activityPruneTimer: pruneTimer });
+    // Subscribe to pending proposals — used by the workspace to surface
+    // "X veut le retirer" warnings on the relevant place rows.
+    const proposalsUnsub = onSnapshot(
+      query(
+        collection(db, 'plan_drafts', draftId, 'proposals'),
+        where('status', '==', 'pending'),
+      ),
+      (snap) => {
+        const props: CoPlanProposal[] = snap.docs.map((d) => {
+          const data: any = d.data();
+          return {
+            id: d.id,
+            type: data.type,
+            proposedBy: data.proposedBy,
+            proposedAt: data.proposedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            payload: data.payload || {},
+            votes: data.votes || {},
+            reason: data.reason || undefined,
+            status: data.status || 'pending',
+          };
+        });
+        set({ pendingProposals: props });
+      },
+      (err) => {
+        console.warn('[coPlanStore] proposals listener error:', err.message);
+      },
+    );
+
+    set({ _unsub: unsub, _presenceTimer: timer, _activityPruneTimer: pruneTimer, _proposalsUnsub: proposalsUnsub });
   },
 
   stopObserving: () => {
-    const { _unsub, _presenceTimer, _activityPruneTimer } = get();
+    const { _unsub, _presenceTimer, _activityPruneTimer, _proposalsUnsub } = get();
     _unsub?.();
+    _proposalsUnsub?.();
     if (_presenceTimer) clearInterval(_presenceTimer);
     if (_activityPruneTimer) clearInterval(_activityPruneTimer);
     set({
       _unsub: null,
+      _proposalsUnsub: null,
       _presenceTimer: null,
       _activityPruneTimer: null,
       draftId: null,
@@ -254,6 +295,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       _userId: null,
       _prevDraft: null,
       recentActivity: [],
+      pendingProposals: [],
     });
   },
 

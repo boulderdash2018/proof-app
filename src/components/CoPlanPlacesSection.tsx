@@ -14,7 +14,7 @@ import {
   searchPlacesAutocomplete,
   getPlaceDetails,
 } from '../services/googlePlacesService';
-import { CoPlanProposedPlace, CoPlanParticipant } from '../types';
+import { CoPlanProposedPlace, CoPlanParticipant, CoPlanProposal } from '../types';
 
 interface Props {
   participants: Record<string, CoPlanParticipant>;
@@ -36,6 +36,9 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
   const movePlace = useCoPlanStore((s) => s.movePlace);
   const removePlace = useCoPlanStore((s) => s.removePlace);
   const proposeRemovePlace = useCoPlanStore((s) => s.proposeRemovePlace);
+  const pendingProposals = useCoPlanStore((s) => s.pendingProposals);
+  const draft = useCoPlanStore((s) => s.draft);
+  const totalParticipants = draft?.participants.length || 0;
 
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Place currently targeted by the contextual long-press menu, or null. */
@@ -118,22 +121,34 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
         </View>
       ) : (
         <View style={{ gap: 10, marginTop: 12 }}>
-          {places.map((p, i) => (
-            <PlaceRow
-              key={p.id}
-              place={p}
-              index={i}
-              total={places.length}
-              proposer={participants[p.proposedBy]}
-              currentUserId={user?.id}
-              onVote={handleVote}
-              onMoveUp={() => handleMove(p.id, 'up')}
-              onMoveDown={() => handleMove(p.id, 'down')}
-              onRemove={() => handleRemove(p.id)}
-              onLongPress={() => handleLongPress(p)}
-              isProposing={proposingForId === p.id}
-            />
-          ))}
+          {places.map((p, i) => {
+            // Pending proposal targeting THIS place (remove vote in flight).
+            const pendingRemoval = pendingProposals.find(
+              (prop) => prop.type === 'remove_place' && prop.payload.placeId === p.id,
+            );
+            const removalProposer = pendingRemoval
+              ? participants[pendingRemoval.proposedBy]
+              : undefined;
+            return (
+              <PlaceRow
+                key={p.id}
+                place={p}
+                index={i}
+                total={places.length}
+                proposer={participants[p.proposedBy]}
+                currentUserId={user?.id}
+                onVote={handleVote}
+                onMoveUp={() => handleMove(p.id, 'up')}
+                onMoveDown={() => handleMove(p.id, 'down')}
+                onRemove={() => handleRemove(p.id)}
+                onLongPress={() => handleLongPress(p)}
+                isProposing={proposingForId === p.id}
+                pendingRemoval={pendingRemoval}
+                removalProposer={removalProposer}
+                totalParticipants={totalParticipants}
+              />
+            );
+          })}
         </View>
       )}
 
@@ -198,17 +213,32 @@ interface PlaceRowProps {
   onLongPress?: () => void;
   /** Show a faint pulse while a "Proposer de retirer" call is in flight. */
   isProposing?: boolean;
+  /** A pending `remove_place` proposal targeting this row, if any.
+   *  When set, the row shows a small terracotta warning with the
+   *  proposer's name + live vote count. */
+  pendingRemoval?: CoPlanProposal;
+  removalProposer?: CoPlanParticipant;
+  /** Total participants on the draft — denominator for "X / N votes". */
+  totalParticipants?: number;
 }
 
 const PlaceRow: React.FC<PlaceRowProps> = ({
   place, index, total, proposer, currentUserId, onVote, onMoveUp, onMoveDown, onRemove,
-  onLongPress, isProposing,
+  onLongPress, isProposing, pendingRemoval, removalProposer, totalParticipants,
 }) => {
   const hasVoted = !!currentUserId && place.votes.includes(currentUserId);
   const voteCount = place.votes.length;
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const mine = !!currentUserId && place.proposedBy === currentUserId;
+  // "Pending validation" : only the proposer voted (or zero votes).
+  // Visually dimmed to signal "not yet endorsed by the group".
+  const needsGroupValidation = voteCount < 2;
+  // Removal status — derived from the pending proposal if any.
+  const removalPourCount = pendingRemoval
+    ? Object.values(pendingRemoval.votes).filter((v) => v === 'pour').length
+    : 0;
+  const removalProposerFirstName = removalProposer?.displayName?.split(' ')[0];
 
   return (
     <Pressable
@@ -229,7 +259,15 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
 
       {/* Body */}
       <View style={rowStyles.body}>
-        <Text style={rowStyles.name} numberOfLines={1}>{place.name}</Text>
+        <Text
+          style={[
+            rowStyles.name,
+            needsGroupValidation && rowStyles.nameDimmed,
+          ]}
+          numberOfLines={1}
+        >
+          {place.name}
+        </Text>
         <Text style={rowStyles.address} numberOfLines={1}>{place.address}</Text>
         {proposer && (
           <View style={rowStyles.proposerRow}>
@@ -242,6 +280,23 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
             />
             <Text style={rowStyles.proposerText}>
               {mine ? 'Toi' : `par ${proposer.displayName.split(' ')[0]}`}
+            </Text>
+            {needsGroupValidation && (
+              <View style={rowStyles.pendingTag}>
+                <Text style={rowStyles.pendingTagText}>en attente du groupe</Text>
+              </View>
+            )}
+          </View>
+        )}
+        {/* Warning : an active "remove this place" proposition is in vote.
+            The row stays its normal color (per UX spec) but a subtle
+            terracotta line surfaces who started the vote and the count. */}
+        {pendingRemoval && (
+          <View style={rowStyles.removalWarning}>
+            <Ionicons name="alert-circle" size={12} color={Colors.primary} />
+            <Text style={rowStyles.removalWarningText} numberOfLines={1}>
+              {removalProposerFirstName ? `${removalProposerFirstName} veut le retirer` : 'Retrait proposé'}
+              {totalParticipants ? ` · ${removalPourCount}/${totalParticipants}` : ''}
             </Text>
           </View>
         )}
@@ -698,6 +753,46 @@ const rowStyles = StyleSheet.create({
     fontSize: 11,
     fontFamily: Fonts.bodyMedium,
     color: Colors.textSecondary,
+  },
+  // Subtle dim on the place name when only the proposer has voted —
+  // signals "the group hasn't endorsed this yet" without removing the
+  // place. Tap the heart to upvote and clear the dim.
+  nameDimmed: {
+    color: Colors.textTertiary,
+  },
+  // Tiny faded chip after the proposer name : "en attente du groupe"
+  pendingTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 99,
+    backgroundColor: Colors.bgTertiary,
+  },
+  pendingTagText: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+    letterSpacing: 0.3,
+    textTransform: 'lowercase',
+  },
+  // Active "remove this" warning line — terracotta, sits below proposer.
+  removalWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 99,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.terracotta200,
+    alignSelf: 'flex-start',
+  },
+  removalWarningText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    letterSpacing: 0.05,
   },
 
   actions: {

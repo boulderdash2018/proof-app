@@ -172,15 +172,46 @@ export const CoPlanProposalCard: React.FC<Props> = ({
           </Text>
         ) : null}
 
-        {/* ── Progress bar + N/M votes ── */}
+        {/* ── Progress bar + N/M ── */}
         <View style={styles.progressRow}>
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
           </View>
           <Text style={styles.progressLabel}>
-            {pourCount} / {participantCount} votes
+            {pourCount} / {participantCount} pour
           </Text>
         </View>
+
+        {/* ── Vote breakdown : "X pour · Y contre · Z n'ont pas voté" ── */}
+        {status === 'pending' && (
+          <Text style={styles.breakdown}>
+            {formatVoteBreakdown(participantCount, pourCount, contreCount)}
+          </Text>
+        )}
+
+        {/* ── Contextual hint — fun, warmer, makes the math obvious ── */}
+        {status === 'pending' && (() => {
+          const hint = getProposalHint(participantCount, pourCount, contreCount);
+          if (!hint) return null;
+          return (
+            <View style={[styles.hintRow, hint.urgent && styles.hintRowUrgent]}>
+              <Ionicons
+                name={hint.urgent ? 'flame' : 'information-circle-outline'}
+                size={13}
+                color={hint.urgent ? Colors.primary : Colors.textTertiary}
+              />
+              <Text
+                style={[
+                  styles.hintText,
+                  hint.urgent && styles.hintTextUrgent,
+                ]}
+                numberOfLines={1}
+              >
+                {hint.text}
+              </Text>
+            </View>
+          );
+        })()}
 
         {/* ── Actions : Rejeter (outlined) + Approuver (terracotta) ── */}
         {status === 'pending' && !isProposer && (
@@ -237,6 +268,67 @@ export const CoPlanProposalCard: React.FC<Props> = ({
     </Animated.View>
   );
 };
+
+// ══════════════════════════════════════════════════════════════
+// Copy helpers — vote breakdown + contextual hint
+// ══════════════════════════════════════════════════════════════
+
+/** Human-readable vote breakdown line ("2 pour · 1 contre · 1 n'a pas
+ *  voté"). Skips empty buckets to stay terse. */
+function formatVoteBreakdown(participants: number, pour: number, contre: number): string {
+  const undecided = Math.max(0, participants - pour - contre);
+  const parts: string[] = [];
+  parts.push(`${pour} pour`);
+  if (contre > 0) parts.push(`${contre} contre`);
+  if (undecided > 0) {
+    parts.push(undecided === 1 ? '1 n\'a pas voté' : `${undecided} n\'ont pas voté`);
+  }
+  return parts.join('  ·  ');
+}
+
+/** Contextual hint message — drives anticipation as the threshold
+ *  approaches. Returns null when nothing useful to say. The `urgent`
+ *  flag triggers a warmer terracotta tint + flame icon when only one
+ *  vote separates from adoption / rejection. */
+function getProposalHint(
+  participants: number,
+  pour: number,
+  contre: number,
+): { text: string; urgent: boolean } | null {
+  if (participants <= 1) return null;
+  const adoptThreshold = Math.floor(participants / 2) + 1;
+  const remainingForAdopt = adoptThreshold - pour;
+  const undecided = Math.max(0, participants - pour - contre);
+  const maxPourPossible = pour + undecided;
+
+  // Math is over — should be auto-applied/rejected, but guard anyway.
+  if (remainingForAdopt <= 0) return { text: 'Adoptée', urgent: false };
+  if (maxPourPossible < adoptThreshold) {
+    return { text: 'Majorité plus atteignable — sera rejetée', urgent: true };
+  }
+
+  // Warm urgent message when one vote away.
+  if (remainingForAdopt === 1) {
+    return { text: 'Plus qu\'une voix pour adopter !', urgent: true };
+  }
+  // Warning if 1 contre away from forcing reject.
+  const contreToReject = adoptThreshold - 1; // contre count that makes adoption impossible
+  // actually: contre * 2 >= participants → reject. So contreToReject =
+  // Math.ceil(participants / 2). One contre away = contre is ceil-1.
+  const rejectThreshold = Math.ceil(participants / 2);
+  if (rejectThreshold - contre === 1 && remainingForAdopt > 1) {
+    return { text: '1 voix de plus contre va rejeter', urgent: true };
+  }
+
+  // Mid-stream — informational.
+  if (pour === 0) return { text: 'Personne n\'a encore validé', urgent: false };
+  return {
+    text: remainingForAdopt === 1
+      ? 'Plus qu\'une voix pour adopter'
+      : `Encore ${remainingForAdopt} voix pour adopter`,
+    urgent: false,
+  };
+}
 
 // ══════════════════════════════════════════════════════════════
 // Styles
@@ -351,6 +443,42 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
     letterSpacing: 0.05,
+  },
+
+  // Vote breakdown line — explicit numbers per bucket.
+  breakdown: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+    letterSpacing: 0.05,
+    marginTop: -4,
+    marginBottom: 8,
+  },
+
+  // Contextual hint row (with icon) — drives anticipation.
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: Colors.bgPrimary,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  hintRowUrgent: {
+    backgroundColor: Colors.terracotta50,
+  },
+  hintText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textSecondary,
+    letterSpacing: 0.05,
+  },
+  hintTextUrgent: {
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
   },
 
   // Actions
