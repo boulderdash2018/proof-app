@@ -203,7 +203,11 @@ export const ExploreScreen: React.FC = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
-  const [contentMode, setContentMode] = useState<'tous' | 'plans' | 'lieux'>('tous');
+  // Default = 'plans' — the conversational view is a plans query.
+  // (Previously this was forced via a post-mount useEffect, but that
+  // made `hasAdvancedFilters` falsely true on first render → orange
+  // filter button + active dot without the user touching anything.)
+  const [contentMode, setContentMode] = useState<'tous' | 'plans' | 'lieux'>('plans');
   const [showMap, setShowMap] = useState(false);
 
   // Advanced filters (null = off, number = active threshold)
@@ -216,7 +220,9 @@ export const ExploreScreen: React.FC = () => {
   // Active state derived from selectedFilters (handleNearbyFilter
   // mutates that array).
   const isNearbyActive = selectedFilters.includes(NEARBY_LABEL);
-  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minProofs !== null || contentMode !== 'tous' || isNearbyActive;
+  // The dot lights up when the user has DEVIATED from the defaults.
+  // Default contentMode is 'plans' → 'tous' or 'lieux' counts as active.
+  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minProofs !== null || contentMode !== 'plans' || isNearbyActive;
 
   const BUDGET_STEPS = [20, 50, 100, 200, 500];
   const DURATION_STEPS = [30, 60, 120, 180, 360];
@@ -271,8 +277,9 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [route.params?.applyFilter, toggleFilter, navigation]);
 
-  // Force plans-only — the conversational view is a plans query, not places.
-  useEffect(() => { setContentMode('plans'); }, []);
+  // (Previous post-mount effect that forced contentMode='plans' was
+  // removed — default state already covers it, and the effect was
+  // causing a false-positive on the filter dot at first render.)
 
   // Auto-sync the sentence slots to selectedFilters and re-fetch plans
   // whenever a slot changes. When ALL slots are empty, we don't fetch plans
@@ -409,7 +416,7 @@ export const ExploreScreen: React.FC = () => {
     setMaxBudget(null);
     setMaxDuration(null);
     setMinProofs(null);
-    setContentMode('tous');
+    setContentMode('plans'); // matches the initial state — keeps the dot off
     // If "Dans ton quartier" is on, toggle it off too — handleNearbyFilter
     // is the canonical way to clear since it also resets the filtered
     // plan list correctly.
