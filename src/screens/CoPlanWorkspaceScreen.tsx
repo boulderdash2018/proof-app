@@ -18,7 +18,7 @@ import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
 import { backfillConversationForDraft } from '../services/planDraftService';
-import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanAvailabilitySection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts } from '../components';
+import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts } from '../components';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -93,21 +93,13 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   }, [draft, user?.id, isPresent]);
 
 
-  // Lock pre-conditions — VERROUILLER stays visible (so participants
-  // understand what's coming) but is muted + disabled until the basics
-  // are in place. This prevents accidental locks of an empty draft.
+  // Lock pre-conditions — only requires at least one place. The "QUAND"
+  // section was removed (per UX direction : the chat is where dates
+  // get coordinated, not a structured form).
   const placeCount = draft?.proposedPlaces.length ?? 0;
-  const someoneHasAvailability = useMemo(() => {
-    if (!draft) return false;
-    return Object.values(draft.availability).some((a) => a && a.slots.length > 0);
-  }, [draft]);
-  const canLock = placeCount > 0 && someoneHasAvailability;
+  const canLock = placeCount > 0;
   const lockMissingHint = !canLock
-    ? placeCount === 0 && !someoneHasAvailability
-      ? 'Ajoute au moins un lieu et marque tes dispos pour activer.'
-      : placeCount === 0
-        ? 'Ajoute au moins un lieu pour activer.'
-        : 'Marque tes dispos pour activer.'
+    ? 'Ajoute au moins un lieu pour activer.'
     : null;
 
   if (!draft) {
@@ -204,14 +196,6 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           subtitle="Chacun propose, vous votez ensemble"
         >
           <CoPlanPlacesSection participants={draft.participantDetails} />
-        </SectionBlock>
-        <SectionBlock
-          icon="calendar-outline"
-          label="QUAND"
-          title="Marquez vos dispos"
-          subtitle="L'app repère le créneau commun automatiquement"
-        >
-          <CoPlanAvailabilitySection participants={draft.participantDetails} />
         </SectionBlock>
         <SectionBlock
           icon="walk-outline"

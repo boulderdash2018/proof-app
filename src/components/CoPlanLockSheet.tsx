@@ -6,7 +6,6 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { formatSlotKeyShort } from '../services/planDraftService';
 
 interface Props {
   visible: boolean;
@@ -23,7 +22,6 @@ interface Props {
 export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked }) => {
   const draft = useCoPlanStore((s) => s.draft);
   const places = useCoPlanStore((s) => s.getSortedPlaces());
-  const best = useCoPlanStore((s) => s.getBestOverlapSlot());
   const lockDraft = useCoPlanStore((s) => s.lockDraft);
 
   const [publishOnFeed, setPublishOnFeed] = useState(false);
@@ -33,9 +31,6 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
 
   const canLock = places.length >= 1; // at least 1 place required
   const participantCount = draft.participants.length;
-  const totalParticipants = participantCount;
-  const meetupLabel = best && best.count > 0 ? formatSlotKeyShort(best.key) : 'à préciser';
-  const meetupFullCount = best?.count === totalParticipants;
 
   const handleSubmit = async () => {
     if (!canLock || submitting) return;
@@ -67,12 +62,8 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
             </View>
           </View>
 
-          {/* Recap rows */}
+          {/* Recap rows — date is coordinated in the chat, not here. */}
           <View style={styles.recap}>
-            <RecapRow icon="calendar-outline" label="Quand" value={meetupLabel}
-              hint={best ? `${best.count}/${totalParticipants} dispos` : undefined}
-              highlight={meetupFullCount}
-            />
             <RecapRow icon="location-outline" label="Où" value={`${places.length} lieu${places.length > 1 ? 'x' : ''}`} />
             <RecapRow icon="people-outline" label="Amis" value={`${participantCount} participant${participantCount > 1 ? 's' : ''}`} />
           </View>
