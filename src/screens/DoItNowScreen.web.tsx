@@ -603,9 +603,13 @@ export const DoItNowScreen: React.FC = () => {
             })}
           </View>
         </View>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-          <Ionicons name="close" size={20} color={C.gray600} />
-        </TouchableOpacity>
+        {/* Close × — only in solo mode. In group session, "Discussion"
+            FAB is the canonical way back to the conv. */}
+        {!routeSessionId && (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+            <Ionicons name="close" size={20} color={C.gray600} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Arrived banner */}

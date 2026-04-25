@@ -165,11 +165,10 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   inner: {
-    // Asymmetric margin so the close × button at the top-right of
-    // DoItNow stays visible and tappable. The widget previously
-    // spanned full width and visually swallowed the close button.
-    marginLeft: 12,
-    marginRight: 56,
+    // Symmetric margins again — the DoItNow close × is hidden in
+    // group session mode (the Discussion FAB is the canonical way
+    // back to the conv), so the widget can use the full width.
+    marginHorizontal: 12,
     marginTop: 6,
     backgroundColor: Colors.bgSecondary,
     borderRadius: 16,

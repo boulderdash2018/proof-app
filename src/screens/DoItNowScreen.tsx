@@ -592,9 +592,17 @@ export const DoItNowScreen: React.FC = () => {
             })}
           </View>
         </View>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
-          <Ionicons name="close" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        {/* Close × — only in solo mode. In a group session the
+            "Discussion" floating button is the canonical way back to
+            the conversation (and React Navigation pops to the existing
+            Conversation screen, no stack inflation), so the × becomes
+            redundant + visually competes with the EN COURS ENSEMBLE
+            widget. */}
+        {!routeSessionId && (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Ionicons name="close" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Arrived notification */}
