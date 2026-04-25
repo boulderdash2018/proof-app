@@ -1,9 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, Text } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, View, Text, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { ChatMessage, ConversationParticipant } from '../services/chatService';
 import { CoPlanInlineVote } from './CoPlanInlineVote';
 import { Avatar } from './Avatar';
+import { fetchPlanDraft } from '../services/planDraftService';
 
 interface Props {
   /** All `coplan_place_added` events in the same run (1 if singleton, N if grouped). */
@@ -31,7 +34,33 @@ interface Props {
  * mount. No per-row stagger — overkill for what's just a list view.
  */
 export const CoPlanPlacesCard: React.FC<Props> = ({ events, participants, voterUserId }) => {
+  const navigation = useNavigation<any>();
   const enter = useRef(new Animated.Value(0)).current;
+
+  // Legacy fallback: events posted before we started carrying
+  // `placeGoogleId` on SystemEvent need a one-shot draft fetch to
+  // resolve the Google ID by local placeId. Cached per draftId so
+  // multiple legacy rows in the same card share the lookup.
+  const [legacyMap, setLegacyMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const needsLegacy = events.some(
+      (e) => e.systemEvent?.placeId && !e.systemEvent?.placeGoogleId,
+    );
+    if (!needsLegacy) return;
+    const draftId = events.find((e) => e.systemEvent?.draftId)?.systemEvent?.draftId;
+    if (!draftId) return;
+    let cancelled = false;
+    (async () => {
+      const draft = await fetchPlanDraft(draftId);
+      if (cancelled || !draft) return;
+      const map: Record<string, string> = {};
+      draft.proposedPlaces.forEach((p) => {
+        if (p.googlePlaceId) map[p.id] = p.googlePlaceId;
+      });
+      if (Object.keys(map).length > 0) setLegacyMap(map);
+    })();
+    return () => { cancelled = true; };
+  }, [events]);
   useEffect(() => {
     Animated.spring(enter, {
       toValue: 1,
@@ -88,7 +117,10 @@ export const CoPlanPlacesCard: React.FC<Props> = ({ events, participants, voterU
         {/* Hairline divider — soft, breathing space */}
         <View style={styles.divider} />
 
-        {/* ── Place rows : flawless minimal design, no numbers ── */}
+        {/* ── Place rows : flawless minimal design, no numbers ──
+            Tap a row → opens PlaceDetail modal (photos, Google reviews,
+            Proof community ratings, related plans). The chevron → on
+            the right is the affordance hint. */}
         <View style={styles.list}>
           {events.map((event, idx) => {
             const e = event.systemEvent!;
@@ -96,10 +128,29 @@ export const CoPlanPlacesCard: React.FC<Props> = ({ events, participants, voterU
             const meta = formatPlaceMeta(e.placeCategory, e.placeAddress);
             const showVote =
               !!e.draftId && !!e.placeId && !!voterUserId && e.actorId !== voterUserId;
+            // Resolve Google ID — prefer the field on the event, fall back
+            // to the lookup map for legacy events posted before this field
+            // existed.
+            const resolvedGoogleId = e.placeGoogleId || (e.placeId ? legacyMap[e.placeId] : undefined);
+            const canOpenDetail = !!resolvedGoogleId;
+
+            const handleOpenDetail = () => {
+              if (!resolvedGoogleId) return;
+              navigation.navigate('PlaceDetail', { googlePlaceId: resolvedGoogleId });
+            };
+
             return (
-              <View
+              <Pressable
                 key={event.id}
-                style={[styles.row, idx === events.length - 1 && styles.rowLast]}
+                style={({ pressed }) => [
+                  styles.row,
+                  idx === events.length - 1 && styles.rowLast,
+                  pressed && canOpenDetail && styles.rowPressed,
+                ]}
+                onPress={handleOpenDetail}
+                disabled={!canOpenDetail}
+                accessibilityRole={canOpenDetail ? 'button' : undefined}
+                accessibilityLabel={canOpenDetail ? `Voir les détails de ${placeName}` : undefined}
               >
                 <View style={styles.rowText}>
                   <Text style={styles.placeName} numberOfLines={1}>
@@ -118,7 +169,15 @@ export const CoPlanPlacesCard: React.FC<Props> = ({ events, participants, voterU
                     voterUserId={voterUserId!}
                   />
                 )}
-              </View>
+                {canOpenDetail && (
+                  <Ionicons
+                    name="chevron-forward"
+                    size={15}
+                    color={Colors.textTertiary}
+                    style={styles.chevron}
+                  />
+                )}
+              </Pressable>
             );
           })}
         </View>
@@ -271,10 +330,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginHorizontal: -4, // negate the press-state padding shift
+    borderRadius: 8,
     gap: 12,
   },
   rowLast: {
-    paddingBottom: 0,
+    paddingBottom: 4,
+  },
+  rowPressed: {
+    backgroundColor: Colors.bgPrimary,
+  },
+  chevron: {
+    marginLeft: -4,
+    opacity: 0.7,
   },
   rowText: {
     flex: 1,

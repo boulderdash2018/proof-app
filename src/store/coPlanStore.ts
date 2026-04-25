@@ -131,9 +131,11 @@ function postCoPlanMirror(
   kind: SystemEvent['kind'],
   detail: string,
   /** Optional metadata — set for `coplan_place_added` so the chat card
-   *  can render vote buttons + place subtitle without a refetch. */
+   *  can render vote buttons, the place subtitle, and a deep link to
+   *  the PlaceDetail modal — all without a refetch. */
   options?: {
     placeId?: string;
+    placeGoogleId?: string;
     placeCategory?: string;
     placeAddress?: string;
   },
@@ -163,6 +165,7 @@ function postCoPlanMirror(
     payload: detail,
     draftId: draft.id,
     ...(options?.placeId ? { placeId: options.placeId } : null),
+    ...(options?.placeGoogleId ? { placeGoogleId: options.placeGoogleId } : null),
     ...(options?.placeCategory ? { placeCategory: options.placeCategory } : null),
     ...(options?.placeAddress ? { placeAddress: options.placeAddress } : null),
   };
@@ -311,6 +314,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       // subtitle line ("Café · 17e") without an extra fetch per row.
       postCoPlanMirror('coplan_place_added', newPlace.name, {
         placeId: newPlace.id,
+        placeGoogleId: newPlace.googlePlaceId,
         placeCategory: newPlace.category,
         placeAddress: newPlace.address,
       });
