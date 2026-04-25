@@ -1459,11 +1459,34 @@ export const ConversationScreen: React.FC = () => {
   }, [messages.length, conversationId, user?.id]);
 
   // ── Auto-scroll ──
+  // Two cases :
+  //   1. First time we open this conv (or switch to a new one) → schedule
+  //      MULTIPLE scrollToEnd attempts so the bottom shows even if the
+  //      ListHeaderComponent / images / pinned card take a few frames
+  //      to settle. Without these retries, very long convs landed at
+  //      the top — bad UX. No animation here, we just want to start
+  //      at the bottom on entry.
+  //   2. Same conv, new message arrives → single animated scroll to
+  //      bottom (nice "fly-in" feel for live messages).
+  const initialScrollConvIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    if (messages.length === 0) return;
+    const isFirstLoadForThisConv = initialScrollConvIdRef.current !== conversationId;
+    if (isFirstLoadForThisConv) {
+      initialScrollConvIdRef.current = conversationId;
+      const timeouts: ReturnType<typeof setTimeout>[] = [];
+      [60, 200, 500, 1000].forEach((delay) => {
+        timeouts.push(setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, delay));
+      });
+      return () => timeouts.forEach(clearTimeout);
     }
-  }, [messages.length]);
+    const t = setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    return () => clearTimeout(t);
+  }, [messages.length, conversationId]);
 
   // ── Text change → typing ──
   const handleTextChange = useCallback((val: string) => {
