@@ -210,13 +210,16 @@ export const ExploreScreen: React.FC = () => {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [maxBudget, setMaxBudget] = useState<number | null>(null);
   const [maxDuration, setMaxDuration] = useState<number | null>(null);
-  const [minLikes, setMinLikes] = useState<number | null>(null);
   const [minProofs, setMinProofs] = useState<number | null>(null);
-  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minLikes !== null || minProofs !== null || contentMode !== 'tous';
+  // "Dans ton quartier" was a category in the explore tabs — moved to
+  // a proper filter (it's a geographic constraint, not a theme).
+  // Active state derived from selectedFilters (handleNearbyFilter
+  // mutates that array).
+  const isNearbyActive = selectedFilters.includes(NEARBY_LABEL);
+  const hasAdvancedFilters = maxBudget !== null || maxDuration !== null || minProofs !== null || contentMode !== 'tous' || isNearbyActive;
 
   const BUDGET_STEPS = [20, 50, 100, 200, 500];
   const DURATION_STEPS = [30, 60, 120, 180, 360];
-  const LIKES_STEPS = [1, 5, 10, 25, 50];
   const PROOFS_STEPS = [1, 3, 5, 10, 25];
 
   // Derive active theme group from selected filters (still used by the
@@ -378,7 +381,6 @@ export const ExploreScreen: React.FC = () => {
     return plans.filter((p) => {
       if (maxBudget !== null && parsePrice(p.price) > maxBudget) return false;
       if (maxDuration !== null && parseDuration(p.duration) > maxDuration) return false;
-      if (minLikes !== null && p.likesCount < minLikes) return false;
       if (minProofs !== null && p.proofCount < minProofs) return false;
       return true;
     });
@@ -406,9 +408,14 @@ export const ExploreScreen: React.FC = () => {
   const clearAdvancedFilters = () => {
     setMaxBudget(null);
     setMaxDuration(null);
-    setMinLikes(null);
     setMinProofs(null);
     setContentMode('tous');
+    // If "Dans ton quartier" is on, toggle it off too — handleNearbyFilter
+    // is the canonical way to clear since it also resets the filtered
+    // plan list correctly.
+    if (selectedFilters.includes(NEARBY_LABEL)) {
+      handleNearbyFilter();
+    }
   };
 
   const handleMapOpen = () => {
@@ -935,7 +942,7 @@ export const ExploreScreen: React.FC = () => {
             </View>
 
             <ScrollView style={styles.filtersBody} showsVerticalScrollIndicator={false}>
-              {/* Content mode toggle */}
+              {/* ── 1. Type d'affichage (top — définit le scope) ── */}
               <View style={styles.filterField}>
                 <View style={styles.filterFieldHeader}>
                   <Ionicons name="layers-outline" size={16} color={Colors.textSecondary} />
@@ -961,12 +968,52 @@ export const ExploreScreen: React.FC = () => {
                 </View>
               </View>
 
+              {/* ── 2. Géographie : Dans ton quartier (toggle) ──
+                  Ex-catégorie devenue filtre — c'est une contrainte
+                  de localisation, pas un thème de contenu. */}
+              <View style={styles.filterField}>
+                <View style={styles.filterFieldHeader}>
+                  <Ionicons name="location-outline" size={16} color={Colors.textSecondary} />
+                  <Text style={[styles.filterFieldLabel, { color: Colors.textPrimary }]}>Dans ton quartier</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleNearbyFilter}
+                  activeOpacity={0.85}
+                  style={[
+                    styles.nearbyToggle,
+                    isNearbyActive
+                      ? { backgroundColor: Colors.primary, borderColor: Colors.primary }
+                      : { backgroundColor: Colors.bgTertiary, borderColor: Colors.borderSubtle },
+                  ]}
+                >
+                  <Ionicons
+                    name={isNearbyActive ? 'location' : 'location-outline'}
+                    size={15}
+                    color={isNearbyActive ? Colors.textOnAccent : Colors.textSecondary}
+                  />
+                  <Text style={[
+                    styles.nearbyToggleText,
+                    { color: isNearbyActive ? Colors.textOnAccent : Colors.textSecondary },
+                  ]}>
+                    {isNearbyActive ? 'Activé · 2 km autour de toi' : 'Activer la géolocalisation'}
+                  </Text>
+                </TouchableOpacity>
+                {locationDenied && (
+                  <Text style={styles.nearbyHint}>
+                    Autorise la localisation dans les paramètres pour utiliser ce filtre.
+                  </Text>
+                )}
+              </View>
+
+              {/* ── 3. Budget ── */}
               {renderStepRow('Budget maximum', 'cash-outline', BUDGET_STEPS, maxBudget, setMaxBudget,
                 (n, isLast) => isLast ? `${n}${cityConfig.currency}+` : `${n}${cityConfig.currency}`)}
+
+              {/* ── 4. Temps ── */}
               {renderStepRow('Temps maximum', 'hourglass-outline', DURATION_STEPS, maxDuration, setMaxDuration,
                 (n, isLast) => isLast ? `${formatDuration(n)}+` : formatDuration(n))}
-              {renderStepRow('Likes minimum', 'heart-outline', LIKES_STEPS, minLikes, setMinLikes,
-                (n, isLast) => isLast ? `${n}+` : `${n}`)}
+
+              {/* ── 5. Qualité validée par la communauté ── */}
               {renderStepRow('Proof. it minimum', 'checkmark-circle-outline', PROOFS_STEPS, minProofs, setMinProofs,
                 (n, isLast) => isLast ? `${n}+` : `${n}`)}
             </ScrollView>
@@ -1450,6 +1497,30 @@ const styles = StyleSheet.create({
   stepsRow: { gap: 8, paddingRight: 20 },
   stepChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5 },
   stepChipText: { fontSize: 13, fontFamily: Fonts.bodySemiBold },
+  // ── Toggle "Dans ton quartier" ──
+  nearbyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth + 0.3,
+  },
+  nearbyToggleText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: -0.05,
+  },
+  nearbyHint: {
+    marginTop: 8,
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.error,
+    textAlign: 'center',
+  },
   filtersFooter: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1 },
   filtersClearBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
   filtersClearText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },

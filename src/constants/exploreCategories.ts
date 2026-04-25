@@ -208,14 +208,10 @@ export const EXPLORE_GROUPS: ExploreGroup[] = [
     ],
   },
 
-  // ── DANS TON QUARTIER ──
-  {
-    key: 'nearby',
-    label: 'Dans ton quartier',
-    emoji: '📍',
-    layout: 'grid',
-    sections: [],
-  },
+  // NB : "Dans ton quartier" n'est PLUS un thème — c'est désormais un
+  // filtre dans le modal Filtres (cf. ExploreScreen). Plus cohérent
+  // pour le user (une catégorie c'est ce qu'on cherche, pas où on
+  // est physiquement).
 
   // ── TENDANCE (unchanged) ──
   {
