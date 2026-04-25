@@ -165,7 +165,11 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   inner: {
-    marginHorizontal: 12,
+    // Asymmetric margin so the close × button at the top-right of
+    // DoItNow stays visible and tappable. The widget previously
+    // spanned full width and visually swallowed the close button.
+    marginLeft: 12,
+    marginRight: 56,
     marginTop: 6,
     backgroundColor: Colors.bgSecondary,
     borderRadius: 16,
