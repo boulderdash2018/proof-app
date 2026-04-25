@@ -240,27 +240,43 @@ export const fetchPlanDraft = async (draftId: string): Promise<PlanDraft | null>
 /**
  * Find an active draft attached to a given conversation id. Used by the
  * conversation screen to decide whether to render the "📋 Brouillon"
- * lens-switcher tab. Falls back to a query when the conversation doc
- * doesn't carry `linkedDraftId` yet (legacy convs).
+ * lens-switcher tab.
+ *
+ * The query is constrained by `participants array-contains userId` so it
+ * complies with the standard plan_drafts rule pattern (only participants
+ * can read). Without this filter, Firestore rejects the whole query with
+ * "Missing or insufficient permissions", which silently broke ALL
+ * conversation opens — even DMs unrelated to co-plan.
  *
  * Returns null if no matching active draft.
  */
 export const findDraftByConversationId = async (
   conversationId: string,
+  userId: string,
 ): Promise<PlanDraft | null> => {
-  const q = query(
-    collection(db, DRAFTS),
-    where('conversationId', '==', conversationId),
-  );
-  const snap = await getDocs(q);
-  // Pick the freshest active draft (locked drafts shouldn't surface the
-  // "Brouillon en cours" affordance — the plan is now real).
-  const drafts = snap.docs
-    .map((d) => hydrateDraft(d.id, d.data()))
-    .filter((d) => d.status === 'draft');
-  if (drafts.length === 0) return null;
-  drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  return drafts[0];
+  if (!userId) return null;
+  try {
+    const q = query(
+      collection(db, DRAFTS),
+      where('participants', 'array-contains', userId),
+      where('conversationId', '==', conversationId),
+    );
+    const snap = await getDocs(q);
+    // Pick the freshest active draft (locked drafts shouldn't surface the
+    // "Brouillon en cours" affordance — the plan is now real).
+    const drafts = snap.docs
+      .map((d) => hydrateDraft(d.id, d.data()))
+      .filter((d) => d.status === 'draft');
+    if (drafts.length === 0) return null;
+    drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return drafts[0];
+  } catch (err) {
+    // Defensive — rules might still reject the query in some configs.
+    // Failing silently means the lens-switcher tab simply won't appear,
+    // not that the whole conv breaks.
+    console.warn('[planDraftService] findDraftByConversationId failed:', err);
+    return null;
+  }
 };
 
 /** List all active drafts the current user participates in, newest first. */

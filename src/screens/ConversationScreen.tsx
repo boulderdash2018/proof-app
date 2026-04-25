@@ -1006,25 +1006,34 @@ export const ConversationScreen: React.FC = () => {
   // an active draft. We prefer the denormalized `linkedDraftId` on the conv
   // (set by the planDraftService when seeding the conv at draft time), and
   // fall back to a one-shot query for legacy convs without that field.
+  // The query is wrapped in try/catch in the service — a failure (rules,
+  // network) just means the switcher tab won't appear, not that the conv
+  // breaks.
   const [linkedDraftId, setLinkedDraftId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     // Reset on conv change.
     setLinkedDraftId(null);
-    if (!activeConv) return;
+    if (!activeConv || !user?.id) return;
     // Locked plan? No "Brouillon" tab — the plan is a real Plan now.
     if (activeConv.linkedPlanId) return;
     if (activeConv.linkedDraftId) {
       setLinkedDraftId(activeConv.linkedDraftId);
       return;
     }
-    // Legacy: query.
+    // Legacy fallback: query plan_drafts. Constrained by participants
+    // to satisfy the standard rule pattern.
     (async () => {
-      const draft = await findDraftByConversationId(activeConv.id);
-      if (!cancelled && draft) setLinkedDraftId(draft.id);
+      try {
+        const draft = await findDraftByConversationId(activeConv.id, user.id);
+        if (!cancelled && draft) setLinkedDraftId(draft.id);
+      } catch (err) {
+        // Already swallowed in the service — extra safety here.
+        if (__DEV__) console.warn('[ConversationScreen] linked-draft lookup error:', err);
+      }
     })();
     return () => { cancelled = true; };
-  }, [activeConv?.id, activeConv?.linkedDraftId, activeConv?.linkedPlanId]);
+  }, [activeConv?.id, activeConv?.linkedDraftId, activeConv?.linkedPlanId, user?.id]);
 
   const isGroup = activeConv?.isGroup === true;
 
