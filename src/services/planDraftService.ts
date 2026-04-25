@@ -20,16 +20,22 @@ import {
   query,
   where,
   getDocs,
+  runTransaction,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import {
   PlanDraft,
   CoPlanParticipant,
   CoPlanProposedPlace,
+  CoPlanProposal,
+  CoPlanProposalType,
+  CoPlanVote,
 } from '../types';
-import { createGroupConversation, ConversationParticipant } from './chatService';
+import { createGroupConversation, ConversationParticipant, postSystemEvent } from './chatService';
 
 const DRAFTS = 'plan_drafts';
+const PROPOSALS = 'proposals';
 
 // ══════════════════════════════════════════════════════════════
 // Helpers
@@ -583,4 +589,295 @@ export const formatSlotKeyShort = (key: string): string => {
     evening: 'soir',
   };
   return `${dayLabel} · ${partLabel[parsed.part]}`;
+};
+
+// ══════════════════════════════════════════════════════════════
+// Proposals subcollection — group-validated mutations of the draft.
+//
+// Lives at `plan_drafts/{draftId}/proposals/{propId}`. A proposal is a
+// pending mutation that needs a strict-majority vote (>50% of
+// participants voting "pour") before it auto-applies. This protects
+// participants' contributions: anyone can ADD freely (soft action), but
+// REMOVING / REPLACING / RENAMING someone else's work goes through the
+// group.
+//
+// Auto-apply is transactional — the first client to detect a passing
+// threshold wins the apply via runTransaction; any racing client sees
+// status !== 'pending' and bails out.
+// ══════════════════════════════════════════════════════════════
+
+const hydrateProposal = (id: string, data: any): CoPlanProposal => ({
+  id,
+  type: data.type,
+  proposedBy: data.proposedBy,
+  proposedAt: toISO(data.proposedAt),
+  payload: data.payload || {},
+  votes: data.votes || {},
+  status: data.status || 'pending',
+  resolvedAt: data.resolvedAt ? toISO(data.resolvedAt) : undefined,
+  resolvedBy: data.resolvedBy,
+  chatMessageId: data.chatMessageId,
+});
+
+/**
+ * Create a proposal doc + post the mirror chat card. Returns the new
+ * proposal id (which is also linked back via `chatMessageId` once the
+ * chat message exists).
+ *
+ * Idempotency: not strictly idempotent — caller should debounce the UI.
+ * Two rapid taps will create two proposals, which is annoying but harmless.
+ */
+export const createProposal = async (input: {
+  draftId: string;
+  proposedBy: string;
+  type: CoPlanProposalType;
+  payload: CoPlanProposal['payload'];
+  /** Conv id for the linked chat — required to post the mirror card. */
+  conversationId: string;
+  /** Snapshot subject for the chat preview line ("Café Pinson"). */
+  subject: string;
+}): Promise<string> => {
+  const propRef = doc(collection(db, DRAFTS, input.draftId, PROPOSALS));
+  const propId = propRef.id;
+
+  // Proposer auto-counts as "pour" — they wouldn't propose against themselves.
+  const initialVotes: Record<string, CoPlanVote> = {
+    [input.proposedBy]: 'pour',
+  };
+
+  await setDoc(propRef, {
+    type: input.type,
+    proposedBy: input.proposedBy,
+    proposedAt: serverTimestamp(),
+    payload: input.payload,
+    votes: initialVotes,
+    status: 'pending',
+  });
+
+  // Post the mirror chat message — type='coplan_proposal' so the
+  // ConversationScreen renders it as a rich card with vote buttons.
+  // We DON'T use postSystemEvent here (different shape) — direct addDoc.
+  try {
+    const messagesCol = collection(db, 'conversations', input.conversationId, 'messages');
+    const msgRef = await addDoc(messagesCol, {
+      conversationId: input.conversationId,
+      senderId: input.proposedBy,
+      type: 'coplan_proposal',
+      content: '',
+      proposalDraftId: input.draftId,
+      proposalId: propId,
+      proposalType: input.type,
+      proposalSubject: input.subject,
+      reactions: [],
+      readBy: [input.proposedBy],
+      createdAt: serverTimestamp(),
+    });
+    // Update conv lastMessage + back-link the chatMessageId on the proposal.
+    await updateDoc(doc(db, 'conversations', input.conversationId), {
+      lastMessage: previewForProposal(input.type, input.subject),
+      lastMessageType: 'coplan_proposal',
+      lastMessageSenderId: input.proposedBy,
+      lastMessageAt: serverTimestamp(),
+    });
+    await updateDoc(propRef, { chatMessageId: msgRef.id });
+  } catch (err) {
+    console.warn('[planDraftService] could not post proposal mirror message:', err);
+  }
+
+  return propId;
+};
+
+const previewForProposal = (type: CoPlanProposalType, subject: string): string => {
+  switch (type) {
+    case 'remove_place':   return `Proposition : retirer ${subject}`;
+    case 'replace_place':  return `Proposition : remplacer ${subject}`;
+    case 'change_meetup':  return `Proposition : changer la date`;
+    case 'change_title':   return `Proposition : nouveau titre`;
+  }
+};
+
+/** Subscribe to a single proposal doc — used by the chat card to render
+ *  live vote count + status transitions. */
+export const subscribeProposal = (
+  draftId: string,
+  proposalId: string,
+  onData: (proposal: CoPlanProposal | null) => void,
+  onError?: (err: Error) => void,
+): (() => void) => {
+  return onSnapshot(
+    doc(db, DRAFTS, draftId, PROPOSALS, proposalId),
+    (snap) => {
+      if (!snap.exists()) return onData(null);
+      onData(hydrateProposal(snap.id, snap.data()));
+    },
+    (err) => {
+      console.warn('[planDraftService] subscribeProposal error:', err.message);
+      onError?.(err);
+    },
+  );
+};
+
+/**
+ * Vote on a pending proposal. After the vote write, runs the auto-apply
+ * check transactionally — the first client to see a passing threshold
+ * applies the mutation; racing clients see status !== 'pending' and skip.
+ *
+ * Toggles work like this:
+ *   • Tap "Pour" when no vote        → record 'pour'
+ *   • Tap "Pour" when already 'pour' → unvote (delete from map)
+ *   • Tap "Contre" when no vote      → record 'contre'
+ *   • Tap "Contre" when 'pour'       → switch to 'contre'
+ *   • etc.
+ */
+export const voteOnProposal = async (
+  draftId: string,
+  proposalId: string,
+  voterUserId: string,
+  vote: CoPlanVote,
+): Promise<void> => {
+  const propRef = doc(db, DRAFTS, draftId, PROPOSALS, proposalId);
+  const snap = await getDoc(propRef);
+  if (!snap.exists()) return;
+  const prop = hydrateProposal(snap.id, snap.data());
+  if (prop.status !== 'pending') return; // already resolved — silent no-op
+
+  const currentVote = prop.votes[voterUserId];
+  const nextVotes = { ...prop.votes };
+  if (currentVote === vote) {
+    // Same button = unvote
+    delete nextVotes[voterUserId];
+  } else {
+    nextVotes[voterUserId] = vote;
+  }
+
+  await updateDoc(propRef, { votes: nextVotes });
+
+  // Threshold check — strict majority (>50%) of participants voting "pour".
+  const draftSnap = await getDoc(doc(db, DRAFTS, draftId));
+  if (!draftSnap.exists()) return;
+  const totalParticipants: number = (draftSnap.data().participants || []).length;
+  const pourCount = Object.values(nextVotes).filter((v) => v === 'pour').length;
+  const contreCount = Object.values(nextVotes).filter((v) => v === 'contre').length;
+
+  if (pourCount * 2 > totalParticipants) {
+    await applyProposal(draftId, proposalId);
+  } else if (contreCount * 2 >= totalParticipants) {
+    // Mathematically impossible to reach majority pour → mark rejected early.
+    await rejectProposal(draftId, proposalId, voterUserId);
+  }
+};
+
+/**
+ * Apply a passing proposal to the draft transactionally. Only the FIRST
+ * caller to see status='pending' wins; subsequent callers see 'applied'
+ * and bail out — protects against duplicate mutations from racing
+ * clients all detecting the threshold simultaneously.
+ *
+ * Currently handles `remove_place`. `replace_place` / `change_*` are
+ * stubbed for the next commit.
+ */
+export const applyProposal = async (
+  draftId: string,
+  proposalId: string,
+): Promise<void> => {
+  const propRef = doc(db, DRAFTS, draftId, PROPOSALS, proposalId);
+  const draftRef = doc(db, DRAFTS, draftId);
+
+  let appliedSubject = '';
+  let conversationId = '';
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const propSnap = await tx.get(propRef);
+      if (!propSnap.exists()) throw new Error('proposal vanished');
+      const prop = hydrateProposal(propSnap.id, propSnap.data());
+      if (prop.status !== 'pending') return; // already resolved — bail
+
+      const draftSnap = await tx.get(draftRef);
+      if (!draftSnap.exists()) throw new Error('draft vanished');
+      const draft = draftSnap.data();
+      conversationId = draft.conversationId || draft.publishedConvId || '';
+
+      switch (prop.type) {
+        case 'remove_place': {
+          const places: CoPlanProposedPlace[] = draft.proposedPlaces || [];
+          const target = places.find((p) => p.id === prop.payload.placeId);
+          appliedSubject = target?.name || prop.payload.placeName || 'lieu';
+          tx.update(draftRef, {
+            proposedPlaces: places.filter((p) => p.id !== prop.payload.placeId),
+            updatedAt: serverTimestamp(),
+          });
+          break;
+        }
+        // Other types — wired in commit 3.
+        case 'replace_place':
+        case 'change_meetup':
+        case 'change_title':
+          // For now: just mark resolved without mutating the draft. The
+          // real apply lands when the corresponding UI does.
+          appliedSubject = prop.payload.placeName || prop.payload.title || '';
+          break;
+      }
+
+      tx.update(propRef, {
+        status: 'applied',
+        resolvedAt: serverTimestamp(),
+      });
+    });
+  } catch (err) {
+    console.warn('[planDraftService] applyProposal failed:', err);
+    return;
+  }
+
+  // Post a confirmation system event in the conv (best-effort, outside
+  // the transaction so a chat error doesn't roll back the draft mutation).
+  // The proposal CARD itself also transforms via its live snapshot, so
+  // this event is mostly a "lastMessage" cue in the conversations list.
+  if (conversationId && appliedSubject) {
+    postSystemEvent(
+      conversationId,
+      { kind: 'coplan_proposal_applied', payload: appliedSubject },
+      `Proposition adoptée : ${appliedSubject}`,
+    ).catch(() => {});
+  }
+};
+
+/** Mark a proposal rejected (when contre count makes pour-majority impossible). */
+export const rejectProposal = async (
+  draftId: string,
+  proposalId: string,
+  resolverUserId: string,
+): Promise<void> => {
+  const propRef = doc(db, DRAFTS, draftId, PROPOSALS, proposalId);
+  let rejectedSubject = '';
+  let conversationId = '';
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(propRef);
+      if (!snap.exists()) return;
+      const prop = hydrateProposal(snap.id, snap.data());
+      if (prop.status !== 'pending') return;
+      rejectedSubject = prop.payload.placeName || prop.payload.title || '';
+      // Pull conv id from parent draft for the post-rejection event.
+      const draftSnap = await tx.get(doc(db, DRAFTS, draftId));
+      if (draftSnap.exists()) {
+        conversationId = draftSnap.data().conversationId || draftSnap.data().publishedConvId || '';
+      }
+      tx.update(propRef, {
+        status: 'rejected',
+        resolvedAt: serverTimestamp(),
+        resolvedBy: resolverUserId,
+      });
+    });
+  } catch (err) {
+    console.warn('[planDraftService] rejectProposal failed:', err);
+    return;
+  }
+  if (conversationId) {
+    postSystemEvent(
+      conversationId,
+      { kind: 'coplan_proposal_rejected', payload: rejectedSubject },
+      `Proposition rejetée${rejectedSubject ? ` : ${rejectedSubject}` : ''}`,
+    ).catch(() => {});
+  }
 };

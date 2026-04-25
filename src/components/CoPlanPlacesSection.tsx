@@ -35,8 +35,12 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
   const toggleVote = useCoPlanStore((s) => s.toggleVote);
   const movePlace = useCoPlanStore((s) => s.movePlace);
   const removePlace = useCoPlanStore((s) => s.removePlace);
+  const proposeRemovePlace = useCoPlanStore((s) => s.proposeRemovePlace);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** Place currently targeted by the contextual long-press menu, or null. */
+  const [longPressTarget, setLongPressTarget] = useState<CoPlanProposedPlace | null>(null);
+  const [proposingForId, setProposingForId] = useState<string | null>(null);
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -57,6 +61,25 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     removePlace(placeId);
   }, [removePlace]);
+
+  /** Long-press on a row → contextual menu. */
+  const handleLongPress = useCallback((place: CoPlanProposedPlace) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setLongPressTarget(place);
+  }, []);
+
+  /** "Proposer de retirer" — kicks off the group-vote flow for this place. */
+  const handleProposeRemove = useCallback(async () => {
+    if (!longPressTarget) return;
+    const place = longPressTarget;
+    setLongPressTarget(null);
+    setProposingForId(place.id);
+    try {
+      await proposeRemovePlace(place.id);
+    } finally {
+      setProposingForId(null);
+    }
+  }, [longPressTarget, proposeRemovePlace]);
 
   const isEmpty = places.length === 0;
 
@@ -106,10 +129,27 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
               onMoveUp={() => handleMove(p.id, 'up')}
               onMoveDown={() => handleMove(p.id, 'down')}
               onRemove={() => handleRemove(p.id)}
+              onLongPress={() => handleLongPress(p)}
+              isProposing={proposingForId === p.id}
             />
           ))}
         </View>
       )}
+
+      {/* ── Long-press contextual menu ──
+          When you long-press a row, this small action sheet opens. Options
+          depend on whether you proposed the place or someone else did. */}
+      <ContextualMenu
+        place={longPressTarget}
+        currentUserId={user?.id}
+        onClose={() => setLongPressTarget(null)}
+        onDirectRemove={() => {
+          if (!longPressTarget) return;
+          handleRemove(longPressTarget.id);
+          setLongPressTarget(null);
+        }}
+        onProposeRemove={handleProposeRemove}
+      />
 
       <PlacePickerModal
         visible={pickerOpen}
@@ -154,10 +194,14 @@ interface PlaceRowProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemove: () => void;
+  onLongPress?: () => void;
+  /** Show a faint pulse while a "Proposer de retirer" call is in flight. */
+  isProposing?: boolean;
 }
 
 const PlaceRow: React.FC<PlaceRowProps> = ({
   place, index, total, proposer, currentUserId, onVote, onMoveUp, onMoveDown, onRemove,
+  onLongPress, isProposing,
 }) => {
   const hasVoted = !!currentUserId && place.votes.includes(currentUserId);
   const voteCount = place.votes.length;
@@ -166,7 +210,13 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
   const mine = !!currentUserId && place.proposedBy === currentUserId;
 
   return (
-    <View style={rowStyles.container}>
+    <Pressable
+      style={[rowStyles.container, isProposing && { opacity: 0.6 }]}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      // No onPress — taps inside the row hit specific buttons (vote, X, etc).
+      // Pressable here only captures the long-press gesture for the contextual menu.
+    >
       {/* Thumbnail */}
       {place.photoUrl ? (
         <Image source={{ uri: place.photoUrl }} style={rowStyles.thumb} />
@@ -242,16 +292,107 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={rowStyles.removeBtn}
-          onPress={onRemove}
-          activeOpacity={0.7}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Ionicons name="close" size={13} color={Colors.textTertiary} />
-        </TouchableOpacity>
+        {/* Direct remove button — visible ONLY on rows I proposed.
+            For others' rows, removal goes through the long-press menu
+            which creates a group proposal (see ContextualMenu below). */}
+        {mine && (
+          <TouchableOpacity
+            style={rowStyles.removeBtn}
+            onPress={onRemove}
+            activeOpacity={0.7}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
+            <Ionicons name="close" size={13} color={Colors.textTertiary} />
+          </TouchableOpacity>
+        )}
       </View>
-    </View>
+    </Pressable>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+// Contextual menu — opens on long-press of a place row.
+//
+// What it offers depends on ownership:
+//   • If I proposed the place → "Retirer le lieu" (direct, silent)
+//   • If someone else did     → "Proposer au groupe de retirer ce lieu"
+//                               (creates a CoPlanProposal + chat card)
+//
+// Designed as a small bottom-anchored sheet so it doesn't fight with the
+// existing modals (lock sheet, picker). The user taps outside to dismiss.
+// ══════════════════════════════════════════════════════════════
+
+interface ContextualMenuProps {
+  place: CoPlanProposedPlace | null;
+  currentUserId?: string;
+  onClose: () => void;
+  onDirectRemove: () => void;
+  onProposeRemove: () => void;
+}
+
+const ContextualMenu: React.FC<ContextualMenuProps> = ({
+  place, currentUserId, onClose, onDirectRemove, onProposeRemove,
+}) => {
+  if (!place) return null;
+  const isMine = !!currentUserId && place.proposedBy === currentUserId;
+
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <Pressable style={ctxStyles.backdrop} onPress={onClose}>
+        <Pressable style={ctxStyles.sheet} onPress={() => {}}>
+          {/* Header — what we're acting on */}
+          <View style={ctxStyles.header}>
+            <View style={ctxStyles.headerIcon}>
+              <Ionicons name="location" size={16} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={ctxStyles.headerEyebrow}>LIEU PROPOSÉ</Text>
+              <Text style={ctxStyles.headerTitle} numberOfLines={1}>{place.name}</Text>
+            </View>
+          </View>
+
+          {/* Action — single primary CTA */}
+          {isMine ? (
+            <TouchableOpacity
+              style={ctxStyles.actionBtn}
+              onPress={onDirectRemove}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="trash-outline" size={17} color={Colors.textPrimary} />
+              <View style={{ flex: 1 }}>
+                <Text style={ctxStyles.actionTitle}>Retirer le lieu</Text>
+                <Text style={ctxStyles.actionHint}>Tu en es le proposeur — retrait direct.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={ctxStyles.actionBtn}
+              onPress={onProposeRemove}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="construct" size={17} color={Colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={ctxStyles.actionTitle}>Proposer au groupe de retirer</Text>
+                <Text style={ctxStyles.actionHint}>
+                  Un vote sera lancé dans la conv. Adopté si majorité pour.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+
+          {/* Cancel */}
+          <TouchableOpacity
+            style={ctxStyles.cancelBtn}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Text style={ctxStyles.cancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 };
 
@@ -632,4 +773,90 @@ const pickerStyles = StyleSheet.create({
   },
   emptyWrap: { paddingVertical: 40, alignItems: 'center' },
   emptyText: { fontSize: 13, fontFamily: Fonts.body, color: Colors.textSecondary },
+});
+
+// ── Contextual long-press menu styles ──
+const ctxStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(44,36,32,0.45)',
+    justifyContent: 'flex-end',
+    padding: 12,
+  },
+  sheet: {
+    backgroundColor: Colors.bgSecondary,
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.borderSubtle,
+  },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.terracotta50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerEyebrow: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
+    marginBottom: 1,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.bgPrimary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  actionTitle: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  actionHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  cancelBtn: {
+    marginTop: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+  },
 });

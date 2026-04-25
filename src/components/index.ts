@@ -30,6 +30,7 @@ export { CoPlanSummaryFooter } from './CoPlanSummaryFooter';
 export { CoPlanActivityToasts } from './CoPlanActivityToasts';
 export { CoPlanInlineVote } from './CoPlanInlineVote';
 export { CoPlanWorkspaceFab } from './CoPlanWorkspaceFab';
+export { CoPlanProposalCard } from './CoPlanProposalCard';
 export { SessionInviteToast } from './SessionInviteToast';
 export { GroupSessionLayer } from './GroupSessionLayer';
 export { GroupAlbumSheet } from './GroupAlbumSheet';

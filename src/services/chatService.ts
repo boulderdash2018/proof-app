@@ -42,11 +42,13 @@ export type SystemEventKind =
   // Posted by the planDraftService whenever a participant mutates the
   // shared workspace, so the chat thread becomes the "fil de
   // l'organisation" — visible without leaving the chat.
-  | 'coplan_place_added'      // payload = place name
-  | 'coplan_place_removed'    // payload = place name
-  | 'coplan_place_voted'      // payload = place name
-  | 'coplan_availability_set' // payload = "N dispos" or empty for reset
-  | 'coplan_locked';          // payload = locked plan title
+  | 'coplan_place_added'         // payload = place name
+  | 'coplan_place_removed'       // payload = place name
+  | 'coplan_place_voted'         // payload = place name
+  | 'coplan_availability_set'    // payload = "N dispos" or empty for reset
+  | 'coplan_locked'              // payload = locked plan title
+  | 'coplan_proposal_applied'    // payload = subject (e.g. place name) — group adopted
+  | 'coplan_proposal_rejected';  // payload = subject — rejected by majority contre
 
 export interface SystemEvent {
   kind: SystemEventKind;
@@ -70,7 +72,7 @@ export interface Conversation {
   participants: string[];
   participantDetails: Record<string, ConversationParticipant>;
   lastMessage: string;
-  lastMessageType: 'text' | 'plan' | 'photo' | 'poll' | 'system';
+  lastMessageType: 'text' | 'plan' | 'photo' | 'poll' | 'system' | 'coplan_proposal';
   lastMessageSenderId: string;
   lastMessageAt: string;
   unreadCount: Record<string, number>;
@@ -117,7 +119,7 @@ export interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
-  type: 'text' | 'plan' | 'photo' | 'poll' | 'system';
+  type: 'text' | 'plan' | 'photo' | 'poll' | 'system' | 'coplan_proposal';
   content: string;
   // ── Plan share ─────────────────────────────────────
   planId?: string;
@@ -135,6 +137,16 @@ export interface ChatMessage {
   pollVotes?: Record<string, number>;
   // ── System event ───────────────────────────────────
   systemEvent?: SystemEvent;
+  // ── Co-plan proposal ───────────────────────────────
+  /** Originating draft for the proposal */
+  proposalDraftId?: string;
+  /** Proposal id in plan_drafts/{draftId}/proposals/{id} */
+  proposalId?: string;
+  /** Proposal type — used to render the right card variant */
+  proposalType?: 'remove_place' | 'replace_place' | 'change_meetup' | 'change_title';
+  /** Snapshot of the affected item name (e.g. "Café Pinson") so the card
+   *  can describe the proposal even if the underlying place was edited. */
+  proposalSubject?: string;
   // ── Shared fields ──────────────────────────────────
   reactions: MessageReaction[];
   readBy: string[];

@@ -351,6 +351,59 @@ export interface CoPlanAvailability {
   updatedAt: string;
 }
 
+/**
+ * Group proposal for a hard mutation of a draft (something that affects
+ * other participants' contributions). Stored as a Firestore subcollection
+ * `plan_drafts/{draftId}/proposals/{propId}` and mirrored as a chat
+ * message of type `coplan_proposal` so the group can vote in-thread.
+ *
+ * Soft mutations (adding your own place, voting, marking your own
+ * dispos) bypass this — they go directly via the regular service calls
+ * and surface as system events, not proposals.
+ */
+export type CoPlanProposalType =
+  | 'remove_place'
+  // Future types — wired progressively, behind their own UI:
+  | 'replace_place'
+  | 'change_meetup'
+  | 'change_title';
+
+export type CoPlanVote = 'pour' | 'contre';
+export type CoPlanProposalStatus = 'pending' | 'applied' | 'rejected';
+
+export interface CoPlanProposal {
+  id: string;
+  type: CoPlanProposalType;
+  proposedBy: string;
+  proposedAt: string; // ISO
+  /** Type-specific payload. Snapshots names so the chat card can still
+   *  describe the proposal even if the underlying place was renamed/removed. */
+  payload: {
+    /** For remove_place / replace_place — the targeted place id */
+    placeId?: string;
+    /** Display snapshot for the targeted item */
+    placeName?: string;
+    /** For replace_place — the new place metadata */
+    newPlace?: Omit<CoPlanProposedPlace, 'proposedBy' | 'proposedAt' | 'votes' | 'orderIndex'>;
+    /** For change_meetup */
+    meetupAt?: string;
+    /** For change_title */
+    title?: string;
+  };
+  /** Map userId → vote. Absence = no vote yet. The proposer is
+   *  auto-counted as "pour" at creation time, so they appear here too. */
+  votes: Record<string, CoPlanVote>;
+  status: CoPlanProposalStatus;
+  /** Set when the proposal transitions to applied/rejected (by the
+   *  client that wins the auto-apply transaction). */
+  resolvedAt?: string;
+  resolvedBy?: string;
+  /** Chat message id that displays this proposal — set right after both
+   *  the proposal doc and its mirror message exist. Lets the workspace
+   *  tap on a proposal to scroll to it in the chat (future polish). */
+  chatMessageId?: string;
+}
+
 /** Top-level collaborative draft document. */
 export interface PlanDraft {
   id: string;

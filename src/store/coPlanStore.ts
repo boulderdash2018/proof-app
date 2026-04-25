@@ -17,6 +17,7 @@ import {
   makeLocalId,
   computeOverlapCounts,
   slotKeyToMeetupAt,
+  createProposal as svcCreateProposal,
 } from '../services/planDraftService';
 import { createPlan } from '../services/plansService';
 import { attachPlanToConversation, createGroupConversation, postSystemEvent, ConversationParticipant, SystemEvent } from '../services/chatService';
@@ -96,6 +97,10 @@ interface CoPlanStore {
   movePlace: (placeId: string, direction: 'up' | 'down') => Promise<void>;
   setAvailability: (slots: string[]) => Promise<void>;
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
+
+  // ── Group proposals (hard mutations needing a vote) ──
+  /** Create a proposal asking the group to remove someone else's place. */
+  proposeRemovePlace: (placeId: string) => Promise<string | null>;
 
   // ── Lock → conversion to real Plan + group conv ──
   lockDraft: (publishOnFeed: boolean) => Promise<{ conversationId: string; planId: string | null } | null>;
@@ -405,6 +410,36 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       ? current.filter((k) => k !== slotKey)
       : [...current, slotKey];
     await get().setAvailability(next);
+  },
+
+  // ── Group proposals ──
+  proposeRemovePlace: async (placeId: string) => {
+    const { draft, _userId } = get();
+    if (!draft || !_userId) return null;
+    const place = draft.proposedPlaces.find((p) => p.id === placeId);
+    if (!place) return null;
+    const convId = draft.conversationId || draft.publishedConvId;
+    if (!convId) {
+      console.warn('[coPlanStore] proposeRemovePlace: no linked conv');
+      return null;
+    }
+    try {
+      const propId = await svcCreateProposal({
+        draftId: draft.id,
+        proposedBy: _userId,
+        type: 'remove_place',
+        payload: {
+          placeId: place.id,
+          placeName: place.name,
+        },
+        conversationId: convId,
+        subject: place.name,
+      });
+      return propId;
+    } catch (err) {
+      console.warn('[coPlanStore] proposeRemovePlace error:', err);
+      return null;
+    }
   },
 
   // ── Derived helpers ──

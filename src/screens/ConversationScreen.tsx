@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanWorkspaceFab } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanWorkspaceFab, CoPlanProposalCard } from '../components';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
@@ -466,6 +466,29 @@ const MessageRow = React.memo<MessageRowProps>(({
     );
   }
 
+  // ── Co-plan proposal card: rich card with live vote count ──
+  if (item.type === 'coplan_proposal') {
+    const proposerName = participants?.[item.senderId]?.displayName?.split(' ')[0] || 'Quelqu\'un';
+    return (
+      <View>
+        {showDate && (
+          <View style={styles.dateSeparator}>
+            <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+          </View>
+        )}
+        <CoPlanProposalCard
+          draftId={item.proposalDraftId!}
+          proposalId={item.proposalId!}
+          proposalSubject={item.proposalSubject || ''}
+          participantCount={participants ? Object.keys(participants).length : 1}
+          proposerName={proposerName}
+          voterUserId={userId!}
+          isProposer={item.senderId === userId}
+        />
+      </View>
+    );
+  }
+
   // ── Group: show sender name above bubble for the FIRST message of a run by a non-self sender ──
   const showSenderLabel =
     isGroupContext && !isMine && senderUser &&
@@ -907,6 +930,10 @@ const renderSystemEventText = (
       return `${firstNameOf(ev.actorId)} a marqué ${ev.payload || 'ses dispos'}`;
     case 'coplan_locked':
       return `Plan lancé : ${ev.payload || ''}`;
+    case 'coplan_proposal_applied':
+      return `✓ Proposition adoptée : ${ev.payload || ''}`;
+    case 'coplan_proposal_rejected':
+      return `✕ Proposition rejetée${ev.payload ? ` : ${ev.payload}` : ''}`;
     default:
       return '';
   }
