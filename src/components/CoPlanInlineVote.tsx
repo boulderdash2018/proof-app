@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, View, Text, TouchableOpacity, Easing } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { fetchPlanDraft, togglePlaceVote } from '../services/planDraftService';
@@ -7,34 +7,30 @@ import { fetchPlanDraft, togglePlaceVote } from '../services/planDraftService';
 interface Props {
   draftId: string;
   placeId: string;
-  /** The user who is voting — usually the current user. */
+  /** Current viewer — used to show "voted" state. */
   voterUserId: string;
 }
 
 /**
- * Inline pour/contre control rendered ON a `coplan_place_added` system
- * event in the chat. Tapping a button toggles the vote on the actual
- * draft place — so voting from the chat IS voting on the workspace.
+ * Single-tap heart vote chip rendered next to a `coplan_place_added` line
+ * in the chat. Voting from the chat IS voting on the workspace — same
+ * `place.votes` array.
  *
- * To avoid subscribing to the entire draft from inside the conv (heavy),
- * we do a one-shot fetch on mount to seed the vote count + my-vote
- * state, then update OPTIMISTICALLY on tap. Other participants' votes
- * land on the next mount or via a fresh re-render — good enough for an
- * MVP and far cheaper than a per-message live listener.
- *
- * Animations:
- *   • Tap → fast bounce on the pressed button (scale 1 → 0.92 → 1)
- *   • Vote count chip slides in/out when transitioning between
- *     "no votes" and "1+ votes" states
- *   • Soft confirm flash — the button briefly tints behind itself
+ * Design (after UX feedback) :
+ *   • One element instead of three (Pour / Annuler / count) — much
+ *     calmer in the conv stream.
+ *   • Heart outline → filled when voted; tap toggles.
+ *   • Count shown only when ≥ 2 (1 = just the proposer, no info value).
+ *   • Tap-bounce + flash animation; optimistic state.
  */
 export const CoPlanInlineVote: React.FC<Props> = ({ draftId, placeId, voterUserId }) => {
   const [voteCount, setVoteCount] = useState<number | null>(null);
   const [myVote, setMyVote] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // One-shot hydrate. We don't need to refetch on draft updates —
-  // optimistic state is enough for this MVP.
+  // One-shot hydrate from the draft. No live listener — optimistic
+  // updates handle the local case; other participants' votes refresh
+  // on next mount of this row.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -42,7 +38,7 @@ export const CoPlanInlineVote: React.FC<Props> = ({ draftId, placeId, voterUserI
       if (cancelled || !draft) return;
       const place = draft.proposedPlaces.find((p) => p.id === placeId);
       if (!place) {
-        // Place was removed since the system event was posted.
+        // Place was removed since the system event was posted — show as 0.
         setVoteCount(0);
         setMyVote(false);
         return;
@@ -54,188 +50,90 @@ export const CoPlanInlineVote: React.FC<Props> = ({ draftId, placeId, voterUserI
   }, [draftId, placeId, voterUserId]);
 
   const tapScale = useRef(new Animated.Value(1)).current;
-  const flash = useRef(new Animated.Value(0)).current;
 
-  const animateTap = () => {
+  const handleTap = async () => {
+    if (myVote === null || isLoading) return;
     Animated.sequence([
-      Animated.timing(tapScale, { toValue: 0.92, duration: 80, useNativeDriver: true }),
+      Animated.timing(tapScale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
       Animated.spring(tapScale, { toValue: 1, friction: 4, tension: 220, useNativeDriver: true }),
     ]).start();
-    Animated.sequence([
-      Animated.timing(flash, { toValue: 1, duration: 120, useNativeDriver: true }),
-      Animated.timing(flash, { toValue: 0, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-    ]).start();
-  };
 
-  const handlePour = async () => {
-    if (myVote === null || isLoading) return;
-    if (myVote) return; // Already voted — UX choice: tap "contre" to undo
-    animateTap();
-    // Optimistic
-    setMyVote(true);
-    setVoteCount((c) => (c ?? 0) + 1);
+    // Optimistic toggle.
+    const wasVoting = myVote;
+    setMyVote(!wasVoting);
+    setVoteCount((c) => Math.max(0, (c ?? 0) + (wasVoting ? -1 : 1)));
     setIsLoading(true);
     try {
       await togglePlaceVote(draftId, placeId, voterUserId);
     } catch (err) {
       // Revert
-      setMyVote(false);
-      setVoteCount((c) => Math.max(0, (c ?? 0) - 1));
-      console.warn('[CoPlanInlineVote] vote failed:', err);
+      setMyVote(wasVoting);
+      setVoteCount((c) => Math.max(0, (c ?? 0) + (wasVoting ? 1 : -1)));
+      console.warn('[CoPlanInlineVote] toggle failed:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleContre = async () => {
-    if (myVote === null || isLoading) return;
-    if (!myVote) return; // Not voted yet — "Contre" toggles a YES off
-    animateTap();
-    setMyVote(false);
-    setVoteCount((c) => Math.max(0, (c ?? 0) - 1));
-    setIsLoading(true);
-    try {
-      await togglePlaceVote(draftId, placeId, voterUserId);
-    } catch (err) {
-      setMyVote(true);
-      setVoteCount((c) => (c ?? 0) + 1);
-      console.warn('[CoPlanInlineVote] unvote failed:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const flashOpacity = flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] });
+  const isReady = voteCount !== null && myVote !== null;
+  const showCount = (voteCount ?? 0) >= 2;
 
   return (
-    <View style={styles.row}>
-      {/* POUR button — primary terracotta when active */}
-      <Animated.View style={{ transform: [{ scale: myVote ? tapScale : 1 }] }}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handlePour}
-          disabled={voteCount === null || isLoading}
-          style={[
-            styles.btn,
-            myVote === true ? styles.btnPourActive : styles.btnPourIdle,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Voter pour ce lieu"
-        >
-          <Animated.View style={[styles.flashLayer, { opacity: flashOpacity }]} />
-          <Ionicons
-            name={myVote === true ? 'heart' : 'heart-outline'}
-            size={14}
-            color={myVote === true ? Colors.textOnAccent : Colors.primary}
-          />
-          <Text style={[styles.btnText, myVote === true ? styles.btnTextActive : styles.btnTextIdle]}>
-            Pour
+    <Animated.View style={{ transform: [{ scale: tapScale }] }}>
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={handleTap}
+        disabled={!isReady || isLoading}
+        style={[
+          styles.chip,
+          myVote ? styles.chipActive : styles.chipIdle,
+          !isReady && styles.chipLoading,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={myVote ? "Annuler mon vote" : "Voter pour ce lieu"}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        <Ionicons
+          name={myVote ? 'heart' : 'heart-outline'}
+          size={14}
+          color={myVote ? Colors.textOnAccent : Colors.primary}
+        />
+        {showCount && (
+          <Text style={[styles.count, { color: myVote ? Colors.textOnAccent : Colors.primary }]}>
+            {voteCount}
           </Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* CONTRE button — outline gray, only meaningful as "undo my pour" */}
-      <Animated.View style={{ transform: [{ scale: myVote === false ? tapScale : 1 }] }}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handleContre}
-          disabled={voteCount === null || isLoading || !myVote}
-          style={[
-            styles.btn,
-            styles.btnContre,
-            !myVote && styles.btnContreDisabled,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Annuler mon vote"
-        >
-          <Ionicons
-            name="close"
-            size={14}
-            color={myVote ? Colors.textSecondary : Colors.gray400}
-          />
-          <Text style={[styles.btnText, { color: myVote ? Colors.textSecondary : Colors.gray400 }]}>
-            Annuler
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Vote count chip — soft fade-in once we have a number */}
-      {voteCount !== null && voteCount > 0 && (
-        <View style={styles.countChip}>
-          <Text style={styles.countChipText}>
-            {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
-          </Text>
-        </View>
-      )}
-    </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
-// ══════════════════════════════════════════════════════════════
-// Styles
-// ══════════════════════════════════════════════════════════════
-
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  btn: {
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 99,
     borderWidth: StyleSheet.hairlineWidth + 0.3,
-    overflow: 'hidden',
-    position: 'relative',
+    minWidth: 36,
+    justifyContent: 'center',
   },
-  btnPourIdle: {
+  chipIdle: {
     backgroundColor: Colors.bgSecondary,
     borderColor: Colors.terracotta200,
   },
-  btnPourActive: {
+  chipActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  btnContre: {
-    backgroundColor: 'transparent',
-    borderColor: Colors.borderSubtle,
-  },
-  btnContreDisabled: {
+  chipLoading: {
     opacity: 0.5,
   },
-  flashLayer: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: Colors.primary,
-  },
-  btnText: {
+  count: {
     fontSize: 11.5,
     fontFamily: Fonts.bodySemiBold,
     letterSpacing: -0.05,
-  },
-  btnTextIdle: {
-    color: Colors.primary,
-  },
-  btnTextActive: {
-    color: Colors.textOnAccent,
-  },
-  countChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 99,
-    backgroundColor: Colors.terracotta50,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.terracotta200,
-  },
-  countChipText: {
-    fontSize: 10.5,
-    fontFamily: Fonts.bodyBold,
-    color: Colors.primary,
-    letterSpacing: 0.2,
   },
 });
