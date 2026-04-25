@@ -99,8 +99,10 @@ interface CoPlanStore {
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
 
   // ── Group proposals (hard mutations needing a vote) ──
-  /** Create a proposal asking the group to remove someone else's place. */
-  proposeRemovePlace: (placeId: string) => Promise<string | null>;
+  /** Create a proposal asking the group to remove someone else's place.
+   *  `reason` is an optional free-text justification surfaced on the
+   *  proposition card in the chat. */
+  proposeRemovePlace: (placeId: string, reason?: string) => Promise<string | null>;
 
   // ── Lock → conversion to real Plan + group conv ──
   lockDraft: (publishOnFeed: boolean) => Promise<{ conversationId: string; planId: string | null } | null>;
@@ -128,9 +130,13 @@ interface CoPlanStore {
 function postCoPlanMirror(
   kind: SystemEvent['kind'],
   detail: string,
-  /** Optional place id — set for `coplan_place_added` so the chat can
-   *  render inline vote buttons that drive the workspace vote count. */
-  placeId?: string,
+  /** Optional metadata — set for `coplan_place_added` so the chat card
+   *  can render vote buttons + place subtitle without a refetch. */
+  options?: {
+    placeId?: string;
+    placeCategory?: string;
+    placeAddress?: string;
+  },
 ): void {
   // Read latest state — important: this fires AFTER the optimistic
   // update so `get().draft` already reflects the change.
@@ -156,7 +162,9 @@ function postCoPlanMirror(
     actorId: _userId,
     payload: detail,
     draftId: draft.id,
-    ...(placeId ? { placeId } : null),
+    ...(options?.placeId ? { placeId: options.placeId } : null),
+    ...(options?.placeCategory ? { placeCategory: options.placeCategory } : null),
+    ...(options?.placeAddress ? { placeAddress: options.placeAddress } : null),
   };
 
   postSystemEvent(convId, event, preview).catch((err) => {
@@ -298,10 +306,14 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     });
     try {
       await svcProposePlace(draftId, newPlace);
-      // Mirror the action into the linked chat thread so participants
-      // not currently in the workspace get a "Léa a proposé X" entry.
-      // The placeId lets the chat-side render inline pour/contre buttons.
-      postCoPlanMirror('coplan_place_added', newPlace.name, newPlace.id);
+      // Mirror the action into the linked chat thread. The chat card uses
+      // placeId for inline vote, and placeCategory/placeAddress for the
+      // subtitle line ("Café · 17e") without an extra fetch per row.
+      postCoPlanMirror('coplan_place_added', newPlace.name, {
+        placeId: newPlace.id,
+        placeCategory: newPlace.category,
+        placeAddress: newPlace.address,
+      });
     } catch (err) {
       console.warn('[coPlanStore] proposePlace error:', err);
     }
@@ -413,7 +425,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   },
 
   // ── Group proposals ──
-  proposeRemovePlace: async (placeId: string) => {
+  proposeRemovePlace: async (placeId: string, reason?: string) => {
     const { draft, _userId } = get();
     if (!draft || !_userId) return null;
     const place = draft.proposedPlaces.find((p) => p.id === placeId);
@@ -434,6 +446,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
         },
         conversationId: convId,
         subject: place.name,
+        reason,
       });
       return propId;
     } catch (err) {

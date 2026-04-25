@@ -65,6 +65,12 @@ export interface SystemEvent {
   /** Proposed place id, set on `coplan_place_added` so the chat can render
    *  inline "Pour/Contre" buttons that toggle the place's vote count. */
   placeId?: string;
+  /** Google Place category (e.g. "restaurant", "cafe") — set on
+   *  `coplan_place_added` so the chat card can render "Café · 17e"
+   *  metadata without an extra fetch. */
+  placeCategory?: string;
+  /** Place address — used to extract the arrondissement for the chat card. */
+  placeAddress?: string;
 }
 
 export interface Conversation {

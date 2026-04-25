@@ -68,14 +68,15 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
     setLongPressTarget(place);
   }, []);
 
-  /** "Proposer de retirer" — kicks off the group-vote flow for this place. */
-  const handleProposeRemove = useCallback(async () => {
+  /** "Proposer de retirer" — kicks off the group-vote flow for this place.
+   *  Accepts an optional reason that surfaces on the chat card. */
+  const handleProposeRemove = useCallback(async (reason?: string) => {
     if (!longPressTarget) return;
     const place = longPressTarget;
     setLongPressTarget(null);
     setProposingForId(place.id);
     try {
-      await proposeRemovePlace(place.id);
+      await proposeRemovePlace(place.id, reason);
     } finally {
       setProposingForId(null);
     }
@@ -327,12 +328,26 @@ interface ContextualMenuProps {
   currentUserId?: string;
   onClose: () => void;
   onDirectRemove: () => void;
-  onProposeRemove: () => void;
+  /** Caller wraps this in its own loading state; passes the optional
+   *  reason captured by the in-sheet textarea. */
+  onProposeRemove: (reason?: string) => void;
 }
 
 const ContextualMenu: React.FC<ContextualMenuProps> = ({
   place, currentUserId, onClose, onDirectRemove, onProposeRemove,
 }) => {
+  // 2-step sheet : step 1 = action picker, step 2 = optional reason.
+  const [step, setStep] = useState<'pick' | 'reason'>('pick');
+  const [reason, setReason] = useState('');
+
+  // Reset internal state whenever the sheet re-opens for a different place.
+  useEffect(() => {
+    if (place) {
+      setStep('pick');
+      setReason('');
+    }
+  }, [place?.id]);
+
   if (!place) return null;
   const isMine = !!currentUserId && place.proposedBy === currentUserId;
 
@@ -351,45 +366,81 @@ const ContextualMenu: React.FC<ContextualMenuProps> = ({
             </View>
           </View>
 
-          {/* Action — single primary CTA */}
-          {isMine ? (
-            <TouchableOpacity
-              style={ctxStyles.actionBtn}
-              onPress={onDirectRemove}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="trash-outline" size={17} color={Colors.textPrimary} />
-              <View style={{ flex: 1 }}>
-                <Text style={ctxStyles.actionTitle}>Retirer le lieu</Text>
-                <Text style={ctxStyles.actionHint}>Tu en es le proposeur — retrait direct.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={ctxStyles.actionBtn}
-              onPress={onProposeRemove}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="construct" size={17} color={Colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={ctxStyles.actionTitle}>Proposer au groupe de retirer</Text>
-                <Text style={ctxStyles.actionHint}>
-                  Un vote sera lancé dans la conv. Adopté si majorité pour.
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </TouchableOpacity>
-          )}
+          {step === 'pick' ? (
+            <>
+              {isMine ? (
+                <TouchableOpacity
+                  style={ctxStyles.actionBtn}
+                  onPress={onDirectRemove}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="trash-outline" size={17} color={Colors.textPrimary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={ctxStyles.actionTitle}>Retirer le lieu</Text>
+                    <Text style={ctxStyles.actionHint}>Tu en es le proposeur — retrait direct.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={ctxStyles.actionBtn}
+                  onPress={() => setStep('reason')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="construct" size={17} color={Colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={ctxStyles.actionTitle}>Proposer au groupe de retirer</Text>
+                    <Text style={ctxStyles.actionHint}>
+                      Un vote sera lancé dans la conv. Adopté si majorité pour.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              )}
 
-          {/* Cancel */}
-          <TouchableOpacity
-            style={ctxStyles.cancelBtn}
-            onPress={onClose}
-            activeOpacity={0.7}
-          >
-            <Text style={ctxStyles.cancelText}>Annuler</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={ctxStyles.cancelBtn}
+                onPress={onClose}
+                activeOpacity={0.7}
+              >
+                <Text style={ctxStyles.cancelText}>Annuler</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* ── Step 2 : optional reasoning ── */}
+              <Text style={ctxStyles.reasonLabel}>
+                Pourquoi ce changement ?
+                <Text style={ctxStyles.reasonOptional}> · optionnel</Text>
+              </Text>
+              <TextInput
+                style={ctxStyles.reasonInput}
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Trop loin du métro, on a déjà mieux placé…"
+                placeholderTextColor={Colors.textTertiary}
+                multiline
+                maxLength={240}
+                autoFocus
+              />
+              <View style={ctxStyles.reasonActions}>
+                <TouchableOpacity
+                  style={ctxStyles.reasonSecondary}
+                  onPress={() => setStep('pick')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={ctxStyles.reasonSecondaryText}>Retour</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={ctxStyles.reasonPrimary}
+                  onPress={() => onProposeRemove(reason.trim() || undefined)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={ctxStyles.reasonPrimaryText}>Lancer le vote</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </Pressable>
       </Pressable>
     </Modal>
@@ -858,5 +909,65 @@ const ctxStyles = StyleSheet.create({
     fontSize: 13.5,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
+  },
+
+  // ── Step 2 (reasoning input) ──
+  reasonLabel: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 8,
+    letterSpacing: 0.05,
+  },
+  reasonOptional: {
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+  },
+  reasonInput: {
+    minHeight: 80,
+    maxHeight: 140,
+    fontSize: 14,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.bgPrimary,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    textAlignVertical: 'top',
+    lineHeight: 19,
+  },
+  reasonActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  reasonSecondary: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  reasonSecondaryText: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+  },
+  reasonPrimary: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+  },
+  reasonPrimaryText: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.1,
   },
 });

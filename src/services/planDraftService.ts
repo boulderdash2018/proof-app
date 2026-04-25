@@ -613,6 +613,7 @@ const hydrateProposal = (id: string, data: any): CoPlanProposal => ({
   proposedAt: toISO(data.proposedAt),
   payload: data.payload || {},
   votes: data.votes || {},
+  reason: data.reason || undefined,
   status: data.status || 'pending',
   resolvedAt: data.resolvedAt ? toISO(data.resolvedAt) : undefined,
   resolvedBy: data.resolvedBy,
@@ -636,6 +637,8 @@ export const createProposal = async (input: {
   conversationId: string;
   /** Snapshot subject for the chat preview line ("Café Pinson"). */
   subject: string;
+  /** Optional free-text reasoning shown on the chat card. */
+  reason?: string;
 }): Promise<string> => {
   const propRef = doc(collection(db, DRAFTS, input.draftId, PROPOSALS));
   const propId = propRef.id;
@@ -652,6 +655,7 @@ export const createProposal = async (input: {
     payload: input.payload,
     votes: initialVotes,
     status: 'pending',
+    ...(input.reason && input.reason.trim() ? { reason: input.reason.trim() } : null),
   });
 
   // Post the mirror chat message — type='coplan_proposal' so the

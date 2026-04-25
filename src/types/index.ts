@@ -393,6 +393,10 @@ export interface CoPlanProposal {
   /** Map userId → vote. Absence = no vote yet. The proposer is
    *  auto-counted as "pour" at creation time, so they appear here too. */
   votes: Record<string, CoPlanVote>;
+  /** Optional free-text justification from the proposer (e.g. "Trop loin
+   *  du métro, Casa Luisa serait mieux placé"). Surfaces in the chat
+   *  proposition card to give the group context for their vote. */
+  reason?: string;
   status: CoPlanProposalStatus;
   /** Set when the proposal transitions to applied/rejected (by the
    *  client that wins the auto-apply transaction). */

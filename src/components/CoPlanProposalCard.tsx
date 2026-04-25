@@ -10,9 +10,9 @@ interface Props {
   proposalId: string;
   /** Display fallback used until the live snapshot arrives. */
   proposalSubject: string;
-  /** Required for the "vs N participants" line. Pulled from the conv. */
+  /** Total participants on the parent draft — denominator for "N/M votes". */
   participantCount: number;
-  /** First name of the proposer — for the title. */
+  /** First name of the proposer — for the subtitle. */
   proposerName: string;
   /** Current viewer's user id — to highlight their vote. */
   voterUserId: string;
@@ -27,16 +27,22 @@ interface Props {
  * `plan_drafts/{draftId}/proposals/{proposalId}` doc so vote counts +
  * status transitions are reflected live for everyone in the thread.
  *
- * States :
- *   • pending  → "🛠 NOUVELLE PROPOSITION" + Pour/Contre buttons (live count)
- *   • applied  → "✓ PROPOSITION ADOPTÉE" — green tint, no vote buttons
- *   • rejected → "✕ PROPOSITION REJETÉE" — gray tint, no vote buttons
+ * Design (validated mockup) :
+ *   ┌────────────────────────────────────────────────┐
+ *   │  À VOTER  │  Léo propose une modif      01:32   │
+ *   │  ─────────                                       │
+ *   │  Retirer « Le Flandrin » du plan                 │
+ *   │  Trop loin du métro. Casa Luisa serait mieux…    │
+ *   │  ─────────────────                  1 / 3 votes  │
+ *   │  ┌────────┐  ┌──────────┐                        │
+ *   │  │ Rejeter │  │ Approuver │                       │
+ *   │  └────────┘  └──────────┘                        │
+ *   └────────────────────────────────────────────────┘
  *
- * Animations :
- *   • Card slide-in on mount (FadeInUp-like with translate + opacity).
- *   • Vote button tap-bounce.
- *   • State transition (pending → applied/rejected) pulses the card
- *     border once to draw the eye.
+ * On resolution, the card transforms — the vote bar locks at its final
+ * value, buttons disappear, and a status line replaces them. The
+ * separate `<CoPlanResolutionPill>` rendered later in the chat marks
+ * the moment cleanly.
  */
 export const CoPlanProposalCard: React.FC<Props> = ({
   draftId,
@@ -61,48 +67,47 @@ export const CoPlanProposalCard: React.FC<Props> = ({
   useEffect(() => {
     Animated.spring(enter, {
       toValue: 1,
-      friction: 7,
+      friction: 8,
       tension: 80,
       useNativeDriver: true,
     }).start();
   }, [enter]);
 
-  // Border pulse when status transitions from pending to a final state.
-  const statusFlash = useRef(new Animated.Value(0)).current;
-  const lastStatus = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!prop) return;
-    if (prop.status !== 'pending' && lastStatus.current === 'pending') {
-      Animated.sequence([
-        Animated.timing(statusFlash, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: false }),
-        Animated.timing(statusFlash, { toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: false }),
-      ]).start();
-    }
-    lastStatus.current = prop.status;
-  }, [prop?.status, statusFlash]);
-
   // Tap-bounce per button.
-  const pourBounce = useRef(new Animated.Value(1)).current;
-  const contreBounce = useRef(new Animated.Value(1)).current;
+  const approveBounce = useRef(new Animated.Value(1)).current;
+  const rejectBounce = useRef(new Animated.Value(1)).current;
   const animateBounce = (anim: Animated.Value) => {
     Animated.sequence([
-      Animated.timing(anim, { toValue: 0.92, duration: 80, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 0.94, duration: 80, useNativeDriver: true }),
       Animated.spring(anim, { toValue: 1, friction: 4, tension: 220, useNativeDriver: true }),
     ]).start();
   };
 
-  // Loading shell while the live snap arrives.
+  // Animated progress bar — width % of pour over participantCount.
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!prop) return;
+    const pourCount = Object.values(prop.votes).filter((v) => v === 'pour').length;
+    const target = participantCount > 0 ? Math.min(1, pourCount / participantCount) : 0;
+    Animated.timing(progress, {
+      toValue: target,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [prop, participantCount, progress]);
+
   const subject = prop?.payload.placeName || proposalSubject;
+  const reason = prop?.reason;
   const status = prop?.status || 'pending';
   const votes = prop?.votes || {};
   const myVote: CoPlanVote | undefined = votes[voterUserId];
   const pourCount = Object.values(votes).filter((v) => v === 'pour').length;
   const contreCount = Object.values(votes).filter((v) => v === 'contre').length;
-  const undecidedCount = Math.max(0, participantCount - pourCount - contreCount);
 
   const handleVote = async (vote: CoPlanVote) => {
     if (status !== 'pending' || isVoting) return;
-    animateBounce(vote === 'pour' ? pourBounce : contreBounce);
+    animateBounce(vote === 'pour' ? approveBounce : rejectBounce);
     setIsVoting(true);
     try {
       await voteOnProposal(draftId, proposalId, voterUserId, vote);
@@ -113,60 +118,26 @@ export const CoPlanProposalCard: React.FC<Props> = ({
     }
   };
 
-  // Compute card variant tokens.
-  const variant: 'pending' | 'applied' | 'rejected' = status as any;
-  const variantStyles = (() => {
-    switch (variant) {
-      case 'applied':
-        return {
-          card: styles.cardApplied,
-          eyebrow: 'PROPOSITION ADOPTÉE',
-          eyebrowColor: Colors.success,
-          icon: 'checkmark-circle' as const,
-          iconColor: Colors.success,
-        };
-      case 'rejected':
-        return {
-          card: styles.cardRejected,
-          eyebrow: 'PROPOSITION REJETÉE',
-          eyebrowColor: Colors.textTertiary,
-          icon: 'close-circle' as const,
-          iconColor: Colors.textTertiary,
-        };
-      default:
-        return {
-          card: styles.cardPending,
-          eyebrow: `NOUVELLE PROPOSITION DE ${proposerName.toUpperCase()}`,
-          eyebrowColor: Colors.primary,
-          icon: 'construct' as const,
-          iconColor: Colors.primary,
-        };
-    }
-  })();
-
-  // Body line — describes the proposal action ("Retirer Café Pinson").
+  // Body line — describes the proposal action ("Retirer « Café Pinson » du plan").
   const bodyLine = (() => {
     const t = prop?.type || 'remove_place';
     switch (t) {
-      case 'remove_place':  return `Retirer ${subject}`;
-      case 'replace_place': return `Remplacer ${subject}`;
+      case 'remove_place':  return `Retirer « ${subject} » du plan`;
+      case 'replace_place': return `Remplacer « ${subject} »`;
       case 'change_meetup': return `Changer la date du rendez-vous`;
       case 'change_title':  return `Renommer le brouillon : « ${prop?.payload.title || subject} »`;
       default:              return subject;
     }
   })();
 
-  // Animated entry transform.
+  // Animated transforms for entry.
   const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
   const opacity = enter;
 
-  // Border flash animated value → interpolated to border color.
-  const borderColor = statusFlash.interpolate({
+  // Progress bar width — animated as a percentage string for layout.
+  const progressWidth = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [
-      variant === 'applied' ? Colors.success : variant === 'rejected' ? Colors.borderSubtle : Colors.terracotta200,
-      Colors.primary,
-    ],
+    outputRange: ['0%', '100%'] as any,
   });
 
   return (
@@ -176,107 +147,93 @@ export const CoPlanProposalCard: React.FC<Props> = ({
         { opacity, transform: [{ translateY }] },
       ]}
     >
-      <Animated.View
-        style={[
-          styles.card,
-          variantStyles.card,
-          { borderColor },
-        ]}
-      >
-        {/* Header — icon + eyebrow */}
+      <View style={styles.card}>
+        {/* ── Header : "À VOTER" chip + "X propose une modif" + timestamp ── */}
         <View style={styles.header}>
-          <View style={[styles.iconWrap, { backgroundColor: variantStyles.iconColor + '18' }]}>
-            <Ionicons name={variantStyles.icon} size={16} color={variantStyles.iconColor} />
+          <View style={[styles.chip, status === 'pending' ? styles.chipPending : styles.chipResolved]}>
+            <Text style={[styles.chipText, status === 'pending' ? styles.chipTextPending : styles.chipTextResolved]}>
+              {status === 'pending' ? 'À VOTER' : status === 'applied' ? 'ADOPTÉE' : 'REJETÉE'}
+            </Text>
           </View>
-          <Text style={[styles.eyebrow, { color: variantStyles.eyebrowColor }]} numberOfLines={1}>
-            {variantStyles.eyebrow}
+          <Text style={styles.headerCopy} numberOfLines={1}>
+            <Text style={styles.headerActor}>{proposerName}</Text>
+            <Text style={styles.headerVerb}> propose une modif</Text>
           </Text>
         </View>
 
-        {/* Body — the proposal action */}
+        {/* Hairline divider */}
+        <View style={styles.divider} />
+
+        {/* ── Body : the action + optional reasoning ── */}
         <Text style={styles.body}>{bodyLine}</Text>
+        {reason ? (
+          <Text style={styles.reason} numberOfLines={3}>
+            {reason}
+          </Text>
+        ) : null}
 
-        {variant === 'pending' ? (
-          <>
-            {/* Vote row — hidden for the proposer (they auto-pour) */}
-            {!isProposer && (
-              <View style={styles.voteRow}>
-                <Animated.View style={{ transform: [{ scale: pourBounce }] }}>
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => handleVote('pour')}
-                    disabled={isVoting}
-                    style={[
-                      styles.voteBtn,
-                      myVote === 'pour' ? styles.votePourActive : styles.votePourIdle,
-                    ]}
-                  >
-                    <Ionicons
-                      name={myVote === 'pour' ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                      size={15}
-                      color={myVote === 'pour' ? Colors.textOnAccent : Colors.primary}
-                    />
-                    <Text style={[
-                      styles.voteBtnText,
-                      { color: myVote === 'pour' ? Colors.textOnAccent : Colors.primary },
-                    ]}>
-                      Pour {pourCount > 0 ? pourCount : ''}
-                    </Text>
-                  </TouchableOpacity>
-                </Animated.View>
+        {/* ── Progress bar + N/M votes ── */}
+        <View style={styles.progressRow}>
+          <View style={styles.progressTrack}>
+            <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+          </View>
+          <Text style={styles.progressLabel}>
+            {pourCount} / {participantCount} votes
+          </Text>
+        </View>
 
-                <Animated.View style={{ transform: [{ scale: contreBounce }] }}>
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => handleVote('contre')}
-                    disabled={isVoting}
-                    style={[
-                      styles.voteBtn,
-                      myVote === 'contre' ? styles.voteContreActive : styles.voteContreIdle,
-                    ]}
-                  >
-                    <Ionicons
-                      name={myVote === 'contre' ? 'close-circle' : 'close-circle-outline'}
-                      size={15}
-                      color={myVote === 'contre' ? Colors.textOnAccent : Colors.textSecondary}
-                    />
-                    <Text style={[
-                      styles.voteBtnText,
-                      { color: myVote === 'contre' ? Colors.textOnAccent : Colors.textSecondary },
-                    ]}>
-                      Contre {contreCount > 0 ? contreCount : ''}
-                    </Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              </View>
-            )}
+        {/* ── Actions : Rejeter (outlined) + Approuver (terracotta) ── */}
+        {status === 'pending' && !isProposer && (
+          <View style={styles.actions}>
+            <Animated.View style={[{ flex: 1 }, { transform: [{ scale: rejectBounce }] }]}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleVote('contre')}
+                disabled={isVoting}
+                style={[
+                  styles.btnReject,
+                  myVote === 'contre' && styles.btnRejectActive,
+                ]}
+              >
+                <Text style={[
+                  styles.btnRejectText,
+                  myVote === 'contre' && styles.btnRejectTextActive,
+                ]}>
+                  Rejeter
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {isProposer && (
-              <Text style={styles.proposerHint}>
-                Tu es le proposeur — ton "pour" est automatique.
-              </Text>
-            )}
+            <Animated.View style={[{ flex: 1 }, { transform: [{ scale: approveBounce }] }]}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleVote('pour')}
+                disabled={isVoting}
+                style={[
+                  styles.btnApprove,
+                  myVote === 'pour' && styles.btnApproveActive,
+                ]}
+              >
+                <Text style={styles.btnApproveText}>Approuver</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        )}
 
-            {/* Footer — undecided count + threshold info */}
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>
-                {undecidedCount > 0
-                  ? `${undecidedCount} ${undecidedCount === 1 ? 'personne n\'a' : 'personnes n\'ont'} pas voté`
-                  : 'Tout le monde a voté'}
-              </Text>
-              <View style={styles.footerSep} />
-              <Text style={styles.footerText}>Adoptée si majorité pour</Text>
-            </View>
-          </>
-        ) : (
-          // Final state — small recap of the vote tally.
+        {status === 'pending' && isProposer && (
+          <Text style={styles.proposerHint}>
+            Tu es l{'\u2019'}auteur — ton {'"'}pour{'"'} est automatique.
+          </Text>
+        )}
+
+        {status !== 'pending' && (
           <View style={styles.tally}>
             <Text style={styles.tallyText}>
               {pourCount} pour · {contreCount} contre
             </Text>
           </View>
         )}
-      </Animated.View>
+      </View>
     </Animated.View>
   );
 };
@@ -287,128 +244,179 @@ export const CoPlanProposalCard: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   cardWrap: {
-    marginHorizontal: 16,
+    marginHorizontal: 14,
     marginVertical: 6,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 14,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
     backgroundColor: Colors.bgSecondary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
     elevation: 1,
   },
-  cardPending: {
-    backgroundColor: Colors.terracotta50,
-  },
-  cardApplied: {
-    backgroundColor: 'rgba(123,153,113,0.08)', // success tint
-  },
-  cardRejected: {
-    backgroundColor: Colors.bgTertiary,
-    opacity: 0.8,
-  },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: 10,
   },
-  iconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 6,
   },
-  eyebrow: {
-    flex: 1,
+  chipPending: {
+    backgroundColor: Colors.terracotta100,
+  },
+  chipResolved: {
+    backgroundColor: Colors.bgTertiary,
+  },
+  chipText: {
     fontSize: 9.5,
     fontFamily: Fonts.bodyBold,
     letterSpacing: 1.1,
   },
-  body: {
-    fontSize: 15,
-    fontFamily: Fonts.displaySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
-    marginBottom: 12,
-    lineHeight: 20,
+  chipTextPending: {
+    color: Colors.primary,
   },
-  voteRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  voteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 99,
-    borderWidth: StyleSheet.hairlineWidth + 0.3,
-  },
-  votePourIdle: {
-    backgroundColor: Colors.bgSecondary,
-    borderColor: Colors.terracotta200,
-  },
-  votePourActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  voteContreIdle: {
-    backgroundColor: 'transparent',
-    borderColor: Colors.borderSubtle,
-  },
-  voteContreActive: {
-    backgroundColor: Colors.textTertiary,
-    borderColor: Colors.textTertiary,
-  },
-  voteBtnText: {
-    fontSize: 12.5,
-    fontFamily: Fonts.bodySemiBold,
-    letterSpacing: -0.05,
-  },
-  proposerHint: {
-    fontSize: 11.5,
-    fontFamily: Fonts.body,
-    fontStyle: 'italic',
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderSubtle,
-  },
-  footerText: {
-    fontSize: 11,
-    fontFamily: Fonts.body,
+  chipTextResolved: {
     color: Colors.textTertiary,
   },
-  footerSep: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.textTertiary,
-    opacity: 0.4,
+  headerCopy: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    letterSpacing: -0.05,
   },
+  headerActor: {
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  headerVerb: {
+    color: Colors.textSecondary,
+  },
+
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.borderSubtle,
+    marginVertical: 12,
+  },
+
+  // Body
+  body: {
+    fontSize: 16,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.25,
+    lineHeight: 21,
+  },
+  reason: {
+    marginTop: 6,
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    letterSpacing: 0.05,
+  },
+
+  // Progress bar
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    marginBottom: 12,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.terracotta100,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+    letterSpacing: 0.05,
+  },
+
+  // Actions
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  btnReject: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.bgPrimary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderMedium,
+  },
+  btnRejectActive: {
+    backgroundColor: Colors.bgTertiary,
+    borderColor: Colors.textTertiary,
+  },
+  btnRejectText: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+    letterSpacing: -0.1,
+  },
+  btnRejectTextActive: {
+    color: Colors.textPrimary,
+  },
+  btnApprove: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primaryDeep,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  btnApproveActive: {
+    backgroundColor: Colors.primaryDeep,
+  },
+  btnApproveText: {
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: -0.1,
+  },
+  proposerHint: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+    textAlign: 'center',
+  },
+
+  // Final-state tally
   tally: {
-    marginTop: 4,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderSubtle,
+    paddingTop: 4,
   },
   tallyText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: Fonts.bodyMedium,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
 });

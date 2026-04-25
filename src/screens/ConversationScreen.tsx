@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanWorkspaceFab, CoPlanProposalCard } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanResolutionPill, CoPlanStatusBar } from '../components';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
@@ -493,20 +493,18 @@ const MessageRow = React.memo<MessageRowProps>(({
   const myReaction = item.reactions.find((r) => r.userId === userId);
   const hasReply = !!item.replyToId;
 
-  // ── System event: rendered as centered gray italic line, no bubble, no swipe, no reactions ──
+  // ── System event ──
   if (item.type === 'system') {
     const ev = item.systemEvent;
     const isCoplan = ev?.kind?.startsWith('coplan_') ?? false;
     const isSessionStart = ev?.kind === 'session_started' && ev.actorId !== userId;
     const isSessionComplete = ev?.kind === 'session_completed';
 
-    // ── Co-plan compact / grouped rendering ──
-    // For coplan_availability_set + coplan_place_voted runs we keep ONLY
-    // the last event in the streak — the rest is hidden. The last event
-    // says "X a mis à jour ses dispos" without any count noise.
-    if (isCoplan && ev?.kind !== 'coplan_place_added' && coplanRun && !coplanRun.isLast) {
-      // Hidden — but still render the date separator if needed so it
-      // doesn't go missing on the visible follow-up.
+    // `coplan_place_added` is intercepted by renderItem → <CoPlanPlacesCard>;
+    // never reaches this branch.
+
+    // Hide all-but-last for coplan availability/voted runs (noise).
+    if (isCoplan && coplanRun && !coplanRun.isLast) {
       return showDate ? (
         <View style={styles.dateSeparator}>
           <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
@@ -514,59 +512,49 @@ const MessageRow = React.memo<MessageRowProps>(({
       ) : null;
     }
 
-    // For coplan_place_added runs the FIRST row carries the run header
-    // ("X a proposé N lieux"). Subsequent rows in the same run render
-    // as compact lines (no actor name, just the place + heart).
-    const isPlaceAddedRun = ev?.kind === 'coplan_place_added' && coplanRun && coplanRun.inMultiRun;
-    const isPlaceRunFirst = isPlaceAddedRun && coplanRun!.isFirst;
-    const isPlaceRunFollower = isPlaceAddedRun && !coplanRun!.isFirst;
-
-    // Compute the displayed text — for a multi-run availability/voted,
-    // use generic "mis à jour" copy; for normal cases delegate to the
-    // existing renderSystemEventText.
-    const text = (() => {
-      if (item.content) return item.content;
-      if (ev?.kind === 'coplan_availability_set' && coplanRun?.inMultiRun) {
-        const name = participants?.[ev.actorId || '']?.displayName?.split(' ')[0] || 'Quelqu\'un';
-        return `${name} a mis à jour ses dispos`;
-      }
-      if (ev?.kind === 'coplan_availability_set') {
-        // Single avail event — use compact text instead of "X a marqué 1 dispo"
-        const name = participants?.[ev.actorId || '']?.displayName?.split(' ')[0] || 'Quelqu\'un';
-        return `${name} a marqué ses dispos`;
-      }
-      if (isPlaceRunFirst && coplanRun!.forwardCount > 1) {
-        const name = participants?.[ev?.actorId || '']?.displayName?.split(' ')[0] || 'Quelqu\'un';
-        return `${name} a proposé ${coplanRun!.forwardCount} lieux`;
-      }
-      return renderSystemEventText(ev, participants);
-    })();
-
-    // Inline vote — only for OTHER participants.
-    const showInlineVote =
-      ev?.kind === 'coplan_place_added' &&
-      !!ev.draftId && !!ev.placeId &&
-      !!userId && ev.actorId !== userId;
-
-    // Compact "place row" rendering for events inside a place-added run.
-    if (isPlaceAddedRun && !isPlaceRunFirst) {
+    // ── Resolution pill for proposal outcomes ──
+    if (ev?.kind === 'coplan_proposal_applied' || ev?.kind === 'coplan_proposal_rejected') {
       return (
-        <View style={styles.coplanRunRow}>
-          <Ionicons name="location" size={13} color={Colors.primary} />
-          <Text style={styles.coplanRunRowName} numberOfLines={1}>
-            {ev?.payload || 'Lieu'}
-          </Text>
-          {showInlineVote && (
-            <CoPlanInlineVote
-              draftId={ev!.draftId!}
-              placeId={ev!.placeId!}
-              voterUserId={userId!}
-            />
+        <View>
+          {showDate && (
+            <View style={styles.dateSeparator}>
+              <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+            </View>
           )}
+          <CoPlanResolutionPill
+            variant={ev.kind === 'coplan_proposal_applied' ? 'applied' : 'rejected'}
+            subject={ev.payload}
+          />
         </View>
       );
     }
 
+    // ── Compact event ──
+    // For all OTHER coplan_* kinds + the regular system events INSIDE a
+    // co-plan group (group_created, joined, left, renamed, session_*),
+    // use the compact one-line format with avatar + actor + verb +
+    // timestamp. We detect "co-plan group" via the presence of any
+    // coplan_* kind earlier in the conv — but as a simpler heuristic,
+    // compact format applies whenever the current event is coplan_* OR
+    // the conv has at least one coplan_* event in it.
+    // For minimal scope here : compact format applies if isCoplan, OR
+    // if it's a `group_created` event (the mockup shows it that way).
+    const useCompact = isCoplan || ev?.kind === 'group_created' || ev?.kind === 'joined' || ev?.kind === 'left' || ev?.kind === 'renamed';
+    if (useCompact) {
+      return (
+        <View>
+          {showDate && (
+            <View style={styles.dateSeparator}>
+              <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+            </View>
+          )}
+          <CoPlanCompactEvent message={item} participants={participants} />
+        </View>
+      );
+    }
+
+    // Fallback : centered gray italic line (sessions, etc.)
+    const text = item.content || renderSystemEventText(ev, participants);
     return (
       <View>
         {showDate && (
@@ -596,38 +584,7 @@ const MessageRow = React.memo<MessageRowProps>(({
               <Text style={styles.systemJoinText}>Voir l{'\u2019'}album</Text>
             </TouchableOpacity>
           )}
-          {/* Inline vote chip on the FIRST row of a place-added run sits
-              next to the place name (single line); on a singleton it sits
-              under the text on its own line. */}
-          {showInlineVote && !isPlaceRunFirst && (
-            <View style={{ marginTop: 6 }}>
-              <CoPlanInlineVote
-                draftId={ev!.draftId!}
-                placeId={ev!.placeId!}
-                voterUserId={userId!}
-              />
-            </View>
-          )}
         </View>
-
-        {/* When this is the first of a place-added run, show the FIRST
-            place's compact row directly under the header so the visual
-            structure is "header + N rows". */}
-        {isPlaceRunFirst && (
-          <View style={styles.coplanRunRow}>
-            <Ionicons name="location" size={13} color={Colors.primary} />
-            <Text style={styles.coplanRunRowName} numberOfLines={1}>
-              {ev?.payload || 'Lieu'}
-            </Text>
-            {showInlineVote && (
-              <CoPlanInlineVote
-                draftId={ev!.draftId!}
-                placeId={ev!.placeId!}
-                voterUserId={userId!}
-              />
-            )}
-          </View>
-        )}
       </View>
     );
   }
@@ -1574,6 +1531,40 @@ export const ConversationScreen: React.FC = () => {
     // consecutive same-kind same-sender events into a single visual block.
     const coplanRun = computeCoplanRunInfo(msgs, index);
 
+    // ── Co-plan place-added run : render as ONE coherent card ──
+    // When the current event is a `coplan_place_added`:
+    //   • If it's the FIRST of a run, slice msgs[idx, idx+forwardCount]
+    //     and render a `CoPlanPlacesCard` listing all of them.
+    //   • If it's NOT first (follower), return null — the card already
+    //     covers it. We still preserve the date separator if needed.
+    if (item.type === 'system' && item.systemEvent?.kind === 'coplan_place_added') {
+      const showDate = shouldShowDateSeparator(item, index > 0 ? msgs[index - 1] : undefined);
+      if (coplanRun.isFirst) {
+        const runLength = Math.max(1, coplanRun.forwardCount || 1);
+        const runEvents = msgs.slice(index, index + runLength);
+        return (
+          <View>
+            {showDate && (
+              <View style={styles.dateSeparator}>
+                <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+              </View>
+            )}
+            <CoPlanPlacesCard
+              events={runEvents}
+              participants={activeConv?.participantDetails}
+              voterUserId={user?.id}
+            />
+          </View>
+        );
+      }
+      // Follower row — already inside the card above.
+      return showDate ? (
+        <View style={styles.dateSeparator}>
+          <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+        </View>
+      ) : null;
+    }
+
     return (
     <MessageRow
       item={item}
@@ -1714,6 +1705,30 @@ export const ConversationScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* ── Co-plan status widget ──
+          Sticky just below the header — shows the live status of the
+          linked draft (places, dispos, pending modifs) and exposes the
+          two main shortcuts : "Modifier" → workspace, and a tap on
+          "X modif en attente" → scroll to the freshest pending card. */}
+      {linkedDraftId && (
+        <CoPlanStatusBar
+          draftId={linkedDraftId}
+          onOpenWorkspace={() => navigation.navigate('CoPlanWorkspace', { draftId: linkedDraftId })}
+          onJumpToPendingProposal={(proposalId) => {
+            const idx = messagesRef.current.findIndex(
+              (m) => m.type === 'coplan_proposal' && m.proposalId === proposalId,
+            );
+            if (idx >= 0 && flatListRef.current) {
+              try {
+                flatListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
+              } catch {
+                // scrollToIndex can throw on virtualized lists — fall back to scrollToOffset.
+                flatListRef.current.scrollToEnd({ animated: true });
+              }
+            }
+          }}
+        />
+      )}
 
       {/* Messages */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
@@ -2147,19 +2162,6 @@ export const ConversationScreen: React.FC = () => {
         onSubmit={(question, options) => sendPoll({ question, options })}
       />
 
-      {/* ── Floating "Modifier le plan" FAB ──
-          Only when this conv is attached to a co-plan draft. Tapping
-          navigates to the workspace; coming back uses the workspace's
-          chevron-back. The conv stays the home; the workspace is a
-          visit-and-return atelier. */}
-      <CoPlanWorkspaceFab
-        visible={!!linkedDraftId}
-        onPress={() => {
-          if (!linkedDraftId) return;
-          navigation.navigate('CoPlanWorkspace', { draftId: linkedDraftId });
-        }}
-      />
-
       {/* Rename modal (groups only) */}
       {isGroup && (
         <Modal
@@ -2515,24 +2517,6 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     textAlign: 'center',
     lineHeight: 16,
-  },
-  // ── Co-plan compact "place run" row (used inside place_added groups) ──
-  // A thin horizontal row sitting right under the run header — name +
-  // tiny location pin + heart vote chip on the right.
-  coplanRunRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 30,
-    paddingVertical: 4,
-    marginVertical: 1,
-  },
-  coplanRunRowName: {
-    flex: 1,
-    fontSize: 12.5,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.05,
   },
   systemJoinBtn: {
     flexDirection: 'row',
