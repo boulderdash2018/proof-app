@@ -493,7 +493,7 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Layout.screenPadding, paddingVertical: 10, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 22, fontFamily: Fonts.bodySemiBold, letterSpacing: -0.3 },
+  headerTitle: { fontSize: 22, fontFamily: Fonts.displaySemiBold, letterSpacing: -0.3 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   friendReqBtn: { marginRight: 16, position: 'relative' },
   friendReqIcon: { fontSize: 22 },
