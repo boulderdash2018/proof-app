@@ -7,9 +7,11 @@ import {
   doc,
   updateDoc,
   getDoc,
+  increment,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { PlaceReview, ReviewSource, User } from '../types';
+import { useAuthStore } from '../store/authStore';
 
 const PLACE_REVIEWS = 'placeReviews';
 
@@ -108,15 +110,28 @@ export const submitPlaceReviews = async (
 
   // Only increment stats for NEW reviews (not updates)
   if (newRatingsCount > 0) {
+    // 1. Atomic Firestore increment (sert plusieurs reviews simultanées sans race)
     try {
       const userRef = doc(db, 'users', author.id);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        const current = userSnap.data().places_rated_count || 0;
-        await updateDoc(userRef, { places_rated_count: current + newRatingsCount });
-      }
+      await updateDoc(userRef, { places_rated_count: increment(newRatingsCount) });
     } catch (err) {
       console.error('[placeReviewService] update user stats error:', err);
+    }
+
+    // 2. Sync local Zustand state — sinon la ProfileScreen continue d'afficher
+    //    l'ancien count (read non-réactif depuis user.places_rated_count) et
+    //    la barre de complétion 'Rate 3 places' reste bloquée à 0/3.
+    try {
+      const localUser = useAuthStore.getState().user;
+      if (localUser && localUser.id === author.id) {
+        const current = localUser.places_rated_count ?? 0;
+        useAuthStore.getState().setUser({
+          ...localUser,
+          places_rated_count: current + newRatingsCount,
+        });
+      }
+    } catch (err) {
+      console.error('[placeReviewService] sync local user state error:', err);
     }
   }
 };
