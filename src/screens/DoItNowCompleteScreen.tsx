@@ -303,6 +303,52 @@ export const DoItNowCompleteScreen: React.FC = () => {
     }
   };
 
+  // "Pas cette fois" — l'user termine le plan SANS le proof it.
+  // On marque le plan comme 'fait' (isDone=true) mais sans proofStatus.
+  // → pas de bump du proofCount, pas d'ajout dans recreatedByIds.
+  // Le bouton 'Do it now' sur PlanDetail sera désactivé via isDone (déjà
+  // garanti par le flag local + Firestore via savesStore.markAsDone).
+  const handleProofDeclined = () => {
+    try {
+      const savesState = useSavesStore.getState();
+      const feedState = useFeedStore.getState();
+      const existingEntry = savesState.savedPlans.find((sp) => sp.planId === plan.id);
+
+      if (!existingEntry && currentUser) {
+        const entry: SavedPlan = {
+          planId: plan.id,
+          plan,
+          isDone: false,
+          savedAt: new Date().toISOString(),
+        };
+        useSavesStore.setState((state) => ({
+          savedPlans: [entry, ...state.savedPlans],
+        }));
+        const newSet = new Set(feedState.savedPlanIds);
+        newSet.add(plan.id);
+        useFeedStore.setState({ savedPlanIds: newSet });
+        try {
+          savePlanFS(currentUser.id, plan.id, currentUser, plan).catch((err) =>
+            console.error('[DoItNowComplete] savePlan FS failed (decline):', err),
+          );
+        } catch (err) {
+          console.error('[DoItNowComplete] savePlan FS sync error:', err);
+        }
+      }
+
+      // Mark done WITHOUT proofStatus — no proof emitted, count untouched
+      useSavesStore.getState().markAsDone(plan.id);
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setShowProofModal(false);
+      clearSession();
+      navigation.popToTop();
+    } catch (err) {
+      console.error('[DoItNowComplete] proof decline error:', err);
+      setShowProofModal(false);
+    }
+  };
+
   const handleClose = () => {
     clearSession();
     navigation.popToTop();
@@ -559,6 +605,7 @@ export const DoItNowCompleteScreen: React.FC = () => {
         visible={showProofModal}
         plan={plan}
         onProof={handleProofConfirmed}
+        onDecline={handleProofDeclined}
         skipRating
         source="do_it_now"
       />

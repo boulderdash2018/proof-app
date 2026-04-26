@@ -64,7 +64,7 @@ interface Props {
   source?: ReviewSource;
 }
 
-export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skipRating, rateOnly, initialRatings, source = 'already_done' }) => {
+export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, onDecline, skipRating, rateOnly, initialRatings, source = 'already_done' }) => {
   const C = useColors();
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
@@ -336,6 +336,19 @@ export const ProofSurveyModal: React.FC<Props> = ({ visible, plan, onProof, skip
               </View>
 
               <View style={styles.btnRow}>
+                {onDecline && (
+                  <TouchableOpacity
+                    style={[styles.btnDecline, { borderColor: C.gray400, flex: 1 }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      onDecline();
+                    }}
+                    activeOpacity={0.7}
+                    disabled={stampType !== 'none'}
+                  >
+                    <Text style={[styles.btnDeclineText, { color: C.gray700 }]}>Pas cette fois</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.btnProof, { backgroundColor: STAMP_PROOF, flex: 1 }]}
                   onPress={playStamp}
@@ -587,6 +600,18 @@ const styles = StyleSheet.create({
   },
   btnProofText: {
     color: '#FFF8F0',
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.3,
+  },
+  btnDecline: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+  },
+  btnDeclineText: {
     fontSize: 14,
     fontFamily: Fonts.bodySemiBold,
     letterSpacing: 0.3,
