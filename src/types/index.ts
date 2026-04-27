@@ -161,6 +161,54 @@ export interface Plan {
   sourceDraftId?: string;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// Spots — recommandation single-place (format secondaire au Plan)
+//
+// Différent du Plan : pas de séquence, pas de "Do It Now", pas de
+// "Proof.it" validation. Juste un lieu + une phrase personnelle du
+// recommandeur. Format gamifiable (carte qui se retourne pour révéler
+// la phrase). Présent dans le feed mais avec un ratio capped (~1 toutes
+// les 2-3 plans) pour ne pas écraser la primauté du Plan.
+//
+// Cap à la création : 3-5 spots/mois par user (à enforcer côté UI).
+// ══════════════════════════════════════════════════════════════════════════
+export interface Spot {
+  id: string;
+
+  // ── Recommandeur (snapshotted sur le doc) ──
+  recommenderId: string;
+  recommenderName: string;        // displayName
+  recommenderUsername: string;
+  recommenderAvatarUrl: string | null;
+  recommenderAvatarBg: string;
+  recommenderAvatarColor: string;
+  recommenderInitials: string;
+
+  // ── Lieu Google Places (snapshotted) ──
+  googlePlaceId: string;
+  placeName: string;
+  /** Catégorie Google brute ("restaurant", "cafe"…) — formatée à l'affichage. */
+  placeCategory?: string;
+  placeAddress?: string;
+  /** URL d'une photo du lieu (déjà transformée par googlePlacesService). */
+  photoUrl?: string | null;
+  latitude?: number;
+  longitude?: number;
+
+  /** Phrase obligatoire du recommandeur. 30-180 chars enforced à la création.
+   *  C'est le différenciateur authentique vs un avis Yelp anodin. */
+  quote: string;
+
+  /** Ids des users qui ont sauvegardé le Spot (engagement metric). */
+  savedByIds: string[];
+
+  /** Ville (pour le filtrage feed par ville actuelle). */
+  city?: string;
+
+  createdAt: string;       // ISO
+  timeAgo: string;         // "il y a 2j" — calculé à l'hydratation
+}
+
 export type BadgeId =
   | 'explorer' | 'top_creator' | 'citadin' | 'viral_5'
   | 'first_plan' | 'social_butterfly' | 'foodie_expert';
