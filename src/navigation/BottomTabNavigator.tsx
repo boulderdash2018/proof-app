@@ -335,6 +335,35 @@ export const BottomTabNavigator: React.FC = () => {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
               </TouchableOpacity>
+
+              <View style={styles.createModalDivider} />
+
+              {/* ── 4e option : Recommander un Spot ──
+                  Format secondaire au plan : un seul lieu + une phrase
+                  perso. Plus léger à publier mais visuellement distinct
+                  dans le feed. CreateSpot est registered au RootStack
+                  (sibling de Main) — on monte d'un niveau via getParent
+                  pour y accéder depuis l'intérieur du BottomTabNavigator. */}
+              <TouchableOpacity
+                style={styles.createModalOption}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  setTimeout(() => {
+                    const rootNav = navigationRef.getParent?.() || navigationRef;
+                    rootNav.navigate('CreateSpot');
+                  }, 180);
+                }}
+              >
+                <View style={[styles.createModalIcon, { backgroundColor: Colors.terracotta50 }]}>
+                  <Ionicons name="bookmark-outline" size={24} color={Colors.primary} />
+                </View>
+                <View style={styles.createModalText}>
+                  <Text style={styles.createModalTitle}>Recommander un spot</Text>
+                  <Text style={styles.createModalDesc}>Un lieu, une phrase, partagé en 30 secondes</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.gray600} />
+              </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
         </View>

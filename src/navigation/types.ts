@@ -64,6 +64,7 @@ export type RootStackParamList = {
   DoItNowComplete: undefined;
   OrganizeComplete: undefined;
   CoPlanWorkspace: { draftId: string };
+  CreateSpot: undefined;
 };
 
 export type BottomTabParamList = {
