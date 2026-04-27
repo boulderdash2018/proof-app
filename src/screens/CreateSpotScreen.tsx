@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts } from '../constants';
-import { useAuthStore } from '../store';
+import { useAuthStore, useFeedStore } from '../store';
 import { useCity } from '../hooks/useCity';
 import {
   searchPlacesAutocomplete,
@@ -126,7 +126,6 @@ export const CreateSpotScreen: React.FC = () => {
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || !pickedPlace || !user) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -148,12 +147,19 @@ export const CreateSpotScreen: React.FC = () => {
         quote: quote.trim(),
         city: cityConfig.name,
       });
-      // Success — back to where the user came from.
+      // Success haptic AFTER the network write succeeds (vs. firing it
+      // optimistically — we want it to confirm completion, not intent).
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      // Refresh the feed's spots so the new one shows up immediately when
+      // the user lands back on the feed (the feed only refetches on city
+      // change otherwise; the profile spots tab refetches on focus).
+      useFeedStore.getState().fetchSpots(cityConfig.name).catch(() => {});
       navigation.goBack();
     } catch (err: any) {
       const msg = err?.message || 'La publication a échoué, réessaye.';
       console.warn('[CreateSpotScreen] createSpot error:', err);
       setSubmitError(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
       setSubmitting(false);
     }

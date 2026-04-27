@@ -39,7 +39,8 @@ import { useGuestStore } from '../store/guestStore';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
-import { Plan, Comment, User } from '../types';
+import { Plan, Comment, User, Spot } from '../types';
+import { SpotCard } from '../components/SpotCard';
 import { fetchComments, addComment } from '../services/plansService';
 import { checkPlaceOpenStatus, PlaceOpenStatus } from '../services/googlePlacesService';
 import { searchUsers } from '../services/friendsService';
@@ -47,6 +48,36 @@ import { detectActiveMention, insertMention, tokenizeComment } from '../utils';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 type FeedTab = 'reco' | 'friends';
+
+/**
+ * Discriminated union for items rendered in the feed FlatList.
+ * Plans are the premium content; Spots are interleaved as a secondary,
+ * lighter format (one spot every 3 plans on the "reco" tab).
+ */
+type FeedItem =
+  | { type: 'plan'; id: string; plan: Plan }
+  | { type: 'spot'; id: string; spot: Spot };
+
+/**
+ * Interleave plans + spots: 1 spot every 3 plans on the reco tab.
+ * Spots appear at positions 3, 7, 11... so plans always lead the feed
+ * (premium content first impression). If we run out of spots, plans
+ * continue uninterrupted.
+ */
+const interleaveFeed = (plans: Plan[], spots: Spot[]): FeedItem[] => {
+  if (plans.length === 0) return [];
+  const items: FeedItem[] = [];
+  let spotIdx = 0;
+  for (let i = 0; i < plans.length; i++) {
+    items.push({ type: 'plan', id: plans[i].id, plan: plans[i] });
+    // After every 3 plans, insert a spot if we have one available
+    if ((i + 1) % 3 === 0 && spotIdx < spots.length) {
+      const s = spots[spotIdx++];
+      items.push({ type: 'spot', id: s.id, spot: s });
+    }
+  }
+  return items;
+};
 
 const getCommentTimeAgo = (dateStr: string): string => {
   const now = Date.now();
@@ -77,7 +108,7 @@ export const FeedScreen: React.FC = () => {
   const { t } = useTranslation();
 
   const {
-    plans, friendsPlans,
+    plans, friendsPlans, spots,
     isLoading, isFriendsLoading,
     likedPlanIds, savedPlanIds,
     fetchFeed, fetchFriendsFeed,
@@ -103,7 +134,7 @@ export const FeedScreen: React.FC = () => {
   const [groupPlan, setGroupPlan] = useState<Plan | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
-  const flatListRef = useRef<FlatList<Plan>>(null);
+  const flatListRef = useRef<FlatList<FeedItem>>(null);
 
   // ── Comment sheet ─────────────────────────────────────────────
   const [commentPlan, setCommentPlan] = useState<Plan | null>(null);
@@ -364,6 +395,15 @@ export const FeedScreen: React.FC = () => {
 
   // ── Derived ───────────────────────────────────────────────────
   const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
+  // Spots are only interleaved on the reco tab — the friends feed stays
+  // exclusively plans from people you mutually follow.
+  const currentItems = React.useMemo<FeedItem[]>(
+    () => activeTab === 'reco'
+      ? interleaveFeed(currentPlans, spots)
+      : currentPlans.map((p) => ({ type: 'plan' as const, id: p.id, plan: p })),
+    [activeTab, currentPlans, spots],
+  );
+  const currentItem = currentItems[currentIndex];
 
   // ── Persist scroll position so the feed keeps its place across focus/blur ──
   useEffect(() => {
@@ -374,13 +414,13 @@ export const FeedScreen: React.FC = () => {
     setLastTab(activeTab);
   }, [activeTab, setLastTab]);
 
-  // ── Restore scroll position once the list has plans + measured height ──
+  // ── Restore scroll position once the list has items + measured height ──
   // Runs only on the very first render where both conditions are met.
   useEffect(() => {
     if (hasRestoredScrollRef.current) return;
-    if (currentPlans.length === 0 || listH === 0) return;
+    if (currentItems.length === 0 || listH === 0) return;
     const target = initialIndices[activeTab] ?? 0;
-    if (target <= 0 || target >= currentPlans.length) {
+    if (target <= 0 || target >= currentItems.length) {
       hasRestoredScrollRef.current = true;
       return;
     }
@@ -390,7 +430,7 @@ export const FeedScreen: React.FC = () => {
       setCurrentIndex(target);
       hasRestoredScrollRef.current = true;
     });
-  }, [currentPlans.length, listH, activeTab, initialIndices]);
+  }, [currentItems.length, listH, activeTab, initialIndices]);
   const currentLoading = activeTab === 'reco' ? isLoading : isFriendsLoading;
 
   const getCoverPhoto = useCallback((plan: Plan): string | undefined => {
@@ -401,43 +441,70 @@ export const FeedScreen: React.FC = () => {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════
-  //  RENDER ITEM — ImmersiveCard with swipe-to-reveal detail
+  //  RENDER ITEM — dispatch on FeedItem type
+  //  - 'plan'  → ImmersiveCard (full-bleed, swipe-to-reveal detail)
+  //  - 'spot'  → SpotCard centered in a full-screen page wrapper
   // ═══════════════════════════════════════════════════════════════
   const renderItem = useCallback(
-    ({ item, index }: { item: Plan; index: number }) => (
-      <ImmersiveCard
-        plan={item}
-        width={SCREEN_W}
-        height={listH}
-        isActive={index === currentIndex}
-        isLiked={likedPlanIds.has(item.id)}
-        isSaved={savedPlanIds.has(item.id)}
-        likesCount={item.likesCount ?? 0}
-        commentsCount={item.commentsCount ?? 0}
-        onLike={() => handleLike(item.id)}
-        onSave={() => handleSave(item.id)}
-        onAuthorPress={() => {
-          if (!requireAuth())
-            navigation.navigate('OtherProfile', { userId: item.authorId });
-        }}
-        onProfilePress={(userId) => {
-          if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
-        }}
-        onDetailStateChange={setIsDetailOpen}
-        onHeaderHideChange={setIsHeaderHidden}
-        onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: item.id })}
-        onComment={() => handleOpenComment(item)}
-        onShare={() => handleShare(item)}
-        onDoItNow={() => handleDoItNow(item)}
-        onGroupPlan={() => {
-          if (requireAuth()) return;
-          setGroupPlan(item);
-        }}
-        onMapPress={() => handleMapPress(item)}
-        onDetailScrollY={handleDetailScrollY}
-      />
-    ),
-    [listH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress, handleDetailScrollY],
+    ({ item, index }: { item: FeedItem; index: number }) => {
+      if (item.type === 'spot') {
+        // Spot page: clear the floating header on top, then vertically center
+        // the card in the remaining space so it reads as its own paginated unit
+        // (not visually anchored to the top edge). The SpotCard provides its
+        // own horizontal margin — wrapper stays edge-to-edge.
+        return (
+          <View
+            style={[
+              styles.spotPage,
+              {
+                width: SCREEN_W,
+                height: listH,
+                paddingTop: (headerH || 100),
+              },
+            ]}
+          >
+            <View style={styles.spotPageInner}>
+              <SpotCard spot={item.spot} />
+            </View>
+          </View>
+        );
+      }
+      const plan = item.plan;
+      return (
+        <ImmersiveCard
+          plan={plan}
+          width={SCREEN_W}
+          height={listH}
+          isActive={index === currentIndex}
+          isLiked={likedPlanIds.has(plan.id)}
+          isSaved={savedPlanIds.has(plan.id)}
+          likesCount={plan.likesCount ?? 0}
+          commentsCount={plan.commentsCount ?? 0}
+          onLike={() => handleLike(plan.id)}
+          onSave={() => handleSave(plan.id)}
+          onAuthorPress={() => {
+            if (!requireAuth())
+              navigation.navigate('OtherProfile', { userId: plan.authorId });
+          }}
+          onProfilePress={(userId) => {
+            if (!requireAuth()) navigation.navigate('OtherProfile', { userId });
+          }}
+          onDetailStateChange={setIsDetailOpen}
+          onHeaderHideChange={setIsHeaderHidden}
+          onPlacePress={(placeId) => navigation.navigate('PlaceDetail', { placeId, planId: plan.id })}
+          onComment={() => handleOpenComment(plan)}
+          onShare={() => handleShare(plan)}
+          onDoItNow={() => handleDoItNow(plan)}
+          onGroupPlan={() => {
+            if (requireAuth()) return;
+            setGroupPlan(plan);
+          }}
+          onMapPress={() => handleMapPress(plan)}
+          onDetailScrollY={handleDetailScrollY}
+        />
+      );
+    },
+    [listH, headerH, currentIndex, likedPlanIds, savedPlanIds, requireAuth, handleLike, handleSave, handleOpenComment, handleShare, handleDoItNow, handleMapPress, handleDetailScrollY],
   );
 
   // ══════════════════════════════════════════════════════════════
@@ -574,11 +641,11 @@ export const FeedScreen: React.FC = () => {
         ]}
         onLayout={(e) => setListH(e.nativeEvent.layout.height)}
       >
-        {listH === 0 ? null : currentLoading && currentPlans.length === 0 ? (
+        {listH === 0 ? null : currentLoading && currentItems.length === 0 ? (
           <View style={styles.centeredWrap}>
             <LoadingSkeleton count={1} />
           </View>
-        ) : currentPlans.length === 0 ? (
+        ) : currentItems.length === 0 ? (
           <View style={styles.centeredWrap}>
             <EmptyState
               icon={activeTab === 'reco' ? '🏙️' : '👥'}
@@ -612,9 +679,9 @@ export const FeedScreen: React.FC = () => {
               horizontal
               pagingEnabled
               scrollEnabled={!isDetailOpen}
-              data={currentPlans}
+              data={currentItems}
               renderItem={renderItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => `${item.type}-${item.id}`}
               showsHorizontalScrollIndicator={false}
               windowSize={3}
               initialNumToRender={1}
@@ -632,11 +699,12 @@ export const FeedScreen: React.FC = () => {
         )}
       </View>
 
-      {/* ─── Sticky CTA bar — visible only when a card is in detail
-            mode. Lives at screen level (not inside the card) so it never gets
-            clipped by the card's overflow:hidden + borderRadius.
+      {/* ─── Sticky CTA bar — visible only when a PLAN card is in detail
+            mode (spots have their own dedicated CTAs). Lives at screen level
+            (not inside the card) so it never gets clipped by the card's
+            overflow:hidden + borderRadius.
             Two actions: solo "Do it now" (primary) + "À plusieurs" (outline). */}
-      {isDetailOpen && currentPlans[currentIndex] && (
+      {isDetailOpen && currentItem?.type === 'plan' && (
         <View
           style={[styles.feedStickyCtaBar, { paddingBottom: insets.bottom + 12 }]}
           pointerEvents="box-none"
@@ -645,7 +713,7 @@ export const FeedScreen: React.FC = () => {
             style={styles.feedStickyCtaGroupBtn}
             onPress={() => {
               if (requireAuth()) return;
-              setGroupPlan(currentPlans[currentIndex]);
+              setGroupPlan(currentItem.plan);
             }}
             activeOpacity={0.8}
           >
@@ -654,7 +722,7 @@ export const FeedScreen: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.feedStickyCtaButton}
-            onPress={() => handleDoItNow(currentPlans[currentIndex])}
+            onPress={() => handleDoItNow(currentItem.plan)}
             activeOpacity={0.85}
           >
             <Ionicons name="compass" size={18} color={Colors.textOnAccent} />
@@ -1023,6 +1091,20 @@ const styles = StyleSheet.create({
   },
   listArea: {
     flex: 1,
+  },
+
+  // ── Spot page (full-screen wrapper around the SpotCard) ────────
+  // The SpotCard is a compact ~320px-tall card. We center it vertically
+  // in the space below the floating header so it reads as its own
+  // paginated unit, distinct from the full-bleed ImmersiveCard for
+  // plans. Soft cream background reinforces the "secondary, lighter"
+  // hierarchy. SpotCard owns its horizontal margin — wrapper edge-to-edge.
+  spotPage: {
+    backgroundColor: Colors.bgPrimary,
+  },
+  spotPageInner: {
+    flex: 1,
+    justifyContent: 'center',
   },
 
   // ── Loading / Empty ────────────────────────────────────────

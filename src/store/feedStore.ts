@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Plan, SavedPlan } from '../types';
+import { Plan, SavedPlan, Spot } from '../types';
 import analytics from '../services/analyticsUtils';
 import {
   fetchFeedPlans,
@@ -9,6 +9,7 @@ import {
   savePlan as savePlanFS,
   unsavePlan as unsavePlanFS,
 } from '../services/plansService';
+import { fetchFeedSpots } from '../services/spotsService';
 import { getFriendIds, getMutualFollowIds, getFollowingIds } from '../services/friendsService';
 import { useSavesStore } from './savesStore';
 import { useAuthStore } from './authStore';
@@ -23,6 +24,8 @@ type FeedTab = 'reco' | 'friends';
 interface FeedStore {
   plans: Plan[];
   friendsPlans: Plan[];
+  /** Spots du feed reco — interleave côté UI 1 toutes les 3 cartes. */
+  spots: Spot[];
   isLoading: boolean;
   isRefreshing: boolean;
   isFriendsLoading: boolean;
@@ -38,6 +41,7 @@ interface FeedStore {
   refreshFeed: (guestInterests?: string[], city?: string) => Promise<void>;
   fetchFriendsFeed: (city?: string) => Promise<void>;
   refreshFriendsFeed: (city?: string) => Promise<void>;
+  fetchSpots: (city?: string) => Promise<void>;
   addPlan: (plan: Plan) => void;
   toggleLike: (planId: string) => void;
   toggleSave: (planId: string) => void;
@@ -48,6 +52,7 @@ interface FeedStore {
 export const useFeedStore = create<FeedStore>((set, get) => ({
   plans: [],
   friendsPlans: [],
+  spots: [],
   isLoading: false,
   isRefreshing: false,
   isFriendsLoading: false,
@@ -72,7 +77,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const uid = userId || getCurrentUserId();
     set({ isLoading: true });
     try {
-      let plans = await fetchFeedPlans(city);
+      const [plansRaw, spots] = await Promise.all([
+        fetchFeedPlans(city),
+        fetchFeedSpots(city).catch((e) => { console.error('fetchFeedSpots error:', e); return []; }),
+      ]);
+      let plans = plansRaw;
 
       if (uid) {
         const [likedIds, savedIds, friendIds, followingIds] = await Promise.all([
@@ -86,7 +95,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         plans = plans.filter((p) =>
           !p.author?.isPrivate || p.authorId === uid || followingSet.has(p.authorId)
         );
-        set({ plans, isLoading: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
+        set({ plans, spots, isLoading: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
       } else {
         // Not logged in: filter out all private plans
         plans = plans.filter((p) => !p.author?.isPrivate);
@@ -97,7 +106,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
             p.tags.some((tag) => interestsLower.includes(tag.toLowerCase()))
           );
         }
-        set({ plans, isLoading: false } as any);
+        set({ plans, spots, isLoading: false } as any);
       }
     } catch (err) {
       console.error('fetchFeed error:', err);
@@ -109,7 +118,11 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const uid = getCurrentUserId();
     set({ isRefreshing: true });
     try {
-      let plans = await fetchFeedPlans(city);
+      const [plansRaw, spots] = await Promise.all([
+        fetchFeedPlans(city),
+        fetchFeedSpots(city).catch((e) => { console.error('fetchFeedSpots error:', e); return []; }),
+      ]);
+      let plans = plansRaw;
 
       if (uid) {
         const [likedIds, savedIds, friendIds, followingIds] = await Promise.all([
@@ -122,7 +135,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         plans = plans.filter((p) =>
           !p.author?.isPrivate || p.authorId === uid || followingSet.has(p.authorId)
         );
-        set({ plans, isRefreshing: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
+        set({ plans, spots, isRefreshing: false, likedPlanIds: likedIds, savedPlanIds: savedIds } as any);
       } else {
         plans = plans.filter((p) => !p.author?.isPrivate);
         if (guestInterests && guestInterests.length > 0) {
@@ -131,10 +144,19 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
             p.tags.some((tag) => interestsLower.includes(tag.toLowerCase()))
           );
         }
-        set({ plans, isRefreshing: false } as any);
+        set({ plans, spots, isRefreshing: false } as any);
       }
     } catch {
       set({ isRefreshing: false });
+    }
+  },
+
+  fetchSpots: async (city?: string) => {
+    try {
+      const spots = await fetchFeedSpots(city);
+      set({ spots });
+    } catch (err) {
+      console.error('fetchSpots error:', err);
     }
   },
 

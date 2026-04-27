@@ -5,13 +5,14 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton, LoadingSkeleton } from '../components';
+import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton, LoadingSkeleton, SpotCard } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
-import { User, Plan } from '../types';
+import { User, Plan, Spot } from '../types';
 import { useAuthStore, useFriendsStore, useChatStore } from '../store';
 import { getUserById, getFollowStatus, isFollowingUser, getFollowerIds, getFollowingIds, followUser, unfollowUser, sendFollowRequest, getPendingRequestId } from '../services/friendsService';
 import { fetchUserPlans, fetchSavedPlans } from '../services/plansService';
+import { fetchSpotsByUser } from '../services/spotsService';
 import type { ConversationParticipant } from '../services/chatService';
 
 type FollowStatus = 'none' | 'following' | 'requested';
@@ -49,8 +50,9 @@ export const OtherProfileScreen: React.FC = () => {
   const [theyFollowMe, setTheyFollowMe] = useState(false);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [userPlans, setUserPlans] = useState<Plan[]>([]);
+  const [userSpots, setUserSpots] = useState<Spot[]>([]);
   const [doneByUserPlans, setDoneByUserPlans] = useState<Plan[]>([]);
-  const [activeTab, setActiveTab] = useState<'created' | 'done'>('created');
+  const [activeTab, setActiveTab] = useState<'created' | 'spots' | 'done'>('created');
   const [otherFollowersCount, setOtherFollowersCount] = useState(0);
   const [otherFollowingCount, setOtherFollowingCount] = useState(0);
   const C = useColors();
@@ -79,6 +81,7 @@ export const OtherProfileScreen: React.FC = () => {
     // Check if they follow us (for "follow back" label)
     isFollowingUser(userId, currentUser.id).then(setTheyFollowMe);
     fetchUserPlans(userId).then(setUserPlans);
+    fetchSpotsByUser(userId).then(setUserSpots).catch(() => setUserSpots([]));
     // "Plans faits" — saves with isDone, excluding their own plans
     fetchSavedPlans(userId)
       .then((saves) =>
@@ -313,6 +316,21 @@ export const OtherProfileScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.tabBtn}
+                onPress={() => setActiveTab('spots')}
+                activeOpacity={0.7}
+                accessibilityLabel="Spots recommandés"
+              >
+                <Ionicons
+                  name={activeTab === 'spots' ? 'sparkles' : 'sparkles-outline'}
+                  size={22}
+                  color={activeTab === 'spots' ? C.black : C.gray500}
+                />
+                {activeTab === 'spots' && (
+                  <View style={[styles.tabUnderline, { backgroundColor: C.primary }]} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.tabBtn}
                 onPress={() => setActiveTab('done')}
                 activeOpacity={0.7}
                 accessibilityLabel="Plans faits"
@@ -328,7 +346,24 @@ export const OtherProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {activeTab === 'created' ? (
+            {activeTab === 'spots' ? (
+              userSpots.length > 0 ? (
+                <View style={styles.spotsList}>
+                  {userSpots.map((spot) => (
+                    <View key={spot.id}>
+                      <SpotCard spot={spot} />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptySpots}>
+                  <Ionicons name="sparkles-outline" size={36} color={C.gray500} />
+                  <Text style={[styles.emptyPlansText, { color: C.gray600 }]}>
+                    Aucun spot recommandé
+                  </Text>
+                </View>
+              )
+            ) : activeTab === 'created' ? (
               userPlans.length > 0 ? (
                 <View style={styles.instaGrid}>
                   {(() => {
@@ -612,6 +647,18 @@ const styles = StyleSheet.create({
   },
   emptyPlansText: {
     fontSize: 14,
+  },
+  // Spots tab — vertical stack of SpotCards with breathing room
+  // for the flip mechanic.
+  spotsList: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 14,
+    gap: 16,
+  } as any,
+  emptySpots: {
+    paddingVertical: 50,
+    alignItems: 'center',
+    gap: 10,
   },
 
   // Private section

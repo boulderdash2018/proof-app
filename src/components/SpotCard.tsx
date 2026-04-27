@@ -351,7 +351,10 @@ function truncate(str: string, max: number): string {
 // Styles
 // ══════════════════════════════════════════════════════════════
 
-const CARD_HEIGHT = 240;
+// Hauteur alignée sur les Plans dans le feed (~même poids visuel) —
+// la différenciation vient du flip mechanic, du strip eyebrow "SPOT"
+// et du footer custom, PAS d'être plus petit.
+const CARD_HEIGHT = 320;
 
 const styles = StyleSheet.create({
   wrap: {
@@ -529,20 +532,21 @@ const styles = StyleSheet.create({
   },
   quoteOpen: {
     position: 'absolute',
-    top: -6,
-    left: -2,
-    fontSize: 56,
-    lineHeight: 56,
+    top: -10,
+    left: -4,
+    fontSize: 72,
+    lineHeight: 72,
     fontFamily: Fonts.displaySemiBold,
     color: Colors.terracotta200,
   },
   quoteText: {
-    paddingLeft: 22,
-    fontSize: 16.5,
-    lineHeight: 23,
+    paddingLeft: 28,
+    paddingTop: 6,
+    fontSize: 19,
+    lineHeight: 27,
     fontFamily: Fonts.displayItalic,
     color: Colors.textPrimary,
-    letterSpacing: -0.15,
+    letterSpacing: -0.2,
   },
 
   backActions: {

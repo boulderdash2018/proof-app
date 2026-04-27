@@ -17,12 +17,14 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, BadgeGrid, FounderBadge } from '../components';
+import { Avatar, RankBadge, BadgeGrid, FounderBadge, SpotCard } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { getFollowerIds, getFollowingIds, migrateToFollows } from '../services/friendsService';
 import { fetchUserPlans } from '../services/plansService';
+import { fetchSpotsByUser } from '../services/spotsService';
+import { Spot } from '../types';
 import { checkAndUnlockBadges } from '../services/badgeService';
 import { useLanguageStore } from '../store/languageStore';
 
@@ -58,6 +60,7 @@ export const ProfileScreen: React.FC = () => {
   const C = useColors();
   const { t } = useTranslation();
   const [userPlans, setUserPlans] = useState<any[]>([]);
+  const [userSpots, setUserSpots] = useState<Spot[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
@@ -68,6 +71,7 @@ export const ProfileScreen: React.FC = () => {
     if (user) {
       migrateToFollows(user.id).catch(() => {});
       fetchUserPlans(user.id).then(setUserPlans);
+      fetchSpotsByUser(user.id).then(setUserSpots).catch(() => {});
       fetchIncomingRequests(user.id);
       getFollowerIds(user.id).then(ids => setFollowersCount(ids.length));
       getFollowingIds(user.id).then(ids => setFollowingCount(ids.length));
@@ -87,6 +91,7 @@ export const ProfileScreen: React.FC = () => {
         getFollowingIds(user.id).then(ids => setFollowingCount(ids.length));
         fetchIncomingRequests(user.id);
         fetchUserPlans(user.id).then(setUserPlans);
+        fetchSpotsByUser(user.id).then(setUserSpots).catch(() => {});
         fetchSaves(user.id);
         checkAndUnlockBadges(user.id, user).then(({ allBadges, totalProofs: tp }) => {
           setUnlockedAchievements(allBadges);
@@ -99,8 +104,8 @@ export const ProfileScreen: React.FC = () => {
   const donePlans = savedPlans.filter((sp) => sp.isDone && sp.plan?.author?.id !== user?.id);
   const todoPlans = savedPlans.filter((sp) => !sp.isDone);
 
-  // Profile tabs
-  const [profileTab, setProfileTab] = useState<'plans' | 'drafts' | 'badges'>('plans');
+  // Profile tabs — "spots" is the lightweight format alongside plans (premium content)
+  const [profileTab, setProfileTab] = useState<'plans' | 'spots' | 'drafts' | 'badges'>('plans');
   const [draftCategory, setDraftCategory] = useState<'publish' | 'organize' | null>(null);
 
   // Compute real stats from fetched plans
@@ -268,10 +273,11 @@ export const ProfileScreen: React.FC = () => {
 
         {/* ═══ Tab bar ═══ */}
         <View style={[styles.profileTabBar, { borderBottomColor: Colors.borderSubtle }]}>
-          {(['plans', 'drafts', 'badges'] as const).map((tab) => {
+          {(['plans', 'spots', 'drafts', 'badges'] as const).map((tab) => {
             const isActive = profileTab === tab;
             const iconMap: Record<string, { active: string; inactive: string }> = {
               plans: { active: 'map', inactive: 'map-outline' },
+              spots: { active: 'sparkles', inactive: 'sparkles-outline' },
               drafts: { active: 'document-text', inactive: 'document-text-outline' },
               badges: { active: 'ribbon', inactive: 'ribbon-outline' },
             };
@@ -327,6 +333,35 @@ export const ProfileScreen: React.FC = () => {
               <View style={styles.emptyTab}>
                 <Ionicons name="map-outline" size={36} color={Colors.textTertiary} />
                 <Text style={[styles.emptyTabText, { color: Colors.textSecondary }]}>Aucun plan pour le moment</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {profileTab === 'spots' && (
+          <>
+            {userSpots.length > 0 ? (
+              <View style={styles.spotsList}>
+                {userSpots.map((spot) => (
+                  <View key={spot.id} style={styles.spotsListItem}>
+                    <SpotCard spot={spot} />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyTab}>
+                <Ionicons name="sparkles-outline" size={36} color={Colors.textTertiary} />
+                <Text style={[styles.emptyTabText, { color: Colors.textSecondary }]}>
+                  Aucun spot recommandé pour le moment
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyTabCta}
+                  onPress={() => navigation.navigate('CreateSpot')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="add" size={16} color={Colors.textOnAccent} />
+                  <Text style={styles.emptyTabCtaText}>Recommander un spot</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
@@ -514,6 +549,26 @@ const styles = StyleSheet.create({
   profileTabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
   emptyTab: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50, gap: 10 },
   emptyTabText: { fontSize: 14, fontFamily: Fonts.body },
+  emptyTabCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: Colors.primary,
+  } as any,
+  emptyTabCtaText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.1,
+  },
+  // Spots tab — vertical stack of SpotCards, each in a full-width container
+  // with comfortable padding so the flip mechanic has room to breathe.
+  spotsList: { paddingHorizontal: Layout.screenPadding, paddingTop: 14, gap: 16 } as any,
+  spotsListItem: {},
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
   sectionLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   completionSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 16, paddingBottom: 4 },
