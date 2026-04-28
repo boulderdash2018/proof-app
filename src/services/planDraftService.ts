@@ -108,14 +108,41 @@ export const createPlanDraft = async (input: CreateDraftInput): Promise<string> 
     updatedAt: serverTimestamp(),
   };
 
-  // 1) Create the draft doc
+  // Création du brouillon SANS conversation associée. La conversation est
+  // créée explicitement plus tard quand le créateur clique "Créer le groupe"
+  // dans le workspace (cf. shareDraftAsGroup ci-dessous). Cela évite que
+  // toutes les actions de la phase de préparation (a proposé, a retiré, …)
+  // partent dans le chat en boucle avant même qu'il soit partagé.
   const ref = await addDoc(collection(db, DRAFTS), payload);
+  return ref.id;
+};
 
-  // 2) Spin up the linked group conversation IMMEDIATELY so participants can
-  //    chat while organizing. The conv is enriched with linkedPlanId at lock
-  //    time (see lockDraft → attachPlanToConversation), but starts plan-less
-  //    so the chat UI is usable from minute one.
+// ══════════════════════════════════════════════════════════════
+// Group sharing — convertit un brouillon "solo" en groupe avec chat.
+// Idempotent : si le brouillon a déjà une conv, on n'en crée pas une
+// deuxième et on ne re-post pas le message d'annonce. Renvoie l'id de
+// la conversation (existante ou nouvelle).
+// ══════════════════════════════════════════════════════════════
+
+export const shareDraftAsGroup = async (
+  draftId: string,
+): Promise<string | null> => {
   try {
+    const ref = doc(db, DRAFTS, draftId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data() as any;
+    const existing = data.conversationId || data.publishedConvId;
+    if (existing) return existing; // déjà partagé — no-op idempotent
+
+    const details: Record<string, CoPlanParticipant> | undefined = data.participantDetails;
+    const participants: string[] | undefined = data.participants;
+    if (!details || !participants || participants.length === 0) return null;
+
+    const creatorId: string = data.createdBy;
+    const creator = details[creatorId];
+    if (!creator) return null;
+
     const me: ConversationParticipant = {
       userId: creator.userId,
       displayName: creator.displayName,
@@ -125,30 +152,40 @@ export const createPlanDraft = async (input: CreateDraftInput): Promise<string> 
       avatarColor: creator.avatarColor,
       initials: creator.initials,
     };
-    const others: ConversationParticipant[] = invitees.map((p) => ({
-      userId: p.userId,
-      displayName: p.displayName,
-      username: p.username,
-      avatarUrl: p.avatarUrl,
-      avatarBg: p.avatarBg,
-      avatarColor: p.avatarColor,
-      initials: p.initials,
-    }));
+    const others: ConversationParticipant[] = participants
+      .filter((id) => id !== creatorId)
+      .map((id) => details[id])
+      .filter(Boolean)
+      .map((p) => ({
+        userId: p.userId,
+        displayName: p.displayName,
+        username: p.username,
+        avatarUrl: p.avatarUrl,
+        avatarBg: p.avatarBg,
+        avatarColor: p.avatarColor,
+        initials: p.initials,
+      }));
+
     const conversationId = await createGroupConversation({
       creator: me,
       otherParticipants: others,
-      groupName: cleanTitle,
-      // No plan + no meetupAt yet — those land at lock time.
-      linkedDraftId: ref.id,
+      groupName: data.title || 'Brouillon',
+      linkedDraftId: draftId,
     });
-    // Link the conv id back onto the draft for easy retrieval.
     await updateDoc(ref, { conversationId, updatedAt: serverTimestamp() });
-  } catch (err) {
-    // Non-fatal — draft is usable without the conv (degraded but workable).
-    console.warn('[planDraftService] could not seed conversation for draft:', err);
-  }
+    // Le chat démarre propre : createGroupConversation a déjà posté un
+    // unique message system 'group_created' ("X a créé le groupe"). On NE
+    // rejoue PAS l'historique des actions du créateur — c'est précisément
+    // ce que le user voulait éviter ("ce qui est passé dans la tête de
+    // celui qui publie est de la nuisance"). Les modifications ULTÉRIEURES
+    // (proposePlace, removePlace…) sont mirror normalement puisque le
+    // draft a maintenant un conversationId — ce qui est cohérent.
 
-  return ref.id;
+    return conversationId;
+  } catch (err) {
+    console.warn('[planDraftService] shareDraftAsGroup error:', err);
+    return null;
+  }
 };
 
 /**

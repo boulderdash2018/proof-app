@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { backfillConversationForDraft } from '../services/planDraftService';
+import { backfillConversationForDraft, shareDraftAsGroup } from '../services/planDraftService';
 import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts } from '../components';
 
 /**
@@ -48,6 +48,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
 
   // Lock confirm sheet state
   const [lockOpen, setLockOpen] = useState(false);
+  // "Créer le groupe" loading state — quand on partage le brouillon
+  // initialement (avant qu'il ait une conversation associée).
+  const [sharing, setSharing] = useState(false);
 
   // Observe the draft while mounted — also starts presence heartbeat.
   useEffect(() => {
@@ -57,16 +60,16 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   }, [draftId, user?.id, observeDraft, stopObserving]);
 
   // Lazy backfill — runs idempotently on every mount for the creator.
-  // Two cases it handles:
-  //   1. Legacy drafts without `conversationId` → creates the group conv.
-  //   2. Drafts whose conv pre-dates the `linkedDraftId` field → patches
-  //      it on the existing conv so the chat side can render the
-  //      "Brouillon en cours" banner.
-  // Only the creator triggers it to avoid duplicate convs / write races
-  // if multiple participants open the workspace at the same instant.
+  // IMPORTANT (UX fix) : on n'auto-crée PLUS la conv pour un brouillon
+  // sans conversationId. Le créateur doit explicitement cliquer "Créer
+  // le groupe" pour partager — ça évite que toutes ses actions de la
+  // phase de préparation finissent dans le chat. Le backfill ne sert
+  // donc plus qu'à patcher `linkedDraftId` sur les convs existantes
+  // pré-feature (drafts legacy qui ont déjà une conv).
   useEffect(() => {
     if (!draft || !user?.id) return;
     if (draft.createdBy !== user.id) return;
+    if (!draft.conversationId && !draft.publishedConvId) return; // pas de conv → pas de backfill
     backfillConversationForDraft(draft.id).catch((err) => {
       console.warn('[CoPlanWorkspaceScreen] backfill failed:', err);
     });
@@ -101,6 +104,31 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   const lockMissingHint = !canLock
     ? 'Ajoute au moins un lieu pour activer.'
     : null;
+
+  // ── Stage du brouillon ─────────────────────────────────────
+  // - "solo" : pas encore de conv → CTA "Créer le groupe" (partage initial)
+  // - "shared" : conv existe → CTA "Lancer le plan" (publier sur le feed)
+  const hasGroup = !!(draft?.conversationId || draft?.publishedConvId);
+
+  // Action : créer le groupe → crée la conv + post un snapshot + nav vers le chat.
+  const handleCreateGroup = async () => {
+    if (!draft || sharing) return;
+    setSharing(true);
+    try {
+      const conversationId = await shareDraftAsGroup(draft.id);
+      if (conversationId) {
+        navigation.reset({
+          index: 0,
+          routes: [
+            { name: 'Main' },
+            { name: 'Conversation', params: { conversationId, otherUser: null } },
+          ] as any,
+        });
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
 
   if (!draft) {
     return (
@@ -208,37 +236,83 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         {/* Summary pills — estimated duration + budget, above the lock section. */}
         <CoPlanSummaryFooter />
 
-        <SectionBlock
-          icon="rocket-outline"
-          label="LANCER LE PLAN"
-          title="Quand le groupe est prêt"
-          subtitle="Le brouillon devient le plan officiel — visible par tout le monde dans la conv et utilisable en session live."
-          muted={!canLock}
-        >
-          <TouchableOpacity
-            style={[styles.lockBtn, !canLock && styles.lockBtnDisabled]}
-            onPress={() => canLock && setLockOpen(true)}
-            activeOpacity={canLock ? 0.85 : 1}
-            disabled={!canLock}
+        {hasGroup ? (
+          // ── Étape 2 : le groupe existe déjà → on peut publier le plan
+          //    sur le feed (visibilité publique, devient un Plan officiel).
+          <SectionBlock
+            icon="rocket-outline"
+            label="LANCER LE PLAN"
+            title="Prêt à publier ?"
+            subtitle="Le brouillon devient un plan officiel — visible dans la conv et utilisable en session live. Vous pouvez aussi le rendre public sur le feed."
+            muted={!canLock}
           >
-            <Ionicons
-              name="rocket"
-              size={16}
-              color={canLock ? Colors.textOnAccent : Colors.textTertiary}
-            />
-            <Text
-              style={[
-                styles.lockBtnText,
-                !canLock && styles.lockBtnTextDisabled,
-              ]}
+            <TouchableOpacity
+              style={[styles.lockBtn, !canLock && styles.lockBtnDisabled]}
+              onPress={() => canLock && setLockOpen(true)}
+              activeOpacity={canLock ? 0.85 : 1}
+              disabled={!canLock}
             >
-              Lancer le plan
-            </Text>
-          </TouchableOpacity>
-          {lockMissingHint && (
-            <Text style={styles.lockHint}>{lockMissingHint}</Text>
-          )}
-        </SectionBlock>
+              <Ionicons
+                name="rocket"
+                size={16}
+                color={canLock ? Colors.textOnAccent : Colors.textTertiary}
+              />
+              <Text
+                style={[
+                  styles.lockBtnText,
+                  !canLock && styles.lockBtnTextDisabled,
+                ]}
+              >
+                Lancer le plan
+              </Text>
+            </TouchableOpacity>
+            {lockMissingHint && (
+              <Text style={styles.lockHint}>{lockMissingHint}</Text>
+            )}
+          </SectionBlock>
+        ) : (
+          // ── Étape 1 : brouillon solo → CTA "Créer le groupe".
+          //    Crée la conv et y poste un snapshot du plan tel qu'il est
+          //    maintenant (sans rejouer toutes les actions de préparation,
+          //    qui sont du bruit pour les invités).
+          <SectionBlock
+            icon="people-outline"
+            label="PARTAGER"
+            title="Quand votre proposition est prête"
+            subtitle="Le groupe sera créé avec votre plan tel qu'il est maintenant. Tout le monde pourra ensuite voter et modifier ensemble."
+            muted={!canLock}
+          >
+            <TouchableOpacity
+              style={[styles.lockBtn, (!canLock || sharing) && styles.lockBtnDisabled]}
+              onPress={() => canLock && !sharing && handleCreateGroup()}
+              activeOpacity={canLock && !sharing ? 0.85 : 1}
+              disabled={!canLock || sharing}
+            >
+              {sharing ? (
+                <ActivityIndicator size="small" color={Colors.textOnAccent} />
+              ) : (
+                <>
+                  <Ionicons
+                    name="people"
+                    size={16}
+                    color={canLock ? Colors.textOnAccent : Colors.textTertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.lockBtnText,
+                      !canLock && styles.lockBtnTextDisabled,
+                    ]}
+                  >
+                    Créer le groupe
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {lockMissingHint && (
+              <Text style={styles.lockHint}>{lockMissingHint}</Text>
+            )}
+          </SectionBlock>
+        )}
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
