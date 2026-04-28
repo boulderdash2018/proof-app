@@ -729,6 +729,18 @@ export const PlanDetailModal: React.FC = () => {
             has proofed yet — the PROOF STATUS BANNER below covers the empty CTA. */}
         {(localProofCount > 0 || isProofedByUser) && (
           <View style={[st.socialProof, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+            {/* Petit éditorial : total "ont fait" — donne le contexte qui rend le
+                ratio Proof/Décliné lisible d'un coup d'œil. Discret (italique tertiary)
+                pour ne pas voler la vedette à la ligne validation juste en dessous. */}
+            {(() => {
+              const totalDid = localProofCount + (plan.declinedCount ?? 0);
+              if (totalDid === 0) return null;
+              return (
+                <Text style={[st.socialProofTotal, { color: Colors.textTertiary }]}>
+                  {totalDid} {totalDid === 1 ? 'personne a fait' : 'personnes ont fait'} ce plan
+                </Text>
+              );
+            })()}
             <View style={st.socialProofTop}>
               <MiniStampIcon type="proof" size={18} />
               <Text style={[st.socialProofText, { color: Colors.textPrimary }]}>
@@ -1414,6 +1426,15 @@ const st = StyleSheet.create({
 
   // Social proof
   socialProof: { marginHorizontal: 16, marginTop: 20, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
+  // Petite phrase éditoriale "X personnes ont fait ce plan" — italique tertiary,
+  // posée juste au-dessus de la ligne validation pour la comparaison visuelle.
+  socialProofTotal: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyMedium,
+    fontStyle: 'italic',
+    letterSpacing: 0.05,
+    marginBottom: 6,
+  },
   socialProofTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   socialProofText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, flex: 1 },
   socialDot: { width: 3, height: 3, borderRadius: 1.5 },
