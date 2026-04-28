@@ -842,6 +842,40 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               ) : null}
             </Animated.View>
 
+            {/* ═══════ Social proof — total "ont fait" + validation count ═══════
+                Identique à PlanDetailModal : petite phrase italique tertiary qui
+                donne le total (proof + déclinés), suivie de la ligne validation
+                avec stamps. La proximité visuelle des deux nombres permet la
+                comparaison instantanée "fait" ↔ "proof". */}
+            {(plan.proofCount ?? 0) > 0 && (
+              <Animated.View
+                style={[styles.socialProofRow, { opacity: d1.opacity, transform: [{ translateY: d1.translateY }] }]}
+              >
+                {(() => {
+                  const totalDid = (plan.proofCount ?? 0) + (plan.declinedCount ?? 0);
+                  if (totalDid === 0) return null;
+                  return (
+                    <Text style={styles.socialProofTotal}>
+                      {totalDid} {totalDid === 1 ? 'personne a fait' : 'personnes ont fait'} ce plan
+                    </Text>
+                  );
+                })()}
+                <View style={styles.socialProofMain}>
+                  <MiniStampIcon type="proof" size={16} />
+                  <Text style={styles.socialProofText}>
+                    {plan.proofCount} {plan.proofCount === 1 ? "personne l'a" : "personnes l'ont"} vérifié sur Proof.
+                  </Text>
+                  {(plan.declinedCount ?? 0) > 0 && (
+                    <>
+                      <View style={styles.socialProofDot} />
+                      <MiniStampIcon type="declined" size={16} />
+                      <Text style={styles.socialProofDeclined}>{plan.declinedCount}</Text>
+                    </>
+                  )}
+                </View>
+              </Animated.View>
+            )}
+
             {/* ═══════ Tags (moved here — shown right after metrics for instant glance) ═══════ */}
             {plan.tags && plan.tags.length > 0 ? (
               <Animated.View
@@ -1281,6 +1315,45 @@ const styles = StyleSheet.create({
     width: 1,
     height: 18,
     backgroundColor: Colors.borderSubtle,
+  },
+
+  // ── Social proof block (entre metrics et tags) ──
+  // Aligné sur le padding horizontal des métriques pour rester dans la grille.
+  socialProofRow: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  // Petite phrase éditoriale "X personnes ont fait ce plan" — italique tertiary,
+  // posée juste au-dessus de la ligne validation pour la comparaison visuelle.
+  socialProofTotal: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyMedium,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+    letterSpacing: 0.05,
+    marginBottom: 6,
+  },
+  socialProofMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  } as any,
+  socialProofText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  socialProofDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textTertiary,
+  },
+  socialProofDeclined: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
   },
 
   // ── SECTION 3: Tip pull-quote ──
