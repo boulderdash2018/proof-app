@@ -192,16 +192,21 @@ export const fetchFeedSpots = async (
   }
 };
 
-/** Spots posté par un user (pour le profil — onglet "Spots"). */
+/** Spots posté par un user (pour le profil — onglet "Spots").
+ *  IMPORTANT : on évite intentionnellement le `orderBy('createdAt')` ici
+ *  parce que la combo `where(recommenderId) + orderBy(createdAt)` exige
+ *  un index composite Firestore. Trier côté client est négligeable
+ *  (un user a typiquement <50 spots) et ça évite le déploiement d'index. */
 export const fetchSpotsByUser = async (userId: string): Promise<Spot[]> => {
   try {
     const q = query(
       collection(db, SPOTS),
       where('recommenderId', '==', userId),
-      orderBy('createdAt', 'desc'),
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => hydrateSpot(d.id, d.data()));
+    const spots = snap.docs.map((d) => hydrateSpot(d.id, d.data()));
+    // Tri client-side : plus récent → plus ancien
+    return spots.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (err) {
     console.warn('[spotsService] fetchSpotsByUser error:', err);
     return [];

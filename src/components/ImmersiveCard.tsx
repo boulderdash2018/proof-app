@@ -897,7 +897,12 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     <TouchableOpacity
                       style={styles.timelineStep}
                       activeOpacity={0.7}
-                      onPress={() => onPlacePress(place.id)}
+                      // Préfère le googlePlaceId pour que PlaceDetailModal
+                      // puisse hit l'API Google direct ; fallback sur l'UUID
+                      // interne pour les plans legacy (mockApi). Sans ça,
+                      // le modal affichait "lieu introuvable" sur tous les
+                      // plans Firestore.
+                      onPress={() => onPlacePress(place.googlePlaceId || place.id)}
                     >
                       <View style={styles.timelineLeft}>
                         <View style={styles.timelineNodeHalo}>
