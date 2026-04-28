@@ -23,6 +23,7 @@ import {
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 import { createPlan } from '../services/plansService';
+import { getPlaceDetails } from '../services/googlePlacesService';
 import { attachPlanToConversation, createGroupConversation, postSystemEvent, ConversationParticipant, SystemEvent } from '../services/chatService';
 import { useAuthStore } from './authStore';
 import { Place, CategoryTag, TransportMode, CoAuthor } from '../types';
@@ -553,22 +554,39 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       const best = get().getBestOverlapSlot();
       const meetupAt = best ? slotKeyToMeetupAt(best.key) : null;
 
-      // 2) Build places in manual order.
+      // 2) Build places in manual order. Enrichit chaque lieu avec les
+      //    données Google (rating, reviewCount, photos additionnelles)
+      //    en parallèle — sinon le PlanDetail s'affiche avec "★ 0 (0 avis)"
+      //    et c'est moche. Les fetches sont best-effort : si un échoue,
+      //    on retombe sur les snapshots locaux du brouillon.
       const sortedPlaces = get().getSortedPlaces();
-      const planPlaces: Place[] = sortedPlaces.map((p) => ({
+      const enriched = await Promise.all(
+        sortedPlaces.map(async (p) => {
+          try {
+            const g = await getPlaceDetails(p.googlePlaceId);
+            return { p, g };
+          } catch {
+            return { p, g: null };
+          }
+        }),
+      );
+      const planPlaces: Place[] = enriched.map(({ p, g }) => ({
         id: `place-${p.googlePlaceId}-${Math.random().toString(36).slice(2, 8)}`,
         googlePlaceId: p.googlePlaceId,
         name: p.name,
         type: p.category || 'Lieu',
         address: p.address,
-        rating: 0,
-        reviewCount: 0,
+        rating: g?.rating ?? 0,
+        reviewCount: g?.reviewCount ?? 0,
         ratingDistribution: [0, 0, 0, 0, 0],
         reviews: [],
-        photoUrls: p.photoUrl ? [p.photoUrl] : [],
-        priceLevel: p.priceLevel,
-        latitude: p.latitude,
-        longitude: p.longitude,
+        // Combine snapshot photo + extra Google photos (sans doublon).
+        photoUrls: Array.from(
+          new Set([p.photoUrl, ...(g?.photoUrls || [])].filter(Boolean) as string[]),
+        ),
+        priceLevel: p.priceLevel ?? g?.priceLevel,
+        latitude: p.latitude ?? g?.latitude,
+        longitude: p.longitude ?? g?.longitude,
       }));
 
       // 3) Coarse category tag from the first place's category.

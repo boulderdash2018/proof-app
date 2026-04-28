@@ -860,7 +860,11 @@ export const PlanDetailModal: React.FC = () => {
 
                   <TouchableOpacity
                     style={[st.placeCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
-                    onPress={() => navigation.navigate('PlaceDetail', { placeId: place.id, planId: plan.id })}
+                    // Préfère le googlePlaceId pour que PlaceDetailModal hit
+                    // l'API Google direct (rating, photos, reviews live). Le
+                    // fallback sur place.id reste pour les plans legacy
+                    // (mockApi) qui n'ont pas de googlePlaceId.
+                    onPress={() => navigation.navigate('PlaceDetail', { placeId: place.googlePlaceId || place.id, planId: plan.id })}
                     activeOpacity={0.7}
                   >
                     {placePhoto && <Image source={{ uri: placePhoto }} style={st.placeCardImg} />}
