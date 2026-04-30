@@ -1,6 +1,7 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Animated,
+  Easing,
   StyleSheet,
   View,
   Text,
@@ -120,6 +121,24 @@ export const SpotCard: React.FC<Props> = ({ spot }) => {
     outputRange: [0, 0, 1, 1],
   });
 
+  // ── Pulse subtil sur l'icône ↻ pour inviter le tap (boucle douce,
+  // s'arrête quand la carte est retournée pour ne pas distraire). ──
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (flipped) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.delay(600),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [flipped, pulse]);
+  const pulseRotate = pulse.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+  const pulseOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+
   // ── Display helpers ──
   const meta = formatPlaceMeta(spot.placeCategory, spot.placeAddress);
   const recommenderFirstName =
@@ -143,7 +162,7 @@ export const SpotCard: React.FC<Props> = ({ spot }) => {
         pointerEvents={flipped ? 'none' : 'auto'}
       >
         <Pressable onPress={toggleFlip} style={styles.cardInner}>
-          {/* Eyebrow strip — distingue clairement Spot vs Plan */}
+          {/* ── Eyebrow — terracotta strip qui crie "c'est un SPOT" ── */}
           <View style={styles.eyebrowStrip}>
             <View style={styles.dotLive} />
             <Text style={styles.eyebrowLabel}>SPOT · recommandé par {recommenderFirstName}</Text>
@@ -160,51 +179,61 @@ export const SpotCard: React.FC<Props> = ({ spot }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Hero image */}
-          <View style={styles.hero}>
-            {spot.photoUrl ? (
-              <Image source={{ uri: spot.photoUrl }} style={styles.heroImage} />
-            ) : (
-              <LinearGradient
-                colors={[Colors.terracotta300, Colors.terracotta700]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            )}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.78)']}
-              locations={[0, 0.45, 1]}
-              style={styles.heroFade}
-            />
+          {/* ── Polaroid — photo encadrée d'un cadre blanc + légende
+                en dessous (titre + meta). Différence visuelle claire avec
+                les Plans qui ont leur titre OVERLAY sur la photo. ── */}
+          <View style={styles.polaroidWrap}>
+            <View style={styles.polaroid}>
+              <View style={styles.photoFrame}>
+                {spot.photoUrl ? (
+                  <Image source={{ uri: spot.photoUrl }} style={styles.photo} />
+                ) : (
+                  <LinearGradient
+                    colors={[Colors.terracotta300, Colors.terracotta700]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                )}
+              </View>
 
-            {/* Tap zone DÉDIÉE pour le titre — propage pas au flip */}
-            <Pressable
-              onPress={handleOpenPlace}
-              style={styles.heroTitleZone}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Text style={styles.heroTitle} numberOfLines={1}>
-                {spot.placeName}
-              </Text>
-              {meta && (
-                <Text style={styles.heroMeta} numberOfLines={1}>
-                  {meta}
+              {/* Légende — titre + meta sous la photo, comme une vraie
+                  polaroid manuscrite. Tap dédié → PlaceDetail. */}
+              <Pressable
+                onPress={handleOpenPlace}
+                style={styles.captionZone}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Text style={styles.caption} numberOfLines={1}>
+                  {spot.placeName}
                 </Text>
-              )}
-            </Pressable>
+                {meta && (
+                  <Text style={styles.captionMeta} numberOfLines={1}>
+                    {meta}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
           </View>
 
-          {/* Footer — saved count + flip hint */}
-          <View style={styles.footer}>
-            <Text style={styles.footerSaved}>
-              {savedCount > 0
-                ? `${savedCount} ${savedCount > 1 ? 'ont' : 'a'} sauvegardé`
-                : 'Sois le premier à sauvegarder'}
-            </Text>
-            <View style={styles.flipHintRow}>
-              <Text style={styles.flipHint}>la phrase de {recommenderFirstName}</Text>
-              <Ionicons name="sync" size={12} color={Colors.primary} />
+          {/* ── Footer CTA — barre prominente "↻ Retourner pour lire" ──
+                Plus de "petit hint" en bas comme avant : maintenant c'est
+                la principale affordance d'interaction du card. */}
+          <View style={styles.flipCtaBar}>
+            <View style={styles.flipCtaLeft}>
+              <Text style={styles.flipCtaSavedCount}>
+                {savedCount > 0
+                  ? `${savedCount} ${savedCount > 1 ? 'ont' : 'a'} sauvegardé`
+                  : 'Sois le premier à sauvegarder'}
+              </Text>
+            </View>
+            <View style={styles.flipCtaRight}>
+              <Animated.View style={{ transform: [{ rotate: pulseRotate }], opacity: pulseOpacity }}>
+                <Ionicons name="sync" size={14} color={Colors.primary} />
+              </Animated.View>
+              <Text style={styles.flipCtaText}>
+                Retourner pour lire la reco
+              </Text>
             </View>
           </View>
         </Pressable>
@@ -351,31 +380,34 @@ function truncate(str: string, max: number): string {
 // Styles
 // ══════════════════════════════════════════════════════════════
 
-// Hauteur alignée sur les Plans dans le feed (~même poids visuel) —
-// la différenciation vient du flip mechanic, du strip eyebrow "SPOT"
-// et du footer custom, PAS d'être plus petit.
-const CARD_HEIGHT = 320;
+// Format polaroid — beaucoup plus haut que les 320px d'avant pour
+// donner une vraie présence éditoriale, plafonné en largeur sur web
+// pour ne pas devenir un bandeau étiré sur grand écran.
+const CARD_HEIGHT = 560;
+const CARD_MAX_WIDTH = 480;
 
 const styles = StyleSheet.create({
   wrap: {
+    width: '100%',
+    maxWidth: CARD_MAX_WIDTH,
+    alignSelf: 'center',
     marginHorizontal: 14,
     marginVertical: 8,
     height: CARD_HEIGHT,
-    // perspective parent — donne une vraie profondeur 3D au flip
   },
   face: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: Colors.bgSecondary,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.borderSubtle,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 18,
+    elevation: 4,
   },
   faceAbsolute: {
     position: 'absolute',
@@ -418,72 +450,91 @@ const styles = StyleSheet.create({
     marginRight: -4, // visual recenter into the strip
   },
 
-  hero: {
+  // ── Polaroid frame — l'élément qui dit "ce n'est pas un plan" ──
+  // Cadre blanc autour de la photo + légende en dessous (pas en overlay
+  // comme les Plans). Centré dans le card, room qui respire au-dessus
+  // et au-dessous pour le ton crème éditorial.
+  polaroidWrap: {
     flex: 1,
-    backgroundColor: Colors.bgTertiary,
-    position: 'relative',
-    justifyContent: 'flex-end',
+    paddingHorizontal: 22,
+    paddingTop: 22,
+    paddingBottom: 18,
+    justifyContent: 'center',
   },
-  heroImage: {
-    ...StyleSheet.absoluteFillObject,
+  polaroid: {
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    paddingBottom: 16,
+    borderRadius: 6,
+    shadowColor: 'rgba(44,36,32,0.18)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  photoFrame: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    backgroundColor: Colors.bgTertiary,
+    overflow: 'hidden',
+    borderRadius: 2,
+  },
+  photo: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  heroFade: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    height: 110,
+  captionZone: {
+    paddingTop: 12,
+    paddingHorizontal: 2,
   },
-  heroTitleZone: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  heroTitle: {
-    fontSize: 19,
+  caption: {
+    fontSize: 22,
     fontFamily: Fonts.displaySemiBold,
-    color: '#FFF',
-    letterSpacing: -0.3,
-    lineHeight: 22,
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
+    color: Colors.textPrimary,
+    letterSpacing: -0.4,
+    lineHeight: 26,
   },
-  heroMeta: {
-    fontSize: 11.5,
-    fontFamily: Fonts.body,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 3,
+  captionMeta: {
+    fontSize: 12,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+    marginTop: 2,
     letterSpacing: 0.1,
   },
 
-  footer: {
+  // ── Footer CTA — barre prominente "↻ Retourner pour lire" ──
+  flipCtaBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    backgroundColor: Colors.bgSecondary,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.terracotta50,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderSubtle,
+    borderTopColor: Colors.terracotta100,
+    gap: 10,
   },
-  footerSaved: {
+  flipCtaLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  flipCtaSavedCount: {
     fontSize: 11.5,
     fontFamily: Fonts.bodyMedium,
     color: Colors.textSecondary,
     letterSpacing: 0.05,
   },
-  flipHintRow: {
+  flipCtaRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
-  flipHint: {
-    fontSize: 11,
-    fontFamily: Fonts.body,
-    fontStyle: 'italic',
+  flipCtaText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,
-    letterSpacing: 0.1,
+    letterSpacing: -0.05,
   },
 
   // ── Back face ──
