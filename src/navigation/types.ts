@@ -63,6 +63,10 @@ export type RootStackParamList = {
   DoItNow: { planId: string; sessionId?: string; conversationId?: string };
   DoItNowComplete: undefined;
   OrganizeComplete: undefined;
+  /** Pre-meeting holding screen — countdown + plan preview + dev override
+   *  to start the session early. Shown when a participant tries to launch
+   *  the live session before meetupAt has been reached. */
+  WaitingRoom: { planId: string; conversationId: string; meetupAt: string | null };
   CoPlanWorkspace: { draftId: string };
   CreateSpot: undefined;
 };

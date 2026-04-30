@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant } from '../components';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
@@ -480,6 +480,15 @@ interface MessageRowProps {
   participants?: Record<string, ConversationParticipant>;
   /** Run-grouping info for co-plan system events (computed in parent). */
   coplanRun?: CoplanRunInfo;
+  /** Linked plan metadata — used by the "Plan prêt" card on
+   *  coplan_details_confirmed events to render a tappable preview. Null
+   *  when the conv has no plan attached yet (early lifecycle). */
+  linkedPlanInfo?: {
+    planId: string | null;
+    title: string | null;
+    cover: string | null;
+    meetupAt: string | null;
+  } | null;
 }
 
 const MessageRow = React.memo<MessageRowProps>(({
@@ -487,7 +496,7 @@ const MessageRow = React.memo<MessageRowProps>(({
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
   onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress, onOpenAlbum, onVotePoll,
-  participants, coplanRun,
+  participants, coplanRun, linkedPlanInfo,
 }) => {
   const isMine = item.senderId === userId;
   const showDate = shouldShowDateSeparator(item, prevMsg);
@@ -525,6 +534,39 @@ const MessageRow = React.memo<MessageRowProps>(({
           <CoPlanResolutionPill
             variant={ev.kind === 'coplan_proposal_applied' ? 'applied' : 'rejected'}
             subject={ev.payload}
+          />
+        </View>
+      );
+    }
+
+    // ── "Plan prêt" preview card ──
+    // Surfaced for coplan_details_confirmed — replaces the 1-line compact
+    // event with a richer animated card so the moment "the plan is ready
+    // to launch" is unmissable in the chat. Tapping the card opens the
+    // linked Plan detail (when there's already one published) or stays
+    // non-tappable if the plan hasn't been locked yet.
+    if (ev?.kind === 'coplan_details_confirmed') {
+      const linkedPlanId = linkedPlanInfo?.planId ?? null;
+      const linkedPlanTitle = linkedPlanInfo?.title ?? null;
+      const linkedPlanCover = linkedPlanInfo?.cover ?? null;
+      const meetupAt = linkedPlanInfo?.meetupAt ?? null;
+      const onPress = linkedPlanId
+        ? () => onPlanPress(linkedPlanId)
+        : undefined;
+      return (
+        <View>
+          {showDate && (
+            <View style={styles.dateSeparator}>
+              <Text style={styles.dateSeparatorText}>{formatDateSeparator(item.createdAt)}</Text>
+            </View>
+          )}
+          <CoPlanDetailsConfirmedCard
+            message={item}
+            participants={participants}
+            planTitle={linkedPlanTitle ?? undefined}
+            coverPhoto={linkedPlanCover}
+            meetupAt={meetupAt ?? undefined}
+            onPress={onPress}
           />
         </View>
       );
@@ -1337,6 +1379,28 @@ export const ConversationScreen: React.FC = () => {
 
   const handleStartSession = useCallback(async () => {
     if (!user?.id || !activeConv?.linkedPlanId || isStartingSession) return;
+
+    // ── Gate : si le RDV est dans le futur (>15min), on n'allume pas la
+    // session live tout de suite. On envoie l'utilisateur dans la
+    // SALLE D'ATTENTE qui montre un countdown + un aperçu du plan + un
+    // bouton dev pour override. La salle d'attente créera la session
+    // elle-même quand l'utilisateur clique "Commencer maintenant" ou
+    // quand le countdown arrive à zéro.
+    //
+    // Le seuil 15min absorbe les petits décalages d'horloge sans
+    // bloquer un démarrage légitime à l'heure pile.
+    const meetupISO = activeConv.meetupAt;
+    const meetupMs = meetupISO ? new Date(meetupISO).getTime() : NaN;
+    const isFutureMeetup = Number.isFinite(meetupMs) && (meetupMs - Date.now()) > 15 * 60 * 1000;
+    if (isFutureMeetup) {
+      navigation.navigate('WaitingRoom', {
+        planId: activeConv.linkedPlanId,
+        conversationId,
+        meetupAt: meetupISO ?? null,
+      });
+      return;
+    }
+
     setIsStartingSession(true);
     try {
       const plan = await fetchPlanById(activeConv.linkedPlanId);
@@ -1664,6 +1728,12 @@ export const ConversationScreen: React.FC = () => {
       onVotePoll={votePoll}
       participants={activeConv?.participantDetails}
       coplanRun={coplanRun}
+      linkedPlanInfo={activeConv ? {
+        planId: activeConv.linkedPlanId ?? null,
+        title: activeConv.linkedPlanTitle ?? null,
+        cover: activeConv.linkedPlanCover ?? null,
+        meetupAt: activeConv.meetupAt ?? null,
+      } : null}
     />
     );
   }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession, votePoll]);

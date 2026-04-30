@@ -22,6 +22,7 @@ import { CoPlanWorkspaceScreen } from '../screens/CoPlanWorkspaceScreen';
 import { CreateSpotScreen } from '../screens/CreateSpotScreen';
 import { DoItNowCompleteScreen } from '../screens/DoItNowCompleteScreen';
 import { OrganizeCompleteScreen } from '../screens/OrganizeCompleteScreen';
+import { WaitingRoomScreen } from '../screens/WaitingRoomScreen';
 import { AccountPromptModal } from '../components/AccountPromptModal';
 import { SessionInviteToast } from '../components/SessionInviteToast';
 
@@ -64,6 +65,7 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="NewConversation" component={NewConversationScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="Conversation" component={ConversationScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="DoItNow" component={DoItNowScreen} options={{ animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="WaitingRoom" component={WaitingRoomScreen} options={{ animation: 'slide_from_bottom' }} />
               <Stack.Screen name="CoPlanWorkspace" component={CoPlanWorkspaceScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="CreateSpot" component={CreateSpotScreen} options={{ animation: 'slide_from_bottom' }} />
               <Stack.Screen name="DoItNowComplete" component={DoItNowCompleteScreen} options={{ animation: 'slide_from_right' }} />
