@@ -65,6 +65,11 @@ export async function getDirections(
   destination: { lat: number; lng: number },
   mode: DoItNowTransport = 'walking'
 ): Promise<RouteResult | null> {
+  // Timeout dur 6s — sans ça un fetch peut hang indéfiniment et bloquer
+  // tout pool de connexions du browser quand plusieurs segments sont
+  // calculés en parallèle (cf. ERR_INSUFFICIENT_RESOURCES en cascade).
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
   try {
     const originParam = `${origin.lat},${origin.lng}`;
     const destParam = `${destination.lat},${destination.lng}`;
@@ -72,7 +77,7 @@ export async function getDirections(
       ? `${API_BASE_URL}/api/directions?origin=${originParam}&destination=${destParam}&mode=${mode}`
       : `https://maps.googleapis.com/maps/api/directions/json?origin=${originParam}&destination=${destParam}&mode=${mode}&key=${API_KEY}`;
 
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
     const data = await res.json();
 
     if (data.status !== 'OK' || !data.routes?.length) {
@@ -98,8 +103,14 @@ export async function getDirections(
         instruction: s.html_instructions?.replace(/<[^>]+>/g, '') || '',
       })),
     };
-  } catch (err) {
-    console.error('[directions] Error:', err);
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      console.warn('[directions] timeout 6s for', `${origin.lat},${origin.lng} → ${destination.lat},${destination.lng}`);
+    } else {
+      console.error('[directions] Error:', err);
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

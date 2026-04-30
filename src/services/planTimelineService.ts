@@ -118,6 +118,13 @@ const cacheSetSegments = (sig: string, segs: number[]): void => {
   segmentCache.set(sig, segs);
 };
 
+// ⚠️ Dedup in-flight : si deux callers demandent computePlanTimeline avec
+// la même signature en parallèle (cache miss simultané), on partage la
+// même promesse. Sinon les deux callers lancent CHACUN leurs Directions
+// fetches → tempête de requêtes → ERR_INSUFFICIENT_RESOURCES → freeze.
+// Les promesses sont supprimées une fois résolues (succès ou échec).
+const inflightSegments = new Map<string, Promise<number[]>>();
+
 const formatTravel = (seconds: number): string => {
   const m = Math.round(seconds / 60);
   if (m < 1) return '< 1 min';
@@ -156,36 +163,55 @@ export const computePlanTimeline = async (
   let segments = cacheGetSegments(sig);
 
   if (!segments) {
-    const segPromises: Promise<number | null>[] = [];
-    for (let i = 1; i < orderedPlaces.length; i++) {
-      const from = orderedPlaces[i - 1];
-      const to = orderedPlaces[i];
-      if (
-        typeof from.latitude !== 'number' ||
-        typeof from.longitude !== 'number' ||
-        typeof to.latitude !== 'number' ||
-        typeof to.longitude !== 'number'
-      ) {
-        segPromises.push(Promise.resolve(null));
-        continue;
-      }
-      segPromises.push(
-        getDirections(
-          { lat: from.latitude, lng: from.longitude },
-          { lat: to.latitude, lng: to.longitude },
-          transport,
-        )
-          .then((r) => (r ? r.durationSeconds : null))
-          .catch(() => null),
-      );
+    // Dedup in-flight — si une compute est déjà en cours pour cette sig,
+    // on attend la SAME promesse plutôt que de lancer une 2e tempête de
+    // fetches en parallèle. Critique sur web où le browser limite à ~6
+    // connexions par host.
+    let pending = inflightSegments.get(sig);
+    if (!pending) {
+      pending = (async () => {
+        const segPromises: Promise<number | null>[] = [];
+        for (let i = 1; i < orderedPlaces.length; i++) {
+          const from = orderedPlaces[i - 1];
+          const to = orderedPlaces[i];
+          if (
+            typeof from.latitude !== 'number' ||
+            typeof from.longitude !== 'number' ||
+            typeof to.latitude !== 'number' ||
+            typeof to.longitude !== 'number'
+          ) {
+            segPromises.push(Promise.resolve(null));
+            continue;
+          }
+          segPromises.push(
+            getDirections(
+              { lat: from.latitude, lng: from.longitude },
+              { lat: to.latitude, lng: to.longitude },
+              transport,
+            )
+              .then((r) => (r ? r.durationSeconds : null))
+              .catch(() => null),
+          );
+        }
+        const resolved = await Promise.all(segPromises);
+        const segs = resolved.map((s) => s ?? 0);
+        // Only cache if every segment resolved — partial failures shouldn't
+        // poison the cache (next open might have network back).
+        if (resolved.every((s) => s !== null)) {
+          cacheSetSegments(sig, segs);
+        }
+        return segs;
+      })();
+      inflightSegments.set(sig, pending);
+      // Cleanup quoi qu'il arrive (succès ou échec) — sinon on bloque
+      // les futures computes avec la même sig.
+      pending.finally(() => {
+        if (inflightSegments.get(sig) === pending) {
+          inflightSegments.delete(sig);
+        }
+      });
     }
-    const resolved = await Promise.all(segPromises);
-    segments = resolved.map((s) => s ?? 0);
-    // Only cache if every segment resolved — partial failures shouldn't
-    // poison the cache (next open might have network back).
-    if (resolved.every((s) => s !== null)) {
-      cacheSetSegments(sig, segments);
-    }
+    segments = await pending;
   }
 
   // Walk the timeline from startISO.

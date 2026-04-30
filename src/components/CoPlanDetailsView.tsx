@@ -56,7 +56,28 @@ export const CoPlanDetailsView: React.FC<Props> = ({ onEdit, onLock, canLock }) 
     return fallback.toISOString();
   }, [draft?.meetupAtProposed]);
 
-  // Compute la timeline à chaque changement de places ou de meetupAt.
+  // ⚠️ CRITIQUE — bug freeze : `places` est un NOUVEAU array à chaque appel
+  // de `getSortedPlaces()` (le store fait `[...arr].sort()`), donc utiliser
+  // `places` directement comme dep useEffect re-déclenche le fetch à chaque
+  // snapshot Firestore (presence ping toutes les 20s + chaque écriture).
+  // Comme le service planTimeline n'a pas de dédup in-flight, plusieurs
+  // appels concurrents lancent CHACUN leurs fetch /api/directions, ce qui
+  // sature le pool de connexions du browser (ERR_INSUFFICIENT_RESOURCES)
+  // et freeze la page.
+  //
+  // Fix : on calcule une SIGNATURE string stable (ids + ordre + coords) et
+  // on l'utilise comme dep. Tant que les données réelles ne changent pas,
+  // la signature reste identique en valeur (string === string), useEffect
+  // ne re-tire pas, plus de tempête de fetch.
+  const placesSig = useMemo(
+    () =>
+      places
+        .map((p) => `${p.id}:${p.orderIndex}:${p.latitude ?? ''}:${p.longitude ?? ''}`)
+        .join('|'),
+    [places],
+  );
+
+  // Compute la timeline à chaque changement RÉEL de places ou de meetupAt.
   // Le service cache les segments via signature, donc relancer à
   // l'identique est gratuit.
   useEffect(() => {
@@ -77,7 +98,9 @@ export const CoPlanDetailsView: React.FC<Props> = ({ onEdit, onLock, canLock }) 
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [places, startISO]);
+    // ⚠️ NE PAS mettre `places` ici — voir commentaire plus haut sur la sig.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placesSig, startISO]);
 
   if (!draft) return null;
 
