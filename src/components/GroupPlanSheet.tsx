@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   Modal, TouchableWithoutFeedback, ActivityIndicator, ScrollView, Image,
@@ -39,61 +39,62 @@ interface GroupPlanSheetProps {
 type Step = 'pick' | 'compose';
 
 // ══════════════════════════════════════════════════════════════
-// Date presets — 4 smart defaults covering most real-life cases
+// Calendrier inline — day strip + hour grid (mêmes presets visuels
+// que CoPlanMeetupSheet / DoItNowDateSheet pour homogénéité). On ne
+// garde plus les 4 pills "Ce soir / Demain / Ce weekend / Plus tard"
+// parce que la précision manquait : impossible de poser un samedi
+// soir à 20h sans repasser par le chat. Maintenant on a 21 jours × 15
+// créneaux horaires d'un coup, et la WaitingRoom respectera la date
+// choisie côté chat ensuite.
 // ══════════════════════════════════════════════════════════════
 
-interface DatePreset {
+const toDayKey = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+interface DayCell {
   key: string;
-  label: string;
-  sublabel: string;
-  /** Returns null for "pas de date" option. */
-  compute: () => string | null;
+  dow: string;
+  dayNum: string;
+  month: string;
 }
 
-const atHour = (date: Date, h: number, m = 0): Date => {
-  const d = new Date(date);
-  d.setHours(h, m, 0, 0);
-  return d;
+const buildDays = (count: number): DayCell[] => {
+  const out: DayCell[] = [];
+  const today = new Date();
+  for (let i = 0; i < count; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    out.push({
+      key: toDayKey(d),
+      dow: d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''),
+      dayNum: d.getDate().toString(),
+      month: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''),
+    });
+  }
+  return out;
 };
 
-const nextSaturday = (): Date => {
+/** Smart default — next Saturday at 12h. Same default as the previous
+ *  preset behavior (most real-life shared plans land on the next
+ *  weekend). */
+const defaultSelectedDate = (): { day: string; hour: number } => {
   const d = new Date();
-  const day = d.getDay(); // 0 = Sunday, 6 = Saturday
-  const diff = (6 - day + 7) % 7 || 7; // always a future Saturday
+  const day = d.getDay();
+  const diff = (6 - day + 7) % 7 || 7;
   d.setDate(d.getDate() + diff);
-  return atHour(d, 12);
+  return { day: toDayKey(d), hour: 12 };
 };
 
-const DATE_PRESETS: DatePreset[] = [
-  {
-    key: 'tonight',
-    label: 'Ce soir',
-    sublabel: '19h',
-    compute: () => atHour(new Date(), 19).toISOString(),
-  },
-  {
-    key: 'tomorrow',
-    label: 'Demain',
-    sublabel: '12h',
-    compute: () => {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      return atHour(d, 12).toISOString();
-    },
-  },
-  {
-    key: 'saturday',
-    label: 'Ce weekend',
-    sublabel: 'samedi 12h',
-    compute: () => nextSaturday().toISOString(),
-  },
-  {
-    key: 'later',
-    label: 'Plus tard',
-    sublabel: 'on verra',
-    compute: () => null,
-  },
-];
+const buildIsoFrom = (dayKey: string, hour: number): string | null => {
+  if (!dayKey) return null;
+  const [y, m, d] = dayKey.split('-').map((s) => parseInt(s, 10));
+  const dt = new Date(y, m - 1, d, hour, 0, 0, 0);
+  return dt.toISOString();
+};
 
 const formatMeetup = (iso: string | null): string => {
   if (!iso) return 'Pas encore décidée';
@@ -120,9 +121,17 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [presetKey, setPresetKey] = useState<string>('saturday'); // default: ce weekend
+  // Date picker state — initialized to "next Saturday at 12h" (same
+  // smart default as the previous preset chip).
+  const initialDate = useMemo(() => defaultSelectedDate(), []);
+  const [selectedDay, setSelectedDay] = useState<string>(initialDate.day);
+  const [selectedHour, setSelectedHour] = useState<number>(initialDate.hour);
   const [message, setMessage] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // Cached day strip + hour grid (both stable for the whole session).
+  const days = useMemo(() => buildDays(21), []);
+  const hours = useMemo(() => Array.from({ length: 15 }, (_, i) => i + 8), []);
 
   // ── Reset whenever the sheet opens ──
   useEffect(() => {
@@ -132,7 +141,9 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
       setSelectedIds(new Set());
       setMessage('');
       setSearch('');
-      setPresetKey('saturday');
+      const d = defaultSelectedDate();
+      setSelectedDay(d.day);
+      setSelectedHour(d.hour);
       setIsCreating(false);
     }
   }, [visible, user?.id]);
@@ -233,8 +244,7 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
         avatarColor: f.avatarColor,
         initials: f.initials,
       }));
-      const preset = DATE_PRESETS.find((p) => p.key === presetKey) || DATE_PRESETS[0];
-      const meetupAt = preset.compute() || undefined;
+      const meetupAt = buildIsoFrom(selectedDay, selectedHour) || undefined;
       const trimmedMessage = message.trim() || undefined;
 
       const convId = await createGroupConversation({
@@ -258,7 +268,7 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
     } finally {
       setIsCreating(false);
     }
-  }, [user, isCreating, selectedIds, friends, presetKey, message, planId, planTitle, planCover, onClose, onCreated]);
+  }, [user, isCreating, selectedIds, friends, selectedDay, selectedHour, message, planId, planTitle, planCover, onClose, onCreated]);
 
   // ── Renderers ──
   const renderFriendRow = ({ item }: { item: FriendItem }) => {
@@ -297,8 +307,7 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
   const selectedCount = selectedIds.size;
   const selectedFriendsList = friends.filter((f) => selectedIds.has(f.id));
 
-  const selectedPreset = DATE_PRESETS.find((p) => p.key === presetKey) || DATE_PRESETS[0];
-  const computedMeetup = selectedPreset.compute();
+  const computedMeetup = buildIsoFrom(selectedDay, selectedHour);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -466,46 +475,66 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
                 </View>
               </View>
 
-              {/* Date chips */}
+              {/* Date picker — day strip + hour grid (même UI que la
+                  CoPlanMeetupSheet du workspace pour homogénéité). */}
               <Text style={styles.sectionLabel}>QUAND ?</Text>
-              <View style={styles.dateChipsRow}>
-                {DATE_PRESETS.map((p) => {
-                  const active = p.key === presetKey;
+
+              {/* Day strip — 21 jours (auj → +20j) */}
+              <Text style={styles.pickerSubLabel}>Jour</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.dayStrip}
+              >
+                {days.map((day) => {
+                  const isSelected = day.key === selectedDay;
                   return (
                     <TouchableOpacity
-                      key={p.key}
-                      style={[
-                        styles.dateChip,
-                        active
-                          ? { backgroundColor: Colors.primary, borderColor: Colors.primary }
-                          : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
-                      ]}
+                      key={day.key}
+                      style={[styles.dayChip, isSelected && styles.dayChipActive]}
                       onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                        setPresetKey(p.key);
+                        Haptics.selectionAsync().catch(() => {});
+                        setSelectedDay(day.key);
                       }}
-                      activeOpacity={0.85}
+                      activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.dateChipLabel,
-                          { color: active ? Colors.textOnAccent : Colors.textPrimary },
-                        ]}
-                      >
-                        {p.label}
+                      <Text style={[styles.dayChipDow, isSelected && styles.dayChipTextActive]}>
+                        {day.dow}
                       </Text>
-                      <Text
-                        style={[
-                          styles.dateChipSub,
-                          { color: active ? 'rgba(255,248,240,0.8)' : Colors.textTertiary },
-                        ]}
-                      >
-                        {p.sublabel}
+                      <Text style={[styles.dayChipNum, isSelected && styles.dayChipTextActive]}>
+                        {day.dayNum}
+                      </Text>
+                      <Text style={[styles.dayChipMonth, isSelected && styles.dayChipTextActive]}>
+                        {day.month}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Hour grid — 8h..22h */}
+              <Text style={styles.pickerSubLabel}>Heure</Text>
+              <View style={styles.hourGrid}>
+                {hours.map((h) => {
+                  const isSelected = h === selectedHour;
+                  return (
+                    <TouchableOpacity
+                      key={h}
+                      style={[styles.hourChip, isSelected && styles.hourChipActive]}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setSelectedHour(h);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.hourChipText, isSelected && styles.hourChipTextActive]}>
+                        {h}h
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
+
               <Text style={styles.meetupPreview}>
                 <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
                 {'  '}
@@ -769,28 +798,84 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Date chips
-  dateChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // ── Inline date picker (same DA as CoPlanMeetupSheet) ──
+  pickerSubLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: Colors.textSecondary,
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  dayStrip: {
     gap: 8,
     paddingHorizontal: 16,
+    paddingRight: 8,
   },
-  dateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  dayChip: {
+    width: 56,
+    paddingVertical: 8,
     borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    minWidth: 110,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
   },
-  dateChipLabel: {
-    fontSize: 13.5,
+  dayChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  dayChipDow: {
+    fontSize: 10,
     fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: Colors.textSecondary,
   },
-  dateChipSub: {
-    fontSize: 11,
+  dayChipNum: {
+    fontSize: 18,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+  },
+  dayChipMonth: {
+    fontSize: 10,
     fontFamily: Fonts.body,
-    marginTop: 2,
+    color: Colors.textSecondary,
+  },
+  dayChipTextActive: {
+    color: Colors.textOnAccent,
+  },
+  hourGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  hourChip: {
+    minWidth: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgPrimary,
+    alignItems: 'center',
+  },
+  hourChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  hourChipText: {
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  hourChipTextActive: {
+    color: Colors.textOnAccent,
   },
   meetupPreview: {
     fontSize: 12,
