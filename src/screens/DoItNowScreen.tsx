@@ -29,7 +29,8 @@ import { useCity } from '../hooks/useCity';
 import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast } from '../components';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
-import { sendPhotoMessage } from '../services/chatService';
+import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
+import { notifySessionAdvanced } from '../services/planSessionService';
 import { pickImage } from '../utils';
 
 // Quick-word chips shown on the editorial review screen.
@@ -458,6 +459,33 @@ export const DoItNowScreen: React.FC = () => {
     setRouteCoords([]);
   };
 
+  // ── Group-mode broadcast helper ────────────────────────────────
+  // When advancing in a group session, post a system message in the
+  // linked conversation so everyone sees the chronological signal
+  // ("Marc est passé à Toutainville (étape 2/3)"). Best-effort.
+  const broadcastAdvanceIfGroup = (nextIndex: number) => {
+    if (!groupConversationId || !plan || !user) return;
+    const target = plan.places[nextIndex];
+    if (!target) return;
+    const actor: ConversationParticipant = {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    notifySessionAdvanced(
+      groupConversationId,
+      actor,
+      nextIndex,
+      plan.places.length,
+      target.name,
+      routeSessionId,
+    );
+  };
+
   const handleNextStop = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -473,6 +501,7 @@ export const DoItNowScreen: React.FC = () => {
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {
       nextStop();
+      broadcastAdvanceIfGroup(currentIndex + 1);
     }
   };
 
@@ -485,6 +514,7 @@ export const DoItNowScreen: React.FC = () => {
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {
       nextStop();
+      broadcastAdvanceIfGroup(currentIndex + 1);
     }
   };
 

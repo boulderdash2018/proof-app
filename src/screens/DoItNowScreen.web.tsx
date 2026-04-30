@@ -15,7 +15,8 @@ import { fetchPlanById } from '../services/plansService';
 import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast } from '../components';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
-import { sendPhotoMessage } from '../services/chatService';
+import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
+import { notifySessionAdvanced } from '../services/planSessionService';
 import { pickImage } from '../utils';
 
 // Quick-word chips shown on the editorial review screen.
@@ -539,6 +540,33 @@ export const DoItNowScreen: React.FC = () => {
     setRoute(null);
   };
 
+  // ── Group-mode broadcast helper ────────────────────────────────
+  // When the user advances in a group session, post a system message in
+  // the linked chat so the other participants get a chronological signal
+  // ("Marc est passé à Toutainville (étape 2/3)"). Best-effort, fire & forget.
+  const broadcastAdvanceIfGroup = useCallback((nextIndex: number) => {
+    if (!groupConversationId || !plan || !user) return;
+    const target = plan.places[nextIndex];
+    if (!target) return;
+    const actor: ConversationParticipant = {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    notifySessionAdvanced(
+      groupConversationId,
+      actor,
+      nextIndex,
+      plan.places.length,
+      target.name,
+      routeSessionId,
+    );
+  }, [groupConversationId, plan, user, routeSessionId]);
+
   const handleNext = () => {
     if (placeMode && placeMode.rating > 0) {
       useDoItNowStore.getState().ratePlace(currentIndex, placeMode.rating, buildCommentWithTags());
@@ -552,6 +580,7 @@ export const DoItNowScreen: React.FC = () => {
     } else {
       justAdvancedRef.current = true;
       nextStop();
+      broadcastAdvanceIfGroup(currentIndex + 1);
     }
   };
 
@@ -565,6 +594,7 @@ export const DoItNowScreen: React.FC = () => {
     } else {
       justAdvancedRef.current = true;
       nextStop();
+      broadcastAdvanceIfGroup(currentIndex + 1);
     }
   };
 

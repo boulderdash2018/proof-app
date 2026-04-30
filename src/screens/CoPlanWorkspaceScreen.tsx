@@ -423,16 +423,34 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
       <CoPlanLockSheet
         visible={lockOpen}
         onClose={() => setLockOpen(false)}
-        onLocked={(conversationId) => {
-          // Navigate to the freshly-created group conversation. The flow
-          // "Do it now multi-user" + polls + album takes over from there.
-          navigation.reset({
-            index: 0,
-            routes: [
-              { name: 'Main' },
-              { name: 'Conversation', params: { conversationId, otherUser: null } },
-            ] as any,
-          });
+        onLocked={({ conversationId, planId, sessionId }) => {
+          // Adaptive nav based on whether the LockSheet also created a
+          // live session (user chose "Démarrer maintenant") :
+          //   • Session created → stack = Main → Conversation → DoItNow
+          //     (so back from DoItNow lands the user in the chat).
+          //   • No session → land in the chat (waiting room). The
+          //     pinned plan card + "Démarrer la session" CTA take over.
+          if (sessionId && planId) {
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Main' },
+                { name: 'Conversation', params: { conversationId, otherUser: null } },
+                {
+                  name: 'DoItNow',
+                  params: { planId, sessionId, conversationId },
+                },
+              ] as any,
+            });
+          } else {
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Main' },
+                { name: 'Conversation', params: { conversationId, otherUser: null } },
+              ] as any,
+            });
+          }
         }}
       />
 

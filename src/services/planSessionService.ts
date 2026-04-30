@@ -188,6 +188,41 @@ export const checkInAtPlace = async (
   });
 };
 
+/**
+ * Posts a "session_advanced" system message in the group chat when a
+ * participant moves to the next place. Best-effort — chat post errors
+ * are swallowed so they don't break the local progression.
+ *
+ * Format displayed in chat: "Marc est passé à Toutainville (étape 2/3)"
+ *
+ * Optional `sessionId` is included in the payload as JSON so the chat UI
+ * can later deep-link the message back to the session.
+ */
+export const notifySessionAdvanced = async (
+  conversationId: string,
+  actor: ConversationParticipant,
+  toIndex: number,           // 0-based index of the place the user just reached
+  totalPlaces: number,
+  toPlaceName: string,
+  sessionId?: string,
+): Promise<void> => {
+  try {
+    const oneBased = toIndex + 1;
+    const preview = `${actor.displayName} est passé à ${toPlaceName} (étape ${oneBased}/${totalPlaces})`;
+    await postSystemEvent(
+      conversationId,
+      {
+        kind: 'session_advanced',
+        actorId: actor.userId,
+        payload: sessionId ? `${toPlaceName}|${oneBased}|${totalPlaces}|${sessionId}` : `${toPlaceName}|${oneBased}|${totalPlaces}`,
+      },
+      preview,
+    );
+  } catch (err) {
+    console.warn('[notifySessionAdvanced] failed:', err);
+  }
+};
+
 /** Marks the session as completed and posts a system message. */
 export const completeGroupSession = async (
   sessionId: string,

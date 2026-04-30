@@ -38,6 +38,7 @@ export type SystemEventKind =
   | 'renamed'
   | 'session_started'
   | 'session_completed'
+  | 'session_advanced'           // payload = "Tours" (next place name); message lit "X est passé à Tours (étape 2/3)"
   // ── Co-plan workspace mirror events ──────────────────────────────
   // Posted by the planDraftService whenever a participant mutates the
   // shared workspace, so the chat thread becomes the "fil de

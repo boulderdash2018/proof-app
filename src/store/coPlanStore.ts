@@ -28,7 +28,7 @@ import { createPlan } from '../services/plansService';
 import { getPlaceDetails } from '../services/googlePlacesService';
 import { attachPlanToConversation, createGroupConversation, postSystemEvent, ConversationParticipant, SystemEvent } from '../services/chatService';
 import { useAuthStore } from './authStore';
-import { Place, CategoryTag, TransportMode, CoAuthor } from '../types';
+import { Place, Plan, CategoryTag, TransportMode, CoAuthor } from '../types';
 
 /**
  * Observes a single active draft at a time (what the workspace screen shows).
@@ -132,7 +132,7 @@ interface CoPlanStore {
   proposeRemovePlace: (placeId: string, reason?: string) => Promise<string | null>;
 
   // ── Lock → conversion to real Plan + group conv ──
-  lockDraft: (publishOnFeed: boolean) => Promise<{ conversationId: string; planId: string | null } | null>;
+  lockDraft: (publishOnFeed: boolean) => Promise<{ conversationId: string; planId: string | null; plan: Plan | null } | null>;
 
   // ── Derived helpers (pure reads, compute on demand) ──
   getSortedPlaces: () => CoPlanProposedPlace[];
@@ -803,7 +803,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       );
 
       console.log('[lockDraft] DONE — convId:', convId, 'planId:', plan.id);
-      return { conversationId: convId, planId: plan.id };
+      return { conversationId: convId, planId: plan.id, plan };
     } catch (err) {
       console.warn('[coPlanStore] lockDraft error:', err);
       return null;

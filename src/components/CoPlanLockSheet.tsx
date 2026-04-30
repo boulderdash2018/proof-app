@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ActivityIndicator,
 } from 'react-native';
@@ -6,12 +6,35 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useCoPlanStore } from '../store/coPlanStore';
+import { useAuthStore } from '../store/authStore';
+import { useDoItNowStore } from '../store/doItNowStore';
+import { createGroupSession } from '../services/planSessionService';
+import { ConversationParticipant } from '../services/chatService';
+
+/** Result returned to the parent after a successful lock. */
+export interface LockResult {
+  conversationId: string;
+  planId: string | null;
+  /** Set when the user chose "Démarrer maintenant" — parent should
+   *  navigate to DoItNow. Null = parent should land in the chat. */
+  sessionId: string | null;
+}
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onLocked: (conversationId: string) => void;
+  onLocked: (result: LockResult) => void;
 }
+
+/** Smart default for "start now" : ON if no meetup date or if the meetup
+ *  is within the next hour. OFF if the meetup is comfortably in the
+ *  future — the user is just publishing the draft, not running it now. */
+const computeStartNowDefault = (meetupAtISO: string | null | undefined): boolean => {
+  if (!meetupAtISO) return true;
+  const ms = new Date(meetupAtISO).getTime();
+  if (!Number.isFinite(ms)) return true;
+  return ms - Date.now() < 60 * 60 * 1000; // < 1h → start now
+};
 
 /**
  * Lock confirmation — summarizes the draft then creates the real Plan +
@@ -23,8 +46,23 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
   const draft = useCoPlanStore((s) => s.draft);
   const places = useCoPlanStore((s) => s.getSortedPlaces());
   const lockDraft = useCoPlanStore((s) => s.lockDraft);
+  const user = useAuthStore((s) => s.user);
 
   const [publishOnFeed, setPublishOnFeed] = useState(false);
+  // Initialised lazily per visible-mount via useMemo so the smart default
+  // re-computes if the LockSheet is reopened after the user changed the
+  // meetup date (otherwise the cache would lock in a stale value).
+  const startNowDefault = useMemo(
+    () => computeStartNowDefault(draft?.meetupAtProposed),
+    [draft?.meetupAtProposed, visible],
+  );
+  const [startNow, setStartNow] = useState(startNowDefault);
+  // Sync local state when the smart default flips (e.g. user changed
+  // meetupAtProposed while the sheet was already open).
+  React.useEffect(() => {
+    setStartNow(startNowDefault);
+  }, [startNowDefault]);
+
   const [submitting, setSubmitting] = useState(false);
 
   if (!draft) return null;
@@ -38,11 +76,51 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     try {
       const result = await lockDraft(publishOnFeed);
-      if (result?.conversationId) {
-        onClose();
-        // Slight defer so the close anim doesn't compete with the nav.
-        setTimeout(() => onLocked(result.conversationId), 180);
+      if (!result?.conversationId) return;
+
+      // ── Optionally create the live session right away ──
+      // If the user chose "Démarrer maintenant", we also create the
+      // plan_sessions doc and pre-populate the local DoItNowStore so the
+      // DoItNow screen mounts already-bootstrapped (avoids the
+      // hooks-order edge case from its `if (!session) return null;`
+      // early guard). Failure here is non-fatal — fall back to chat
+      // landing so the user is never stuck.
+      let sessionId: string | null = null;
+      if (startNow && result.plan && user) {
+        try {
+          const creator: ConversationParticipant = {
+            userId: user.id,
+            displayName: user.displayName,
+            username: user.username,
+            avatarUrl: user.avatarUrl || null,
+            avatarBg: user.avatarBg,
+            avatarColor: user.avatarColor,
+            initials: user.initials,
+          };
+          sessionId = await createGroupSession({
+            plan: {
+              id: result.plan.id,
+              title: result.plan.title,
+              coverPhoto: result.plan.coverPhotos?.[0] ?? null,
+              placeIds: result.plan.places.map((p: { id: string }) => p.id),
+            },
+            conversationId: result.conversationId,
+            creator,
+          });
+          useDoItNowStore.getState().startSession(result.plan, 'walking', user.id);
+        } catch (err) {
+          console.warn('[CoPlanLockSheet] startNow session creation failed — falling back to chat:', err);
+          sessionId = null;
+        }
       }
+
+      onClose();
+      // Slight defer so the close anim doesn't compete with the nav.
+      setTimeout(() => onLocked({
+        conversationId: result.conversationId,
+        planId: result.planId,
+        sessionId,
+      }), 180);
     } finally {
       setSubmitting(false);
     }
@@ -67,6 +145,38 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
             <RecapRow icon="location-outline" label="Où" value={`${places.length} lieu${places.length > 1 ? 'x' : ''}`} />
             <RecapRow icon="people-outline" label="Amis" value={`${participantCount} participant${participantCount > 1 ? 's' : ''}`} />
           </View>
+
+          {/* "Démarrer maintenant" toggle — décide si le clic Lance la
+              session live tout de suite (et route le créateur vers DoItNow)
+              ou si on publie juste le plan dans la conv (salle d'attente).
+              Smart default : ON si meetupAt < 1h ou non fixé, OFF sinon. */}
+          <TouchableOpacity
+            style={styles.publishRow}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setStartNow((v) => !v);
+            }}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                startNow
+                  ? { backgroundColor: Colors.primary, borderColor: Colors.primary }
+                  : { borderColor: Colors.gray400 },
+              ]}
+            >
+              {startNow && <Ionicons name="checkmark" size={14} color={Colors.textOnAccent} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.publishTitle}>Démarrer la session maintenant</Text>
+              <Text style={styles.publishHint}>
+                {startNow
+                  ? 'Tu atterris direct sur la map du groupe. Tes amis verront un signal "session en cours" dans le chat pour rejoindre.'
+                  : 'Le plan est publié dans la conv. Tu démarres la session live plus tard (au RDV) depuis le chat.'}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
           {/* Publish toggle */}
           <TouchableOpacity
@@ -118,8 +228,10 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
                 <ActivityIndicator size="small" color={Colors.textOnAccent} />
               ) : (
                 <>
-                  <Ionicons name="rocket" size={14} color={Colors.textOnAccent} />
-                  <Text style={styles.btnConfirmText}>Lancer le plan</Text>
+                  <Ionicons name={startNow ? 'navigate' : 'rocket'} size={14} color={Colors.textOnAccent} />
+                  <Text style={styles.btnConfirmText}>
+                    {startNow ? 'Démarrer la session' : 'Publier le plan'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
