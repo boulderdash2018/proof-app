@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant, DoItNowDateSheet } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant, DoItNowDateSheet, SessionEndedActions } from '../components';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
@@ -595,6 +595,14 @@ const MessageRow = React.memo<MessageRowProps>(({
             </View>
           )}
           <CoPlanCompactEvent message={item} participants={participants} />
+          {/* When a session_completed event lands, surface the per-user
+              archive action card right under the compact line. Each
+              member decides individually : "Archiver" (the conv
+              disappears from THEIR list only) or "Garder" (no-op,
+              card collapses locally). */}
+          {ev?.kind === 'session_completed' && userId && item.conversationId && (
+            <SessionEndedActions conversationId={item.conversationId} userId={userId} />
+          )}
         </View>
       );
     }
@@ -1395,6 +1403,15 @@ export const ConversationScreen: React.FC = () => {
       }));
   }, [activeGroupSession, user?.id]);
 
+  // Per-user gate : has the current user already finished THIS session?
+  // Once finished, the FloatingDock + Rejoindre + "Démarrer la session"
+  // affordances all hide for them — the parcours is over for them
+  // even if some teammates are still walking the route.
+  const isMeFinishedInActiveSession = useMemo(() => {
+    if (!activeGroupSession || !user?.id) return false;
+    return !!activeGroupSession.participants?.[user.id]?.finishedAt;
+  }, [activeGroupSession, user?.id]);
+
   const handlePickPhoto = useCallback(async () => {
     setAttachMenuOpen(false);
     if (isUploadingPhoto) return;
@@ -1483,6 +1500,9 @@ export const ConversationScreen: React.FC = () => {
 
   const handleJoinSession = useCallback(async () => {
     if (!user?.id || !activeConv?.activeSessionId || !activeConv.linkedPlanId) return;
+    // Per-user gate : if I've already finished this session, I can't
+    // rejoin — the parcours is over for me regardless of teammates.
+    if (isMeFinishedInActiveSession) return;
     // Fetch the plan + pre-populate the local doItNowStore BEFORE navigating —
     // same rationale as handleStartSession (avoids the DoItNowScreen
     // hooks-order edge case).
@@ -1498,7 +1518,7 @@ export const ConversationScreen: React.FC = () => {
     } catch (err) {
       console.warn('[ConversationScreen] join session error:', err);
     }
-  }, [user, activeConv, conversationId, navigation]);
+  }, [user, activeConv, conversationId, navigation, isMeFinishedInActiveSession]);
 
   const isMuted = useMemo(
     () => Boolean(activeConv && user?.id && (activeConv.mutedBy || []).includes(user.id)),
@@ -1996,7 +2016,7 @@ export const ConversationScreen: React.FC = () => {
                     moved to the FloatingSessionDock above the input bar
                     (less competing with the pinned card for attention,
                     closer to the thumb, carries social presence). */}
-                {!activeConv.activeSessionId && (
+                {!activeConv.activeSessionId && !activeConv.lastSessionCompletedAt && (
                   <TouchableOpacity
                     style={[styles.sessionStartBtn, { opacity: isStartingSession ? 0.6 : 1 }]}
                     onPress={handleStartSession}
@@ -2136,7 +2156,7 @@ export const ConversationScreen: React.FC = () => {
           button on the system event). Sits just above the message input,
           carries social presence ("Léa et Marc sont en route"), auto-hides
           while the user is typing. Dismounts when the session ends. */}
-      {isGroup && activeConv?.activeSessionId && (
+      {isGroup && activeConv?.activeSessionId && !isMeFinishedInActiveSession && (
         <FloatingSessionDock
           others={dockOthers}
           hidden={isInputFocused}

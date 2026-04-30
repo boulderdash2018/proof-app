@@ -96,6 +96,16 @@ export interface Conversation {
   pinnedBy: string[];
   /** User IDs that have muted this conversation. */
   mutedBy: string[];
+  /** User IDs that have archived this conversation FOR THEMSELVES. The
+   *  conversation still exists on Firestore for the others, but it's
+   *  filtered out of the chat list of every user in this array. Used
+   *  after a session ends to let each member tidy up individually. */
+  archivedBy: string[];
+  /** ISO timestamp of the last fully-completed plan_session in this
+   *  conversation. Set by markUserFinishedInSession when the last
+   *  participant finishes. Used by the chat to hide "Démarrer la
+   *  session" — once a parcours is done, no restart in the same conv. */
+  lastSessionCompletedAt?: string;
   createdAt: string;
 
   // ── Group extensions ──────────────────────────────────────────
@@ -209,6 +219,8 @@ export const findConversation = async (
         lastReadAt: data.lastReadAt || {},
         pinnedBy: Array.isArray(data.pinnedBy) ? data.pinnedBy : [],
         mutedBy: Array.isArray(data.mutedBy) ? data.mutedBy : [],
+        archivedBy: Array.isArray(data.archivedBy) ? data.archivedBy : [],
+        ...(data.lastSessionCompletedAt ? { lastSessionCompletedAt: toISO(data.lastSessionCompletedAt) } : {}),
         isGroup: false,
         lastMessageAt: toISO(data.lastMessageAt),
         createdAt: toISO(data.createdAt),
@@ -240,6 +252,7 @@ export const createConversation = async (
     lastReadAt: {},
     pinnedBy: [],
     mutedBy: [],
+    archivedBy: [],
     isGroup: false,
     createdAt: serverTimestamp(),
   });
@@ -431,6 +444,45 @@ export const toggleMuteConversation = async (
   await updateDoc(convRef, { mutedBy: muted });
 };
 
+/**
+ * Archive a conversation FOR ONE USER. The conv is filtered out of the
+ * user's chat list (subscribeConversations skips entries where
+ * archivedBy includes the user id), but other participants still see
+ * it normally. Idempotent — calling twice is a no-op.
+ *
+ * Used after a session ends : each member is offered the choice to
+ * tidy their messages list ("Archiver" or "Garder").
+ */
+export const archiveConversationForUser = async (
+  conversationId: string,
+  userId: string,
+): Promise<void> => {
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const snap = await getDoc(convRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const archived: string[] = Array.isArray(data.archivedBy) ? [...data.archivedBy] : [];
+  if (archived.includes(userId)) return;
+  archived.push(userId);
+  await updateDoc(convRef, { archivedBy: archived });
+};
+
+/** Unarchive — re-surfaces the conv in the user's chat list. */
+export const unarchiveConversationForUser = async (
+  conversationId: string,
+  userId: string,
+): Promise<void> => {
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const snap = await getDoc(convRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const archived: string[] = Array.isArray(data.archivedBy) ? [...data.archivedBy] : [];
+  const idx = archived.indexOf(userId);
+  if (idx < 0) return;
+  archived.splice(idx, 1);
+  await updateDoc(convRef, { archivedBy: archived });
+};
+
 /** Set typing status */
 export const setTypingStatus = async (
   conversationId: string,
@@ -478,13 +530,19 @@ export const subscribeConversations = (
           lastReadAt: data.lastReadAt || {},
           pinnedBy: Array.isArray(data.pinnedBy) ? data.pinnedBy : [],
           mutedBy: Array.isArray(data.mutedBy) ? data.mutedBy : [],
+        archivedBy: Array.isArray(data.archivedBy) ? data.archivedBy : [],
+        ...(data.lastSessionCompletedAt ? { lastSessionCompletedAt: toISO(data.lastSessionCompletedAt) } : {}),
           isGroup,
           lastMessageAt: toISO(data.lastMessageAt),
           createdAt: toISO(data.createdAt),
         } as Conversation;
       });
-      conversations.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
-      onData(conversations);
+      // Filter out conversations archived BY THIS USER. The doc itself
+      // stays in Firestore for the other participants — archive is a
+      // per-user view filter, not a destructive op.
+      const visible = conversations.filter((c) => !c.archivedBy.includes(userId));
+      visible.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+      onData(visible);
     },
     (err) => {
       console.warn('[chatService] conversations listener error:', err.message);
@@ -757,6 +815,7 @@ export const createGroupConversation = async (
     lastReadAt: {},
     pinnedBy: [],
     mutedBy: [],
+    archivedBy: [],
     isGroup: true,
     groupName: defaultName,
     createdBy: creator.userId,

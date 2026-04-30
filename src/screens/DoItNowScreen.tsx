@@ -30,7 +30,7 @@ import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirP
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
-import { notifySessionAdvanced } from '../services/planSessionService';
+import { notifySessionAdvanced, markUserFinishedInSession } from '../services/planSessionService';
 import { pickImage } from '../utils';
 
 // Quick-word chips shown on the editorial review screen.
@@ -486,6 +486,26 @@ export const DoItNowScreen: React.FC = () => {
     );
   };
 
+  // ── Group session completion helper ─────────────────────────────
+  // Same role as in DoItNowScreen.web.tsx — best-effort write of the
+  // current user's finishedAt on the shared plan_sessions doc. The
+  // service closes the session globally when everyone is done.
+  const finishGroupIfApplicable = (proofed: boolean) => {
+    if (!routeSessionId || !user) return;
+    const actor: ConversationParticipant = {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    markUserFinishedInSession(routeSessionId, actor, proofed).catch((err) => {
+      console.warn('[DoItNow] markUserFinishedInSession:', err);
+    });
+  };
+
   const handleNextStop = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -497,6 +517,7 @@ export const DoItNowScreen: React.FC = () => {
     resetPlaceModeUi();
 
     if (isLastPlace) {
+      finishGroupIfApplicable(!!(placeMode && placeMode.rating > 0));
       completeSession();
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {
@@ -510,6 +531,7 @@ export const DoItNowScreen: React.FC = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     resetPlaceModeUi();
     if (isLastPlace) {
+      finishGroupIfApplicable(false);
       completeSession();
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {

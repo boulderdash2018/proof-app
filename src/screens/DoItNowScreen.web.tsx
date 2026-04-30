@@ -16,7 +16,7 @@ import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirP
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
-import { notifySessionAdvanced } from '../services/planSessionService';
+import { notifySessionAdvanced, markUserFinishedInSession } from '../services/planSessionService';
 import { pickImage } from '../utils';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
@@ -560,6 +560,28 @@ export const DoItNowScreen: React.FC = () => {
     );
   }, [groupConversationId, plan, user, routeSessionId]);
 
+  // ── Group session completion helper ─────────────────────────────
+  // Marks the current user as finished in the shared plan_session doc.
+  // The service auto-detects when EVERY participant is finished and
+  // closes the session for the whole group (clearing activeSessionId
+  // on the conv + posting session_completed event). Best-effort —
+  // failure here doesn't block the local navigation.
+  const finishGroupIfApplicable = (proofed: boolean) => {
+    if (!routeSessionId || !user) return;
+    const actor: ConversationParticipant = {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    markUserFinishedInSession(routeSessionId, actor, proofed).catch((err) => {
+      console.warn('[DoItNow.web] markUserFinishedInSession:', err);
+    });
+  };
+
   const handleNext = () => {
     if (placeMode && placeMode.rating > 0) {
       useDoItNowStore.getState().ratePlace(currentIndex, placeMode.rating, buildCommentWithTags());
@@ -568,6 +590,9 @@ export const DoItNowScreen: React.FC = () => {
     resetPlaceModeUi();
 
     if (isLastPlace) {
+      // proofed = true if the user gave a rating on the last place,
+      // false if they finished without (still counts as "did the plan").
+      finishGroupIfApplicable(!!(placeMode && placeMode.rating > 0));
       completeSession();
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {
@@ -582,6 +607,8 @@ export const DoItNowScreen: React.FC = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     resetPlaceModeUi();
     if (isLastPlace) {
+      // Skipping the review on the last place = user finished but didn't proof.
+      finishGroupIfApplicable(false);
       completeSession();
       navigation.replace(session.isOrganizeMode ? 'OrganizeComplete' : 'DoItNowComplete');
     } else {

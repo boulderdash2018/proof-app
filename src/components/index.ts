@@ -1,6 +1,7 @@
 export { Avatar } from './Avatar';
 export { CoAuthorAvatarStack } from './CoAuthorAvatarStack';
 export { CollaboratorsSheet } from './CollaboratorsSheet';
+export { SessionEndedActions } from './SessionEndedActions';
 export { Chip } from './Chip';
 export { UserBadge } from './UserBadge';
 export { EmptyState } from './EmptyState';
