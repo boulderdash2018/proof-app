@@ -423,13 +423,21 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
       <CoPlanLockSheet
         visible={lockOpen}
         onClose={() => setLockOpen(false)}
-        onLocked={({ conversationId, planId, sessionId }) => {
-          // Adaptive nav based on whether the LockSheet also created a
-          // live session (user chose "Démarrer maintenant") :
-          //   • Session created → stack = Main → Conversation → DoItNow
-          //     (so back from DoItNow lands the user in the chat).
-          //   • No session → land in the chat (waiting room). The
-          //     pinned plan card + "Démarrer la session" CTA take over.
+        onLocked={({ conversationId, planId, sessionId, meetupAt }) => {
+          // Three-way nav based on what the LockSheet decided :
+          //   • sessionId set → meetup is now / past / missing, session
+          //     was created → stack = Main → Conversation → DoItNow
+          //     (back from DoItNow lands the user in the chat naturally).
+          //   • sessionId null + meetupAt in the future → route through
+          //     the WAITING ROOM with countdown + dev override. This is
+          //     the path the user reported missing — the LockSheet now
+          //     ALWAYS goes through the waiting room when the meetup
+          //     hasn't been reached yet.
+          //   • Else (sessionId null + no future meetup) → fallback to
+          //     the chat (publish-only landing).
+          const meetupMs = meetupAt ? new Date(meetupAt).getTime() : NaN;
+          const isFutureMeetup = Number.isFinite(meetupMs) && (meetupMs - Date.now()) > 15 * 60 * 1000;
+
           if (sessionId && planId) {
             navigation.reset({
               index: 0,
@@ -439,6 +447,18 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
                 {
                   name: 'DoItNow',
                   params: { planId, sessionId, conversationId },
+                },
+              ] as any,
+            });
+          } else if (isFutureMeetup && planId) {
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Main' },
+                { name: 'Conversation', params: { conversationId, otherUser: null } },
+                {
+                  name: 'WaitingRoom',
+                  params: { planId, conversationId, meetupAt: meetupAt ?? null },
                 },
               ] as any,
             });

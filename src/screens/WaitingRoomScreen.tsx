@@ -199,9 +199,11 @@ export const WaitingRoomScreen: React.FC = () => {
   };
 
   // ── Headline copy adapts to how far the countdown is ──
+  // Voulu friendly + directif : "reviens plus tard" pour les RDV lointains,
+  // un compte à rebours plus motivant quand c'est imminent.
   const headlineSub = useMemo(() => {
     if (!countdown) return 'Le plan démarrera quand vous serez prêts.';
-    if (countdown.variant === 'far') return `Le plan démarre ${countdown.farLabel}.`;
+    if (countdown.variant === 'far') return `Reviens plus tard — le plan démarre ${countdown.farLabel}.`;
     if (countdown.variant === 'close') return 'Plus que quelques instants…';
     return 'C’est l’heure !';
   }, [countdown]);
@@ -293,7 +295,7 @@ export const WaitingRoomScreen: React.FC = () => {
 
           {/* ── Soft hint ── */}
           <Text style={styles.hint}>
-            En attendant, suis les échanges dans la conversation. Le plan démarrera tout seul à l{'’'}heure prévue.
+            Tu peux fermer l{'’'}app sans souci. À l{'’'}heure du RDV, le plan démarre tout seul pour tout le groupe.
           </Text>
         </Animated.View>
       </ScrollView>
