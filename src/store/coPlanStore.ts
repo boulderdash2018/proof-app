@@ -635,6 +635,8 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     if (!user) return null;
 
     try {
+      console.log('[lockDraft] start — draft:', draft.id, 'publishOnFeed:', publishOnFeed);
+
       // 1) Determine meetupAt — priorité au meetupAtProposed (date EXACTE
       //    choisie par le créateur ou validée par sondage), sinon fallback
       //    sur l'auto-overlap des dispos. Cette précédence reflète l'intent :
@@ -651,8 +653,15 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       //    en parallèle — sinon le PlanDetail s'affiche avec "★ 0 (0 avis)"
       //    et c'est moche. Les fetches sont best-effort : si un échoue,
       //    on retombe sur les snapshots locaux du brouillon.
+      //
+      //    Master timeout 9s (au cas où le timeout interne 7s de
+      //    getPlaceDetails ne suffirait pas) — si on dépasse, on lance le
+      //    plan avec rating: 0 plutôt que de hang. L'utilisateur préférera
+      //    toujours un plan créé sans Google data plutôt qu'un freeze.
       const sortedPlaces = get().getSortedPlaces();
-      const enriched = await Promise.all(
+      console.log('[lockDraft] enriching', sortedPlaces.length, 'places via Google');
+      const t0 = Date.now();
+      const enrichmentPromise = Promise.all(
         sortedPlaces.map(async (p) => {
           try {
             const g = await getPlaceDetails(p.googlePlaceId);
@@ -662,6 +671,15 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
           }
         }),
       );
+      const fallbackPromise = new Promise<Array<{ p: typeof sortedPlaces[number]; g: null }>>(
+        (resolve) =>
+          setTimeout(() => {
+            console.warn('[lockDraft] enrichment master timeout 9s — falling back to local snapshots');
+            resolve(sortedPlaces.map((p) => ({ p, g: null })));
+          }, 9000),
+      );
+      const enriched = await Promise.race([enrichmentPromise, fallbackPromise]);
+      console.log('[lockDraft] enrichment done in', Date.now() - t0, 'ms');
       const planPlaces: Place[] = enriched.map(({ p, g }) => ({
         id: `place-${p.googlePlaceId}-${Math.random().toString(36).slice(2, 8)}`,
         googlePlaceId: p.googlePlaceId,
@@ -704,6 +722,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       // 5) Create the Plan doc. Always created — the group conv needs a
       //    linkedPlanId for "Do it now" multi-user. Visibility controls
       //    whether the Plan appears in public feed queries.
+      console.log('[lockDraft] creating Plan doc...');
       const plan = await createPlan(
         {
           title: draft.title,
@@ -727,8 +746,10 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       //    creation time so participants could chat during the prep phase).
       //    Fallback : if for some reason the draft has no conv id yet (legacy
       //    drafts pre-this-commit), create one on the fly to keep things working.
+      console.log('[lockDraft] Plan created:', plan.id);
       let convId = draft.conversationId || draft.publishedConvId;
       if (convId) {
+        console.log('[lockDraft] attaching plan to existing conv:', convId);
         await attachPlanToConversation(
           convId,
           {
@@ -772,6 +793,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       }
 
       // 6) Mark the draft as locked + cross-linked.
+      console.log('[lockDraft] marking draft locked, convId:', convId);
       await markDraftLocked(
         draft.id,
         _userId,
@@ -780,6 +802,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
         convId,
       );
 
+      console.log('[lockDraft] DONE — convId:', convId, 'planId:', plan.id);
       return { conversationId: convId, planId: plan.id };
     } catch (err) {
       console.warn('[coPlanStore] lockDraft error:', err);

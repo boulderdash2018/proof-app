@@ -152,6 +152,14 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceDetai
     'reviews',
   ];
 
+  // ⚠️ Timeout dur 7s : sans ça un fetch peut hang indéfiniment (Vercel route
+  // qui ne répond plus, connexion stale, Google API lente). Si ça arrive
+  // pendant lockDraft (CoPlan), le Promise.all bloque tout et l'app freeze
+  // sans message d'erreur. AbortController lève une AbortError attrapée par
+  // le catch en bas → retourne null → fallback sur les snapshots locaux.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
   try {
     const url = isWeb
       ? `${API_BASE_URL}/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
@@ -160,7 +168,7 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceDetai
       ? {}
       : { 'X-Goog-Api-Key': API_KEY, 'X-Goog-FieldMask': fields.join(','), 'Accept-Language': 'fr' };
 
-    const res = await fetch(url, { method: 'GET', headers });
+    const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
 
     const data = await res.json();
     if (!data.displayName) return null;
@@ -191,9 +199,17 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceDetai
       longitude: data.location?.longitude || 0,
       reviews,
     };
-  } catch (err) {
-    console.error('Place details error:', err);
+  } catch (err: any) {
+    // AbortError = timeout 7s atteint, fallback silencieux. Tout autre
+    // err est loggé mais on retourne null → caller doit fallback.
+    if (err?.name === 'AbortError') {
+      console.warn('[getPlaceDetails] timeout 7s for placeId:', placeId);
+    } else {
+      console.error('Place details error:', err);
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
