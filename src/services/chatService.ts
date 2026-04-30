@@ -841,6 +841,60 @@ export const postSystemEvent = async (
   await updateDoc(convRef, updatePayload);
 };
 
+/**
+ * Set / clear / change the meetup date on a group conversation, and post
+ * a system event to surface the change in the chat. Used by the date
+ * picker sheet that's accessible from the pinned plan card — lets the
+ * group fix a precise start time for "Do it now à plusieurs", which the
+ * waiting room then counts down to.
+ *
+ * Format the payload as a human-readable preview ("le 1 mai à 18h" /
+ * "sans date") so the existing `coplan_meetup_set` renderer (which has
+ * been around since the workspace) handles the chat row natively — no
+ * new SystemEventKind needed.
+ *
+ * Pass `meetupAt = null` to clear the date.
+ */
+export const setConversationMeetupAt = async (
+  conversationId: string,
+  meetupAt: string | null,
+  actor: ConversationParticipant,
+): Promise<void> => {
+  await updateDoc(doc(db, CONVERSATIONS, conversationId), {
+    meetupAt: meetupAt,
+  });
+  const friendly = meetupAt ? formatMeetupHumanShort(meetupAt) : 'sans date';
+  const preview = meetupAt
+    ? `${actor.displayName} a fixé le départ — ${friendly}`
+    : `${actor.displayName} a retiré la date du départ`;
+  await postSystemEvent(
+    conversationId,
+    {
+      kind: 'coplan_meetup_set',
+      actorId: actor.userId,
+      payload: friendly,
+    },
+    preview,
+  );
+};
+
+/**
+ * Compact "le 1 mai à 18h" formatter — kept private to chatService to
+ * avoid leaking yet another date util. Mirrors the format used by
+ * planDraftService.formatMeetupForTitle but without the dependency on
+ * planDraftService (avoids a circular import risk between services).
+ */
+const formatMeetupHumanShort = (iso: string): string => {
+  try {
+    const d = new Date(iso);
+    const dateLabel = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    const timeLabel = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return `le ${dateLabel} à ${timeLabel.replace(':00', 'h').replace(':', 'h')}`;
+  } catch {
+    return iso;
+  }
+};
+
 /** Add a participant to an existing group. Posts a `joined` system event. */
 export const addParticipantToGroup = async (
   conversationId: string,

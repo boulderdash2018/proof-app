@@ -11,13 +11,13 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant, DoItNowDateSheet } from '../components';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useColors } from '../hooks/useColors';
-import { ChatMessage, ConversationParticipant, resetUnreadCount } from '../services/chatService';
+import { ChatMessage, ConversationParticipant, resetUnreadCount, setConversationMeetupAt } from '../services/chatService';
 import { createGroupSession } from '../services/planSessionService';
 import { fetchPlanById } from '../services/plansService';
 import { useDoItNowStore } from '../store/doItNowStore';
@@ -1324,6 +1324,41 @@ export const ConversationScreen: React.FC = () => {
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  // Date sheet — used to fix the "Do it now à plusieurs" start time on
+  // a group conv. Tappable from the pinned plan card (the calendar line).
+  const [dateSheetOpen, setDateSheetOpen] = useState(false);
+
+  // ── Meetup date handlers ──
+  // Persists meetupAt on the conversation + posts a system event so the
+  // whole group sees the change in the chat. Reuses the chat-service
+  // helper which mirrors the pattern of every other group mutation.
+  const handleSetMeetupAt = useCallback(async (iso: string) => {
+    if (!user || !conversationId) return;
+    const actor: ConversationParticipant = activeConv?.participantDetails?.[user.id] || {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    await setConversationMeetupAt(conversationId, iso, actor);
+  }, [user, conversationId, activeConv?.participantDetails]);
+
+  const handleClearMeetupAt = useCallback(async () => {
+    if (!user || !conversationId) return;
+    const actor: ConversationParticipant = activeConv?.participantDetails?.[user.id] || {
+      userId: user.id,
+      displayName: user.displayName,
+      username: user.username,
+      avatarUrl: user.avatarUrl || null,
+      avatarBg: user.avatarBg,
+      avatarColor: user.avatarColor,
+      initials: user.initials,
+    };
+    await setConversationMeetupAt(conversationId, null, actor);
+  }, [user, conversationId, activeConv?.participantDetails]);
   // Track focus on the message input — used to hide the floating
   // session dock while the user is typing (no CTA noise mid-message).
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -1905,10 +1940,36 @@ export const ConversationScreen: React.FC = () => {
                       {activeConv.linkedPlanTitle || 'Plan'}
                     </Text>
                     <View style={styles.pinnedPlanMeta}>
-                      <Ionicons name="calendar-outline" size={11} color={Colors.textSecondary} />
-                      <Text style={styles.pinnedPlanMetaText}>
-                        {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
-                      </Text>
+                      {/* Calendar line — tappable. Stops bubbling so the
+                          parent card's onPress (open PlanDetail) doesn't
+                          fire. Shows "Date à fixer" in terracotta to
+                          invite the action when no date is set yet. */}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          // RN-Web : stopPropagation so the parent card
+                          // doesn't navigate to PlanDetail when the user
+                          // taps the date line.
+                          (e as any).stopPropagation?.();
+                          setDateSheetOpen(true);
+                        }}
+                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 8 }}
+                        style={styles.pinnedPlanMetaPressable}
+                        activeOpacity={0.6}
+                      >
+                        <Ionicons
+                          name="calendar-outline"
+                          size={11}
+                          color={activeConv.meetupAt ? Colors.textSecondary : Colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.pinnedPlanMetaText,
+                            !activeConv.meetupAt && { color: Colors.primary, fontFamily: Fonts.bodySemiBold },
+                          ]}
+                        >
+                          {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
+                        </Text>
+                      </TouchableOpacity>
                       <Text style={styles.pinnedPlanMetaSep}>·</Text>
                       <Ionicons name="people-outline" size={11} color={Colors.textSecondary} />
                       <Text style={styles.pinnedPlanMetaText}>
@@ -2313,6 +2374,21 @@ export const ConversationScreen: React.FC = () => {
         onClose={() => setPollComposerOpen(false)}
         onSubmit={(question, options) => sendPoll({ question, options })}
       />
+
+      {/* "Do it now à plusieurs" date sheet — fix the start time of the
+          group session. Reuses the same calendar UI as CoPlanMeetupSheet
+          (day strip + hour grid) but writes to the conv's meetupAt
+          rather than the draft. Only mounted for groups with a linked
+          plan — the date is meaningless for plain DM conversations. */}
+      {isGroup && activeConv?.linkedPlanId && (
+        <DoItNowDateSheet
+          visible={dateSheetOpen}
+          onClose={() => setDateSheetOpen(false)}
+          currentMeetupAt={activeConv.meetupAt ?? null}
+          onConfirm={handleSetMeetupAt}
+          onClear={handleClearMeetupAt}
+        />
+      )}
 
       {/* Rename modal (groups only) */}
       {isGroup && (
@@ -2778,6 +2854,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginTop: 4,
+  },
+  pinnedPlanMetaPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   pinnedPlanMetaText: {
     fontSize: 11.5,

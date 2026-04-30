@@ -33,6 +33,7 @@ export { CoPlanProposalCard } from './CoPlanProposalCard';
 export { CoPlanPlacesCard } from './CoPlanPlacesCard';
 export { CoPlanCompactEvent } from './CoPlanCompactEvent';
 export { CoPlanDetailsConfirmedCard } from './CoPlanDetailsConfirmedCard';
+export { DoItNowDateSheet } from './DoItNowDateSheet';
 export { CoPlanResolutionPill } from './CoPlanResolutionPill';
 export { CoPlanStatusBar } from './CoPlanStatusBar';
 export { GroupLiveMapSheet } from './GroupLiveMapSheet';
