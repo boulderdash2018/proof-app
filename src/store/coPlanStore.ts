@@ -11,6 +11,7 @@ import {
   removePlace as svcRemovePlace,
   togglePlaceVote as svcTogglePlaceVote,
   movePlace as svcMovePlace,
+  setPlaceDurationMin as svcSetPlaceDurationMin,
   setAvailability as svcSetAvailability,
   setMeetupAtProposed as svcSetMeetupAtProposed,
   renameDraft as svcRenameDraft,
@@ -105,6 +106,9 @@ interface CoPlanStore {
   removePlace: (placeId: string) => Promise<void>;
   toggleVote: (placeId: string) => Promise<void>;
   movePlace: (placeId: string, direction: 'up' | 'down') => Promise<void>;
+  /** Override the on-site duration of a proposed place. Pass null to
+   *  clear the override (timeline falls back to the default). */
+  setPlaceDuration: (placeId: string, minutes: number | null) => Promise<void>;
   setAvailability: (slots: string[]) => Promise<void>;
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
 
@@ -447,6 +451,29 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       await svcMovePlace(draftId, placeId, direction);
     } catch (err) {
       console.warn('[coPlanStore] movePlace error:', err);
+    }
+  },
+
+  setPlaceDuration: async (placeId: string, minutes: number | null) => {
+    const { draftId, draft, _userId } = get();
+    if (!draftId || !draft || !_userId) return;
+    // Optimistic update — write the new duration locally so the timeline
+    // recomputes instantly (no spinner round-trip on the user). The
+    // Firestore write below is mirrored back via the live subscribe ;
+    // if it fails, the next snapshot will reconcile.
+    const next = draft.proposedPlaces.map((p) => {
+      if (p.id !== placeId) return p;
+      if (minutes === null) {
+        const { estimatedDurationMin, durationSetByUserId, ...rest } = p as any;
+        return rest;
+      }
+      return { ...p, estimatedDurationMin: minutes, durationSetByUserId: _userId };
+    });
+    set({ draft: { ...draft, proposedPlaces: next } });
+    try {
+      await svcSetPlaceDurationMin(draftId, placeId, minutes, _userId);
+    } catch (err) {
+      console.warn('[coPlanStore] setPlaceDuration error:', err);
     }
   },
 

@@ -467,6 +467,48 @@ export const togglePlaceVote = async (
   });
 };
 
+/**
+ * Override the on-site duration for a proposed place. Setting `minutes`
+ * to null clears the override (the timeline falls back to the default
+ * 60min). Available to ANY participant — same edit policy as votes ;
+ * the avatar of the last editor surfaces in the row so the group sees
+ * who set what.
+ *
+ * Stamps `durationSetByUserId` for that attribution. Tracking the
+ * setter at the place level (not via a separate audit log) keeps the
+ * doc small and the UI single-source-of-truth.
+ */
+export const setPlaceDurationMin = async (
+  draftId: string,
+  placeId: string,
+  minutes: number | null,
+  userId: string,
+): Promise<void> => {
+  const ref = doc(db, DRAFTS, draftId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const places: CoPlanProposedPlace[] = data.proposedPlaces || [];
+  const next = places.map((p) => {
+    if (p.id !== placeId) return p;
+    if (minutes === null) {
+      // Clear override — strip the field entirely so the timeline
+      // computation falls back to the default in planTimelineService.
+      const { estimatedDurationMin, durationSetByUserId, ...rest } = p as any;
+      return rest;
+    }
+    return {
+      ...p,
+      estimatedDurationMin: minutes,
+      durationSetByUserId: userId,
+    };
+  });
+  await updateDoc(ref, {
+    proposedPlaces: next,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 /** Reorder places by moving one up/down in the list (orderIndex shift). */
 export const movePlace = async (
   draftId: string,

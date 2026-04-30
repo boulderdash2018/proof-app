@@ -385,6 +385,11 @@ export interface CoPlanProposedPlace {
   priceLevel?: number;
   /** Rough duration-on-site, in minutes. Optional — used for total duration estimate (Tier 2). */
   estimatedDurationMin?: number;
+  /** User id of the participant who last overrode the duration on this
+   *  place. Surfaced as a tiny avatar next to the duration chip so the
+   *  group sees attribution ("Léo a fixé à 2h30 — match LDC"). Cleared
+   *  when the override is removed. */
+  durationSetByUserId?: string;
   latitude?: number;
   longitude?: number;
   /** User id who added this place. */

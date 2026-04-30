@@ -2,6 +2,7 @@ export { Avatar } from './Avatar';
 export { CoAuthorAvatarStack } from './CoAuthorAvatarStack';
 export { CollaboratorsSheet } from './CollaboratorsSheet';
 export { SessionEndedActions } from './SessionEndedActions';
+export { DurationPickerSheet } from './DurationPickerSheet';
 export { Chip } from './Chip';
 export { UserBadge } from './UserBadge';
 export { EmptyState } from './EmptyState';

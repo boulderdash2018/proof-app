@@ -15,6 +15,7 @@ import {
   getPlaceDetails,
 } from '../services/googlePlacesService';
 import { CoPlanProposedPlace, CoPlanParticipant, CoPlanProposal } from '../types';
+import { DurationPickerSheet } from './DurationPickerSheet';
 
 interface Props {
   participants: Record<string, CoPlanParticipant>;
@@ -36,6 +37,7 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
   const movePlace = useCoPlanStore((s) => s.movePlace);
   const removePlace = useCoPlanStore((s) => s.removePlace);
   const proposeRemovePlace = useCoPlanStore((s) => s.proposeRemovePlace);
+  const setPlaceDuration = useCoPlanStore((s) => s.setPlaceDuration);
   const pendingProposals = useCoPlanStore((s) => s.pendingProposals);
   const draft = useCoPlanStore((s) => s.draft);
   const totalParticipants = draft?.participants.length || 0;
@@ -44,6 +46,8 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
   /** Place currently targeted by the contextual long-press menu, or null. */
   const [longPressTarget, setLongPressTarget] = useState<CoPlanProposedPlace | null>(null);
   const [proposingForId, setProposingForId] = useState<string | null>(null);
+  /** Place currently targeted by the duration picker sheet, or null. */
+  const [durationTarget, setDurationTarget] = useState<CoPlanProposedPlace | null>(null);
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -129,6 +133,9 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
             const removalProposer = pendingRemoval
               ? participants[pendingRemoval.proposedBy]
               : undefined;
+            const durationSetter = p.durationSetByUserId
+              ? participants[p.durationSetByUserId]
+              : undefined;
             return (
               <PlaceRow
                 key={p.id}
@@ -142,6 +149,8 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
                 onMoveDown={() => handleMove(p.id, 'down')}
                 onRemove={() => handleRemove(p.id)}
                 onLongPress={() => handleLongPress(p)}
+                onEditDuration={() => setDurationTarget(p)}
+                durationSetter={durationSetter}
                 isProposing={proposingForId === p.id}
                 pendingRemoval={pendingRemoval}
                 removalProposer={removalProposer}
@@ -165,6 +174,22 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
           setLongPressTarget(null);
         }}
         onProposeRemove={handleProposeRemove}
+      />
+
+      {/* ── Duration picker — chip + occasion presets ──
+          Opens when the user taps the "1h sur place" chip on a row.
+          Edit is open to any participant ; the setter's avatar is then
+          surfaced next to the duration on the row (attribution). */}
+      <DurationPickerSheet
+        visible={!!durationTarget}
+        onClose={() => setDurationTarget(null)}
+        currentMinutes={durationTarget?.estimatedDurationMin ?? null}
+        placeName={durationTarget?.name}
+        placeCategory={durationTarget?.category}
+        onConfirm={async (minutes) => {
+          if (!durationTarget) return;
+          await setPlaceDuration(durationTarget.id, minutes);
+        }}
       />
 
       <PlacePickerModal
@@ -211,6 +236,11 @@ interface PlaceRowProps {
   onMoveDown: () => void;
   onRemove: () => void;
   onLongPress?: () => void;
+  /** Tap on the duration chip → open the picker sheet for this row. */
+  onEditDuration: () => void;
+  /** Avatar of whoever last set a custom duration on this row (when set).
+   *  Surfaces attribution next to the duration chip. */
+  durationSetter?: CoPlanParticipant;
   /** Show a faint pulse while a "Proposer de retirer" call is in flight. */
   isProposing?: boolean;
   /** A pending `remove_place` proposal targeting this row, if any.
@@ -222,9 +252,20 @@ interface PlaceRowProps {
   totalParticipants?: number;
 }
 
+/** Format the duration chip label : "1h sur place" by default, "2h30
+ *  sur place" / "45 min sur place" when overridden. */
+const formatDurationLabel = (minutes?: number): string => {
+  const m = minutes ?? 60;
+  if (m < 60) return `${m} min sur place`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  const dur = r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
+  return `${dur} sur place`;
+};
+
 const PlaceRow: React.FC<PlaceRowProps> = ({
   place, index, total, proposer, currentUserId, onVote, onMoveUp, onMoveDown, onRemove,
-  onLongPress, isProposing, pendingRemoval, removalProposer, totalParticipants,
+  onLongPress, onEditDuration, durationSetter, isProposing, pendingRemoval, removalProposer, totalParticipants,
 }) => {
   const hasVoted = !!currentUserId && place.votes.includes(currentUserId);
   const voteCount = place.votes.length;
@@ -269,6 +310,44 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
           {place.name}
         </Text>
         <Text style={rowStyles.address} numberOfLines={1}>{place.address}</Text>
+
+        {/* Duration chip — tappable. Shows the override when set, the
+            default "1h sur place" otherwise. The pencil icon is the
+            affordance. When someone overrode the duration, their
+            avatar appears next to the chip (attribution). */}
+        {(() => {
+          const hasOverride = typeof place.estimatedDurationMin === 'number';
+          return (
+            <TouchableOpacity
+              style={[rowStyles.durationChip, hasOverride && rowStyles.durationChipCustom]}
+              onPress={onEditDuration}
+              activeOpacity={0.7}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            >
+              <Ionicons
+                name="time-outline"
+                size={11}
+                color={hasOverride ? Colors.primary : Colors.textTertiary}
+              />
+              <Text style={[rowStyles.durationText, hasOverride && rowStyles.durationTextCustom]}>
+                {formatDurationLabel(place.estimatedDurationMin)}
+              </Text>
+              {durationSetter && hasOverride && (
+                <View style={rowStyles.durationAvatar}>
+                  <Avatar
+                    initials={durationSetter.initials}
+                    bg={durationSetter.avatarBg}
+                    color={durationSetter.avatarColor}
+                    size="XS"
+                    avatarUrl={durationSetter.avatarUrl ?? undefined}
+                  />
+                </View>
+              )}
+              <Ionicons name="pencil" size={9} color={Colors.textTertiary} style={rowStyles.durationPencil} />
+            </TouchableOpacity>
+          );
+        })()}
+
         {proposer && (
           <View style={rowStyles.proposerRow}>
             <Avatar
@@ -743,6 +822,43 @@ const rowStyles = StyleSheet.create({
     color: Colors.textTertiary,
     marginTop: 2,
   },
+
+  // Duration chip — tappable, opens the picker
+  durationChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+    backgroundColor: Colors.bgPrimary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    marginTop: 6,
+  },
+  durationChipCustom: {
+    backgroundColor: Colors.terracotta50,
+    borderColor: Colors.terracotta200,
+  },
+  durationText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textTertiary,
+    letterSpacing: 0.05,
+  },
+  durationTextCustom: {
+    color: Colors.primary,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  durationAvatar: {
+    marginLeft: 2,
+  },
+  durationPencil: {
+    marginLeft: 2,
+    opacity: 0.6,
+  },
+
   proposerRow: {
     flexDirection: 'row',
     alignItems: 'center',
