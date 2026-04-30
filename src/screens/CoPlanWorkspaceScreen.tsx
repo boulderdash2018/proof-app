@@ -20,6 +20,7 @@ import { useCoPlanStore } from '../store/coPlanStore';
 import { backfillConversationForDraft, shareDraftAsGroup, formatMeetupForTitle, getDisplayTitle } from '../services/planDraftService';
 import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts } from '../components';
 import { CoPlanMeetupSheet } from '../components/CoPlanMeetupSheet';
+import { CoPlanDetailsView } from '../components/CoPlanDetailsView';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -42,6 +43,7 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   const stopObserving = useCoPlanStore((s) => s.stopObserving);
   const rename = useCoPlanStore((s) => s.rename);
   const isPresent = useCoPlanStore((s) => s.isPresent);
+  const postDetailsConfirmedMirror = useCoPlanStore((s) => s.postDetailsConfirmedMirror);
 
   // Rename modal state
   const [renameOpen, setRenameOpen] = useState(false);
@@ -51,6 +53,11 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   const [lockOpen, setLockOpen] = useState(false);
   // Meetup date/time sheet state
   const [meetupSheetOpen, setMeetupSheetOpen] = useState(false);
+  // Details-view toggle — when true, hide the editable sections and show
+  // a read-only timeline + final "Lancer le plan" button. UI-only state,
+  // not persisted (anyone can flip back to edit mode anytime via the
+  // "Modifier" button surfaced inside the details view).
+  const [detailsView, setDetailsView] = useState(false);
   // "Créer le groupe" loading state — quand on partage le brouillon
   // initialement (avant qu'il ait une conversation associée).
   const [sharing, setSharing] = useState(false);
@@ -112,6 +119,23 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
   // - "solo" : pas encore de conv → CTA "Créer le groupe" (partage initial)
   // - "shared" : conv existe → CTA "Lancer le plan" (publier sur le feed)
   const hasGroup = !!(draft?.conversationId || draft?.publishedConvId);
+
+  // Action : "Confirmer les détails" → bascule en read-only + post une
+  // carte preview dans le chat. Pas de mutation Firestore — c'est un état
+  // UI, l'utilisateur peut revenir éditer via le bouton "Modifier" à
+  // l'intérieur du details view. Le summary est volontairement compact
+  // ("4 lieux · 5h · ≈45-80€") pour rester lisible dans la lastMessage.
+  const handleConfirmDetails = () => {
+    if (!draft) return;
+    const placeCount = draft.proposedPlaces.length;
+    const placesLabel = `${placeCount} lieu${placeCount > 1 ? 'x' : ''}`;
+    const dateLabel = draft.meetupAtProposed
+      ? formatMeetupForTitle(draft.meetupAtProposed)
+      : null;
+    const summary = [placesLabel, dateLabel].filter(Boolean).join(' · ');
+    postDetailsConfirmedMirror(summary);
+    setDetailsView(true);
+  };
 
   // Action : créer le groupe → crée la conv + post un snapshot + nav vers le chat.
   const handleCreateGroup = async () => {
@@ -216,7 +240,16 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         )}
       </View>
 
-      {/* ── Body sections (placeholders — filled by commits 5 / 6 / 7) ─ */}
+      {/* ── Body : edit mode OR details (read-only) view ─────── */}
+      {detailsView ? (
+        <View style={{ flex: 1 }}>
+          <CoPlanDetailsView
+            onEdit={() => setDetailsView(false)}
+            onLock={() => canLock && setLockOpen(true)}
+            canLock={canLock}
+          />
+        </View>
+      ) : (
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
@@ -290,23 +323,24 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
         <CoPlanSummaryFooter />
 
         {hasGroup ? (
-          // ── Étape 2 : le groupe existe déjà → on peut publier le plan
-          //    sur le feed (visibilité publique, devient un Plan officiel).
+          // ── Étape 2 : le groupe existe déjà → on peut "Confirmer les détails"
+          //    pour basculer en read-only + carte preview dans le chat.
+          //    Le vrai "Lancer le plan" (lock final) vit en bas du details view.
           <SectionBlock
-            icon="rocket-outline"
-            label="LANCER LE PLAN"
-            title="Prêt à publier ?"
-            subtitle="Le brouillon devient un plan officiel — visible dans la conv et utilisable en session live. Vous pouvez aussi le rendre public sur le feed."
+            icon="checkmark-done-outline"
+            label="CONFIRMER"
+            title="Tout est bon ?"
+            subtitle="Confirme les détails du plan pour passer en lecture seule et partager une preview dans le chat. Tu pourras toujours revenir éditer si besoin."
             muted={!canLock}
           >
             <TouchableOpacity
               style={[styles.lockBtn, !canLock && styles.lockBtnDisabled]}
-              onPress={() => canLock && setLockOpen(true)}
+              onPress={() => canLock && handleConfirmDetails()}
               activeOpacity={canLock ? 0.85 : 1}
               disabled={!canLock}
             >
               <Ionicons
-                name="rocket"
+                name="checkmark-done"
                 size={16}
                 color={canLock ? Colors.textOnAccent : Colors.textTertiary}
               />
@@ -316,7 +350,7 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
                   !canLock && styles.lockBtnTextDisabled,
                 ]}
               >
-                Lancer le plan
+                Confirmer les détails du plan
               </Text>
             </TouchableOpacity>
             {lockMissingHint && (
@@ -369,6 +403,7 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
+      )}
 
       {/* ── Live activity toasts ──────────────────
           Bottom of the workspace — surfaces "Léa a ajouté Café Pinson"

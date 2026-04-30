@@ -1056,6 +1056,8 @@ const renderSystemEventText = (
       return ev.payload === 'sans date'
         ? `${firstNameOf(ev.actorId)} a retiré la date`
         : `${firstNameOf(ev.actorId)} a fixé la date · ${ev.payload || ''}`;
+    case 'coplan_details_confirmed':
+      return `📋 ${firstNameOf(ev.actorId)} a confirmé les détails — ${ev.payload || ''}`;
     case 'coplan_locked':
       return `Plan lancé : ${ev.payload || ''}`;
     case 'coplan_proposal_applied':

@@ -108,6 +108,13 @@ interface CoPlanStore {
   setAvailability: (slots: string[]) => Promise<void>;
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
 
+  // ── Details confirmation (post-edit, pre-lock) ──
+  /** Posts a "details confirmed" preview card in the chat. Pure mirror —
+   *  doesn't modify the draft. The summary string is computed by the
+   *  caller (typically the workspace screen) so we don't duplicate the
+   *  timeline math. Returns immediately ; chat post is best-effort. */
+  postDetailsConfirmedMirror: (summary: string) => void;
+
   // ── Meetup date/time ──
   /** Creator-only path : set or clear the proposed meetup datetime
    *  directly on the draft (no vote). Pass null to clear.
@@ -176,6 +183,7 @@ function postCoPlanMirror(
     case 'coplan_place_voted':      preview = `${firstName} a voté pour ${detail}`; break;
     case 'coplan_availability_set': preview = `${firstName} a marqué ${detail}`; break;
     case 'coplan_meetup_set':       preview = detail === 'sans date' ? `${firstName} a retiré la date` : `${firstName} a fixé la date : ${detail}`; break;
+    case 'coplan_details_confirmed': preview = `${firstName} a confirmé les détails — ${detail}`; break;
     case 'coplan_locked':           preview = `Plan lancé : ${detail}`; break;
     default:                        preview = `${firstName} a modifié le brouillon`;
   }
@@ -482,6 +490,11 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       ? current.filter((k) => k !== slotKey)
       : [...current, slotKey];
     await get().setAvailability(next);
+  },
+
+  // ── Details confirmation mirror ──
+  postDetailsConfirmedMirror: (summary: string) => {
+    postCoPlanMirror('coplan_details_confirmed', summary);
   },
 
   // ── Meetup date/time ──
