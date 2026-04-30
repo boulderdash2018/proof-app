@@ -15,6 +15,7 @@ import {
   getDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   serverTimestamp,
   query,
@@ -61,6 +62,7 @@ const hydrateDraft = (id: string, data: any): PlanDraft => {
     availability: data.availability || {},
     status: data.status || 'draft',
     meetupAt: data.meetupAt,
+    meetupAtProposed: data.meetupAtProposed,
     lockedBy: data.lockedBy,
     lockedAt: data.lockedAt ? toISO(data.lockedAt) : undefined,
     publishedPlanId: data.publishedPlanId,
@@ -510,6 +512,37 @@ export const setAvailability = async (
   });
 };
 
+/**
+ * Set or clear the proposed meetup date/time on a draft.
+ *
+ * Called directly by the creator (no vote needed) — for non-creators, the
+ * UI routes through createProposal({type: 'change_meetup'}) instead, which
+ * lands here via applyProposal() once the strict-majority threshold is
+ * reached.
+ *
+ * Pass null to clear (e.g. "remettre la date au plus tard").
+ */
+export const setMeetupAtProposed = async (
+  draftId: string,
+  meetupAt: string | null,
+): Promise<void> => {
+  const ref = doc(db, DRAFTS, draftId);
+  if (meetupAt === null) {
+    // Firestore : undefined is rejected, but using a sentinel deleteField()
+    // is safer than a null write here. We accept null in the public API but
+    // delete the field server-side for cleanliness.
+    await updateDoc(ref, {
+      meetupAtProposed: deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await updateDoc(ref, {
+      meetupAtProposed: meetupAt,
+      updatedAt: serverTimestamp(),
+    });
+  }
+};
+
 /** Heartbeat for live presence (fire every ~20s while the workspace is open). */
 export const pingPresence = async (draftId: string, userId: string): Promise<void> => {
   try {
@@ -611,6 +644,38 @@ export const slotKeyToMeetupAt = (key: string): string | null => {
   };
   d.setHours(hoursByPart[parsed.part], 0, 0, 0);
   return d.toISOString();
+};
+
+/**
+ * Format an ISO meetup datetime as a French suffix appended to the plan
+ * title : "le 17 avril à 18h" (or "à 18h30" if minutes ≠ 0).
+ *
+ * Le format est volontairement court (compatible avec la barre de header
+ * du chat où l'espace est compté) et déterministe — pas de "demain"/"aprem"
+ * qui change avec le temps absolu.
+ */
+export const formatMeetupForTitle = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const hourStr = m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, '0')}`;
+  return `le ${day} à ${hourStr}`;
+};
+
+/**
+ * Compute the title shown in the workspace + conv header.
+ * Falls back to the raw title when no meetup is set.
+ */
+export const getDisplayTitle = (
+  baseTitle: string,
+  meetupAtProposed?: string | null,
+): string => {
+  if (!meetupAtProposed) return baseTitle;
+  const suffix = formatMeetupForTitle(meetupAtProposed);
+  if (!suffix) return baseTitle;
+  return `${baseTitle} ${suffix}`;
 };
 
 /** Human-readable label for a slot key (e.g. "Sam 26 · midi"). */
@@ -814,8 +879,8 @@ export const voteOnProposal = async (
  * and bail out — protects against duplicate mutations from racing
  * clients all detecting the threshold simultaneously.
  *
- * Currently handles `remove_place`. `replace_place` / `change_*` are
- * stubbed for the next commit.
+ * Handles `remove_place` and `change_meetup`. `replace_place` and
+ * `change_title` are stubbed (proposals are accepted but applied as no-op).
  */
 export const applyProposal = async (
   draftId: string,
@@ -850,9 +915,27 @@ export const applyProposal = async (
           });
           break;
         }
+        case 'change_meetup': {
+          // Le sondage adopté → on applique la date proposée comme la
+          // nouvelle valeur courante du brouillon. Si meetupAt est absent
+          // (cas "annuler la date"), on retire le champ.
+          const newAt = prop.payload.meetupAt;
+          appliedSubject = newAt ? formatMeetupForTitle(newAt) : 'sans date';
+          if (newAt) {
+            tx.update(draftRef, {
+              meetupAtProposed: newAt,
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            tx.update(draftRef, {
+              meetupAtProposed: deleteField(),
+              updatedAt: serverTimestamp(),
+            });
+          }
+          break;
+        }
         // Other types — wired in commit 3.
         case 'replace_place':
-        case 'change_meetup':
         case 'change_title':
           // For now: just mark resolved without mutating the draft. The
           // real apply lands when the corresponding UI does.

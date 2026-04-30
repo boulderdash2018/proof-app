@@ -17,8 +17,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
-import { backfillConversationForDraft, shareDraftAsGroup } from '../services/planDraftService';
+import { backfillConversationForDraft, shareDraftAsGroup, formatMeetupForTitle, getDisplayTitle } from '../services/planDraftService';
 import { GroupMosaicAvatar, CoPlanPlacesSection, CoPlanLockSheet, CoPlanRouteSection, CoPlanSummaryFooter, CoPlanActivityToasts } from '../components';
+import { CoPlanMeetupSheet } from '../components/CoPlanMeetupSheet';
 
 /**
  * Collaborative workspace — "Organiser avec mes amis".
@@ -48,6 +49,8 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
 
   // Lock confirm sheet state
   const [lockOpen, setLockOpen] = useState(false);
+  // Meetup date/time sheet state
+  const [meetupSheetOpen, setMeetupSheetOpen] = useState(false);
   // "Créer le groupe" loading state — quand on partage le brouillon
   // initialement (avant qu'il ait une conversation associée).
   const [sharing, setSharing] = useState(false);
@@ -179,7 +182,9 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
             activeOpacity={0.7}
             style={styles.headerTitleWrap}
           >
-            <Text style={styles.headerTitle} numberOfLines={1}>{draft.title}</Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {getDisplayTitle(draft.title, draft.meetupAtProposed)}
+            </Text>
             <Ionicons name="create-outline" size={13} color={Colors.textTertiary} style={{ marginLeft: 4 }} />
           </TouchableOpacity>
         </View>
@@ -224,6 +229,54 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           subtitle="Chacun propose, vous votez ensemble"
         >
           <CoPlanPlacesSection participants={draft.participantDetails} />
+        </SectionBlock>
+        <SectionBlock
+          icon="calendar-outline"
+          label="QUAND"
+          title={draft.meetupAtProposed ? 'Date du plan' : 'Fixer la date'}
+          subtitle={
+            draft.createdBy === user?.id
+              ? 'Choisis le jour et l\'heure exacts du rendez-vous'
+              : 'Propose une date au groupe — sondage rapide dans le chat'
+          }
+        >
+          <TouchableOpacity
+            style={styles.meetupRow}
+            onPress={() => setMeetupSheetOpen(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.meetupIconWrap}>
+              <Ionicons
+                name={draft.meetupAtProposed ? 'time' : 'time-outline'}
+                size={18}
+                color={draft.meetupAtProposed ? Colors.primary : Colors.textSecondary}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              {draft.meetupAtProposed ? (
+                <>
+                  <Text style={styles.meetupValue}>
+                    {formatMeetupForTitle(draft.meetupAtProposed)}
+                  </Text>
+                  <Text style={styles.meetupHint}>
+                    Touche pour modifier
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.meetupPlaceholder}>
+                    Aucune date pour l'instant
+                  </Text>
+                  <Text style={styles.meetupHint}>
+                    {draft.createdBy === user?.id
+                      ? 'Touche pour fixer la date'
+                      : 'Touche pour proposer'}
+                  </Text>
+                </>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+          </TouchableOpacity>
         </SectionBlock>
         <SectionBlock
           icon="walk-outline"
@@ -324,6 +377,12 @@ export const CoPlanWorkspaceScreen: React.FC = () => {
           affordance now (in the header), so toasts can use the full
           bottom area without overlap. */}
       <CoPlanActivityToasts />
+
+      {/* ── Meetup date/time sheet ────────────── */}
+      <CoPlanMeetupSheet
+        visible={meetupSheetOpen}
+        onClose={() => setMeetupSheetOpen(false)}
+      />
 
       {/* ── Lock confirm sheet ────────────────── */}
       <CoPlanLockSheet
@@ -440,6 +499,43 @@ const SectionBlock: React.FC<SectionBlockProps> = ({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgPrimary },
+
+  // Meetup row (QUAND section)
+  meetupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  meetupIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.terracotta50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  meetupValue: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  meetupPlaceholder: {
+    fontSize: 14,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  meetupHint: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    color: Colors.textTertiary,
+  },
 
   // Header
   header: {

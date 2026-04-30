@@ -46,6 +46,7 @@ export type SystemEventKind =
   | 'coplan_place_removed'       // payload = place name
   | 'coplan_place_voted'         // payload = place name
   | 'coplan_availability_set'    // payload = "N dispos" or empty for reset
+  | 'coplan_meetup_set'          // payload = "le 17 avril à 18h" (creator direct write)
   | 'coplan_locked'              // payload = locked plan title
   | 'coplan_proposal_applied'    // payload = subject (e.g. place name) — group adopted
   | 'coplan_proposal_rejected';  // payload = subject — rejected by majority contre

@@ -159,6 +159,12 @@ export interface Plan {
   visibility?: 'public' | 'private';
   /** Back-reference to the originating draft (if the plan was born from a co-plan). */
   sourceDraftId?: string;
+  /**
+   * Date/heure du rendez-vous quand le plan en a une (typiquement les
+   * co-plans verrouillés via le workspace). ISO 8601. Sert au .ics export
+   * + à l'affichage "le 17 avril à 18h" dans le détail.
+   */
+  meetupAt?: string;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -470,9 +476,20 @@ export interface PlanDraft {
   // Workspace — availability
   availability: Record<string, CoPlanAvailability>;
 
+  /**
+   * Date/heure exacte choisie par le créateur (ou validée par sondage si
+   * proposée par un autre participant). Distinct de `meetupAt` qui n'est
+   * set qu'au lock — ici c'est la valeur EN COURS dans le brouillon, et
+   * elle override l'auto-overlap au moment du lock.
+   *
+   * ISO 8601 (ex: "2026-04-17T18:00:00.000Z"). Le format/affichage est
+   * computed à l'UI via `formatMeetupForTitle()` ("le 17 avril à 18h").
+   */
+  meetupAtProposed?: string;
+
   // Lock state
   status: 'draft' | 'locked' | 'archived';
-  /** ISO date-time picked when locking (derived from overlap pick). */
+  /** ISO date-time picked when locking (derived from overlap pick OR meetupAtProposed). */
   meetupAt?: string;
   lockedBy?: string;
   lockedAt?: string;

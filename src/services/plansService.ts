@@ -115,6 +115,8 @@ export const createPlan = async (
     visibility?: 'public' | 'private';
     /** Back-reference to the source draft id. */
     sourceDraftId?: string;
+    /** Co-plan : date/heure du rendez-vous (ISO 8601). */
+    meetupAt?: string;
   },
   author: User
 ): Promise<Plan> => {
@@ -141,6 +143,7 @@ export const createPlan = async (
     ...(planData.coAuthors && planData.coAuthors.length > 0 && { coAuthors: planData.coAuthors }),
     ...(planData.visibility && { visibility: planData.visibility }),
     ...(planData.sourceDraftId && { sourceDraftId: planData.sourceDraftId }),
+    ...(planData.meetupAt && { meetupAt: planData.meetupAt }),
     likesCount: 0,
     commentsCount: 0,
     proofCount: 0,

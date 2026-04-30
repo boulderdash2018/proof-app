@@ -1052,6 +1052,10 @@ const renderSystemEventText = (
       return `${firstNameOf(ev.actorId)} a voté pour ${ev.payload || 'un lieu'}`;
     case 'coplan_availability_set':
       return `${firstNameOf(ev.actorId)} a marqué ${ev.payload || 'ses dispos'}`;
+    case 'coplan_meetup_set':
+      return ev.payload === 'sans date'
+        ? `${firstNameOf(ev.actorId)} a retiré la date`
+        : `${firstNameOf(ev.actorId)} a fixé la date · ${ev.payload || ''}`;
     case 'coplan_locked':
       return `Plan lancé : ${ev.payload || ''}`;
     case 'coplan_proposal_applied':

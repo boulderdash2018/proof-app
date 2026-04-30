@@ -12,12 +12,14 @@ import {
   togglePlaceVote as svcTogglePlaceVote,
   movePlace as svcMovePlace,
   setAvailability as svcSetAvailability,
+  setMeetupAtProposed as svcSetMeetupAtProposed,
   renameDraft as svcRenameDraft,
   pingPresence as svcPingPresence,
   markDraftLocked,
   makeLocalId,
   computeOverlapCounts,
   slotKeyToMeetupAt,
+  formatMeetupForTitle,
   createProposal as svcCreateProposal,
 } from '../services/planDraftService';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
@@ -106,6 +108,16 @@ interface CoPlanStore {
   setAvailability: (slots: string[]) => Promise<void>;
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
 
+  // ── Meetup date/time ──
+  /** Creator-only path : set or clear the proposed meetup datetime
+   *  directly on the draft (no vote). Pass null to clear.
+   *  No-op if the current user is NOT the creator. */
+  setMeetupAtProposed: (iso: string | null) => Promise<void>;
+  /** Non-creator path : propose a change_meetup to the group. Returns
+   *  the proposal id (or null if it failed). Pass null in `iso` to
+   *  propose "remove the date". */
+  proposeChangeMeetup: (iso: string | null, reason?: string) => Promise<string | null>;
+
   // ── Group proposals (hard mutations needing a vote) ──
   /** Create a proposal asking the group to remove someone else's place.
    *  `reason` is an optional free-text justification surfaced on the
@@ -163,6 +175,7 @@ function postCoPlanMirror(
     case 'coplan_place_removed':    preview = `${firstName} a retiré ${detail}`; break;
     case 'coplan_place_voted':      preview = `${firstName} a voté pour ${detail}`; break;
     case 'coplan_availability_set': preview = `${firstName} a marqué ${detail}`; break;
+    case 'coplan_meetup_set':       preview = detail === 'sans date' ? `${firstName} a retiré la date` : `${firstName} a fixé la date : ${detail}`; break;
     case 'coplan_locked':           preview = `Plan lancé : ${detail}`; break;
     default:                        preview = `${firstName} a modifié le brouillon`;
   }
@@ -471,6 +484,65 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     await get().setAvailability(next);
   },
 
+  // ── Meetup date/time ──
+  setMeetupAtProposed: async (iso: string | null) => {
+    const { draft, draftId, _userId } = get();
+    if (!draftId || !draft || !_userId) return;
+    // Garde-fou : seul le créateur peut écrire en direct. Les autres doivent
+    // passer par proposeChangeMeetup. Si on est appelé à tort, on no-op
+    // silencieusement plutôt que de throw — l'UI gating est la source de
+    // vérité, ceci est une 2e ligne de défense.
+    if (draft.createdBy !== _userId) {
+      console.warn('[coPlanStore] setMeetupAtProposed: not creator, no-op');
+      return;
+    }
+    // Optimistic local update.
+    set({
+      draft: {
+        ...draft,
+        meetupAtProposed: iso || undefined,
+      },
+    });
+    try {
+      await svcSetMeetupAtProposed(draftId, iso);
+      // Mirror dans le chat — même style que les autres mutations.
+      const detail = iso ? formatMeetupForTitle(iso) : 'sans date';
+      postCoPlanMirror('coplan_meetup_set', detail);
+    } catch (err) {
+      console.warn('[coPlanStore] setMeetupAtProposed error:', err);
+    }
+  },
+
+  proposeChangeMeetup: async (iso: string | null, reason?: string) => {
+    const { draft, _userId } = get();
+    if (!draft || !_userId) return null;
+    const convId = draft.conversationId || draft.publishedConvId;
+    if (!convId) {
+      console.warn('[coPlanStore] proposeChangeMeetup: no linked conv');
+      return null;
+    }
+    try {
+      const subject = iso ? formatMeetupForTitle(iso) : 'sans date';
+      const propId = await svcCreateProposal({
+        draftId: draft.id,
+        proposedBy: _userId,
+        type: 'change_meetup',
+        payload: {
+          // Stocké sur le doc proposal : permettra à applyProposal de
+          // récupérer la valeur cible quand le sondage passe.
+          ...(iso ? { meetupAt: iso } : null),
+        },
+        conversationId: convId,
+        subject,
+        reason,
+      });
+      return propId;
+    } catch (err) {
+      console.warn('[coPlanStore] proposeChangeMeetup error:', err);
+      return null;
+    }
+  },
+
   // ── Group proposals ──
   proposeRemovePlace: async (placeId: string, reason?: string) => {
     const { draft, _userId } = get();
@@ -550,9 +622,16 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
     if (!user) return null;
 
     try {
-      // 1) Determine meetupAt from the best overlap slot (if any).
-      const best = get().getBestOverlapSlot();
-      const meetupAt = best ? slotKeyToMeetupAt(best.key) : null;
+      // 1) Determine meetupAt — priorité au meetupAtProposed (date EXACTE
+      //    choisie par le créateur ou validée par sondage), sinon fallback
+      //    sur l'auto-overlap des dispos. Cette précédence reflète l'intent :
+      //    si quelqu'un a explicitement fixé une date, on la respecte ; si
+      //    personne n'a tranché, on devine.
+      let meetupAt: string | null = draft.meetupAtProposed || null;
+      if (!meetupAt) {
+        const best = get().getBestOverlapSlot();
+        meetupAt = best ? slotKeyToMeetupAt(best.key) : null;
+      }
 
       // 2) Build places in manual order. Enrichit chaque lieu avec les
       //    données Google (rating, reviewCount, photos additionnelles)
@@ -626,6 +705,7 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
           coAuthors,
           visibility: publishOnFeed ? 'public' : 'private',
           sourceDraftId: draft.id,
+          ...(meetupAt ? { meetupAt } : null),
         },
         user,
       );

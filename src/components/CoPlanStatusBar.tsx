@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
-import { fetchPlanDraft } from '../services/planDraftService';
+import { subscribePlanDraft, formatMeetupForTitle } from '../services/planDraftService';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 
@@ -23,6 +23,8 @@ interface DraftSummary {
   pendingProposalCount: number;
   /** ID of the most-recent pending proposal — used as the jump target. */
   latestPendingProposalId: string | null;
+  /** ISO meetup datetime when set — drives the date suffix on line 2. */
+  meetupAtProposed?: string;
 }
 
 /**
@@ -46,27 +48,31 @@ interface DraftSummary {
 export const CoPlanStatusBar: React.FC<Props> = ({ draftId, onOpenWorkspace, onJumpToPendingProposal }) => {
   const [summary, setSummary] = useState<DraftSummary | null>(null);
 
-  // Hydrate the draft scalars once per draftId change.
+  // Live subscribe — needs to react when the creator/group changes the
+  // meetup date or when places/dispos move. The pending-proposals
+  // listener below stays separate (different subcollection).
   useEffect(() => {
-    let cancelled = false;
     setSummary(null);
-    (async () => {
-      const draft = await fetchPlanDraft(draftId);
-      if (cancelled || !draft) return;
+    if (!draftId) return;
+    const unsub = subscribePlanDraft(draftId, (draft) => {
+      if (!draft) return;
       const participantCount = draft.participants.length;
       const participantsWithDispos = draft.participants.filter((uid) => {
         const slots = draft.availability[uid]?.slots;
         return slots && slots.length > 0;
       }).length;
-      setSummary({
+      setSummary((prev) => ({
         placeCount: draft.proposedPlaces.length,
         participantCount,
         participantsWithDispos,
-        pendingProposalCount: 0,
-        latestPendingProposalId: null,
-      });
-    })();
-    return () => { cancelled = true; };
+        // Preserve the proposals state from the other listener — only this
+        // listener owns the place / dispos / meetup fields.
+        pendingProposalCount: prev?.pendingProposalCount ?? 0,
+        latestPendingProposalId: prev?.latestPendingProposalId ?? null,
+        meetupAtProposed: draft.meetupAtProposed,
+      }));
+    });
+    return () => unsub();
   }, [draftId]);
 
   // Live listen on the proposals subcollection — the "X modif en
@@ -116,6 +122,11 @@ export const CoPlanStatusBar: React.FC<Props> = ({ draftId, onOpenWorkspace, onJ
   const pendingLabel = summary.pendingProposalCount === 1
     ? '1 modif en attente de vote'
     : `${summary.pendingProposalCount} modifs en attente de vote`;
+  // Date suffix : si une date est posée, elle prend la place du
+  // "Brouillon en cours" générique. Le sondage en cours reste prioritaire.
+  const meetupLabel = summary.meetupAtProposed
+    ? `Rendez-vous ${formatMeetupForTitle(summary.meetupAtProposed)}`
+    : null;
 
   return (
     <View style={styles.wrap}>
@@ -139,8 +150,11 @@ export const CoPlanStatusBar: React.FC<Props> = ({ draftId, onOpenWorkspace, onJ
             </Text>
           </Pressable>
         ) : (
-          <Text style={styles.line2} numberOfLines={1}>
-            {hasPending ? pendingLabel : 'Brouillon en cours'}
+          <Text
+            style={meetupLabel ? styles.line2Meetup : styles.line2}
+            numberOfLines={1}
+          >
+            {hasPending ? pendingLabel : (meetupLabel || 'Brouillon en cours')}
           </Text>
         )}
       </View>
@@ -215,6 +229,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.05,
   },
   line2Pending: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    marginTop: 2,
+    letterSpacing: 0.05,
+  },
+  line2Meetup: {
     fontSize: 11.5,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.primary,

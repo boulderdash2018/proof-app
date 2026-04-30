@@ -31,6 +31,8 @@ import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, TravelSegment, TransportMode } from '../types';
 import { fetchPlanById, fetchComments, addComment, deletePlan, archivePlan } from '../services/plansService';
+import { formatMeetupForTitle } from '../services/planDraftService';
+import { exportToCalendar } from '../utils/calendarExport';
 import { getPlaceDetails, computeTravelDuration, checkPlaceOpenStatus, PlaceOpenStatus } from '../services/googlePlacesService';
 import { useCity } from '../hooks/useCity';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
@@ -704,6 +706,36 @@ export const PlanDetailModal: React.FC = () => {
           ) : null}
         </View>
 
+        {/* ===== MEETUP DATE (co-plan only) ===== Affiché seulement si le plan
+            a un meetupAt — typiquement les co-plans verrouillés. Donne accès
+            au .ics export pour ajouter l'événement au calendrier de l'utilisateur. */}
+        {plan.meetupAt && (
+          <View style={st.meetupCard}>
+            <View style={st.meetupIconWrap}>
+              <Ionicons name="calendar" size={20} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={st.meetupCardEyebrow}>RENDEZ-VOUS</Text>
+              <Text style={st.meetupCardValue} numberOfLines={1}>
+                {formatMeetupForTitle(plan.meetupAt)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={st.meetupCalBtn}
+              onPress={() => exportToCalendar({
+                title: plan.title,
+                startISO: plan.meetupAt!,
+                location: plan.places?.[0]?.address,
+                description: plan.authorTip || `Plan créé via Proof — ${plan.places?.length || 0} lieu${(plan.places?.length || 0) > 1 ? 'x' : ''}`,
+              })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar-outline" size={14} color={Colors.textOnAccent} />
+              <Text style={st.meetupCalBtnText}>Calendrier</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ===== LIKED BY ===== */}
         {likerUsers.length > 0 && (
           <TouchableOpacity style={st.likesRow} onPress={() => setShowLikersSheet(true)} activeOpacity={0.7}>
@@ -1304,6 +1336,57 @@ const st = StyleSheet.create({
     height: 12,
     backgroundColor: Colors.borderMedium,
     marginHorizontal: 4,
+  },
+
+  // Meetup card (co-plan with date)
+  meetupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderColor: Colors.terracotta200,
+  },
+  meetupIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  meetupCardEyebrow: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  meetupCardValue: {
+    fontSize: 14,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  meetupCalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  meetupCalBtnText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
   },
 
   // Tags
