@@ -18,6 +18,7 @@ import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
 import { notifySessionAdvanced } from '../services/planSessionService';
 import { pickImage } from '../utils';
+import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
 // Quick-word chips shown on the editorial review screen.
 const QUICK_WORDS: { key: string; label: string }[] = [
@@ -81,21 +82,13 @@ const MAP_STYLE = [
   {"featureType":"water","elementType":"geometry","stylers":[{"color":"#D4C9BB"}]},
 ];
 
-let gmLoaded = false;
-let gmLoading = false;
-const gmCallbacks: (() => void)[] = [];
-
-function loadGM(cb: () => void) {
-  if (gmLoaded && (window as any).google?.maps) { cb(); return; }
-  gmCallbacks.push(cb);
-  if (gmLoading) return;
-  gmLoading = true;
-  (window as any).__dinGmCb = () => { gmLoaded = true; gmLoading = false; gmCallbacks.forEach(c => c()); gmCallbacks.length = 0; };
-  const s = document.createElement('script');
-  s.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=__dinGmCb`;
-  s.async = true; s.defer = true;
-  document.head.appendChild(s);
-}
+// Singleton shared loader — utils/loadGoogleMaps. Avant cette refonte
+// ce fichier avait son PROPRE loader (avec callback __dinGmCb) qui ne
+// partageait rien avec utils/loadGoogleMaps utilisé par GroupLiveMapSheet,
+// FriendsMapView, PlanMapModal. Résultat : quand DoItNow montait à côté
+// de GroupLiveMapSheet, la JS API Maps était injectée DEUX fois → custom
+// elements définis 2× → "You have included the Google Maps JavaScript
+// API multiple times" + InvalidValueError sur la 2e instance.
 
 const ARRIVAL_THRESHOLD = 50;
 
@@ -248,7 +241,7 @@ export const DoItNowScreen: React.FC = () => {
   useEffect(() => {
     injectPulseCSS();
 
-    loadGM(() => {
+    loadGoogleMaps(() => {
       if (!mapDivRef.current) return;
       const gm = (window as any).google.maps;
       const validPlaces = plan.places.filter(p => p.latitude && p.longitude);

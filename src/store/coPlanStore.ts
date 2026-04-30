@@ -671,14 +671,20 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
           }
         }),
       );
+      // Master timeout cleared as soon que l'enrichissement gagne — sinon
+      // le warn s'affiche dans la console après le DONE (cosmétique mais
+      // sale pour le debug).
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
       const fallbackPromise = new Promise<Array<{ p: typeof sortedPlaces[number]; g: null }>>(
-        (resolve) =>
-          setTimeout(() => {
+        (resolve) => {
+          fallbackTimer = setTimeout(() => {
             console.warn('[lockDraft] enrichment master timeout 9s — falling back to local snapshots');
             resolve(sortedPlaces.map((p) => ({ p, g: null })));
-          }, 9000),
+          }, 9000);
+        },
       );
       const enriched = await Promise.race([enrichmentPromise, fallbackPromise]);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       console.log('[lockDraft] enrichment done in', Date.now() - t0, 'ms');
       const planPlaces: Place[] = enriched.map(({ p, g }) => ({
         id: `place-${p.googlePlaceId}-${Math.random().toString(36).slice(2, 8)}`,

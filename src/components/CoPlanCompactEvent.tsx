@@ -74,12 +74,30 @@ function formatActionVerb(kind?: string, payload?: string): string {
       return 'a démarré la session';
     case 'session_completed':
       return 'a terminé la session';
+    case 'session_advanced': {
+      // payload format = "PlaceName|step|total|sessionId?" — best-effort parse.
+      // Si on n'arrive pas à parser, on retombe sur un texte générique.
+      const parts = (payload || '').split('|');
+      const place = parts[0] || '';
+      const step = parts[1];
+      const total = parts[2];
+      if (place && step && total) {
+        return `est passé à ${place} (étape ${step}/${total})`;
+      }
+      return place ? `est passé à ${place}` : 'a avancé d\'une étape';
+    }
     case 'coplan_availability_set':
       return 'a mis à jour ses dispos';
     case 'coplan_place_voted':
       return `a voté pour ${payload || 'un lieu'}`;
     case 'coplan_place_removed':
       return `a retiré ${payload || 'un lieu'}`;
+    case 'coplan_meetup_set':
+      return payload === 'sans date'
+        ? 'a retiré la date du RDV'
+        : `a fixé le RDV — ${payload || ''}`;
+    case 'coplan_details_confirmed':
+      return `a confirmé les détails${payload ? ` — ${payload}` : ''}`;
     case 'coplan_locked':
       return `a lancé le plan${payload ? ` : ${payload}` : ''}`;
     default:

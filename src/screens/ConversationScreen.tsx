@@ -538,7 +538,7 @@ const MessageRow = React.memo<MessageRowProps>(({
     // event itself is a clean audit-log line, like coplan_member_joined.
     const COMPACT_KINDS = new Set([
       'group_created', 'joined', 'left', 'renamed',
-      'session_started', 'session_completed',
+      'session_started', 'session_completed', 'session_advanced',
     ]);
     const useCompact = isCoplan || (ev?.kind && COMPACT_KINDS.has(ev.kind));
     if (useCompact) {
@@ -1043,6 +1043,16 @@ const renderSystemEventText = (
       return `La session a démarré`;
     case 'session_completed':
       return `Session terminée`;
+    case 'session_advanced': {
+      const parts = (ev.payload || '').split('|');
+      const place = parts[0] || '';
+      const step = parts[1];
+      const total = parts[2];
+      if (place && step && total) {
+        return `${firstNameOf(ev.actorId)} est passé à ${place} (étape ${step}/${total})`;
+      }
+      return place ? `${firstNameOf(ev.actorId)} est passé à ${place}` : '';
+    }
     // ── Co-plan workspace mirror events ──
     case 'coplan_place_added':
       return `${firstNameOf(ev.actorId)} a proposé ${ev.payload || 'un lieu'}`;
