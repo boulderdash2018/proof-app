@@ -92,7 +92,7 @@ export const PlanDetailModal: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { planId } = route.params as { planId: string };
+  const { planId, openMap: openMapOnMount } = route.params as { planId: string; openMap?: boolean };
   const C = useColors();
   const cityConfig = useCity();
   const { t } = useTranslation();
@@ -127,6 +127,13 @@ export const PlanDetailModal: React.FC = () => {
   const isDone = isDoneLocal || isProofedByUser;
   const [showProofSurvey, setShowProofSurvey] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  // Auto-open the map sheet when the route param `openMap` is true. Used
+  // by chat widgets that want to deep-link straight to the trajectory
+  // (e.g. the "PLAN PRÊT · voir le trajet" card). Fires once on mount.
+  React.useEffect(() => {
+    if (openMapOnMount) setShowMap(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
   const [showTransportChooser, setShowTransportChooser] = useState(false);
   const [showClosedSheet, setShowClosedSheet] = useState(false);

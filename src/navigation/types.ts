@@ -54,7 +54,7 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   ForgotPassword: undefined;
-  PlanDetail: { planId: string };
+  PlanDetail: { planId: string; openMap?: boolean };
   PlaceDetail: { placeId?: string; planId?: string; googlePlaceId?: string };
   Notifications: undefined;
   ChatList: undefined;

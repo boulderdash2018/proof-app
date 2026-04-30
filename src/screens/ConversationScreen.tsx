@@ -472,6 +472,10 @@ interface MessageRowProps {
   onReaction: (emoji: string) => void;
   onScrollToQuote: (msgId: string) => void;
   onPlanPress: (planId: string) => void;
+  /** Deep-link tap → open Plan detail with the map sheet auto-shown.
+   *  Used by the "Plan prêt" timeline card so its destination is
+   *  distinct from the regular pinned plan card. */
+  onOpenPlanMap: (planId: string) => void;
   onJoinSession: () => void;
   onPhotoPress: (url: string) => void;
   onOpenAlbum: () => void;
@@ -495,7 +499,7 @@ const MessageRow = React.memo<MessageRowProps>(({
   item, prevMsg, nextMsg, userId, senderUser, isGroupContext, C, isLastSent, otherHasRead,
   isPickerTarget, pickerScale, listSlideX,
   onSwipeReply, onDoubleTapLike, onLongPress, onDismissPicker, onReaction,
-  onScrollToQuote, onPlanPress, onJoinSession, onPhotoPress, onOpenAlbum, onVotePoll,
+  onScrollToQuote, onPlanPress, onOpenPlanMap, onJoinSession, onPhotoPress, onOpenAlbum, onVotePoll,
   participants, coplanRun, linkedPlanInfo,
 }) => {
   const isMine = item.senderId === userId;
@@ -540,18 +544,17 @@ const MessageRow = React.memo<MessageRowProps>(({
     }
 
     // ── "Plan prêt" preview card ──
-    // Surfaced for coplan_details_confirmed — replaces the 1-line compact
-    // event with a richer animated card so the moment "the plan is ready
-    // to launch" is unmissable in the chat. Tapping the card opens the
-    // linked Plan detail (when there's already one published) or stays
-    // non-tappable if the plan hasn't been locked yet.
+    // Surfaced for coplan_details_confirmed — rich timeline preview with
+    // numbered pins + travel pills + arrival times. Tap → deep-link to
+    // the MAP sheet (different destination than the pinned plan card,
+    // which opens PlanDetail without the map). The two widgets stop
+    // being visually + functionally redundant.
     if (ev?.kind === 'coplan_details_confirmed') {
       const linkedPlanId = linkedPlanInfo?.planId ?? null;
       const linkedPlanTitle = linkedPlanInfo?.title ?? null;
-      const linkedPlanCover = linkedPlanInfo?.cover ?? null;
       const meetupAt = linkedPlanInfo?.meetupAt ?? null;
-      const onPress = linkedPlanId
-        ? () => onPlanPress(linkedPlanId)
+      const onPressMap = linkedPlanId
+        ? () => onOpenPlanMap(linkedPlanId)
         : undefined;
       return (
         <View>
@@ -563,10 +566,10 @@ const MessageRow = React.memo<MessageRowProps>(({
           <CoPlanDetailsConfirmedCard
             message={item}
             participants={participants}
-            planTitle={linkedPlanTitle ?? undefined}
-            coverPhoto={linkedPlanCover}
-            meetupAt={meetupAt ?? undefined}
-            onPress={onPress}
+            planId={linkedPlanId}
+            planTitle={linkedPlanTitle}
+            meetupAt={meetupAt}
+            onPressMap={onPressMap}
           />
         </View>
       );
@@ -1672,6 +1675,14 @@ export const ConversationScreen: React.FC = () => {
     navigation.navigate('PlanDetail', { planId });
   }, [navigation]);
 
+  // Deep-link variant — opens PlanDetail with the map sheet auto-shown.
+  // Used by the "Plan prêt" timeline card so its tap destination is
+  // distinct from the regular pinned plan card (which lands on the
+  // overview without the map).
+  const handleOpenPlanMap = useCallback((planId: string) => {
+    navigation.navigate('PlanDetail', { planId, openMap: true });
+  }, [navigation]);
+
   // ── Last sent message ID (for read receipt) ──
   const lastSentMsgId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -1757,6 +1768,7 @@ export const ConversationScreen: React.FC = () => {
       onReaction={handleReaction}
       onScrollToQuote={handleScrollToQuote}
       onPlanPress={handlePlanPress}
+      onOpenPlanMap={handleOpenPlanMap}
       onJoinSession={handleJoinSession}
       onPhotoPress={setLightboxUrl}
       onOpenAlbum={() => setAlbumOpen(true)}
@@ -1771,7 +1783,7 @@ export const ConversationScreen: React.FC = () => {
       } : null}
     />
     );
-  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleJoinSession, votePoll]);
+  }, [user?.id, otherUser, otherTyping, C, lastSentMsgId, otherHasRead, pickerMsgId, pickerScale, listSlideX, isGroup, activeConv, handleSwipeReply, handleDoubleTapLike, handleLongPressOpen, handleDismissPicker, handleReaction, handleScrollToQuote, handlePlanPress, handleOpenPlanMap, handleJoinSession, votePoll]);
 
   // ── Typing indicator grouping with last received message ──
   const typingIsGrouped = useMemo(() => {
