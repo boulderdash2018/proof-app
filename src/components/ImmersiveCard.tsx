@@ -19,6 +19,8 @@ import { Colors, Fonts, getRankForProofs } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
 import { MiniStampIcon } from './MiniStampIcon';
+import { CoAuthorAvatarStack } from './CoAuthorAvatarStack';
+import { CollaboratorsSheet } from './CollaboratorsSheet';
 import { Plan, TravelSegment, TransportMode, Place } from '../types';
 import { formatAuthorByline } from './PlanCard';
 import { useSavedPlacesStore } from '../store';
@@ -122,6 +124,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const isDetailRef = useRef(false);
   const isCommitting = useRef(false);
   const [hasScrolled, setHasScrolled] = useState(false);
+  // Bottom sheet listing all collaborators when the plan has co-authors.
+  // Opens on tap of the avatar stack / byline (instead of the single
+  // "navigate to author profile" path used for solo plans).
+  const [collaboratorsSheetOpen, setCollaboratorsSheetOpen] = useState(false);
+  const hasCoAuthors = !!(plan.coAuthors && plan.coAuthors.length > 0);
   const headerHiddenRef = useRef(false);
   const HEADER_HIDE_THRESHOLD = 30; // px — past this, header starts its hide animation
 
@@ -565,30 +572,44 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               <TouchableOpacity
                 style={styles.authorRow}
                 activeOpacity={0.7}
-                onPress={onAuthorPress}
+                onPress={hasCoAuthors ? () => setCollaboratorsSheetOpen(true) : onAuthorPress}
               >
-                <View
-                  style={[
-                    styles.authorAvatar,
-                    { backgroundColor: plan.author?.avatarBg || '#444' },
-                  ]}
-                >
-                  {plan.author?.avatarUrl ? (
-                    <Image
-                      source={{ uri: plan.author.avatarUrl }}
-                      style={styles.authorAvatarImg}
-                    />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.authorInitials,
-                        { color: plan.author?.avatarColor || '#FFF' },
-                      ]}
-                    >
-                      {plan.author?.initials || '?'}
-                    </Text>
-                  )}
-                </View>
+                {hasCoAuthors && plan.author ? (
+                  <CoAuthorAvatarStack
+                    mainAuthor={{
+                      avatarUrl: plan.author.avatarUrl ?? null,
+                      initials: plan.author.initials,
+                      avatarBg: plan.author.avatarBg,
+                      avatarColor: plan.author.avatarColor,
+                    }}
+                    coAuthors={plan.coAuthors}
+                    size={20}
+                    borderColor={'rgba(0,0,0,0.7)'}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.authorAvatar,
+                      { backgroundColor: plan.author?.avatarBg || '#444' },
+                    ]}
+                  >
+                    {plan.author?.avatarUrl ? (
+                      <Image
+                        source={{ uri: plan.author.avatarUrl }}
+                        style={styles.authorAvatarImg}
+                      />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.authorInitials,
+                          { color: plan.author?.avatarColor || '#FFF' },
+                        ]}
+                      >
+                        {plan.author?.initials || '?'}
+                      </Text>
+                    )}
+                  </View>
+                )}
                 <Text style={styles.authorName} numberOfLines={1}>
                   {formatAuthorByline(plan.author?.displayName || 'Inconnu', plan.coAuthors)}
                 </Text>
@@ -689,16 +710,34 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                     </Text>
                   ) : null}
                   <Text style={styles.heroTitle} numberOfLines={3}>{plan.title}</Text>
-                  <TouchableOpacity style={styles.heroAuthorRow} onPress={onAuthorPress} activeOpacity={0.7}>
-                    <View style={[styles.heroAuthorAvatar, { backgroundColor: plan.author?.avatarBg || '#444' }]}>
-                      {plan.author?.avatarUrl ? (
-                        <Image source={{ uri: plan.author.avatarUrl }} style={styles.heroAuthorAvatarImg} />
-                      ) : (
-                        <Text style={[styles.heroAuthorInitials, { color: plan.author?.avatarColor || '#FFF' }]}>
-                          {plan.author?.initials || '?'}
-                        </Text>
-                      )}
-                    </View>
+                  <TouchableOpacity
+                    style={styles.heroAuthorRow}
+                    onPress={hasCoAuthors ? () => setCollaboratorsSheetOpen(true) : onAuthorPress}
+                    activeOpacity={0.7}
+                  >
+                    {hasCoAuthors && plan.author ? (
+                      <CoAuthorAvatarStack
+                        mainAuthor={{
+                          avatarUrl: plan.author.avatarUrl ?? null,
+                          initials: plan.author.initials,
+                          avatarBg: plan.author.avatarBg,
+                          avatarColor: plan.author.avatarColor,
+                        }}
+                        coAuthors={plan.coAuthors}
+                        size={24}
+                        borderColor={'rgba(0,0,0,0.5)'}
+                      />
+                    ) : (
+                      <View style={[styles.heroAuthorAvatar, { backgroundColor: plan.author?.avatarBg || '#444' }]}>
+                        {plan.author?.avatarUrl ? (
+                          <Image source={{ uri: plan.author.avatarUrl }} style={styles.heroAuthorAvatarImg} />
+                        ) : (
+                          <Text style={[styles.heroAuthorInitials, { color: plan.author?.avatarColor || '#FFF' }]}>
+                            {plan.author?.initials || '?'}
+                          </Text>
+                        )}
+                      </View>
+                    )}
                     <Text style={styles.heroAuthorText}>
                       par {formatAuthorByline(plan.author?.displayName || 'Inconnu', plan.coAuthors)}
                       {plan.city ? ` · ${plan.city}` : ''}
@@ -1058,6 +1097,27 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
             clipped by the card's overflow:hidden. */}
       </View>
 
+      {/* ── Collaborators sheet — opens when the byline is tapped on a
+            co-authored plan. Lists every author with avatar + username,
+            tap any row → that user's profile (handled by onProfilePress
+            from the parent screen which has navigation). */}
+      {hasCoAuthors && plan.author && (
+        <CollaboratorsSheet
+          visible={collaboratorsSheetOpen}
+          onClose={() => setCollaboratorsSheetOpen(false)}
+          mainAuthor={{
+            id: plan.author.id,
+            displayName: plan.author.displayName,
+            username: plan.author.username,
+            avatarUrl: plan.author.avatarUrl ?? null,
+            initials: plan.author.initials,
+            avatarBg: plan.author.avatarBg,
+            avatarColor: plan.author.avatarColor,
+          }}
+          coAuthors={plan.coAuthors}
+          onProfilePress={onProfilePress}
+        />
+      )}
     </Animated.View>
   );
 };

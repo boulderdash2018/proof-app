@@ -24,7 +24,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
-import { Avatar, Chip, UserBadge } from '../components';
+import { Avatar, Chip, UserBadge, CoAuthorAvatarStack, CollaboratorsSheet } from '../components';
+import { formatAuthorByline } from '../components/PlanCard';
 import { useAuthStore, useFeedStore, useSavesStore, useGuestStore, useDraftStore, useSocialProofStore } from '../store';
 import type { MinimalUser } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -134,6 +135,11 @@ export const PlanDetailModal: React.FC = () => {
     if (openMapOnMount) setShowMap(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sheet listing every collaborator (main author + coAuthors). Tapped
+  // open from the byline when the plan has co-authors — mirrors the
+  // Instagram "Collaborateur(ice)s" pattern.
+  const [collaboratorsSheetOpen, setCollaboratorsSheetOpen] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
   const [showTransportChooser, setShowTransportChooser] = useState(false);
   const [showClosedSheet, setShowClosedSheet] = useState(false);
@@ -589,22 +595,45 @@ export const PlanDetailModal: React.FC = () => {
             )}
             <Text style={st.heroTitle}>{plan.title}</Text>
             {/* Author row inline in the hero — mirrors ImmersiveCard detail */}
+            {/* Solo plans navigate straight to the author profile ; co-authored
+                plans open the Collaborators sheet so every contributor is
+                discoverable. Same pattern as the feed's ImmersiveCard. */}
             <TouchableOpacity
               style={st.heroAuthorRow}
-              onPress={() => navigation.navigate('UserProfile', { userId: plan.author.id })}
+              onPress={() => {
+                if (plan.coAuthors && plan.coAuthors.length > 0) {
+                  setCollaboratorsSheetOpen(true);
+                } else {
+                  navigation.navigate('UserProfile', { userId: plan.author.id });
+                }
+              }}
               activeOpacity={0.7}
             >
-              <View style={[st.heroAuthorAvatar, { backgroundColor: plan.author.avatarBg || '#444' }]}>
-                {plan.author.avatarUrl ? (
-                  <Image source={{ uri: plan.author.avatarUrl }} style={st.heroAuthorAvatarImg} />
-                ) : (
-                  <Text style={[st.heroAuthorInitials, { color: plan.author.avatarColor || '#FFF' }]}>
-                    {plan.author.initials || '?'}
-                  </Text>
-                )}
-              </View>
+              {plan.coAuthors && plan.coAuthors.length > 0 ? (
+                <CoAuthorAvatarStack
+                  mainAuthor={{
+                    avatarUrl: plan.author.avatarUrl ?? null,
+                    initials: plan.author.initials,
+                    avatarBg: plan.author.avatarBg,
+                    avatarColor: plan.author.avatarColor,
+                  }}
+                  coAuthors={plan.coAuthors}
+                  size={24}
+                  borderColor={'rgba(0,0,0,0.5)'}
+                />
+              ) : (
+                <View style={[st.heroAuthorAvatar, { backgroundColor: plan.author.avatarBg || '#444' }]}>
+                  {plan.author.avatarUrl ? (
+                    <Image source={{ uri: plan.author.avatarUrl }} style={st.heroAuthorAvatarImg} />
+                  ) : (
+                    <Text style={[st.heroAuthorInitials, { color: plan.author.avatarColor || '#FFF' }]}>
+                      {plan.author.initials || '?'}
+                    </Text>
+                  )}
+                </View>
+              )}
               <Text style={st.heroAuthorText}>
-                par {plan.author.displayName}
+                par {formatAuthorByline(plan.author.displayName, plan.coAuthors)}
                 {plan.city ? ` · ${plan.city}` : ''}
               </Text>
             </TouchableOpacity>
@@ -1164,6 +1193,23 @@ export const PlanDetailModal: React.FC = () => {
       {plan && (
         <>
           <ProofSurveyModal visible={showProofSurvey} plan={plan} onProof={handleProof} onDecline={handleDeclineProof} />
+          {plan.coAuthors && plan.coAuthors.length > 0 && (
+            <CollaboratorsSheet
+              visible={collaboratorsSheetOpen}
+              onClose={() => setCollaboratorsSheetOpen(false)}
+              mainAuthor={{
+                id: plan.author.id,
+                displayName: plan.author.displayName,
+                username: plan.author.username,
+                avatarUrl: plan.author.avatarUrl ?? null,
+                initials: plan.author.initials,
+                avatarBg: plan.author.avatarBg,
+                avatarColor: plan.author.avatarColor,
+              }}
+              coAuthors={plan.coAuthors}
+              onProfilePress={(userId) => navigation.navigate('UserProfile', { userId })}
+            />
+          )}
           <PlanMapModal
             visible={showMap}
             onClose={() => setShowMap(false)}
