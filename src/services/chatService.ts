@@ -812,15 +812,33 @@ export const postSystemEvent = async (
     content: '',
     systemEvent: event,
     reactions: [],
-    readBy: [],
+    readBy: event.actorId ? [event.actorId] : [],
     createdAt: serverTimestamp(),
   });
-  await updateDoc(doc(db, CONVERSATIONS, conversationId), {
+
+  // ── Incrémenter unreadCount pour les non-acteurs ──
+  // Sans ça, les actions de groupe (confirmation des détails, RDV fixé,
+  // étape suivante, joined/left, etc.) faisaient bien remonter la
+  // conversation en haut de la liste mais sans badge unread → l'user
+  // ratait totalement le signal. Même pattern que sendTextMessage : on
+  // lit l'actuel unreadCount et on +1 pour chaque participant ≠ acteur.
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const convSnap = await getDoc(convRef);
+  const updatePayload: Record<string, any> = {
     lastMessage: previewText,
     lastMessageType: 'system',
     lastMessageSenderId: event.actorId || '',
     lastMessageAt: serverTimestamp(),
-  });
+  };
+  if (convSnap.exists()) {
+    const data = convSnap.data();
+    const newUnread: Record<string, number> = { ...(data.unreadCount || {}) };
+    (data.participants || []).forEach((uid: string) => {
+      if (uid !== event.actorId) newUnread[uid] = (newUnread[uid] || 0) + 1;
+    });
+    updatePayload.unreadCount = newUnread;
+  }
+  await updateDoc(convRef, updatePayload);
 };
 
 /** Add a participant to an existing group. Posts a `joined` system event. */
