@@ -1998,6 +1998,30 @@ export const CreateScreen: React.FC = () => {
                 Un titre court et précis vaut mieux qu'un long descriptif.
               </Text>
 
+              {/* "Partir d'un plan sauvegardé" — bouton pour préfiller le
+                  wizard depuis un plan existant. Placé EN HAUT (avant
+                  l'input qui ouvre le clavier en autoFocus) sinon il est
+                  poussé sous le viewport et invisible. */}
+              <TouchableOpacity
+                style={styles.s0ImportBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setShowSavedPlanPicker(true);
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={styles.s0ImportIconWrap}>
+                  <Ionicons name="bookmark" size={16} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.s0ImportTitle}>Partir d'un plan sauvegardé</Text>
+                  <Text style={styles.s0ImportHint}>
+                    Re-utilise un plan existant et modifie ce que tu veux
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+              </TouchableOpacity>
+
               <View style={styles.s0InputWrap}>
                 <RNTextInput
                   value={title}
@@ -2020,29 +2044,6 @@ export const CreateScreen: React.FC = () => {
                 )}
                 <Text style={styles.s0Counter}>{title.length}/80</Text>
               </View>
-
-              {/* "Partir d'un plan sauvegardé" — bouton pour préfiller le
-                  wizard depuis un plan existant. Les étapes suivantes ne
-                  changent pas, juste les valeurs sont pré-remplies. */}
-              <TouchableOpacity
-                style={styles.s0ImportBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setShowSavedPlanPicker(true);
-                }}
-                activeOpacity={0.85}
-              >
-                <View style={styles.s0ImportIconWrap}>
-                  <Ionicons name="bookmark" size={16} color={Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.s0ImportTitle}>Partir d'un plan sauvegardé</Text>
-                  <Text style={styles.s0ImportHint}>
-                    Re-utilise un plan existant et modifie ce que tu veux
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
-              </TouchableOpacity>
 
               {/* Active co-plan drafts — discoverable re-entry for brouillons en cours. */}
               <CoPlanDraftsList
