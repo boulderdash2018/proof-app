@@ -36,6 +36,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, TravelSegment, Plan } from '../types';
 import { createPlan, updatePlan } from '../services/plansService';
 import { pickImage, pickImageFromSource, pickMultipleImages } from '../utils';
+import { SavedPlanPickerSheet } from '../components/SavedPlanPickerSheet';
 import { trackEvent } from '../services/posthogConfig';
 import {
   searchPlacesAutocomplete,
@@ -309,6 +310,70 @@ export const CreateScreen: React.FC = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // "Partir d'un plan sauvegardé" picker state — opened from step 1.
+  // Prefilling is non-destructive : si le user a déjà tapé un titre, on
+  // l'écrase volontairement (intent assumed : "je repars de zéro depuis ce plan").
+  const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
+
+  /**
+   * Préfill complet du wizard à partir d'un Plan sauvegardé. Recopie
+   * tout ce qui peut être réutilisé tel quel et laisse le user modifier
+   * dans les étapes suivantes. Le source plan n'est PAS touché — on
+   * crée un nouveau plan au final.
+   *
+   * Pas de coverPhotos en duplicata : on copie le tableau original (URLs
+   * Firebase Storage déjà uploadées, partagées entre les deux plans —
+   * acceptable car ce sont des assets publics figés).
+   */
+  const prefillFromSavedPlan = (src: Plan) => {
+    setTitle(src.title || '');
+    setCoverPhotos(src.coverPhotos || []);
+    setSelectedTags(src.tags || []);
+    setAuthorTip(src.authorTip || '');
+    // Convert Place[] → PlaceEntry[] (champs UI custom).
+    const newPlaces: PlaceEntry[] = (src.places || []).map((p, idx) => ({
+      id: `prefill-${Date.now()}-${idx}`,
+      googlePlaceId: p.googlePlaceId,
+      name: p.name,
+      type: p.type || '',
+      address: p.address,
+      placeTypes: undefined,
+      priceRangeIndex: -1,
+      exactPrice: typeof p.placePrice === 'number' && p.placePrice > 0
+        ? String(p.placePrice)
+        : '',
+      price: '',
+      duration: typeof p.placeDuration === 'number' && p.placeDuration > 0
+        ? String(p.placeDuration)
+        : '',
+      customPhoto: p.customPhoto,
+      comment: p.comment,
+      questionAnswer: p.questionAnswer,
+      question: p.question,
+      questions: p.questions,
+      previewPhotoUrl: p.photoUrls?.[0],
+      reservationRecommended: p.reservationRecommended,
+    }));
+    setPlaces(newPlaces);
+    // Travel segments : remap fromPlaceId/toPlaceId to nouveaux ids
+    // pour que le mapping reste cohérent.
+    const idByOldIndex: Record<string, string> = {};
+    (src.places || []).forEach((p, idx) => {
+      idByOldIndex[p.id] = newPlaces[idx]?.id || '';
+    });
+    const newTravels: TravelEntry[] = (src.travelSegments || [])
+      .map((seg) => ({
+        fromId: idByOldIndex[seg.fromPlaceId] || '',
+        toId: idByOldIndex[seg.toPlaceId] || '',
+        duration: seg.duration > 0 ? String(seg.duration) : '',
+        transport: seg.transport,
+      }))
+      .filter((t) => t.fromId && t.toId);
+    setTravels(newTravels);
+    // Reset error state — toute valeur précédente devient obsolète.
+    setErrors({});
+  };
 
   // ========== 5-STEP WIZARD (1: title, 2: cover, 3: categories, 4: places, 5: creator tip) ==========
   type Step = 1 | 2 | 3 | 4 | 5;
@@ -1956,6 +2021,29 @@ export const CreateScreen: React.FC = () => {
                 <Text style={styles.s0Counter}>{title.length}/80</Text>
               </View>
 
+              {/* "Partir d'un plan sauvegardé" — bouton pour préfiller le
+                  wizard depuis un plan existant. Les étapes suivantes ne
+                  changent pas, juste les valeurs sont pré-remplies. */}
+              <TouchableOpacity
+                style={styles.s0ImportBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setShowSavedPlanPicker(true);
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={styles.s0ImportIconWrap}>
+                  <Ionicons name="bookmark" size={16} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.s0ImportTitle}>Partir d'un plan sauvegardé</Text>
+                  <Text style={styles.s0ImportHint}>
+                    Re-utilise un plan existant et modifie ce que tu veux
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+              </TouchableOpacity>
+
               {/* Active co-plan drafts — discoverable re-entry for brouillons en cours. */}
               <CoPlanDraftsList
                 onOpenDraft={(draftId) => navigation.navigate('CoPlanWorkspace', { draftId })}
@@ -2799,6 +2887,20 @@ export const CreateScreen: React.FC = () => {
           </View>
         </Modal>
 
+        {/* ========== SAVED PLAN PICKER (step 1) ========== */}
+        <SavedPlanPickerSheet
+          visible={showSavedPlanPicker}
+          onClose={() => setShowSavedPlanPicker(false)}
+          onPick={(plan) => {
+            prefillFromSavedPlan(plan);
+            // Navigation : on reste sur l'étape 1 — c'est plus safe, le user
+            // valide le titre puis avance lui-même. Évite un saut perçu si
+            // le plan source avait un titre vide ou imprévu.
+          }}
+          title="Partir d'un plan sauvegardé"
+          subtitle="Tous les détails sont préremplis. Tu peux modifier ce que tu veux ensuite."
+        />
+
         {/* ========== PREVIEW MODAL ========== */}
         <Modal visible={showPreview} animationType="slide" presentationStyle="pageSheet">
           <View style={[styles.previewModal, { backgroundColor: C.white, paddingTop: insets.top }]}>
@@ -3252,6 +3354,37 @@ const styles = StyleSheet.create({
   s0Inspirations: {
     gap: 10,
   } as any,
+  s0ImportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.terracotta300,
+    marginBottom: 18,
+  },
+  s0ImportIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.terracotta50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  s0ImportTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  s0ImportHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+  },
   s0InspirationLabel: {
     fontSize: 10,
     fontFamily: Fonts.bodySemiBold,

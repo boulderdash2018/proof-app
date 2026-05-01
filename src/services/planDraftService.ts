@@ -402,6 +402,24 @@ export const renameDraft = async (draftId: string, title: string): Promise<void>
   });
 };
 
+/**
+ * Replace ALL proposed places with a fresh list. Used for "Importer
+ * depuis un plan sauvegardé" — only available pre-group, only by the
+ * creator, so no race-condition concern with concurrent participants.
+ *
+ * Caller is responsible for shaping each input as a CoPlanProposedPlace
+ * (id, proposedAt, votes, orderIndex). We just write the array as-is.
+ */
+export const replaceAllProposedPlaces = async (
+  draftId: string,
+  newPlaces: CoPlanProposedPlace[],
+): Promise<void> => {
+  await updateDoc(doc(db, DRAFTS, draftId), {
+    proposedPlaces: newPlaces,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 /** Add a new proposed place. Appends at the end (highest orderIndex). */
 export const proposePlace = async (
   draftId: string,

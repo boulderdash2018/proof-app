@@ -9,6 +9,7 @@ import {
   subscribePlanDraft,
   proposePlace as svcProposePlace,
   removePlace as svcRemovePlace,
+  replaceAllProposedPlaces as svcReplaceAllProposedPlaces,
   togglePlaceVote as svcTogglePlaceVote,
   movePlace as svcMovePlace,
   setPlaceDurationMin as svcSetPlaceDurationMin,
@@ -109,6 +110,11 @@ interface CoPlanStore {
   /** Override the on-site duration of a proposed place. Pass null to
    *  clear the override (timeline falls back to the default). */
   setPlaceDuration: (placeId: string, minutes: number | null) => Promise<void>;
+  /** Bulk replace : import all places from a saved Plan, overwriting any
+   *  existing proposed places. Caller passes pre-shaped CoPlanProposedPlace
+   *  objects (id, proposedAt, etc. already filled). Used by "Importer
+   *  depuis un plan sauvegardé" (creator-only, pre-group only). */
+  replaceAllProposedPlaces: (places: CoPlanProposedPlace[]) => Promise<void>;
   setAvailability: (slots: string[]) => Promise<void>;
   toggleAvailabilitySlot: (slotKey: string) => Promise<void>;
 
@@ -407,6 +413,28 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       if (removed) postCoPlanMirror('coplan_place_removed', removed.name);
     } catch (err) {
       console.warn('[coPlanStore] removePlace error:', err);
+    }
+  },
+
+  replaceAllProposedPlaces: async (places: CoPlanProposedPlace[]) => {
+    const { draftId, draft } = get();
+    if (!draftId || !draft) return;
+    // Optimistic local update — the workspace re-renders instantly.
+    set({
+      draft: {
+        ...draft,
+        proposedPlaces: places,
+      },
+    });
+    try {
+      await svcReplaceAllProposedPlaces(draftId, places);
+      // Mirror dans le chat n'a pas vraiment de sens ici parce que
+      // (a) cette action est gated pre-group → typiquement il n'y a pas
+      // encore de conv ; (b) si elle existe pour une raison, le bulk
+      // import génèrerait N events d'un coup, ce qui est du bruit. On
+      // skip le mirror.
+    } catch (err) {
+      console.warn('[coPlanStore] replaceAllProposedPlaces error:', err);
     }
   },
 
