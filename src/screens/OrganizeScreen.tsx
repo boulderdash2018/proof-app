@@ -29,6 +29,7 @@ import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { useDraftStore, DraftItem } from '../store/draftStore';
 import { CategoryTag, Place, Plan, DoItNowTransport } from '../types';
 import { TransportChooser } from '../components/TransportChooser';
+import { SavedPlanPickerSheet } from '../components/SavedPlanPickerSheet';
 import {
   searchPlacesAutocomplete,
   getPlaceDetails,
@@ -64,6 +65,29 @@ export const OrganizeScreen: React.FC = () => {
   const [showTransport, setShowTransport] = useState(false);
   const [tempPlan, setTempPlan] = useState<Plan | null>(null);
   const [pickedTransport, setPickedTransport] = useState<DoItNowTransport | null>(null);
+
+  // "Partir d'un plan sauvegardé" — picker pour préfiller le wizard à
+  // partir d'un Plan déjà bookmark. Ouvert depuis l'étape 1.
+  const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
+
+  /**
+   * Préfill : title + tags + places à partir d'un Plan source.
+   * OrganizeScreen est plus simple que CreateScreen — pas de coverPhotos,
+   * authorTip ou travelSegments à recopier. Le user peut tout modifier
+   * dans les étapes suivantes.
+   */
+  const prefillFromSavedPlan = (src: Plan) => {
+    setTitle(src.title || '');
+    setSelectedTags(src.tags || []);
+    const newPlaces: PlaceEntry[] = (src.places || []).map((p, idx) => ({
+      id: `prefill-${Date.now()}-${idx}`,
+      googlePlaceId: p.googlePlaceId || '',
+      name: p.name,
+      type: p.type || '',
+      address: p.address || '',
+    }));
+    setPlaces(newPlaces);
+  };
 
   // ── 4-step Wizard (1: title, 2: vibe, 3: places, 4: launch) ──
   type Step = 1 | 2 | 3 | 4;
@@ -445,6 +469,29 @@ export const OrganizeScreen: React.FC = () => {
             >
               <Text style={styles.stepHint}>Le nom court qui résume l'ambiance. Tu pourras le changer plus tard.</Text>
 
+              {/* "Partir d'un plan sauvegardé" — préfill du wizard depuis
+                  un plan déjà sauvegardé. Placé en HAUT (avant l'input qui
+                  ouvre le clavier en autoFocus) pour rester visible. */}
+              <TouchableOpacity
+                style={styles.importBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setShowSavedPlanPicker(true);
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={styles.importIconWrap}>
+                  <Ionicons name="bookmark" size={16} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.importTitle}>Partir d'un plan sauvegardé</Text>
+                  <Text style={styles.importHint}>
+                    Re-utilise un plan existant et modifie ce que tu veux
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+              </TouchableOpacity>
+
               <View style={[styles.inputWrap, { backgroundColor: Colors.bgSecondary, borderColor: title.length > 0 ? Colors.primary : Colors.borderSubtle, marginTop: 16 }]}>
                 <Ionicons name="pencil-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
                 <RNTextInput
@@ -753,6 +800,15 @@ export const OrganizeScreen: React.FC = () => {
           onSelect={handleTransportSelect}
         />
 
+        {/* ── Saved-plan picker (step 1) ── */}
+        <SavedPlanPickerSheet
+          visible={showSavedPlanPicker}
+          onClose={() => setShowSavedPlanPicker(false)}
+          onPick={(plan) => prefillFromSavedPlan(plan)}
+          title="Partir d'un plan sauvegardé"
+          subtitle="Toutes les infos sont préremplies. Tu peux modifier ce que tu veux ensuite."
+        />
+
         {/* ── Place Picker Modal ── */}
         <Modal visible={showPlacePicker} animationType="slide" presentationStyle="pageSheet">
           <View style={[styles.modalContainer, { paddingTop: insets.top, backgroundColor: C.white }]}>
@@ -964,6 +1020,39 @@ const styles = StyleSheet.create({
   },
   inspEmoji: { fontSize: 18 },
   inspText: { flex: 1, fontSize: 13.5, fontFamily: Fonts.body },
+
+  // "Partir d'un plan sauvegardé" — bouton step 1
+  importBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.terracotta300,
+    marginTop: 16,
+  },
+  importIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.terracotta50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  importTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  importHint: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+  },
 
   // ─────────────────────────────────────────────────────────────
   // Step 4 — recap + transport
