@@ -71,13 +71,16 @@ export const OrganizeScreen: React.FC = () => {
   const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
 
   /**
-   * Préfill : title + tags + places à partir d'un Plan source.
-   * OrganizeScreen est plus simple que CreateScreen — pas de coverPhotos,
-   * authorTip ou travelSegments à recopier. Le user peut tout modifier
-   * dans les étapes suivantes.
+   * Préfill : tags + places à partir d'un Plan source. Le user choisira
+   * son propre titre — sinon il aurait l'impression de copier le plan
+   * d'origine plutôt que de s'en inspirer.
+   *
+   * Switch sur le flow 'fromSaved' qui réordonne les étapes :
+   *   places (préremplis) → title (vide) → vibe (préremplis) → recap
+   * Et reset à l'étape 1 pour partir du début (= places).
    */
   const prefillFromSavedPlan = (src: Plan) => {
-    setTitle(src.title || '');
+    setTitle(''); // titre VIDE — le user crée le sien
     setSelectedTags(src.tags || []);
     const newPlaces: PlaceEntry[] = (src.places || []).map((p, idx) => ({
       id: `prefill-${Date.now()}-${idx}`,
@@ -87,6 +90,8 @@ export const OrganizeScreen: React.FC = () => {
       address: p.address || '',
     }));
     setPlaces(newPlaces);
+    setFlowMode('fromSaved');
+    setStep(1);
   };
 
   // ── 4-step Wizard (1: title, 2: vibe, 3: places, 4: launch) ──
@@ -94,13 +99,36 @@ export const OrganizeScreen: React.FC = () => {
   const TOTAL_STEPS: 4 = 4;
   const [step, setStep] = useState<Step>(1);
 
-  const canProceedFromStep = (s: Step): boolean => {
-    if (s === 1) return title.trim().length >= 3;
-    if (s === 2) return selectedTags.length > 0;
-    if (s === 3) return places.length >= 1;
-    if (s === 4) return pickedTransport !== null;
+  /**
+   * Le wizard a deux flows distincts :
+   *   • 'fresh'     — démarrage depuis zéro : titre → vibe → lieux → transport
+   *   • 'fromSaved' — préfill depuis un Plan sauvegardé : on commence par
+   *     les LIEUX (préremplis, le user retire/ajoute), puis titre VIDE,
+   *     puis catégories préremplies, puis transport.
+   *
+   * Cette logique mappe le numéro d'étape vers la "clé sémantique" de
+   * l'étape — au lieu de hardcoder `step === 1 → titre`, on utilise
+   * `stepKey === 'title' → render le titre`. Permet de réordonner sans
+   * dupliquer le rendu.
+   */
+  type FlowMode = 'fresh' | 'fromSaved';
+  type StepKey = 'title' | 'vibe' | 'places' | 'recap';
+  const [flowMode, setFlowMode] = useState<FlowMode>('fresh');
+  const FLOW_ORDER: Record<FlowMode, StepKey[]> = {
+    fresh:     ['title',  'vibe', 'places', 'recap'],
+    fromSaved: ['places', 'title', 'vibe',  'recap'],
+  };
+  const stepKey: StepKey = FLOW_ORDER[flowMode][step - 1];
+
+  const canProceedFromStepKey = (k: StepKey): boolean => {
+    if (k === 'title')  return title.trim().length >= 3;
+    if (k === 'vibe')   return selectedTags.length > 0;
+    if (k === 'places') return places.length >= 1;
+    if (k === 'recap')  return pickedTransport !== null;
     return false;
   };
+  // Backward-compat alias — used in the JSX below.
+  const canProceedFromStep = (_s: Step): boolean => canProceedFromStepKey(stepKey);
 
   const goToNextStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -415,18 +443,29 @@ export const OrganizeScreen: React.FC = () => {
   ];
 
   // ── Render ──
-  const stepTitles: Record<Step, string> = {
-    1: 'Nomme ta journée',
-    2: 'Quelle vibe ?',
-    3: 'Ajoute les lieux',
-    4: 'Prêt à partir ?',
+  // Labels keyed par StepKey (pas par numéro d'étape) — on récupère le
+  // bon label en fonction du flowMode + step courant.
+  const stepTitlesByKey: Record<StepKey, string> = {
+    title:  'Nomme ta journée',
+    vibe:   'Quelle vibe ?',
+    places: 'Ajoute les lieux',
+    recap:  'Prêt à partir ?',
   };
-  const nextLabels: Record<Step, string> = {
-    1: 'Suivant — la vibe',
-    2: 'Suivant — les lieux',
-    3: 'Suivant — lancement',
-    4: '🚀 Lancer la journée',
-  };
+
+  /** Le label du bouton "Suivant" mentionne ce qu'il y a APRÈS — donc
+   *  dépend du stepKey de l'étape suivante (ou "lancement" si dernière). */
+  const nextStepLabel = (() => {
+    if (step === TOTAL_STEPS) return '🚀 Lancer la journée';
+    const nextKey = FLOW_ORDER[flowMode][step];
+    if (!nextKey) return 'Suivant';
+    const phrase: Record<StepKey, string> = {
+      title:  'Suivant — le titre',
+      vibe:   'Suivant — la vibe',
+      places: 'Suivant — les lieux',
+      recap:  'Suivant — lancement',
+    };
+    return phrase[nextKey];
+  })();
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -444,7 +483,7 @@ export const OrganizeScreen: React.FC = () => {
           )}
           <View style={styles.wizardHeaderCenter}>
             <Text style={styles.wizardStepLabel}>ÉTAPE {step} SUR {TOTAL_STEPS}</Text>
-            <Text style={styles.wizardStepTitle}>{stepTitles[step]}</Text>
+            <Text style={styles.wizardStepTitle}>{stepTitlesByKey[stepKey]}</Text>
           </View>
           <View style={styles.wizardHeaderSide} />
         </View>
@@ -459,8 +498,8 @@ export const OrganizeScreen: React.FC = () => {
 
         {/* ═══════ Step content ═══════ */}
         <View style={styles.stepWrap}>
-          {/* ─── Step 1 — Titre ─── */}
-          {step === 1 && (
+          {/* ─── Étape "title" ─── */}
+          {stepKey === 'title' && (
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
@@ -471,26 +510,29 @@ export const OrganizeScreen: React.FC = () => {
 
               {/* "Partir d'un plan sauvegardé" — préfill du wizard depuis
                   un plan déjà sauvegardé. Placé en HAUT (avant l'input qui
-                  ouvre le clavier en autoFocus) pour rester visible. */}
-              <TouchableOpacity
-                style={styles.importBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setShowSavedPlanPicker(true);
-                }}
-                activeOpacity={0.85}
-              >
-                <View style={styles.importIconWrap}>
-                  <Ionicons name="bookmark" size={16} color={Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.importTitle}>Partir d'un plan sauvegardé</Text>
-                  <Text style={styles.importHint}>
-                    Re-utilise un plan existant et modifie ce que tu veux
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
-              </TouchableOpacity>
+                  ouvre le clavier en autoFocus) pour rester visible.
+                  Caché en mode 'fromSaved' (on est déjà dedans). */}
+              {flowMode === 'fresh' && (
+                <TouchableOpacity
+                  style={styles.importBtn}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setShowSavedPlanPicker(true);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.importIconWrap}>
+                    <Ionicons name="bookmark" size={16} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.importTitle}>Partir d'un plan sauvegardé</Text>
+                    <Text style={styles.importHint}>
+                      Re-utilise un plan existant et modifie ce que tu veux
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+                </TouchableOpacity>
+              )}
 
               <View style={[styles.inputWrap, { backgroundColor: Colors.bgSecondary, borderColor: title.length > 0 ? Colors.primary : Colors.borderSubtle, marginTop: 16 }]}>
                 <Ionicons name="pencil-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
@@ -528,8 +570,8 @@ export const OrganizeScreen: React.FC = () => {
             </ScrollView>
           )}
 
-          {/* ─── Step 2 — Vibe (categories) ─── */}
-          {step === 2 && (
+          {/* ─── Étape "vibe" (catégories) ─── */}
+          {stepKey === 'vibe' && (
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
@@ -634,8 +676,8 @@ export const OrganizeScreen: React.FC = () => {
             </ScrollView>
           )}
 
-          {/* ─── Step 3 — Places ─── */}
-          {step === 3 && (
+          {/* ─── Étape "places" ─── */}
+          {stepKey === 'places' && (
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
@@ -690,8 +732,8 @@ export const OrganizeScreen: React.FC = () => {
             </ScrollView>
           )}
 
-          {/* ─── Step 4 — Launch (recap + transport) ─── */}
-          {step === 4 && (
+          {/* ─── Étape "recap" (lancement + transport) ─── */}
+          {stepKey === 'recap' && (
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={[styles.stepPad, { paddingBottom: 24 }]}
@@ -783,7 +825,7 @@ export const OrganizeScreen: React.FC = () => {
             ) : (
               <>
                 <Text style={[styles.wizardPrimaryBtnText, { color: canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary }]}>
-                  {nextLabels[step]}
+                  {nextStepLabel}
                 </Text>
                 {step < TOTAL_STEPS ? (
                   <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
