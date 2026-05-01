@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,12 @@ import {
   TouchableOpacity,
   Image,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts } from '../constants';
-import { useSavesStore } from '../store';
+import { useSavesStore, useAuthStore } from '../store';
 import { Plan } from '../types';
 
 interface Props {
@@ -50,15 +51,58 @@ export const SavedPlanPickerSheet: React.FC<Props> = ({
   subtitle = 'Choisis l\'un de tes plans sauvegardés. Tu pourras tout modifier ensuite.',
 }) => {
   const savedPlans = useSavesStore((s) => s.savedPlans);
+  const isLoading = useSavesStore((s) => s.isLoading);
+  const fetchSaves = useSavesStore((s) => s.fetchSaves);
+  const userId = useAuthStore((s) => s.user?.id);
 
-  // Tri : plus récents d'abord (savedAt desc).
+  /**
+   * Lazy fetch — au tout premier login, le store n'est pas hydraté
+   * jusqu'à ce que la ProfileScreen ou SavesScreen soit visitée.
+   * On déclenche un fetch quand le sheet s'ouvre la PREMIÈRE fois
+   * (liste vide + pas déjà en cours de chargement).
+   */
+  useEffect(() => {
+    if (!visible || !userId) return;
+    if (savedPlans.length === 0 && !isLoading) {
+      fetchSaves(userId).catch((err) =>
+        console.warn('[SavedPlanPickerSheet] lazy fetch failed:', err),
+      );
+    }
+    // On ne dépend QUE de `visible` et `userId` — re-déclencher à chaque
+    // changement de savedPlans/isLoading provoquerait une boucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, userId]);
+
+  /**
+   * Filtre + tri.
+   *
+   * La sous-collection Firestore `users/{uid}/savedPlans` accumule aussi
+   * des entrées créées par `markPlanAsDone` (Proof It sur un plan jamais
+   * sauvegardé) — ces "fake saves" pollueraient la liste.
+   *
+   * La source de vérité du vrai bookmark est `plan.savedByIds` :
+   *   • `savePlan()` → arrayUnion(userId)
+   *   • `unsavePlan()` → arrayRemove(userId)
+   *   • `markPlanAsDone()` n'y touche PAS
+   *
+   * Donc on filtre sur `savedByIds.includes(userId)` pour ne garder que
+   * les plans que l'utilisateur a explicitement bookmark.
+   */
   const sorted = useMemo(
     () =>
-      [...savedPlans].sort((a, b) =>
-        (b.savedAt || '').localeCompare(a.savedAt || ''),
-      ),
-    [savedPlans],
+      [...savedPlans]
+        .filter((sp) => {
+          if (!sp.plan || !userId) return false;
+          const ids = sp.plan.savedByIds;
+          return Array.isArray(ids) && ids.includes(userId);
+        })
+        .sort((a, b) =>
+          (b.savedAt || '').localeCompare(a.savedAt || ''),
+        ),
+    [savedPlans, userId],
   );
+
+  const showLoading = isLoading && sorted.length === 0;
 
   const handlePick = (plan: Plan) => {
     Haptics.selectionAsync().catch(() => {});
@@ -99,7 +143,12 @@ export const SavedPlanPickerSheet: React.FC<Props> = ({
           <Text style={styles.subtitle}>{subtitle}</Text>
 
           {/* List */}
-          {sorted.length === 0 ? (
+          {showLoading ? (
+            <View style={styles.emptyWrap}>
+              <ActivityIndicator color={Colors.primary} />
+              <Text style={styles.emptyHint}>Chargement de tes plans…</Text>
+            </View>
+          ) : sorted.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Ionicons
                 name="bookmark-outline"
