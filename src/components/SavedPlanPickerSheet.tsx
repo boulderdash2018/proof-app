@@ -74,27 +74,33 @@ export const SavedPlanPickerSheet: React.FC<Props> = ({
   }, [visible, userId]);
 
   /**
-   * Filtre + tri.
+   * Filtre + tri — strict pour ne montrer QUE ce que le user
+   * considère comme "ses plans sauvegardés" :
    *
-   * La sous-collection Firestore `users/{uid}/savedPlans` accumule aussi
-   * des entrées créées par `markPlanAsDone` (Proof It sur un plan jamais
-   * sauvegardé) — ces "fake saves" pollueraient la liste.
+   *   1. !sp.isDone — alignement avec l'onglet "À faire" du SavesScreen
+   *      (filter canonique de l'app). Exclut :
+   *        • Les plans qu'il a Proof It (= déjà faits, pas pertinent
+   *          comme base de copie)
+   *        • Ses propres plans créés (saveCreatedPlan met isDone:true)
+   *        • Les "fake saves" insérées par markPlanAsDone (toujours done)
+   *   2. plan présent — l'entrée a été hydratée par fetchSavedPlans
+   *      (markAsDone insère parfois plan: null en attendant le hydrate)
+   *   3. authorId !== userId — extra-safety pour ses propres plans, au
+   *      cas où une entrée passée serait isDone:false par accident.
    *
-   * La source de vérité du vrai bookmark est `plan.savedByIds` :
-   *   • `savePlan()` → arrayUnion(userId)
-   *   • `unsavePlan()` → arrayRemove(userId)
-   *   • `markPlanAsDone()` n'y touche PAS
-   *
-   * Donc on filtre sur `savedByIds.includes(userId)` pour ne garder que
-   * les plans que l'utilisateur a explicitement bookmark.
+   * Pas de check `savedByIds` : il s'avère désynchronisé en pratique
+   * (unsavePlan a un .catch(()=>{}) silencieux qui peut laisser le user
+   * dedans même après désave), donc filtrer là-dessus laissait passer
+   * des plans que le user considère non-sauvegardés.
    */
   const sorted = useMemo(
     () =>
       [...savedPlans]
         .filter((sp) => {
           if (!sp.plan || !userId) return false;
-          const ids = sp.plan.savedByIds;
-          return Array.isArray(ids) && ids.includes(userId);
+          if (sp.isDone) return false;
+          if (sp.plan.authorId === userId) return false;
+          return true;
         })
         .sort((a, b) =>
           (b.savedAt || '').localeCompare(a.savedAt || ''),
