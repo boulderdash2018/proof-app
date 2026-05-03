@@ -1298,13 +1298,6 @@ export const CreateScreen: React.FC = () => {
     return Math.min(score, 100);
   }, [title, selectedTags, places, travels, coverPhotos]);
 
-  const barAnim = useRef(new Animated.Value(0)).current;
-  const barScale = useRef(new Animated.Value(1)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-  const labelFade = useRef(new Animated.Value(1)).current;
-  const labelSlide = useRef(new Animated.Value(0)).current;
-  const checkScale = useRef(new Animated.Value(0)).current;
-  const [hasReached100, setHasReached100] = useState(false);
   const [showPublishSheet, setShowPublishSheet] = useState(false);
   const sheetSlide = useRef(new Animated.Value(300)).current;
   // Publish fly-away animation
@@ -1312,46 +1305,8 @@ export const CreateScreen: React.FC = () => {
   const publishScale = useRef(new Animated.Value(1)).current;
   const publishOpacity = useRef(new Animated.Value(1)).current;
   const [isFlying, setIsFlying] = useState(false);
-  const prevLabelRef = useRef('');
-  const screenWidth = Dimensions.get('window').width - Layout.screenPadding * 2;
 
-  const qualityLabel = qualityScore >= 100 ? 'Perfect plan' : qualityScore >= 80 ? 'This plan is fire \uD83D\uDD25' : qualityScore >= 56 ? 'Almost there \u2726' : qualityScore >= 31 ? 'Looking good \uD83D\uDC40' : 'Start adding details...';
-  const labelColor = qualityScore >= 100 ? Colors.primary : qualityScore >= 80 ? Colors.primaryDeep : qualityScore >= 56 ? Colors.primary : qualityScore >= 31 ? '#D4784A' : '#8A8078';
   const canPublish = title.trim().length > 0 && coverPhotos.length > 0 && selectedTags.length > 0 && places.length >= 2 && authorTip.trim().length >= TIP_MIN_CHARS;
-
-  useEffect(() => {
-    // Spring fill
-    Animated.spring(barAnim, { toValue: qualityScore, friction: 8, tension: 40, useNativeDriver: false }).start();
-    // Label fade+slide on text change
-    if (prevLabelRef.current !== qualityLabel) {
-      prevLabelRef.current = qualityLabel;
-      Animated.parallel([
-        Animated.timing(labelFade, { toValue: 0, duration: 100, useNativeDriver: true }),
-        Animated.timing(labelSlide, { toValue: 6, duration: 100, useNativeDriver: true }),
-      ]).start(() => {
-        labelSlide.setValue(-6);
-        Animated.parallel([
-          Animated.timing(labelFade, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.spring(labelSlide, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }),
-        ]).start();
-      });
-    }
-    // 100% celebration
-    if (qualityScore >= 100 && !hasReached100) {
-      setHasReached100(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Pulse
-      Animated.sequence([
-        Animated.timing(barScale, { toValue: 1.04, duration: 200, useNativeDriver: true }),
-        Animated.timing(barScale, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
-      // Shimmer sweep
-      shimmerAnim.setValue(0);
-      Animated.timing(shimmerAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-      // Check pop
-      Animated.spring(checkScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
-    }
-  }, [qualityScore]);
 
   // Missing criteria for bottom sheet
   const missingCriteria = useMemo(() => {
@@ -1368,25 +1323,6 @@ export const CreateScreen: React.FC = () => {
   };
   const closePublishSheet = () => {
     Animated.timing(sheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setShowPublishSheet(false));
-  };
-
-  /**
-   * Suppression avec confirmation. Le user a déjà fait son plan IRL en
-   * mode customize — supprimer un lieu = retirer un point d'étape déjà
-   * vécu, action peu fréquente mais légitime (lieu ajouté par erreur,
-   * doublon, etc.). Confirmation Alert pour éviter la fausse manip.
-   */
-  const handleRemovePlaceWithConfirm = (id: string) => {
-    const place = places.find((p) => p.id === id);
-    if (!place) return;
-    Alert.alert(
-      'Retirer ce lieu ?',
-      `« ${place.name} » sera retiré de ce plan.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Retirer', style: 'destructive', onPress: () => removePlace(id) },
-      ],
-    );
   };
 
   const removePlace = (id: string) => {
@@ -1956,24 +1892,21 @@ export const CreateScreen: React.FC = () => {
                       </Text>
                     </View>
 
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        // Customize mode = plan déjà vécu → confirmation pour
-                        // éviter une suppression accidentelle. Mode fresh =
-                        // construction en cours → suppression directe (le user
-                        // peut juste re-ajouter le lieu).
-                        if (isCustomizeMode) {
-                          handleRemovePlaceWithConfirm(place.id);
-                        } else {
-                          removePlace(place.id);
-                        }
-                      }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={styles.tlRemoveBtn}
-                    >
-                      <Ionicons name="close" size={16} color={Colors.textTertiary} />
-                    </TouchableOpacity>
+                    {/* Croix de suppression — uniquement en mode fresh.
+                        En customize, le plan a déjà été vécu IRL : tous les
+                        lieux ajoutés ont été visités, on ne veut pas les
+                        retirer (sinon le plan publié ne reflète plus la
+                        réalité de la session). Le user peut toujours retirer
+                        un lieu en revenant au flow Organize. */}
+                    {!isCustomizeMode && (
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); removePlace(place.id); }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={styles.tlRemoveBtn}
+                      >
+                        <Ionicons name="close" size={16} color={Colors.textTertiary} />
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {/* Meta row — deux variantes selon le mode :
@@ -2215,27 +2148,6 @@ export const CreateScreen: React.FC = () => {
         </View>
 
         <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
-        {/* Quality progress bar */}
-        <Animated.View style={[styles.qualityBarWrap, { transform: [{ scaleY: barScale }] }]}>
-          <View style={styles.qualityBarBg}>
-            <Animated.View style={[styles.qualityBarFill, { width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }) }]}>
-              <LinearGradient colors={['#F5C4A0', '#D4784A', Colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-              {/* Shimmer overlay at 100% */}
-              <Animated.View style={[styles.qualityShimmer, { transform: [{ translateX: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-screenWidth, screenWidth] }) }], opacity: shimmerAnim.interpolate({ inputRange: [0, 0.3, 0.7, 1], outputRange: [0, 0.6, 0.6, 0] }) }]} />
-            </Animated.View>
-          </View>
-          {/* Tracking label — right-aligned inside a container matching bar fill width */}
-          <Animated.View style={[styles.qualityLabelTrack, { width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['10%', '100%'], extrapolate: 'clamp' }) }]}>
-            <Animated.View style={[styles.qualityLabelInner, { opacity: labelFade, transform: [{ translateY: labelSlide }] }]}>
-              <Text style={[styles.qualityLabel, { color: labelColor }]}>
-                {qualityLabel}
-              </Text>
-              {qualityScore >= 100 && (
-                <Animated.Text style={[styles.qualityCheck, { color: Colors.primary, transform: [{ scale: checkScale }] }]}> ✓</Animated.Text>
-              )}
-            </Animated.View>
-          </Animated.View>
-        </Animated.View>
 
         <View style={[styles.scroll, styles.scrollContent, { flex: 1 }]}>
           {/* ═══════ STEP 1: Title only — editorial composer ═══════ */}
@@ -4002,16 +3914,6 @@ const styles = StyleSheet.create({
   publishBtnText: { fontSize: 15, fontFamily: Fonts.displaySemiBold },
   publishHint: { fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: Fonts.body },
   costNote: { fontSize: 12, textAlign: 'center', marginTop: 10 },
-
-  // Quality progress bar
-  qualityBarWrap: { paddingHorizontal: Layout.screenPadding, paddingTop: 10, paddingBottom: 2 },
-  qualityBarBg: { height: 10, borderRadius: 20, backgroundColor: '#EDE8E0', overflow: 'hidden' },
-  qualityBarFill: { height: 10, borderRadius: 20, overflow: 'hidden' },
-  qualityShimmer: { position: 'absolute', top: 0, bottom: 0, width: 60, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 20 },
-  qualityLabelTrack: { marginTop: 5, alignItems: 'flex-end' },
-  qualityLabelInner: { flexDirection: 'row', alignItems: 'center' },
-  qualityLabel: { fontSize: 11, fontWeight: '600', fontFamily: Fonts.bodySemiBold },
-  qualityCheck: { fontSize: 13, fontWeight: '800', fontFamily: Fonts.displaySemiBold },
 
   // Publish bottom sheet
   sheetOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end', zIndex: 999 },
