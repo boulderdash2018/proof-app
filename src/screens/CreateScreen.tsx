@@ -38,6 +38,7 @@ import { createPlan, updatePlan } from '../services/plansService';
 import { pickImage, pickImageFromSource, pickMultipleImages } from '../utils';
 import { SavedPlanPickerSheet } from '../components/SavedPlanPickerSheet';
 import { CreatorTipInput } from '../components/publish/CreatorTipInput';
+import { DurationPickerSheet } from '../components/DurationPickerSheet';
 import { trackEvent } from '../services/posthogConfig';
 import {
   searchPlacesAutocomplete,
@@ -312,6 +313,12 @@ export const CreateScreen: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // DurationPickerSheet — sheet richer qu'une row de pills, monté
+  // uniquement en mode customize où l'on veut un CTA fort sur la durée.
+  // null = sheet fermé. Le placeId stocké pointe vers le lieu qui sera
+  // mis à jour au confirm.
+  const [durationPickerPlaceId, setDurationPickerPlaceId] = useState<string | null>(null);
+
   // "Partir d'un plan sauvegardé" picker state — opened from step 1.
   // Prefilling is non-destructive : si le user a déjà tapé un titre, on
   // l'écrase volontairement (intent assumed : "je repars de zéro depuis ce plan").
@@ -415,7 +422,20 @@ export const CreateScreen: React.FC = () => {
     if (s === 1) return title.trim().length > 0;
     if (s === 2) return coverPhotos.length > 0; // cover photo is mandatory
     if (s === 3) return selectedTags.length > 0;
-    if (s === 4) return places.length >= 2;
+    if (s === 4) {
+      // Mode customize : plan déjà vécu → on exige les infos pour CHAQUE
+      // lieu (photo + durée + prix). Sans ça, la publication serait creuse.
+      // Mode fresh : juste 2 lieux mini, le user remplit progressivement.
+      if ((route.params?.draftId || '').toString().startsWith('organize-')) {
+        if (places.length < 1) return false;
+        return places.every((p) =>
+          !!(p.customPhoto || p.previewPhotoUrl) &&
+          !!p.duration &&
+          p.priceRangeIndex >= 0,
+        );
+      }
+      return places.length >= 2;
+    }
     if (s === 5) return authorTip.trim().length >= TIP_MIN_CHARS;
     return false;
   };
@@ -1350,6 +1370,25 @@ export const CreateScreen: React.FC = () => {
     Animated.timing(sheetSlide, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setShowPublishSheet(false));
   };
 
+  /**
+   * Suppression avec confirmation. Le user a déjà fait son plan IRL en
+   * mode customize — supprimer un lieu = retirer un point d'étape déjà
+   * vécu, action peu fréquente mais légitime (lieu ajouté par erreur,
+   * doublon, etc.). Confirmation Alert pour éviter la fausse manip.
+   */
+  const handleRemovePlaceWithConfirm = (id: string) => {
+    const place = places.find((p) => p.id === id);
+    if (!place) return;
+    Alert.alert(
+      'Retirer ce lieu ?',
+      `« ${place.name} » sera retiré de ce plan.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Retirer', style: 'destructive', onPress: () => removePlace(id) },
+      ],
+    );
+  };
+
   const removePlace = (id: string) => {
     const index = places.findIndex((p) => p.id === id);
     if (index === -1) return;
@@ -1867,25 +1906,48 @@ export const CreateScreen: React.FC = () => {
                     pressed && !isExpanded && styles.tlCardPressed,
                   ]}
                 >
-                  {/* Top row: thumb + name + remove */}
+                  {/* Top row: thumb + name + remove
+                      En customize mode, le thumb est cliquable et ouvre
+                      directement le modal de personnalisation (photo + comment
+                      + QAs) — c'est le seul endroit où l'user peut ajouter
+                      sa propre photo. Le placeholder devient explicite. */}
                   <View style={styles.tlCardTop}>
-                    <View style={styles.tlThumb}>
-                      {hasPhoto ? (
-                        <Image
-                          source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
-                          style={styles.tlThumbImg}
-                        />
-                      ) : (
-                        <LinearGradient
-                          colors={[Colors.terracotta300, Colors.terracotta500]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.tlThumbImg}
-                        >
-                          <Ionicons name="location" size={20} color={Colors.textOnAccent} />
-                        </LinearGradient>
-                      )}
-                    </View>
+                    {isCustomizeMode ? (
+                      <TouchableOpacity
+                        style={styles.tlThumb}
+                        onPress={(e) => { e.stopPropagation(); editPlaceCustomization(index); }}
+                        activeOpacity={0.85}
+                      >
+                        {hasPhoto ? (
+                          <Image
+                            source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
+                            style={styles.tlThumbImg}
+                          />
+                        ) : (
+                          <View style={[styles.tlThumbImg, styles.tlThumbPlaceholder]}>
+                            <Ionicons name="camera" size={18} color={Colors.primary} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.tlThumb}>
+                        {hasPhoto ? (
+                          <Image
+                            source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
+                            style={styles.tlThumbImg}
+                          />
+                        ) : (
+                          <LinearGradient
+                            colors={[Colors.terracotta300, Colors.terracotta500]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.tlThumbImg}
+                          >
+                            <Ionicons name="location" size={20} color={Colors.textOnAccent} />
+                          </LinearGradient>
+                        )}
+                      </View>
+                    )}
 
                     <View style={styles.tlCardInfo}>
                       <Text style={styles.tlPlaceName} numberOfLines={1}>{place.name}</Text>
@@ -1895,7 +1957,18 @@ export const CreateScreen: React.FC = () => {
                     </View>
 
                     <TouchableOpacity
-                      onPress={(e) => { e.stopPropagation(); removePlace(place.id); }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        // Customize mode = plan déjà vécu → confirmation pour
+                        // éviter une suppression accidentelle. Mode fresh =
+                        // construction en cours → suppression directe (le user
+                        // peut juste re-ajouter le lieu).
+                        if (isCustomizeMode) {
+                          handleRemovePlaceWithConfirm(place.id);
+                        } else {
+                          removePlace(place.id);
+                        }
+                      }}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       style={styles.tlRemoveBtn}
                     >
@@ -1903,53 +1976,168 @@ export const CreateScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Meta inline row — pills 'add' quand vide, inline meta quand rempli */}
-                  <View style={styles.tlMetaRow}>
-                    {place.duration ? (
-                      <View style={styles.tlMetaItem}>
-                        <Ionicons name="time-outline" size={11} color={Colors.terracotta500} />
-                        <Text style={styles.tlMetaText}>{formatDurationLabel(place.duration)}</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.tlMetaAddPill}>
-                        <Ionicons name="add" size={11} color={Colors.terracotta600} />
-                        <Ionicons name="time-outline" size={11} color={Colors.terracotta600} />
-                        <Text style={styles.tlMetaAddText}>Durée</Text>
-                      </View>
-                    )}
-                    <Text style={styles.tlMetaSep}>·</Text>
-                    {place.priceRangeIndex >= 0 ? (
-                      <View style={styles.tlMetaItem}>
-                        <Ionicons name="wallet-outline" size={11} color={Colors.terracotta500} />
-                        <Text style={styles.tlMetaText}>
-                          {(() => {
+                  {/* Meta row — deux variantes selon le mode :
+                      • customize : 3 chips CTA explicites (photo / durée / prix)
+                        + jauge "N/3" pour pousser à compléter chaque champ
+                      • fresh : pills compactes (UX historique inchangée) */}
+                  {isCustomizeMode ? (
+                    (() => {
+                      const photoFilled = !!(place.customPhoto || place.previewPhotoUrl);
+                      const durationFilled = !!place.duration;
+                      const priceFilled = place.priceRangeIndex >= 0;
+                      const filledCount = (photoFilled ? 1 : 0) + (durationFilled ? 1 : 0) + (priceFilled ? 1 : 0);
+                      const allFilled = filledCount === 3;
+                      const priceLabel = priceFilled
+                        ? (() => {
                             const r = PRICE_RANGES[place.priceRangeIndex];
                             return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
-                          })()}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.tlMetaAddPill}>
-                        <Ionicons name="add" size={11} color={Colors.terracotta600} />
-                        <Ionicons name="wallet-outline" size={11} color={Colors.terracotta600} />
-                        <Text style={styles.tlMetaAddText}>Prix</Text>
-                      </View>
-                    )}
-                    {place.reservationRecommended && (
-                      <>
-                        <Text style={styles.tlMetaSep}>·</Text>
+                          })()
+                        : null;
+                      return (
+                        <>
+                          {/* Jauge complétion : N/3 + 3 pastilles */}
+                          <View style={styles.czGauge}>
+                            <View style={styles.czGaugeDots}>
+                              {[photoFilled, durationFilled, priceFilled].map((on, i) => (
+                                <View
+                                  key={i}
+                                  style={[
+                                    styles.czGaugeDot,
+                                    on && styles.czGaugeDotOn,
+                                  ]}
+                                />
+                              ))}
+                            </View>
+                            <Text style={[
+                              styles.czGaugeText,
+                              allFilled && { color: Colors.success },
+                            ]}>
+                              {allFilled ? 'Tout est rempli ✓' : `${filledCount}/3 infos`}
+                            </Text>
+                          </View>
+
+                          {/* 3 chips CTA dimensionnés */}
+                          <View style={styles.czChipsRow}>
+                            <TouchableOpacity
+                              style={[styles.czChip, photoFilled && styles.czChipFilled]}
+                              onPress={(e) => { e.stopPropagation(); editPlaceCustomization(index); }}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons
+                                name={photoFilled ? 'image' : 'image-outline'}
+                                size={14}
+                                color={photoFilled ? Colors.success : Colors.primary}
+                              />
+                              <Text style={[
+                                styles.czChipText,
+                                photoFilled && styles.czChipTextFilled,
+                              ]} numberOfLines={1}>
+                                {photoFilled ? 'Photo OK' : 'Ajoute une photo'}
+                              </Text>
+                              {photoFilled && (
+                                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                              )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.czChip, durationFilled && styles.czChipFilled]}
+                              onPress={(e) => { e.stopPropagation(); setDurationPickerPlaceId(place.id); }}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons
+                                name={durationFilled ? 'time' : 'time-outline'}
+                                size={14}
+                                color={durationFilled ? Colors.success : Colors.primary}
+                              />
+                              <Text style={[
+                                styles.czChipText,
+                                durationFilled && styles.czChipTextFilled,
+                              ]} numberOfLines={1}>
+                                {durationFilled ? formatDurationLabel(place.duration) : 'Combien de temps ?'}
+                              </Text>
+                              {durationFilled && (
+                                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                              )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.czChip, priceFilled && styles.czChipFilled]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                // Le prix utilise le picker inline existant (range
+                                // chips dans la section expanded). On expand la
+                                // card pour donner accès aux ranges.
+                                if (!isExpanded) togglePlaceExpand(place.id);
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons
+                                name={priceFilled ? 'wallet' : 'wallet-outline'}
+                                size={14}
+                                color={priceFilled ? Colors.success : Colors.primary}
+                              />
+                              <Text style={[
+                                styles.czChipText,
+                                priceFilled && styles.czChipTextFilled,
+                              ]} numberOfLines={1}>
+                                {priceLabel ?? 'Combien ça coûte ?'}
+                              </Text>
+                              {priceFilled && (
+                                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <View style={styles.tlMetaRow}>
+                      {place.duration ? (
                         <View style={styles.tlMetaItem}>
-                          <Ionicons name="bookmark" size={11} color={Colors.terracotta500} />
-                          <Text style={styles.tlMetaText}>Réserver</Text>
+                          <Ionicons name="time-outline" size={11} color={Colors.terracotta500} />
+                          <Text style={styles.tlMetaText}>{formatDurationLabel(place.duration)}</Text>
                         </View>
-                      </>
-                    )}
-                    {hasCustom && (
-                      <View style={styles.tlCustomBadge}>
-                        <Text style={styles.tlCustomBadgeText}>✨ Perso</Text>
-                      </View>
-                    )}
-                  </View>
+                      ) : (
+                        <View style={styles.tlMetaAddPill}>
+                          <Ionicons name="add" size={11} color={Colors.terracotta600} />
+                          <Ionicons name="time-outline" size={11} color={Colors.terracotta600} />
+                          <Text style={styles.tlMetaAddText}>Durée</Text>
+                        </View>
+                      )}
+                      <Text style={styles.tlMetaSep}>·</Text>
+                      {place.priceRangeIndex >= 0 ? (
+                        <View style={styles.tlMetaItem}>
+                          <Ionicons name="wallet-outline" size={11} color={Colors.terracotta500} />
+                          <Text style={styles.tlMetaText}>
+                            {(() => {
+                              const r = PRICE_RANGES[place.priceRangeIndex];
+                              return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
+                            })()}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.tlMetaAddPill}>
+                          <Ionicons name="add" size={11} color={Colors.terracotta600} />
+                          <Ionicons name="wallet-outline" size={11} color={Colors.terracotta600} />
+                          <Text style={styles.tlMetaAddText}>Prix</Text>
+                        </View>
+                      )}
+                      {place.reservationRecommended && (
+                        <>
+                          <Text style={styles.tlMetaSep}>·</Text>
+                          <View style={styles.tlMetaItem}>
+                            <Ionicons name="bookmark" size={11} color={Colors.terracotta500} />
+                            <Text style={styles.tlMetaText}>Réserver</Text>
+                          </View>
+                        </>
+                      )}
+                      {hasCustom && (
+                        <View style={styles.tlCustomBadge}>
+                          <Text style={styles.tlCustomBadgeText}>✨ Perso</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
 
                   {/* Expanded section */}
                   {isExpanded && renderPlaceExpanded(place, index)}
@@ -2406,8 +2594,15 @@ export const CreateScreen: React.FC = () => {
             {renderPlacesWithTravels()}
             {errors.places && <Text style={[styles.errorText, { marginLeft: 56, marginTop: 4 }]}>{errors.places}</Text>}
 
-            {/* Compact recap pill */}
+            {/* Compact recap pill — conditions adaptées au mode :
+                • fresh    : >= 2 lieux suffit (UX historique)
+                • customize: ne s'affiche QUE quand TOUS les lieux ont
+                  durée + prix renseignés. Sinon la pill mentirait
+                  ("0min", "Free") et brouillerait le user qui pense
+                  que c'est calculé automatiquement. */}
             {places.length >= 2 && (
+              !isCustomizeMode || places.every((p) => p.duration && p.priceRangeIndex >= 0)
+            ) && (
               <View style={styles.tlRecapPill}>
                 <View style={styles.tlRecapItem}>
                   <Text style={styles.tlRecapEmoji}>📍</Text>
@@ -2521,6 +2716,12 @@ export const CreateScreen: React.FC = () => {
           {step === 2 && coverPhotos.length === 0 && (
             <Text style={{ fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginTop: 10, fontFamily: Fonts.body }}>
               Une photo de présentation est obligatoire
+            </Text>
+          )}
+          {/* Hint customize step 4 : explique pourquoi le bouton est gris */}
+          {step === 4 && isCustomizeMode && !canProceedFromStep(4) && (
+            <Text style={{ fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginTop: 10, fontFamily: Fonts.body }}>
+              Complète photo, durée et prix de chaque lieu pour continuer.
             </Text>
           )}
           {step >= TOTAL_STEPS && (
@@ -2931,6 +3132,35 @@ export const CreateScreen: React.FC = () => {
           title="Partir d'un plan sauvegardé"
           subtitle="Tous les détails sont préremplis. Tu peux modifier ce que tu veux ensuite."
         />
+
+        {/* ========== DURATION PICKER (customize mode — étape lieux) ========== */}
+        {(() => {
+          const target = durationPickerPlaceId
+            ? places.find((p) => p.id === durationPickerPlaceId) || null
+            : null;
+          return (
+            <DurationPickerSheet
+              visible={!!target}
+              onClose={() => setDurationPickerPlaceId(null)}
+              currentMinutes={target?.duration ? parseInt(target.duration, 10) : null}
+              placeName={target?.name}
+              placeCategory={target?.placeTypes?.[0] || target?.type}
+              onConfirm={async (minutes) => {
+                if (!target) return;
+                // Le picker utilise null pour clear ; ici on stocke en string.
+                const value = minutes == null ? '' : String(minutes);
+                updatePlaceDuration(target.id, value);
+                // Si la pill toggle (= la valeur posée est égale à la précédente),
+                // updatePlaceDuration vide. On pose explicitement la valeur
+                // pour éviter ce comportement quand on confirme via le sheet.
+                setPlaces((prev) => prev.map((p) =>
+                  p.id === target.id ? { ...p, duration: value } : p,
+                ));
+                setDurationPickerPlaceId(null);
+              }}
+            />
+          );
+        })()}
 
         {/* ========== PREVIEW MODAL ========== */}
         <Modal visible={showPreview} animationType="slide" presentationStyle="pageSheet">
@@ -4049,6 +4279,73 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Placeholder cliquable en customize mode — encourage à ajouter une photo
+  tlThumbPlaceholder: {
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.primary,
+  },
+
+  // ── Carte customize mode (étape "Personnalise tes lieux") ──
+  // Jauge complétion + 3 chips CTA dimensionnés.
+  czGauge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  czGaugeDots: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  czGaugeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: Colors.borderMedium,
+  },
+  czGaugeDotOn: {
+    backgroundColor: Colors.success,
+  },
+  czGaugeText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 0.4,
+  },
+  czChipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  czChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderRadius: 99,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1.2,
+    borderColor: Colors.primary,
+    minHeight: 38,
+  },
+  czChipFilled: {
+    backgroundColor: Colors.successBg,
+    borderColor: Colors.successBorder,
+  },
+  czChipText: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    flexShrink: 1,
+  },
+  czChipTextFilled: {
+    color: Colors.success,
   },
   tlCardInfo: {
     flex: 1,
