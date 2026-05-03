@@ -214,7 +214,15 @@ export const OrganizeCompleteScreen: React.FC = () => {
     const draftId = 'organize-' + Date.now();
     const draftPlaces = p.places.map((place) => {
       const visit = s.placesVisited.find((v) => v.placeId === place.id);
-      const price = visit?.pricePaid || 0;
+      // ⚠️ pricePaid === 0 ne veut PAS dire 'Gratuit', ça veut dire 'pas
+      //   encore saisi' (default value du store organize). Mapper sur 0
+      //   pré-remplirait la pill prix avec 'Gratuit ✓' alors que le user
+      //   n'a rien validé. On laisse priceRangeIndex à -1 (= vide) tant
+      //   que pricePaid n'est pas explicitement > 0. Idem pour duration.
+      const price = visit?.pricePaid ?? 0;
+      const priceRangeIndex = price > 0
+        ? (price <= 15 ? 1 : price <= 30 ? 2 : price <= 60 ? 3 : price <= 100 ? 4 : 5)
+        : -1;
       return {
         id: place.id,
         googlePlaceId: place.googlePlaceId || place.id,
@@ -222,10 +230,12 @@ export const OrganizeCompleteScreen: React.FC = () => {
         type: place.type || '',
         address: place.address || '',
         placeTypes: (place as any).placeTypes || [],
-        priceRangeIndex: price === 0 ? 0 : price <= 15 ? 1 : price <= 30 ? 2 : price <= 60 ? 3 : price <= 100 ? 4 : 5,
+        priceRangeIndex,
         exactPrice: price > 0 ? String(price) : '',
-        price: String(price),
-        duration: String(visit?.timeSpentMinutes || ''),
+        price: price > 0 ? String(price) : '',
+        duration: visit?.timeSpentMinutes && visit.timeSpentMinutes > 0
+          ? String(visit.timeSpentMinutes)
+          : '',
         comment: visit?.reviewText || '',
       };
     });

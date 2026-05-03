@@ -39,6 +39,7 @@ import { pickImage, pickImageFromSource, pickMultipleImages } from '../utils';
 import { SavedPlanPickerSheet } from '../components/SavedPlanPickerSheet';
 import { CreatorTipInput } from '../components/publish/CreatorTipInput';
 import { DurationPickerSheet } from '../components/DurationPickerSheet';
+import { PricePickerSheet } from '../components/PricePickerSheet';
 import { trackEvent } from '../services/posthogConfig';
 import {
   searchPlacesAutocomplete,
@@ -318,6 +319,11 @@ export const CreateScreen: React.FC = () => {
   // null = sheet fermé. Le placeId stocké pointe vers le lieu qui sera
   // mis à jour au confirm.
   const [durationPickerPlaceId, setDurationPickerPlaceId] = useState<string | null>(null);
+  // PricePickerSheet — symétrique au duration picker, ouvert au tap
+  // sur le chip prix en customize mode. Permet de poser explicitement
+  // une valeur (incluant 'Gratuit') au lieu de l'expand inline qui
+  // mélangeait les pills dans la zone détaillée.
+  const [pricePickerPlaceId, setPricePickerPlaceId] = useState<string | null>(null);
 
   // "Partir d'un plan sauvegardé" picker state — opened from step 1.
   // Prefilling is non-destructive : si le user a déjà tapé un titre, on
@@ -1997,10 +2003,7 @@ export const CreateScreen: React.FC = () => {
                               style={[styles.czChip, priceFilled && styles.czChipFilled]}
                               onPress={(e) => {
                                 e.stopPropagation();
-                                // Le prix utilise le picker inline existant (range
-                                // chips dans la section expanded). On expand la
-                                // card pour donner accès aux ranges.
-                                if (!isExpanded) togglePlaceExpand(place.id);
+                                setPricePickerPlaceId(place.id);
                               }}
                               activeOpacity={0.85}
                             >
@@ -3069,6 +3072,34 @@ export const CreateScreen: React.FC = () => {
                   p.id === target.id ? { ...p, duration: value } : p,
                 ));
                 setDurationPickerPlaceId(null);
+              }}
+            />
+          );
+        })()}
+
+        {/* ========== PRICE PICKER (customize mode — étape lieux) ========== */}
+        {(() => {
+          const target = pricePickerPlaceId
+            ? places.find((p) => p.id === pricePickerPlaceId) || null
+            : null;
+          return (
+            <PricePickerSheet
+              visible={!!target}
+              onClose={() => setPricePickerPlaceId(null)}
+              currentRangeIndex={target?.priceRangeIndex ?? -1}
+              currency={cityConfig.currency}
+              placeName={target?.name}
+              onConfirm={async (rangeIndex) => {
+                if (!target) return;
+                // -1 = clear ; 0..5 = un range posé. updatePlacePriceRange
+                // toggle si on retap le même index — on évite ça en posant
+                // explicitement la valeur.
+                setPlaces((prev) => prev.map((p) =>
+                  p.id === target.id
+                    ? { ...p, priceRangeIndex: rangeIndex, exactPrice: rangeIndex < 0 ? '' : p.exactPrice }
+                    : p,
+                ));
+                setPricePickerPlaceId(null);
               }}
             />
           );
