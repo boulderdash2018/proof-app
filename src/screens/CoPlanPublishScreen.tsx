@@ -9,6 +9,8 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -21,7 +23,7 @@ import { fetchPlanById, publishCoPlan } from '../services/plansService';
 import { fetchPlanDraft } from '../services/planDraftService';
 import { pickImage } from '../utils/pickImage';
 import { CreatorTipInput } from '../components/publish/CreatorTipInput';
-import { Avatar } from '../components';
+import { Avatar, GroupAlbumSheet } from '../components';
 import { useAuthStore } from '../store/authStore';
 import { Plan, PlanDraft, CoAuthor } from '../types';
 
@@ -80,6 +82,9 @@ export const CoPlanPublishScreen: React.FC = () => {
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<Set<string>>(new Set());
   const [uploadingCover, setUploadingCover] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // "Choisir la source" sheet (pellicule vs album du groupe)
+  const [coverSourceSheetOpen, setCoverSourceSheetOpen] = useState(false);
+  const [albumPickerOpen, setAlbumPickerOpen] = useState(false);
 
   useEffect(() => {
     if (plan && title === '') setTitle(plan.title || '');
@@ -114,8 +119,26 @@ export const CoPlanPublishScreen: React.FC = () => {
     });
   };
 
-  // ── Cover photo picker ──
-  const handlePickCover = async () => {
+  // ── Cover photo picker — deux sources possibles ──
+  // 1. Pellicule (caméra ou bibliothèque locale via pickImage)
+  // 2. Album du groupe (photos déjà uploadées dans la conversation
+  //    pendant l'exécution du plan, via GroupAlbumSheet en mode picker)
+  //
+  // Le bouton "Changer" ouvre d'abord un petit choisir-la-source si la
+  // conversation est connue (= source draft existe). Sinon fallback
+  // direct sur pellicule.
+  const conversationId = draft?.conversationId || draft?.publishedConvId;
+
+  const openCoverPicker = () => {
+    if (conversationId) {
+      setCoverSourceSheetOpen(true);
+    } else {
+      handlePickFromLibrary();
+    }
+  };
+
+  const handlePickFromLibrary = async () => {
+    setCoverSourceSheetOpen(false);
     const picked = await pickImage({ quality: 0.7 });
     if (!picked) return;
     setUploadingCover(true);
@@ -131,6 +154,19 @@ export const CoPlanPublishScreen: React.FC = () => {
       Alert.alert('Oups', "L'upload de la photo a échoué. Réessaye.");
     } finally {
       setUploadingCover(false);
+    }
+  };
+
+  const handlePickFromAlbum = () => {
+    setCoverSourceSheetOpen(false);
+    setAlbumPickerOpen(true);
+  };
+
+  const handleAlbumSelected = (urls: string[]) => {
+    setAlbumPickerOpen(false);
+    if (urls.length > 0) {
+      setCoverUrl(urls[0]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
   };
 
@@ -249,7 +285,7 @@ export const CoPlanPublishScreen: React.FC = () => {
         </Text>
         <TouchableOpacity
           style={styles.coverWrap}
-          onPress={handlePickCover}
+          onPress={openCoverPicker}
           activeOpacity={0.85}
           disabled={uploadingCover}
         >
@@ -398,6 +434,74 @@ export const CoPlanPublishScreen: React.FC = () => {
           </Text>
         )}
       </View>
+
+      {/* ── Source-choice sheet : pellicule vs album du groupe ── */}
+      <Modal
+        visible={coverSourceSheetOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setCoverSourceSheetOpen(false)}
+      >
+        <Pressable
+          style={styles.sourceBackdrop}
+          onPress={() => setCoverSourceSheetOpen(false)}
+        >
+          <Pressable style={styles.sourceCard} onPress={() => {}}>
+            <View style={styles.sourceHandle} />
+            <Text style={styles.sourceTitle}>Choisir une photo</Text>
+            <Text style={styles.sourceHint}>
+              D'où veux-tu prendre la photo de couverture ?
+            </Text>
+            <TouchableOpacity
+              style={styles.sourceOption}
+              onPress={handlePickFromAlbum}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.sourceOptionIcon, { backgroundColor: Colors.terracotta50 }]}>
+                <Ionicons name="people" size={18} color={Colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sourceOptionTitle}>Album du groupe</Text>
+                <Text style={styles.sourceOptionDesc}>
+                  Photos partagées dans la conversation
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sourceOption}
+              onPress={handlePickFromLibrary}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.sourceOptionIcon, { backgroundColor: Colors.terracotta50 }]}>
+                <Ionicons name="image" size={18} color={Colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sourceOptionTitle}>Pellicule</Text>
+                <Text style={styles.sourceOptionDesc}>
+                  Photo prise par toi sur ton téléphone
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Album picker (mode multi-select extension de GroupAlbumSheet) ── */}
+      {conversationId && (
+        <GroupAlbumSheet
+          visible={albumPickerOpen}
+          onClose={() => setAlbumPickerOpen(false)}
+          conversationId={conversationId}
+          selectionMode={{
+            max: 1,
+            initialSelected: coverUrl ? [coverUrl] : [],
+            onSelected: handleAlbumSelected,
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -608,5 +712,65 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+
+  // Source-choice sheet (cover photo)
+  sourceBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(44,36,32,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sourceCard: {
+    backgroundColor: Colors.bgSecondary,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 22,
+    paddingTop: 8,
+    paddingBottom: 30,
+  },
+  sourceHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.borderMedium,
+    marginBottom: 18,
+  },
+  sourceTitle: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
+  sourceHint: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginBottom: 14,
+  },
+  sourceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  sourceOptionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceOptionTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  sourceOptionDesc: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
   },
 });

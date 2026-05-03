@@ -14,6 +14,23 @@ interface GroupAlbumSheetProps {
   conversationId: string;
   /** Optional filter — only photos tagged with this sessionId. If absent, show all photos. */
   sessionId?: string;
+  /**
+   * Mode "picker" : si défini, le sheet affiche des cases à cocher sur
+   *   chaque photo + un footer "Confirmer (N)". Le tap simple ne déclenche
+   *   plus la lightbox mais coche/décoche la photo. Le callback
+   *   `onSelected` est appelé au tap "Confirmer" avec les URLs cochées.
+   *
+   * Si absent, comportement read-only historique (lightbox au tap, pas
+   *   de sélection multiple).
+   */
+  selectionMode?: {
+    /** Limite max d'éléments sélectionnables (0 = illimité). Défaut 1. */
+    max?: number;
+    /** Pré-cochés au mount (URLs). */
+    initialSelected?: string[];
+    /** Appelé au tap "Confirmer". */
+    onSelected: (urls: string[]) => void;
+  };
 }
 
 interface AlbumItem {
@@ -36,12 +53,48 @@ const COLS = 3;
  * this MVP we keep it read-only.
  */
 export const GroupAlbumSheet: React.FC<GroupAlbumSheetProps> = ({
-  visible, onClose, conversationId, sessionId,
+  visible, onClose, conversationId, sessionId, selectionMode,
 }) => {
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AlbumItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const isPicker = !!selectionMode;
+  const pickerMax = selectionMode?.max ?? 1;
+  const [pickerSelected, setPickerSelected] = useState<Set<string>>(
+    () => new Set(selectionMode?.initialSelected || []),
+  );
+
+  // Reset picker selection chaque fois qu'on rouvre, depuis initialSelected.
+  useEffect(() => {
+    if (visible && selectionMode) {
+      setPickerSelected(new Set(selectionMode.initialSelected || []));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const togglePick = (url: string) => {
+    setPickerSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) {
+        next.delete(url);
+      } else {
+        if (pickerMax > 0 && next.size >= pickerMax) {
+          // Max atteint → on remplace l'élément le plus ancien.
+          // Pour max=1, c'est le mode "single-select" classique.
+          if (pickerMax === 1) next.clear();
+        }
+        next.add(url);
+      }
+      return next;
+    });
+  };
+
+  const handleConfirmPick = () => {
+    if (!selectionMode) return;
+    selectionMode.onSelected(Array.from(pickerSelected));
+    onClose();
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -80,15 +133,31 @@ export const GroupAlbumSheet: React.FC<GroupAlbumSheetProps> = ({
     return 120;
   }, []);
 
-  const renderTile = ({ item }: { item: AlbumItem }) => (
-    <TouchableOpacity
-      onPress={() => setLightboxUrl(item.url)}
-      style={[styles.tile, { width: `${100 / COLS}%`, aspectRatio: 1 }]}
-      activeOpacity={0.85}
-    >
-      <Image source={{ uri: item.url }} style={styles.tileImage} />
-    </TouchableOpacity>
-  );
+  const renderTile = ({ item }: { item: AlbumItem }) => {
+    const isPicked = pickerSelected.has(item.url);
+    return (
+      <TouchableOpacity
+        onPress={() => isPicker ? togglePick(item.url) : setLightboxUrl(item.url)}
+        style={[styles.tile, { width: `${100 / COLS}%`, aspectRatio: 1 }]}
+        activeOpacity={0.85}
+      >
+        <Image source={{ uri: item.url }} style={styles.tileImage} />
+        {isPicker && (
+          <View
+            style={[
+              styles.pickCheckbox,
+              isPicked && styles.pickCheckboxOn,
+            ]}
+          >
+            {isPicked && (
+              <Ionicons name="checkmark" size={14} color={Colors.textOnAccent} />
+            )}
+          </View>
+        )}
+        {isPicker && isPicked && <View style={styles.pickedOverlay} pointerEvents="none" />}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal
@@ -108,12 +177,18 @@ export const GroupAlbumSheet: React.FC<GroupAlbumSheetProps> = ({
           </TouchableOpacity>
           <View style={styles.headerTxt}>
             <Text style={styles.eyebrow}>
-              {sessionId ? 'SESSION · SOUVENIRS' : 'ALBUM'}
+              {isPicker
+                ? 'SÉLECTIONNE UNE PHOTO'
+                : sessionId
+                  ? 'SESSION · SOUVENIRS'
+                  : 'ALBUM'}
             </Text>
             <Text style={styles.title} numberOfLines={1}>
-              {items.length > 0
-                ? `${items.length} photo${items.length > 1 ? 's' : ''}`
-                : 'Aucune photo'}
+              {isPicker && pickerSelected.size > 0
+                ? `${pickerSelected.size} sélectionnée${pickerSelected.size > 1 ? 's' : ''}`
+                : items.length > 0
+                  ? `${items.length} photo${items.length > 1 ? 's' : ''}`
+                  : 'Aucune photo'}
             </Text>
           </View>
           <View style={styles.headerBtn} />
@@ -141,10 +216,54 @@ export const GroupAlbumSheet: React.FC<GroupAlbumSheetProps> = ({
             keyExtractor={(i) => i.id}
             numColumns={COLS}
             renderItem={renderTile}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + (isPicker ? 80 : 16),
+            }}
             columnWrapperStyle={{ justifyContent: 'flex-start' }}
             showsVerticalScrollIndicator={false}
           />
+        )}
+
+        {/* Footer "Confirmer" — uniquement en mode picker */}
+        {isPicker && items.length > 0 && (
+          <View
+            style={[
+              styles.pickerFooter,
+              { paddingBottom: insets.bottom + 12 },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.pickerConfirmBtn,
+                pickerSelected.size === 0 && styles.pickerConfirmBtnDisabled,
+              ]}
+              onPress={handleConfirmPick}
+              disabled={pickerSelected.size === 0}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="checkmark"
+                size={15}
+                color={
+                  pickerSelected.size === 0
+                    ? Colors.textTertiary
+                    : Colors.textOnAccent
+                }
+              />
+              <Text
+                style={[
+                  styles.pickerConfirmText,
+                  pickerSelected.size === 0 && {
+                    color: Colors.textTertiary,
+                  },
+                ]}
+              >
+                {pickerSelected.size === 0
+                  ? 'Sélectionne une photo'
+                  : `Confirmer (${pickerSelected.size})`}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Lightbox — reuses the fullscreen dark pattern */}
@@ -238,12 +357,66 @@ const styles = StyleSheet.create({
   },
   tile: {
     padding: 2,
+    position: 'relative',
   },
   tileImage: {
     width: '100%',
     height: '100%',
     backgroundColor: Colors.bgTertiary,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : null),
+  },
+  // Picker mode
+  pickCheckbox: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.textOnAccent,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickCheckboxOn: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  pickedOverlay: {
+    position: 'absolute',
+    top: 2, left: 2, right: 2, bottom: 2,
+    borderWidth: 3,
+    borderColor: Colors.primary,
+    borderRadius: 4,
+  },
+  pickerFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    backgroundColor: Colors.bgSecondary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+  },
+  pickerConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  pickerConfirmBtnDisabled: {
+    backgroundColor: Colors.gray200,
+  },
+  pickerConfirmText: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
   },
 });
 

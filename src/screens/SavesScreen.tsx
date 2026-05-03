@@ -107,11 +107,20 @@ export const SavesScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Title — bottom-left in Fraunces white */}
+          {/* Title — bottom-left in Fraunces white. Petit badge 'plan de
+              groupe' à gauche du titre quand le plan vient d'un brouillon
+              co-plan (sourceDraftId set) ou a des co-auteurs déclarés. */}
           <View style={styles.heroTitleWrap}>
-            <Text style={styles.heroTitle} numberOfLines={2}>
-              {item.plan.title}
-            </Text>
+            <View style={styles.heroTitleRow}>
+              {(item.plan.sourceDraftId || (item.plan.coAuthors?.length ?? 0) > 0) && (
+                <View style={styles.coPlanBadge}>
+                  <Ionicons name="people" size={11} color={Colors.textOnAccent} />
+                </View>
+              )}
+              <Text style={styles.heroTitle} numberOfLines={2}>
+                {item.plan.title}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -258,7 +267,22 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     paddingTop: 8,
   },
+  heroTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  coPlanBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
   heroTitle: {
+    flex: 1,
     fontSize: 22,
     fontFamily: Fonts.displaySemiBold,
     color: '#FFF',
