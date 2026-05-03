@@ -1836,16 +1836,22 @@ export const CreateScreen: React.FC = () => {
                   <Text style={styles.tlNodeText}>{index + 1}</Text>
                 </View>
 
-                {/* Card */}
+                {/* Card — en customize mode le tap sur la frame n'ouvre PLUS
+                    le menu déroulant (l'expand inline). Toutes les actions
+                    (photo, durée, prix, réservation) sont accessibles via
+                    chips dédiés OU via le bouton "Personnaliser ce lieu" du
+                    photo modal pour le commentaire / QAs. Désactiver l'expand
+                    évite les ouvertures accidentelles et alignera l'UX avec
+                    la sobriété demandée. */}
                 <Pressable
-                  onPress={() => togglePlaceExpand(place.id)}
-                  onLongPress={() => handleLongPressPlace(place.id)}
+                  onPress={isCustomizeMode ? undefined : () => togglePlaceExpand(place.id)}
+                  onLongPress={isCustomizeMode ? undefined : () => handleLongPressPlace(place.id)}
                   delayLongPress={350}
                   style={({ pressed }) => [
                     styles.tlCard,
                     isExpanded && styles.tlCardExpanded,
                     isDragging && styles.tlCardDragging,
-                    pressed && !isExpanded && styles.tlCardPressed,
+                    pressed && !isExpanded && !isCustomizeMode && styles.tlCardPressed,
                   ]}
                 >
                   {/* Top row: thumb + name + remove
@@ -1949,7 +1955,7 @@ export const CreateScreen: React.FC = () => {
                             </View>
                             <Text style={[
                               styles.czGaugeText,
-                              allFilled && { color: Colors.success },
+                              allFilled && { color: Colors.primary },
                             ]}>
                               {allFilled ? 'Tout est rempli ✓' : `${filledCount}/3 infos`}
                             </Text>
@@ -1965,7 +1971,7 @@ export const CreateScreen: React.FC = () => {
                               <Ionicons
                                 name={photoFilled ? 'image' : 'image-outline'}
                                 size={14}
-                                color={photoFilled ? Colors.success : Colors.primary}
+                                color={photoFilled ? Colors.terracotta700 : Colors.primary}
                               />
                               <Text style={[
                                 styles.czChipText,
@@ -1974,7 +1980,7 @@ export const CreateScreen: React.FC = () => {
                                 {photoFilled ? 'Photo OK' : 'Ajoute une photo'}
                               </Text>
                               {photoFilled && (
-                                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                                <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
                               )}
                             </TouchableOpacity>
 
@@ -1986,7 +1992,7 @@ export const CreateScreen: React.FC = () => {
                               <Ionicons
                                 name={durationFilled ? 'time' : 'time-outline'}
                                 size={14}
-                                color={durationFilled ? Colors.success : Colors.primary}
+                                color={durationFilled ? Colors.terracotta700 : Colors.primary}
                               />
                               <Text style={[
                                 styles.czChipText,
@@ -1995,7 +2001,7 @@ export const CreateScreen: React.FC = () => {
                                 {durationFilled ? formatDurationLabel(place.duration) : 'Combien de temps ?'}
                               </Text>
                               {durationFilled && (
-                                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                                <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
                               )}
                             </TouchableOpacity>
 
@@ -2010,7 +2016,7 @@ export const CreateScreen: React.FC = () => {
                               <Ionicons
                                 name={priceFilled ? 'wallet' : 'wallet-outline'}
                                 size={14}
-                                color={priceFilled ? Colors.success : Colors.primary}
+                                color={priceFilled ? Colors.terracotta700 : Colors.primary}
                               />
                               <Text style={[
                                 styles.czChipText,
@@ -2019,10 +2025,40 @@ export const CreateScreen: React.FC = () => {
                                 {priceLabel ?? 'Combien ça coûte ?'}
                               </Text>
                               {priceFilled && (
-                                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                                <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
                               )}
                             </TouchableOpacity>
                           </View>
+
+                          {/* Toggle "Réserver à l'avance" — discret, sous les
+                              chips, opt-in. Sert au lecteur du plan publié à
+                              savoir s'il vaut mieux booker. Optionnel —
+                              n'entre pas dans la jauge 3/3. */}
+                          <TouchableOpacity
+                            style={styles.czReserveRow}
+                            onPress={(e) => { e.stopPropagation(); toggleReservation(place.id); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.czReserveLabel}>
+                              <Ionicons
+                                name={place.reservationRecommended ? 'bookmark' : 'bookmark-outline'}
+                                size={13}
+                                color={place.reservationRecommended ? Colors.primary : Colors.textTertiary}
+                              />
+                              <Text style={[
+                                styles.czReserveText,
+                                place.reservationRecommended && styles.czReserveTextActive,
+                              ]}>
+                                Réservation conseillée
+                              </Text>
+                            </View>
+                            <View style={[styles.czSwitch, place.reservationRecommended && styles.czSwitchOn]}>
+                              <View style={[
+                                styles.czSwitchThumb,
+                                place.reservationRecommended && styles.czSwitchThumbOn,
+                              ]} />
+                            </View>
+                          </TouchableOpacity>
                         </>
                       );
                     })()
@@ -2076,7 +2112,9 @@ export const CreateScreen: React.FC = () => {
                   )}
 
                   {/* Expanded section */}
-                  {isExpanded && renderPlaceExpanded(place, index)}
+                  {/* Pas d'expand en customize mode — tout passe par les
+                      chips et les sheets. Mode fresh garde l'expand. */}
+                  {isExpanded && !isCustomizeMode && renderPlaceExpanded(place, index)}
                 </Pressable>
               </Animated.View>
 
@@ -4222,7 +4260,8 @@ const styles = StyleSheet.create({
   },
 
   // ── Carte customize mode (étape "Personnalise tes lieux") ──
-  // Jauge complétion + 3 chips CTA dimensionnés.
+  // Jauge complétion + 3 chips CTA dimensionnés. Toute la palette est en
+  // terracotta — pas de vert (palette stricte de l'app).
   czGauge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4241,7 +4280,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderMedium,
   },
   czGaugeDotOn: {
-    backgroundColor: Colors.success,
+    backgroundColor: Colors.primary,
   },
   czGaugeText: {
     fontSize: 10.5,
@@ -4268,8 +4307,8 @@ const styles = StyleSheet.create({
     minHeight: 38,
   },
   czChipFilled: {
-    backgroundColor: Colors.successBg,
-    borderColor: Colors.successBorder,
+    backgroundColor: Colors.terracotta100,
+    borderColor: Colors.terracotta300,
   },
   czChipText: {
     fontSize: 11.5,
@@ -4278,7 +4317,54 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   czChipTextFilled: {
-    color: Colors.success,
+    color: Colors.terracotta700,
+  },
+
+  // Toggle "Réserver à l'avance" — discret, sous les chips, en customize
+  czReserveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  czReserveLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  czReserveText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+  },
+  czReserveTextActive: {
+    color: Colors.primary,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  // Mini-switch terracotta
+  czSwitch: {
+    width: 30,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.borderMedium,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  czSwitchOn: {
+    backgroundColor: Colors.primary,
+  },
+  czSwitchThumb: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.bgSecondary,
+  },
+  czSwitchThumbOn: {
+    transform: [{ translateX: 12 }],
   },
   tlCardInfo: {
     flex: 1,
