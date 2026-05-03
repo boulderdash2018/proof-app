@@ -1610,26 +1610,42 @@ export const CreateScreen: React.FC = () => {
   // ========== RENDER TIMELINE (editorial vertical timeline) ==========
   const renderPlaceExpanded = (place: PlaceEntry, index: number) => {
     const hasCustom = !!(place.customPhoto || place.comment || place.questionAnswer || (place.questions && place.questions.length > 0));
+    const priceLabel = place.priceRangeIndex >= 0
+      ? (() => {
+          const r = PRICE_RANGES[place.priceRangeIndex];
+          return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
+        })()
+      : null;
     return (
       <View style={styles.tlExpanded}>
-        {/* PRIX */}
+        {/* PRIX — bouton qui ouvre le PricePickerSheet (système de
+            référence pour tous les flows de saisie de prix dans l'app). */}
         <Text style={styles.tlFieldLabel}>PRIX ({cityConfig.currency})</Text>
-        <View style={styles.tlPillsRow}>
-          {PRICE_RANGES.map((range, ri) => {
-            const isSelected = place.priceRangeIndex === ri;
-            const label = range.max === 0 ? range.label : range.max === Infinity ? `${range.min}${cityConfig.currency}+` : `${range.label}${cityConfig.currency}`;
-            return (
-              <TouchableOpacity
-                key={ri}
-                style={[styles.tlPill, isSelected && styles.tlPillActive]}
-                onPress={() => updatePlacePriceRange(place.id, ri)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.tlPillText, isSelected && styles.tlPillTextActive]}>{label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.tlPickerBtn,
+            place.priceRangeIndex >= 0 && styles.tlPickerBtnFilled,
+          ]}
+          onPress={() => setPricePickerPlaceId(place.id)}
+          activeOpacity={0.85}
+        >
+          <Ionicons
+            name={place.priceRangeIndex >= 0 ? 'wallet' : 'wallet-outline'}
+            size={15}
+            color={place.priceRangeIndex >= 0 ? Colors.terracotta700 : Colors.primary}
+          />
+          <Text style={[
+            styles.tlPickerBtnText,
+            place.priceRangeIndex >= 0 && styles.tlPickerBtnTextFilled,
+          ]}>
+            {priceLabel ?? 'Choisir une fourchette'}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={14}
+            color={place.priceRangeIndex >= 0 ? Colors.terracotta700 : Colors.primary}
+          />
+        </TouchableOpacity>
         {place.priceRangeIndex >= 0 && !showExactPrice[place.id] && (
           <TouchableOpacity
             onPress={() => setShowExactPrice((prev) => ({ ...prev, [place.id]: true }))}
@@ -1657,25 +1673,33 @@ export const CreateScreen: React.FC = () => {
           <Text style={styles.miniError}>{errors[`place_price_${index}`]}</Text>
         )}
 
-        {/* DURÉE */}
+        {/* DURÉE — bouton qui ouvre le DurationPickerSheet. */}
         <Text style={[styles.tlFieldLabel, { marginTop: 14 }]}>DURÉE</Text>
-        <View style={styles.tlPillsRow}>
-          {DURATION_PRESETS.map((preset) => {
-            const isSelected = place.duration === preset;
-            return (
-              <TouchableOpacity
-                key={preset}
-                style={[styles.tlPill, isSelected && styles.tlPillActive]}
-                onPress={() => updatePlaceDuration(place.id, preset)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.tlPillText, isSelected && styles.tlPillTextActive]}>
-                  {formatDurationLabel(preset)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.tlPickerBtn,
+            !!place.duration && styles.tlPickerBtnFilled,
+          ]}
+          onPress={() => setDurationPickerPlaceId(place.id)}
+          activeOpacity={0.85}
+        >
+          <Ionicons
+            name={place.duration ? 'time' : 'time-outline'}
+            size={15}
+            color={place.duration ? Colors.terracotta700 : Colors.primary}
+          />
+          <Text style={[
+            styles.tlPickerBtnText,
+            !!place.duration && styles.tlPickerBtnTextFilled,
+          ]}>
+            {place.duration ? formatDurationLabel(place.duration) : 'Choisir une durée'}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={14}
+            color={place.duration ? Colors.terracotta700 : Colors.primary}
+          />
+        </TouchableOpacity>
         {errors[`place_duration_${index}`] && (
           <Text style={styles.miniError}>{errors[`place_duration_${index}`]}</Text>
         )}
@@ -4494,6 +4518,32 @@ const styles = StyleSheet.create({
   tlPillTextActive: {
     color: Colors.terracotta700,
     fontFamily: Fonts.bodySemiBold,
+  },
+  // Bouton "ouvrir le picker" (sheet) — remplace la row de pills inline
+  // pour les champs durée + prix. Système unifié avec le mode customize.
+  tlPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.terracotta50,
+  },
+  tlPickerBtnFilled: {
+    backgroundColor: Colors.terracotta100,
+    borderColor: Colors.terracotta300,
+  },
+  tlPickerBtnText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+  },
+  tlPickerBtnTextFilled: {
+    color: Colors.terracotta700,
   },
   tlGhostLink: {
     fontSize: 11.5,
