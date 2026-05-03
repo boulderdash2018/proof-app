@@ -68,6 +68,10 @@ export type RootStackParamList = {
    *  the live session before meetupAt has been reached. */
   WaitingRoom: { planId: string; conversationId: string; meetupAt: string | null };
   CoPlanWorkspace: { draftId: string };
+  /** Page de publication post-exécution d'un co-plan. Reçoit le planId
+   *  du Plan privé créé au lock — sera mis à jour vers visibility:'public'
+   *  + coverPhotos + tags + creator tip à la confirmation. */
+  CoPlanPublish: { planId: string };
   CreateSpot: undefined;
 };
 

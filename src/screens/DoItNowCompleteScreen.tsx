@@ -92,6 +92,20 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const [showProofModal, setShowProofModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ── Co-plan publish card state ──
+  // Affichée quand on termine un co-plan privé (sourceDraftId set,
+  // visibility:'private') — propose à l'utilisateur de PUBLIER le plan
+  // sur le feed via la page dédiée, ou de juste SAUVEGARDER (= ne rien
+  // faire de plus, le plan reste dans ses saves via le Proof It standard).
+  // L'utilisateur peut explicitement la dismiss pour sortir de cette
+  // décision et continuer le flow "Fin" classique.
+  const [coPlanCardDismissed, setCoPlanCardDismissed] = useState(false);
+  const isCoPlanCandidate = !!(
+    plan?.sourceDraftId &&
+    plan?.visibility === 'private' &&
+    !coPlanCardDismissed
+  );
+
   // Hydrate from existing session rating/reviews (from DoItNowScreen inline review screen)
   useEffect(() => {
     if (!session) return;
@@ -548,6 +562,57 @@ export const DoItNowCompleteScreen: React.FC = () => {
           );
         })}
 
+        {/* ═════════ CO-PLAN — choix Sauver / Publier ═════════
+            N'apparaît que si le plan vient d'un co-plan privé (créé au
+            lock du brouillon, pas encore publié). Donne un choix clair :
+              • Sauvegarder uniquement  → dismiss la carte, reste dans les
+                saves du user via le Proof It standard
+              • Publier sur le feed     → navigate vers CoPlanPublishScreen
+                où le user enrichit le plan (cover, tags, tip) avant de le
+                rendre public. */}
+        {isCoPlanCandidate && plan && (
+          <View style={styles.coPlanCard}>
+            <View style={styles.coPlanCardHeaderRow}>
+              <View style={styles.coPlanCardIconWrap}>
+                <Ionicons name="people" size={16} color={Colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.coPlanCardEyebrow}>PLAN DE GROUPE TERMINÉ</Text>
+                <Text style={styles.coPlanCardTitle}>Tu veux le partager ?</Text>
+              </View>
+            </View>
+            <Text style={styles.coPlanCardSubtitle}>
+              Tu peux publier ce plan sur le feed pour le rendre découvrable
+              par d'autres, ou simplement le garder dans tes plans
+              sauvegardés.
+            </Text>
+            <View style={styles.coPlanCardActions}>
+              <TouchableOpacity
+                style={styles.coPlanCardBtnGhost}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setCoPlanCardDismissed(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
+                <Text style={styles.coPlanCardBtnGhostText}>Sauvegarder uniquement</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.coPlanCardBtnPrimary}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  navigation.navigate('CoPlanPublish', { planId: plan.id });
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="paper-plane" size={14} color={Colors.textOnAccent} />
+                <Text style={styles.coPlanCardBtnPrimaryText}>Publier sur le feed</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={{ height: 20 }} />
       </ScrollView>
 
@@ -800,6 +865,88 @@ const styles = StyleSheet.create({
   },
 
   // Footer
+  // ── Co-plan publish card ──
+  coPlanCard: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderColor: Colors.terracotta200,
+  },
+  coPlanCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  coPlanCardIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coPlanCardEyebrow: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  coPlanCardTitle: {
+    fontSize: 15,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  coPlanCardSubtitle: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  coPlanCardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  coPlanCardBtnGhost: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 11,
+    borderRadius: 99,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  coPlanCardBtnGhostText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  coPlanCardBtnPrimary: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 11,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  coPlanCardBtnPrimaryText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+  },
+
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
