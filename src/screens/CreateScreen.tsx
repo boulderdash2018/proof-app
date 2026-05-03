@@ -1739,16 +1739,21 @@ export const CreateScreen: React.FC = () => {
   const renderTransition = (fromIdx: number) => {
     const travel = travels[fromIdx];
     if (!travel) return null;
-    const isExpanded = expandedTravelIdx === fromIdx;
+    const isExpanded = !isCustomizeMode && expandedTravelIdx === fromIdx;
     const emoji = TRANSPORT_EMOJIS[travel.transport] || '🚶';
     const durationLabel = travel.duration && travel.duration !== '...' ? `${travel.duration}min` : 'Auto';
 
     return (
       <View style={styles.tlTransitionRow} key={`tr-${fromIdx}`}>
+        {/* Pill transport :
+            • fresh     → cliquable, expand pour changer le mode
+            • customize → read-only, le mode a été choisi en amont par
+                          l'user dans le wizard organize. Pas de chevron. */}
         <TouchableOpacity
           style={[styles.tlTransitionPill, isExpanded && styles.tlTransitionPillActive]}
-          onPress={() => toggleTravelExpand(fromIdx)}
-          activeOpacity={0.75}
+          onPress={isCustomizeMode ? undefined : () => toggleTravelExpand(fromIdx)}
+          activeOpacity={isCustomizeMode ? 1 : 0.75}
+          disabled={isCustomizeMode}
         >
           {travel.duration === '...' ? (
             <ActivityIndicator size="small" color={Colors.primary} />
@@ -1756,12 +1761,14 @@ export const CreateScreen: React.FC = () => {
             <Text style={styles.tlTransitionEmoji}>{emoji}</Text>
           )}
           <Text style={styles.tlTransitionText}>{durationLabel}</Text>
-          <Ionicons
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={11}
-            color={Colors.textTertiary}
-            style={{ marginLeft: 2 }}
-          />
+          {!isCustomizeMode && (
+            <Ionicons
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={11}
+              color={Colors.textTertiary}
+              style={{ marginLeft: 2 }}
+            />
+          )}
         </TouchableOpacity>
 
         {isExpanded && (
@@ -1954,19 +1961,23 @@ export const CreateScreen: React.FC = () => {
           );
         })}
 
-        {/* Add place node */}
-        <View style={styles.tlRow}>
-          <View style={[styles.tlNode, styles.tlNodeAdd]}>
-            <Ionicons name="add" size={16} color={Colors.primary} />
+        {/* Add place node — caché en customize mode (le user vient de
+            faire le plan, on ne veut PAS qu'il rajoute un lieu fantôme
+            qu'il n'a pas vraiment visité). Sinon dispo normalement. */}
+        {!isCustomizeMode && (
+          <View style={styles.tlRow}>
+            <View style={[styles.tlNode, styles.tlNodeAdd]}>
+              <Ionicons name="add" size={16} color={Colors.primary} />
+            </View>
+            <TouchableOpacity
+              style={styles.tlAddCard}
+              onPress={() => setShowPlacePicker(true)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.tlAddText}>Ajouter un lieu</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.tlAddCard}
-            onPress={() => setShowPlacePicker(true)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.tlAddText}>Ajouter un lieu</Text>
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
     );
   };
@@ -2360,10 +2371,15 @@ export const CreateScreen: React.FC = () => {
           {/* ═══════ STEP 4: Places — editorial timeline ═══════ */}
           {step === 4 && (
           <View style={{ flex: 1 }}>
-          {/* Editorial header */}
+          {/* Editorial header — texte adapté au mode :
+              • fresh    → 'Construis ton itinéraire' (encore en construction)
+              • customize → 'Personnalise tes lieux' (les lieux sont déjà là,
+                            le user doit juste enrichir prix/durée/photo) */}
           <View style={styles.tlHeader}>
             <View style={styles.tlHeaderTitleRow}>
-              <Text style={styles.tlHeaderTitle}>Construis ton itinéraire</Text>
+              <Text style={styles.tlHeaderTitle}>
+                {isCustomizeMode ? 'Personnalise tes lieux' : 'Construis ton itinéraire'}
+              </Text>
               {places.length > 0 && (
                 <Text style={styles.tlHeaderCount}>
                   {places.length < 2 ? `${places.length} / 2 min.` : `${places.length} lieu${places.length > 1 ? 'x' : ''}`}
@@ -2372,7 +2388,9 @@ export const CreateScreen: React.FC = () => {
               )}
             </View>
             <Text style={styles.tlHeaderSub}>
-              Tape un lieu pour l'éditer · maintiens pour réorganiser
+              {isCustomizeMode
+                ? 'Tape un lieu pour ajouter prix, durée et photo — ces détails rendent ton plan utile pour les autres'
+                : "Tape un lieu pour l'éditer · maintiens pour réorganiser"}
             </Text>
           </View>
 
