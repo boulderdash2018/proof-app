@@ -193,6 +193,49 @@ export const updatePlan = async (
   });
 };
 
+/**
+ * Publication post-exécution d'un co-plan.
+ *
+ * À ce stade le Plan existe déjà en `visibility:'private'` (créé au lock
+ * du brouillon). Le user a vécu le plan avec son groupe et choisit de
+ * le rendre public — on update les champs enrichis :
+ *   • visibility    → 'public' (le plan apparaît sur le feed)
+ *   • coAuthors     → liste des participants taggés (multi-author byline)
+ *   • coverPhotos   → photos choisies par l'auteur
+ *   • title         → titre potentiellement modifié à la publication
+ *   • authorTip     → conseil créateur (signature)
+ *
+ * Pas de cleanup côté Firestore — tout passe par un seul updateDoc
+ * atomique, le Plan apparaît instantanément dans le feed à la
+ * prochaine fetchFeedPlans (le store coté client peut aussi refetcher).
+ */
+export const publishCoPlan = async (
+  planId: string,
+  data: {
+    title?: string;
+    coverPhotos?: string[];
+    authorTip?: string;
+    coAuthors?: import('../types').CoAuthor[];
+  },
+): Promise<void> => {
+  const payload: Record<string, any> = {
+    visibility: 'public',
+  };
+  if (typeof data.title === 'string' && data.title.trim().length > 0) {
+    payload.title = data.title.trim();
+  }
+  if (data.coverPhotos && data.coverPhotos.length > 0) {
+    payload.coverPhotos = data.coverPhotos;
+  }
+  if (typeof data.authorTip === 'string' && data.authorTip.trim().length > 0) {
+    payload.authorTip = data.authorTip.trim();
+  }
+  if (data.coAuthors && data.coAuthors.length > 0) {
+    payload.coAuthors = data.coAuthors;
+  }
+  await updateDoc(doc(db, PLANS, planId), payload);
+};
+
 /** Fetch all plans for the feed (ordered by date), optionally filtered by city */
 export const fetchFeedPlans = async (city?: string): Promise<Plan[]> => {
   try {
