@@ -378,9 +378,38 @@ export const CreateScreen: React.FC = () => {
   // ========== 5-STEP WIZARD (1: title, 2: cover, 3: categories, 4: places, 5: creator tip) ==========
   type Step = 1 | 2 | 3 | 4 | 5;
   const TOTAL_STEPS: 5 = 5;
-  const [step, setStep] = useState<Step>(1);
+  // Initial step calculé inline pour éviter un flash de l'étape "title"
+  // en customize mode (depuis OrganizeCompleteScreen, on saute 1 et 3).
+  const [step, setStep] = useState<Step>(() =>
+    ((route.params?.draftId || '') as string).startsWith('organize-') ? 2 : 1,
+  );
   const TIP_MIN_CHARS = 10;
   const TIP_MAX_CHARS = 180;
+
+  /**
+   * "Customize mode" — quand on arrive ici depuis OrganizeCompleteScreen
+   * (bouton "Personnaliser ce plan"), le draft a été créé avec un id
+   * préfixé `organize-` et contient déjà :
+   *   • title (saisi à l'étape 1 du wizard organize)
+   *   • selectedTags (saisis à l'étape 2 du wizard organize)
+   * Ces deux étapes sont donc redondantes — on les SKIP.
+   *
+   * Le wizard passe de 5 à 3 étapes effectives : cover → places → tip.
+   * Les setters d'étape internes (goToNextStep/goToPrevStep) sautent
+   * les indices 1 et 3 quand customizeMode est actif.
+   */
+  const isCustomizeMode = (route.params?.draftId || '').startsWith('organize-');
+
+  /** Indices d'étape ACTIVES selon le mode. Un wizard fresh utilise les
+   *  5 étapes ; le mode customize en utilise 3. L'ordre est conservé.
+   *  Le `step` stocké reste l'index du composant render (pour ne pas
+   *  toucher tout le code des `step === N`). */
+  const ACTIVE_STEPS: Step[] = isCustomizeMode ? [2, 4, 5] : [1, 2, 3, 4, 5];
+
+  /** Position 1-based dans la séquence active (utilisé pour "ÉTAPE X SUR Y"). */
+  const stepPosition = ACTIVE_STEPS.indexOf(step) + 1;
+  const visibleTotal = ACTIVE_STEPS.length;
+
   const canProceedFromStep = (s: Step): boolean => {
     if (s === 1) return title.trim().length > 0;
     if (s === 2) return coverPhotos.length > 0; // cover photo is mandatory
@@ -391,11 +420,17 @@ export const CreateScreen: React.FC = () => {
   };
   const goToNextStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step < TOTAL_STEPS) setStep((step + 1) as Step);
+    const idx = ACTIVE_STEPS.indexOf(step);
+    if (idx >= 0 && idx < ACTIVE_STEPS.length - 1) {
+      setStep(ACTIVE_STEPS[idx + 1]);
+    }
   };
   const goToPrevStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step > 1) setStep((step - 1) as Step);
+    const idx = ACTIVE_STEPS.indexOf(step);
+    if (idx > 0) {
+      setStep(ACTIVE_STEPS[idx - 1]);
+    }
   };
 
   // ========== DRAFT / EDIT ==========
@@ -579,6 +614,13 @@ export const CreateScreen: React.FC = () => {
 
     // Reset form before loading new draft
     resetForm();
+
+    // Reset step to the FIRST active step of the (new) mode — sinon
+    // si le user vient de finir un wizard "fresh" en step 5 puis revient
+    // depuis Personnaliser (customize mode), il resterait à 5 alors qu'on
+    // veut redémarrer à 2 (cover).
+    const customizing = (newDraftId || '').startsWith('organize-');
+    setStep(customizing ? 2 : 1);
 
     // Update activeCreateSession
     activeCreateSession.draftId = draftIdRef.current;
@@ -1933,7 +1975,7 @@ export const CreateScreen: React.FC = () => {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
         <View style={[styles.wizardHeader, { borderBottomColor: C.borderLight }]}>
-          {step > 1 ? (
+          {stepPosition > 1 ? (
             <TouchableOpacity onPress={goToPrevStep} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.wizardHeaderSide}>
               <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
@@ -1941,7 +1983,7 @@ export const CreateScreen: React.FC = () => {
             <View style={styles.wizardHeaderSide} />
           )}
           <View style={styles.wizardHeaderCenter}>
-            <Text style={[styles.wizardStepLabel, { color: Colors.textTertiary }]}>ÉTAPE {step} SUR {TOTAL_STEPS}</Text>
+            <Text style={[styles.wizardStepLabel, { color: Colors.textTertiary }]}>ÉTAPE {stepPosition} SUR {visibleTotal}</Text>
             <Text style={[styles.wizardStepTitle, { color: Colors.textPrimary }]}>
               {step === 1
                 ? 'Commence par le titre'
@@ -1957,13 +1999,19 @@ export const CreateScreen: React.FC = () => {
           <View style={styles.wizardHeaderSide} />
         </View>
 
-        {/* Step progress bar (5 segments) */}
+        {/* Step progress bar — un segment par étape ACTIVE (3 en customize
+            mode, 5 en fresh). Chaque segment est rempli si on a atteint
+            ou dépassé son index dans ACTIVE_STEPS. */}
         <View style={styles.wizardProgress}>
-          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 1 ? Colors.primary : Colors.borderSubtle }]} />
-          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 2 ? Colors.primary : Colors.borderSubtle }]} />
-          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 3 ? Colors.primary : Colors.borderSubtle }]} />
-          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 4 ? Colors.primary : Colors.borderSubtle }]} />
-          <View style={[styles.wizardProgressSeg, { backgroundColor: step >= 5 ? Colors.primary : Colors.borderSubtle }]} />
+          {ACTIVE_STEPS.map((s, idx) => (
+            <View
+              key={s}
+              style={[
+                styles.wizardProgressSeg,
+                { backgroundColor: stepPosition >= idx + 1 ? Colors.primary : Colors.borderSubtle },
+              ]}
+            />
+          ))}
         </View>
 
         <Animated.View style={{ flex: 1, opacity: publishOpacity, transform: [{ translateY: publishTranslateY }, { scale: publishScale }] }} pointerEvents={isFlying ? 'none' : 'auto'}>
@@ -2477,13 +2525,18 @@ export const CreateScreen: React.FC = () => {
               activeOpacity={0.85}
             >
               <Text style={[styles.wizardPrimaryBtnText, { color: canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary }]}>
-                {step === 1
-                  ? 'Suivant — la photo'
-                  : step === 2
-                    ? 'Suivant — les catégories'
-                    : step === 3
-                      ? 'Suivant — les lieux'
-                      : 'Suivant — ton conseil'}
+                {(() => {
+                  // Le label "Suivant — X" mentionne l'étape qui SUIT, pas
+                  // celle où on est. En customize mode (skip 1 et 3), il
+                  // faut donc lire ACTIVE_STEPS, pas `step + 1`.
+                  const idx = ACTIVE_STEPS.indexOf(step);
+                  const next = idx >= 0 ? ACTIVE_STEPS[idx + 1] : null;
+                  if (next === 2) return 'Suivant — la photo';
+                  if (next === 3) return 'Suivant — les catégories';
+                  if (next === 4) return 'Suivant — les lieux';
+                  if (next === 5) return 'Suivant — ton conseil';
+                  return 'Suivant';
+                })()}
               </Text>
               <Ionicons name="arrow-forward" size={18} color={canProceedFromStep(step) ? Colors.textOnAccent : Colors.textTertiary} />
             </TouchableOpacity>
