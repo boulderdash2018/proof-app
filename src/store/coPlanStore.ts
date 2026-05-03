@@ -30,7 +30,7 @@ import { createPlan } from '../services/plansService';
 import { getPlaceDetails } from '../services/googlePlacesService';
 import { attachPlanToConversation, createGroupConversation, postSystemEvent, ConversationParticipant, SystemEvent } from '../services/chatService';
 import { useAuthStore } from './authStore';
-import { Place, Plan, CategoryTag, TransportMode, CoAuthor } from '../types';
+import { Place, Plan, CategoryTag, TransportMode } from '../types';
 
 /**
  * Observes a single active draft at a time (what the workspace screen shows).
@@ -142,7 +142,11 @@ interface CoPlanStore {
   proposeRemovePlace: (placeId: string, reason?: string) => Promise<string | null>;
 
   // ── Lock → conversion to real Plan + group conv ──
-  lockDraft: (publishOnFeed: boolean) => Promise<{ conversationId: string; planId: string | null; plan: Plan | null } | null>;
+  /** Lock a draft into a real Plan + group conversation. The Plan is
+   *  ALWAYS created as `visibility: 'private'` — publication on the
+   *  public feed is now strictly post-execution (cf. CoPlanPublishScreen).
+   *  Returns null on failure. */
+  lockDraft: () => Promise<{ conversationId: string; planId: string | null; plan: Plan | null } | null>;
 
   // ── Derived helpers (pure reads, compute on demand) ──
   getSortedPlaces: () => CoPlanProposedPlace[];
@@ -683,14 +687,14 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   // ── Lock → convert to real Plan + group conv ──
   // Called from the LockConfirmSheet. Builds a Plan + group conversation
   // doc, links them on the draft (markDraftLocked), and returns the ids.
-  lockDraft: async (publishOnFeed: boolean) => {
+  lockDraft: async () => {
     const { draft, _userId } = get();
     if (!draft || !_userId) return null;
     const user = useAuthStore.getState().user;
     if (!user) return null;
 
     try {
-      console.log('[lockDraft] start — draft:', draft.id, 'publishOnFeed:', publishOnFeed);
+      console.log('[lockDraft] start — draft:', draft.id);
 
       // 1) Determine meetupAt — priorité au meetupAtProposed (date EXACTE
       //    choisie par le créateur ou validée par sondage), sinon fallback
@@ -764,26 +768,18 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
       const defaultTags: CategoryTag[] = sortedPlaces[0]?.category ? [sortedPlaces[0].category] : [];
       const defaultTransport: TransportMode = 'À pied';
 
-      // 4) Build CoAuthor lite descriptors for each participant (other than me).
-      //    Only included when publishing on the feed — Q5 : "au nom de tout le monde".
-      const coAuthors: CoAuthor[] = publishOnFeed
-        ? Object.values(draft.participantDetails)
-            .filter((p) => p.userId !== user.id)
-            .map((p) => ({
-              id: p.userId,
-              username: p.username,
-              displayName: p.displayName,
-              initials: p.initials,
-              avatarUrl: p.avatarUrl,
-              avatarBg: p.avatarBg,
-              avatarColor: p.avatarColor,
-            }))
-        : [];
-
-      // 5) Create the Plan doc. Always created — the group conv needs a
-      //    linkedPlanId for "Do it now" multi-user. Visibility controls
-      //    whether the Plan appears in public feed queries.
-      console.log('[lockDraft] creating Plan doc...');
+      // 4) Create the Plan doc. ALWAYS visibility:'private' — la
+      //    publication sur le feed se fait dans un second temps via
+      //    CoPlanPublishScreen, après que le groupe ait vécu le plan.
+      //    Au lock on n'a pas encore les vraies photos, le tip, les
+      //    tags participants, etc. — tout ça est saisi à la publication.
+      //    Le Plan est créé quand même (pas juste à la publication) car
+      //    le group conv en a besoin comme `linkedPlanId` pour la
+      //    session multi-user "Do it now".
+      //
+      //    coAuthors reste vide ici. Il sera rempli au moment de la
+      //    publication (si l'auteur choisit de publier).
+      console.log('[lockDraft] creating Plan doc (visibility:private)...');
       const plan = await createPlan(
         {
           title: draft.title,
@@ -795,8 +791,8 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
           travelSegments: [],
           coverPhotos: sortedPlaces[0]?.photoUrl ? [sortedPlaces[0].photoUrl] : [],
           city: 'Paris',
-          coAuthors,
-          visibility: publishOnFeed ? 'public' : 'private',
+          coAuthors: [],
+          visibility: 'private',
           sourceDraftId: draft.id,
           ...(meetupAt ? { meetupAt } : null),
         },
@@ -853,13 +849,15 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
         });
       }
 
-      // 6) Mark the draft as locked + cross-linked.
+      // 5) Mark the draft as locked + cross-linked. publishedPlanId reste
+      //    null tant que le plan n'est pas publié sur le feed (cf. flow
+      //    post-exécution). Le Plan privé est référencé via le convId.
       console.log('[lockDraft] marking draft locked, convId:', convId);
       await markDraftLocked(
         draft.id,
         _userId,
         meetupAt,
-        publishOnFeed ? plan.id : null,
+        null,
         convId,
       );
 

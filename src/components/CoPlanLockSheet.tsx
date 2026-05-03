@@ -36,7 +36,10 @@ interface Props {
  * group conversation via coPlanStore.lockDraft.
  *
  * Behavior :
- *   • Always locks the draft on confirm.
+ *   • Always locks the draft on confirm. The Plan is ALWAYS created with
+ *     visibility:'private' — the publication on the feed is now strictly
+ *     post-execution (cf. CoPlanPublishScreen, accessed from the
+ *     DoItNowComplete screen of a co-plan).
  *   • If the meetup date is in the future (>15min away), the session is
  *     NOT created here — the parent will route to WaitingRoom which
  *     shows the countdown + dev override. This prevents users from
@@ -44,11 +47,11 @@ interface Props {
  *   • If the meetup is now/past or missing, the session is created
  *     immediately so the parent can route straight to DoItNow.
  *
- * The "Publier sur notre feed" toggle remains, but the previous
- * "Démarrer maintenant" toggle was removed : it muddied the contract
- * (it allowed bypassing the WaitingRoom which made the gate useless).
- * Now the WaitingRoom is the SINGLE override surface — its dev button
- * is the only way to start a future-dated plan early.
+ * Anciennement, un toggle "Publier sur notre feed" permettait de publier
+ * dès le lock — c'est-à-dire AVANT que le groupe n'ait vécu le plan.
+ * Cela générait des publications vides sans détails. Le toggle a été
+ * retiré : la publication passe désormais OBLIGATOIREMENT par la page
+ * dédiée post-exécution.
  */
 export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked }) => {
   const draft = useCoPlanStore((s) => s.draft);
@@ -56,7 +59,6 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
   const lockDraft = useCoPlanStore((s) => s.lockDraft);
   const user = useAuthStore((s) => s.user);
 
-  const [publishOnFeed, setPublishOnFeed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   if (!draft) return null;
@@ -69,7 +71,7 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
     setSubmitting(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     try {
-      const result = await lockDraft(publishOnFeed);
+      const result = await lockDraft();
       if (!result?.conversationId) return;
 
       // ── Gate on meetupAt — décide où l'utilisateur atterrit ──
@@ -148,32 +150,16 @@ export const CoPlanLockSheet: React.FC<Props> = ({ visible, onClose, onLocked })
             <RecapRow icon="people-outline" label="Amis" value={`${participantCount} participant${participantCount > 1 ? 's' : ''}`} />
           </View>
 
-          {/* Publish toggle */}
-          <TouchableOpacity
-            style={styles.publishRow}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              setPublishOnFeed((v) => !v);
-            }}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.checkbox,
-                publishOnFeed
-                  ? { backgroundColor: Colors.primary, borderColor: Colors.primary }
-                  : { borderColor: Colors.gray400 },
-              ]}
-            >
-              {publishOnFeed && <Ionicons name="checkmark" size={14} color={Colors.textOnAccent} />}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.publishTitle}>Publier sur notre feed</Text>
-              <Text style={styles.publishHint}>
-                Le plan apparaîtra chez chacun des {participantCount} participants, co-signé.
-              </Text>
-            </View>
-          </TouchableOpacity>
+          {/* Note "publication post-exécution" — explicite pour que le user
+              ne se demande pas pourquoi le plan n'apparaît pas sur le feed
+              après le lock. */}
+          <View style={styles.privateNote}>
+            <Ionicons name="lock-closed-outline" size={13} color={Colors.textSecondary} />
+            <Text style={styles.privateNoteText}>
+              Plan privé. Tu pourras le publier sur le feed une fois que le
+              groupe l'aura vécu.
+            </Text>
+          </View>
 
           {/* Actions */}
           <View style={styles.actions}>
@@ -318,38 +304,24 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
 
-  // Publish toggle
-  publishRow: {
+  // Private-note bandeau (replaces the old publish toggle)
+  privateNote: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    padding: 12,
-    borderRadius: 12,
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.bgPrimary,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.borderSubtle,
-    backgroundColor: Colors.bgPrimary,
     marginBottom: 14,
   },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  publishTitle: {
-    fontSize: 13.5,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.1,
-  },
-  publishHint: {
+  privateNoteText: {
+    flex: 1,
     fontSize: 11.5,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
-    marginTop: 2,
     lineHeight: 16,
   },
 
