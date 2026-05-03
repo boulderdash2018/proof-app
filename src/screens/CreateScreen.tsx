@@ -37,6 +37,7 @@ import { CategoryTag, TransportMode, TravelSegment, Plan } from '../types';
 import { createPlan, updatePlan } from '../services/plansService';
 import { pickImage, pickImageFromSource, pickMultipleImages } from '../utils';
 import { SavedPlanPickerSheet } from '../components/SavedPlanPickerSheet';
+import { CreatorTipInput } from '../components/publish/CreatorTipInput';
 import { trackEvent } from '../services/posthogConfig';
 import {
   searchPlacesAutocomplete,
@@ -2454,57 +2455,15 @@ export const CreateScreen: React.FC = () => {
           {/* ═══════ STEP 5: Creator tip — mandatory signature sentence ═══════ */}
           {step === 5 && (
             <View style={{ flex: 1 }}>
-              <View style={styles.tipHeader}>
-                <Text style={styles.tipOverline}>LA SIGNATURE DU CRÉATEUR</Text>
-                <Text style={styles.tipTitle}>Partage ton conseil</Text>
-                <Text style={styles.tipSubtitle}>
-                  Une phrase que toi seul(e) peux dire. Ce qui rend ce plan spécial, le détail qu'on ne trouve pas sur Google.
-                </Text>
-              </View>
-
-              <View style={styles.tipInputWrap}>
-                <Text style={styles.tipQuoteMark}>&ldquo;</Text>
-                <RNTextInput
-                  style={styles.tipInput}
-                  value={authorTip}
-                  onChangeText={(v) => setAuthorTip(v.slice(0, TIP_MAX_CHARS))}
-                  placeholder="Le secret, c'est d'y aller en semaine au coucher du soleil..."
-                  placeholderTextColor={Colors.textTertiary}
-                  multiline
-                  autoFocus
-                  maxLength={TIP_MAX_CHARS}
-                  textAlignVertical="top"
-                />
-                <View style={styles.tipFooterRow}>
-                  <Text style={[
-                    styles.tipHint,
-                    authorTip.trim().length >= TIP_MIN_CHARS && { color: Colors.primary },
-                  ]}>
-                    {authorTip.trim().length < TIP_MIN_CHARS
-                      ? `Au moins ${TIP_MIN_CHARS} caractères`
-                      : 'Parfait ✓'}
-                  </Text>
-                  <Text style={styles.tipCount}>{authorTip.length} / {TIP_MAX_CHARS}</Text>
-                </View>
-              </View>
-
-              <View style={styles.tipSuggestions}>
-                <Text style={styles.tipSuggestionsLabel}>Inspirations</Text>
-                {[
-                  'Le meilleur moment, c\'est vers 18h quand la lumière est dingue',
-                  'Demande le menu caché au bar, ils ont des plats non listés',
-                  'Réserve la table du fond, c\'est la plus intime',
-                ].map((sug) => (
-                  <TouchableOpacity
-                    key={sug}
-                    style={styles.tipSuggestionChip}
-                    onPress={() => setAuthorTip(sug)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.tipSuggestionText} numberOfLines={1}>{sug}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {/* Composant partagé extrait pour réutilisation dans le flow
+                  CoPlanPublishScreen — render pixel-identique au layout
+                  d'origine, props par défaut = anciennes valeurs hardcodées. */}
+              <CreatorTipInput
+                value={authorTip}
+                onChange={setAuthorTip}
+                minChars={TIP_MIN_CHARS}
+                maxChars={TIP_MAX_CHARS}
+              />
             </View>
           )}
         </View>
