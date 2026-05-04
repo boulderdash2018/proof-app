@@ -58,8 +58,9 @@ export const OrganizeScreen: React.FC = () => {
   // ── State ──
   const [title, setTitle] = useState('');
   const [selectedTags, setSelectedTags] = useState<CategoryTag[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState(EXPLORE_GROUPS[0].key);
-  const [showSubcategories, setShowSubcategories] = useState(false);
+  // Note : `showSubcategories` / `selectedGroup` state has been retired.
+  // The "Voir +" toggle is gone ; subcategories now expand inline under
+  // each selected theme chip (same pattern as the plan creation flow).
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showTransport, setShowTransport] = useState(false);
@@ -599,68 +600,95 @@ export const OrganizeScreen: React.FC = () => {
                 })}
               </ScrollView>
 
-              {/* Row 2: Par thème */}
+              {/* Row 2: Par thème — tap a theme chip to select it (adds the
+                  group label to selectedTags). The subcategory cards then
+                  appear below inline, matching the pattern used in the
+                  regular plan creation flow. The old "Voir +" toggle has
+                  been retired in favor of this consistent UX. */}
               <Text style={[styles.filterRowLabel, { color: Colors.textTertiary, marginTop: 12 }]}>PAR THÈME</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterChips}>
                 {EXPLORE_GROUPS.filter(g => g.key !== 'trending' && g.key !== 'nearby').map((group) => {
-                  const isActive = showSubcategories
-                    ? selectedGroup === group.key
-                    : selectedTags.includes(group.label);
+                  const isSelected = selectedTags.includes(group.label);
                   return (
                     <TouchableOpacity
                       key={group.key}
-                      style={[styles.chip, isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
-                      onPress={() => {
-                        if (showSubcategories) {
-                          setSelectedGroup(group.key);
-                        } else {
-                          toggleTag(group.label);
-                        }
-                      }}
+                      style={[styles.chip, isSelected ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+                      onPress={() => toggleTag(group.label)}
                       activeOpacity={0.7}
                     >
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={13} color={Colors.textOnAccent} style={{ marginRight: 2 }} />
+                      )}
                       <Text style={styles.chipEmoji}>{group.emoji}</Text>
-                      <Text style={[styles.chipText, { color: isActive ? Colors.textOnAccent : Colors.textPrimary }]}>{group.label}</Text>
+                      <Text style={[styles.chipText, { color: isSelected ? Colors.textOnAccent : Colors.textPrimary }]}>{group.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
-                <TouchableOpacity
-                  style={[styles.chip, showSubcategories ? { backgroundColor: Colors.gold, borderColor: Colors.gold } : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
-                  onPress={() => setShowSubcategories(!showSubcategories)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.chipText, { color: showSubcategories ? Colors.textOnAccent : Colors.textPrimary }]}>Voir +</Text>
-                  <Ionicons name={showSubcategories ? 'chevron-up' : 'chevron-down'} size={15} color={showSubcategories ? Colors.textOnAccent : Colors.textPrimary} />
-                </TouchableOpacity>
               </ScrollView>
 
-              {/* Subcategory list */}
-              {showSubcategories && (EXPLORE_GROUPS.filter(g => g.key !== 'trending').find((g) => g.key === selectedGroup) || EXPLORE_GROUPS[0]).sections.map((section) => (
-                <View key={section.title} style={styles.subcategorySection}>
-                  <Text style={[styles.subcategorySectionTitle, { color: Colors.textTertiary }]}>{section.title}</Text>
-                  <View>
-                    {section.items.map((item, idx) => {
-                      const isSelected = selectedTags.includes(item.name);
-                      const isLast = idx === section.items.length - 1;
+              {/* ── Inline subcategory sections — one block per selected
+                  theme. Mirrors the CreateScreen "ÉTAPE 3" UX : header
+                  "Outdoor — précise ton style" + horizontal cards of
+                  subcategory chips. */}
+              {(() => {
+                const selectedThemeGroups = EXPLORE_GROUPS
+                  .filter((g) => g.key !== 'trending' && g.key !== 'nearby')
+                  .filter((g) => selectedTags.includes(g.label));
+                if (selectedThemeGroups.length === 0) return null;
+                return (
+                  <View style={{ marginTop: 18, gap: 14 }}>
+                    {selectedThemeGroups.map((theme) => {
+                      const items = theme.sections.flatMap((s) => s.items);
+                      const selectedInTheme = items.filter((i) => selectedTags.includes(i.name)).length;
                       return (
-                        <TouchableOpacity
-                          key={item.name}
-                          style={[styles.flatSubcatRow, !isLast && { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }, isSelected && { backgroundColor: Colors.terracotta50 }]}
-                          onPress={() => toggleTag(item.name)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.flatSubcatEmoji}>{item.emoji}</Text>
-                          <View style={styles.flatSubcatTextCol}>
-                            <Text style={[styles.flatSubcatName, { color: Colors.textPrimary }]}>{item.name}</Text>
-                            {item.subtitle ? <Text style={[styles.flatSubcatSub, { color: Colors.textSecondary }]}>{item.subtitle}</Text> : null}
+                        <View key={theme.key}>
+                          <View style={subcatStyles.header}>
+                            <Text style={subcatStyles.headerEmoji}>{theme.emoji}</Text>
+                            <Text style={subcatStyles.headerTitle}>{theme.label}</Text>
+                            <Text style={subcatStyles.headerSep}>—</Text>
+                            <Text style={subcatStyles.headerHint}>précise ton style</Text>
+                            {selectedInTheme > 0 && (
+                              <Text style={subcatStyles.headerCount}>
+                                {selectedInTheme} choisi{selectedInTheme > 1 ? 's' : ''}
+                              </Text>
+                            )}
                           </View>
-                          {isSelected ? <Ionicons name="checkmark-circle" size={20} color={Colors.primary} /> : null}
-                        </TouchableOpacity>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={subcatStyles.cardsRow}
+                          >
+                            {items.map((item) => {
+                              const isSelected = selectedTags.includes(item.name);
+                              return (
+                                <TouchableOpacity
+                                  key={item.name}
+                                  style={[subcatStyles.card, isSelected && subcatStyles.cardActive]}
+                                  onPress={() => toggleTag(item.name)}
+                                  activeOpacity={0.75}
+                                >
+                                  <Text style={subcatStyles.cardEmoji}>{item.emoji}</Text>
+                                  <Text
+                                    style={[subcatStyles.cardName, isSelected && subcatStyles.cardNameActive]}
+                                    numberOfLines={2}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  {isSelected && (
+                                    <View style={subcatStyles.cardCheck}>
+                                      <Ionicons name="checkmark" size={10} color={Colors.textOnAccent} />
+                                    </View>
+                                  )}
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                        </View>
                       );
                     })}
                   </View>
-                </View>
-              ))}
+                );
+              })()}
 
               {/* Selected tags recap */}
               {selectedTags.length > 0 && (
@@ -1339,4 +1367,93 @@ const styles = StyleSheet.create({
   sheetBtnOutlineText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   sheetBtnFill: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   sheetBtnFillText: { fontSize: 14, fontFamily: Fonts.bodySemiBold, color: Colors.textOnAccent },
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// Subcategory styles — mirror the CreateScreen "ÉTAPE 3" UX so both
+// flows feel identical when picking categories. Same header layout
+// ("Outdoor — précise ton style"), same horizontal cards row.
+// ══════════════════════════════════════════════════════════════════════
+
+const subcatStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  headerEmoji: {
+    fontSize: 16,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+  },
+  headerSep: {
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginHorizontal: 2,
+  },
+  headerHint: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    fontStyle: 'italic',
+    color: Colors.textTertiary,
+    flex: 1,
+  },
+  headerCount: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
+    letterSpacing: 0.05,
+  },
+  cardsRow: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  card: {
+    width: 100,
+    minHeight: 96,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    position: 'relative',
+  },
+  cardActive: {
+    backgroundColor: Colors.terracotta50,
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+  },
+  cardEmoji: {
+    fontSize: 22,
+  },
+  cardName: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    letterSpacing: -0.05,
+  },
+  cardNameActive: {
+    color: Colors.primary,
+  },
+  cardCheck: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
