@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Share,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,12 +20,16 @@ import { useDoItNowStore } from '../store/doItNowStore';
 import { useAuthStore } from '../store/authStore';
 import { useFeedStore } from '../store/feedStore';
 import { useSavesStore } from '../store/savesStore';
+import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { useDraftStore } from '../store/draftStore';
 import { createPlan } from '../services/plansService';
 import { useCity } from '../hooks/useCity';
-import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan, CategoryTag } from '../types';
+import { TransportMode, TravelSegment, DoItNowSession, DoItNowTransport, Plan, CategoryTag, Place } from '../types';
 import { getDirections } from '../services/directionsService';
 import { ProofSurveyModal } from '../components/ProofSurveyModal';
+import { LinearGradient } from 'expo-linear-gradient';
+import { submitPlaceReviews } from '../services/placeReviewService';
+import { useEffect } from 'react';
 
 const mapTransport = (t: string): TransportMode => {
   switch (t) {
@@ -76,6 +81,116 @@ export const OrganizeCompleteScreen: React.FC = () => {
   const timeString = formatDuration(totalMinutes);
   const placesVisited = s.placesVisited.length;
   const totalPrice = s.placesVisited.reduce((sum, v) => sum + (v.pricePaid || 0), 0);
+
+  // ── Favorites + ratings (UX alignée sur DoItNowCompleteScreen) ──
+  // Le user peut noter chaque lieu et l'ajouter aux favoris depuis cet
+  // écran de récap. Les ratings sont persistés au tap 'Ajouter à fait'
+  // ou 'Publier' via submitPlaceReviews.
+  const savedFavPlaces = useSavedPlacesStore((s) => s.places);
+  const savePlace = useSavedPlacesStore((s) => s.savePlace);
+  const unsavePlace = useSavedPlacesStore((s) => s.unsavePlace);
+
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+
+  // Hydrate ratings depuis la session si déjà saisis pendant le DoItNow.
+  useEffect(() => {
+    if (!s) return;
+    const r0: Record<string, number> = {};
+    for (const v of s.placesVisited) {
+      if (v.rating && v.rating > 0) r0[v.placeId] = v.rating;
+    }
+    if (Object.keys(r0).length > 0) setRatings(r0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const placeFavKey = (place: { googlePlaceId?: string; id: string }) =>
+    place.googlePlaceId || place.id;
+
+  const toggleFavorite = (place: Place) => {
+    Haptics.selectionAsync().catch(() => {});
+    const key = placeFavKey(place);
+    const isFav = savedFavPlaces.some((sp) => sp.placeId === key);
+    if (isFav) {
+      unsavePlace(key);
+    } else {
+      savePlace({
+        placeId: key,
+        name: place.name,
+        address: place.address || '',
+        types: place.type ? [place.type] : [],
+        rating: place.rating || 0,
+        reviewCount: place.reviewCount || 0,
+        photoUrl: place.photoUrls?.[0] || null,
+        savedAt: Date.now(),
+      });
+    }
+  };
+
+  const setRating = (placeId: string, value: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    setRatings((prev) => ({
+      ...prev,
+      [placeId]: prev[placeId] === value ? 0 : value,
+    }));
+  };
+
+  /** Persiste les ratings posés sur cet écran via submitPlaceReviews.
+   *  Best-effort : on n'attend pas le retour pour ne pas bloquer la nav. */
+  const persistRatings = () => {
+    if (!currentUser) return;
+    const reviews = Object.entries(ratings)
+      .filter(([, r]) => r > 0)
+      .map(([placeId, rating]) => {
+        const fullPlace = p.places.find((pl) => pl.id === placeId);
+        return {
+          placeId,
+          googlePlaceId: fullPlace?.googlePlaceId,
+          planId: p.id,
+          rating,
+        };
+      });
+    if (reviews.length === 0) return;
+    submitPlaceReviews(reviews, currentUser, 'organize').catch((err) =>
+      console.warn('[OrganizeCompleteScreen] reviews submit failed:', err),
+    );
+  };
+
+  // Strip header — 1 à 3 photos top.
+  const stripPlaces = p.places.slice(0, 3);
+  const stripPhotoFor = (place: Place): string | null => {
+    return place.customPhoto || place.photoUrls?.[0] || null;
+  };
+
+  // Date badge : "5 MAI · PARIS"
+  const MONTHS_FR = ['JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN', 'JUILLET', 'AOÛT', 'SEPTEMBRE', 'OCTOBRE', 'NOVEMBRE', 'DÉCEMBRE'];
+  const today = new Date();
+  const dateBadge = `${today.getDate()} ${MONTHS_FR[today.getMonth()]} · ${(p.city || cityConfig.name).toUpperCase()}`;
+
+  // Moyenne des ratings (Proof Place ratings + session) — pour la pull-quote.
+  const ratedValues = Object.values(ratings).filter((r) => r > 0);
+  const avgRating = ratedValues.length > 0
+    ? Math.round((ratedValues.reduce((a, b) => a + b, 0) / ratedValues.length) * 10) / 10
+    : null;
+
+  // Render des étoiles cliquables (pattern DoItNow).
+  const renderStars = (placeId: string) => {
+    const value = ratings[placeId] ?? 0;
+    return (
+      <View style={hStyles.placeStars}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <TouchableOpacity
+            key={n}
+            onPress={() => setRating(placeId, n)}
+            hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+          >
+            <Text style={{ fontSize: 14, color: n <= value ? Colors.gold : Colors.borderMedium }}>
+              {n <= value ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
 
   const handlePublish = async () => {
     if (!currentUser) return;
@@ -182,6 +297,7 @@ export const OrganizeCompleteScreen: React.FC = () => {
       addPlan(createdPlan);
       addCreatedPlan(createdPlan);
       publishedPlanRef.current = createdPlan;
+      persistRatings();
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -255,6 +371,9 @@ export const OrganizeCompleteScreen: React.FC = () => {
       // addCreatedPlan : ajoute en saves avec isDone:true → l'apparaît
       // dans l'onglet 'Fait' du SavesScreen.
       addCreatedPlan(createdPlan);
+      // Persist les ratings posés sur cet écran (best-effort, non
+      // bloquant — la nav continue même si le submit traîne).
+      persistRatings();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       clearSession();
       navigation.popToTop();
@@ -361,83 +480,134 @@ export const OrganizeCompleteScreen: React.FC = () => {
     );
   }
 
-  // ── Summary screen ──
+  // ── Summary screen — pattern aligné sur DoItNowCompleteScreen ──
+  // Photo strip top + titre éditorial + pull-quote + récap des lieux
+  // (sans les 3 cards stats trompeuses, sans le prix par lieu).
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: C.white }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <Text style={styles.emoji}>🎉</Text>
-        <Text style={[styles.title, { color: C.black }]}>Journée terminée !</Text>
-        <Text style={[styles.subtitle, { color: C.gray600 }]}>{s.organizeTitle || s.planTitle}</Text>
-
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: C.gray200 }]}>
-            <Ionicons name="hourglass-outline" size={20} color={C.primary} />
-            <Text style={[styles.statValue, { color: C.black }]}>{timeString}</Text>
-            <Text style={[styles.statLabel, { color: C.gray600 }]}>Durée</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: C.gray200 }]}>
-            <Ionicons name="location-outline" size={20} color={C.primary} />
-            <Text style={[styles.statValue, { color: C.black }]}>{placesVisited}</Text>
-            <Text style={[styles.statLabel, { color: C.gray600 }]}>Lieux</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: C.gray200 }]}>
-            <Ionicons name="wallet-outline" size={20} color={Colors.gold} />
-            <Text style={[styles.statValue, { color: C.black }]}>{totalPrice}{cityConfig.currency}</Text>
-            <Text style={[styles.statLabel, { color: C.gray600 }]}>Total</Text>
+    <View style={[hStyles.container, { backgroundColor: Colors.bgPrimary }]}>
+      <ScrollView contentContainerStyle={hStyles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ═════════ TOP PHOTO STRIP ═════════ */}
+        <View style={hStyles.photoStrip}>
+          {stripPlaces.map((pl, i) => {
+            const photo = stripPhotoFor(pl);
+            return (
+              <View key={pl.id || i} style={hStyles.photoTile}>
+                {photo ? (
+                  <Image source={{ uri: photo }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                ) : (
+                  <LinearGradient
+                    colors={[Colors.terracotta300, Colors.terracotta500]}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                )}
+              </View>
+            );
+          })}
+          <LinearGradient
+            colors={['transparent', 'rgba(44, 36, 32, 0.1)', 'rgba(245, 240, 232, 1)']}
+            locations={[0, 0.6, 1]}
+            style={hStyles.photoFade}
+            pointerEvents="none"
+          />
+          {/* Close icon (top-left) */}
+          <TouchableOpacity
+            style={[hStyles.circleBtn, { top: insets.top + 8, left: 16 }]}
+            onPress={handleGoHome}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={18} color="#FFF" />
+          </TouchableOpacity>
+          {/* Date badge */}
+          <View style={[hStyles.dateBadge, { top: insets.top + 10 }]}>
+            <Text style={hStyles.dateBadgeText}>{dateBadge}</Text>
           </View>
         </View>
 
-        {/* Places recap */}
-        <Text style={[styles.sectionTitle, { color: C.gray700 }]}>RÉCAP DE TA JOURNÉE</Text>
+        {/* ═════════ EDITORIAL TITLE ═════════ */}
+        <View style={hStyles.titleBlock}>
+          <Text style={hStyles.overline}>— PLAN VÉCU</Text>
+          <Text style={hStyles.editorialTitle}>{s.organizeTitle || s.planTitle}.</Text>
+        </View>
+
+        {/* ═════════ PULL-QUOTE ═════════
+            Phrase rapide qui résume la journée, sans les 3 cards
+            trompeuses qui affichaient des stats brutes. */}
+        <View style={[hStyles.pullQuote, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+          <Text style={hStyles.pullQuoteText}>
+            « — {timeString} de {p.city || cityConfig.name} à ton rythme.
+            {avgRating !== null ? (
+              <>
+                {'\n'}Moyenne{' '}
+                <Text style={hStyles.pullQuoteRating}>{avgRating}★</Text>
+                {' '}— tu t'es fait du bien. »
+              </>
+            ) : (
+              " Tu t'es fait du bien. »"
+            )}
+          </Text>
+        </View>
+
+        {/* ═════════ RECAP HEADER ═════════ */}
+        <Text style={[hStyles.overline, { marginHorizontal: 20, marginTop: 18, marginBottom: 10 }]}>
+          — RÉCAP · {p.places.length} ÉTAPE{p.places.length > 1 ? 'S' : ''}
+        </Text>
+
+        {/* ═════════ PLACES LIST ═════════
+            Pas de prix/Gratuit affiché par lieu (l'info coût est
+            désormais dans la pull-quote, sinon on encombre). À la place :
+            étoiles cliquables + bouton FAVORI. */}
         {p.places.map((place, i) => {
+          const photo = place.customPhoto || place.photoUrls?.[0];
+          const isFav = savedFavPlaces.some((sp) => sp.placeId === placeFavKey(place));
           const visit = s.placesVisited.find((v) => v.placeId === place.id);
+          const placeMinutes = visit?.timeSpentMinutes || place.placeDuration || 0;
+          const durationText = placeMinutes > 0 ? formatDuration(placeMinutes) : '';
           return (
-            <View key={place.id} style={[styles.recapItem, { borderColor: C.borderLight }]}>
-              <View style={[styles.recapIndex, { backgroundColor: visit ? C.primary : C.gray400 }]}>
-                <Text style={styles.recapIndexText}>{i + 1}</Text>
-              </View>
-              <View style={styles.recapInfo}>
-                <Text style={[styles.recapName, { color: C.black }]}>{place.name}</Text>
-                <View style={styles.recapMetaRow}>
-                  {visit?.timeSpentMinutes !== undefined && (
-                    <Text style={[styles.recapMeta, { color: C.gray600 }]}>
-                      {visit.timeSpentMinutes} min
-                    </Text>
+            <View key={place.id || i} style={[hStyles.placeCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+              <View style={hStyles.placeRow}>
+                <Text style={hStyles.placeIndex}>{(i + 1).toString().padStart(2, '0')}</Text>
+                <View style={hStyles.placeThumb}>
+                  {photo ? (
+                    <Image source={{ uri: photo }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  ) : (
+                    <LinearGradient
+                      colors={[Colors.terracotta300, Colors.terracotta500]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
                   )}
-                  {visit?.rating ? (
-                    <Text style={[styles.recapMeta, { color: Colors.gold }]}>
-                      {'★'.repeat(visit.rating)}{'☆'.repeat(5 - visit.rating)}
+                </View>
+                <View style={hStyles.placeInfo}>
+                  <Text style={hStyles.placeName} numberOfLines={2}>{place.name}</Text>
+                  <Text style={hStyles.placeMeta} numberOfLines={1}>
+                    {(place.type || 'LIEU').toUpperCase()}
+                    {durationText ? ` · ${durationText}` : ''}
+                  </Text>
+                </View>
+                <View style={hStyles.placeRight}>
+                  {renderStars(place.id)}
+                  <TouchableOpacity
+                    onPress={() => toggleFavorite(place)}
+                    style={hStyles.favBadge}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Ionicons
+                      name={isFav ? 'star' : 'star-outline'}
+                      size={11}
+                      color={isFav ? Colors.gold : Colors.textTertiary}
+                    />
+                    <Text style={[hStyles.favBadgeText, { color: isFav ? Colors.gold : Colors.textTertiary }]}>
+                      {isFav ? 'FAVORI' : 'FAVORI ?'}
                     </Text>
-                  ) : null}
+                  </TouchableOpacity>
                 </View>
               </View>
-              {visit?.pricePaid !== undefined && visit.pricePaid > 0 ? (
-                <View style={[styles.priceBadge, { backgroundColor: C.primary + '15' }]}>
-                  <Text style={[styles.priceBadgeText, { color: C.primary }]}>{visit.pricePaid}{cityConfig.currency}</Text>
-                </View>
-              ) : (
-                <Text style={[styles.freeText, { color: Colors.success }]}>Gratuit</Text>
-              )}
             </View>
           );
         })}
 
-        {/* Categories */}
-        {s.organizeTags && s.organizeTags.length > 0 && (
-          <View style={styles.tagsRow}>
-            {s.organizeTags.map((tag) => (
-              <View key={tag} style={[styles.tag, { backgroundColor: C.primary + '15' }]}>
-                <Text style={[styles.tagText, { color: C.primary }]}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
         {/* Error message */}
         {publishError && (
-          <View style={[styles.errorBox, { backgroundColor: Colors.error + '15' }]}>
+          <View style={[styles.errorBox, { backgroundColor: Colors.error + '15', marginHorizontal: 20 }]}>
             <Text style={[styles.errorText, { color: Colors.error }]}>{publishError}</Text>
           </View>
         )}
@@ -554,6 +724,159 @@ const styles = StyleSheet.create({
   customizeBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   closeBtn: { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 10, borderWidth: 1.5 },
   closeBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+});
+
+// ──────────────────────────────────────────────────────────────
+// Hero styles — pattern éditorial aligné sur DoItNowCompleteScreen :
+// photo strip top + titre Fraunces italique + pull-quote + places list.
+// Même valeurs (PHOTO_STRIP_H, paddings, fontSizes) pour cohérence
+// pixel-perfect entre les deux écrans de fin de plan.
+// ──────────────────────────────────────────────────────────────
+const PHOTO_STRIP_H = 270;
+const hStyles = StyleSheet.create({
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 16 },
+  photoStrip: {
+    width: '100%',
+    height: PHOTO_STRIP_H,
+    flexDirection: 'row',
+    position: 'relative',
+    backgroundColor: '#2C2420',
+  },
+  photoTile: {
+    flex: 1,
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  photoFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 90,
+  },
+  circleBtn: {
+    position: 'absolute',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(44, 36, 32, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateBadge: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(44, 36, 32, 0.72)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 99,
+  },
+  dateBadgeText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: '#FFF',
+    letterSpacing: 1.2,
+  },
+  titleBlock: {
+    paddingHorizontal: 20,
+    marginTop: -30,
+  },
+  overline: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+  },
+  editorialTitle: {
+    fontSize: 34,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+    lineHeight: 38,
+    marginTop: 4,
+  },
+  pullQuote: {
+    marginHorizontal: 20,
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  pullQuoteText: {
+    fontSize: 15,
+    fontFamily: Fonts.displayItalic,
+    color: Colors.textPrimary,
+    lineHeight: 22,
+  },
+  pullQuoteRating: {
+    color: Colors.primary,
+    fontFamily: Fonts.displaySemiBoldItalic,
+  },
+  placeCard: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  placeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  placeIndex: {
+    fontSize: 11,
+    fontFamily: Fonts.bodyBold,
+    color: Colors.primary,
+    width: 22,
+    letterSpacing: 0.5,
+  },
+  placeThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: Colors.bgTertiary,
+  },
+  placeInfo: { flex: 1, minWidth: 0 },
+  placeName: {
+    fontSize: 15,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
+    lineHeight: 19,
+  },
+  placeMeta: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1,
+    marginTop: 3,
+  },
+  placeRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+    minWidth: 90,
+  },
+  placeStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+  },
+  favBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  favBadgeText: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 0.8,
+  },
 });
 
 // Styles footer 3-boutons — alignés sur DoItNowCompleteScreen (mêmes
