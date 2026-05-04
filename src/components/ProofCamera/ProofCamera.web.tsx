@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../../constants';
 import { PROOF_FILTERS, ProofFilter, getFilterById, DEFAULT_FILTER_ID } from './filters';
 import { applyProofFilter } from './applyFilter.web';
-import { FilterStrip } from './FilterStrip';
+import { FilterStrip } from './FilterStrip.web';
 
 export interface ProofCameraResult {
   /** Final data URL — already filtered + JPEG-encoded. */
