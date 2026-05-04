@@ -1447,25 +1447,43 @@ export const CreateScreen: React.FC = () => {
   // ========== VALIDATION ==========
   const validate = (): { ok: boolean; errors: Record<string, string> } => {
     const e: Record<string, string> = {};
+    // En customize mode (depuis Organize), beaucoup de checks doivent être
+    // relâchés : places.length peut être 1, les travels arrivent vides
+    // (le mode de transport est figé en amont par Organize, pas saisi
+    // par segment). Sans ce relâchement, validate() bloque silencieusement
+    // le publish (Alert.alert n'apparaît pas sur web → bouton 'inerte').
+    const isCustomizing = ((route.params?.draftId || '') as string).startsWith('organize-');
+
     if (title.length < 5) e.title = t.create_error_title;
     if (coverPhotos.length === 0) e.cover = 'Une photo de présentation est obligatoire';
     if (selectedTags.length === 0) e.tags = t.create_error_tags;
-    if (places.length < 2) e.places = t.create_error_places;
+    if (!isCustomizing && places.length < 2) e.places = t.create_error_places;
+    if (isCustomizing && places.length < 1) e.places = t.create_error_places;
 
-    // Check each place has valid price range + duration
+    // Check each place has valid price range + duration. canProceedFromStep
+    // a déjà gated cette étape donc en théorie toujours OK, mais on garde
+    // un sanity check pour ne rien laisser passer à Firestore.
     places.forEach((p, i) => {
       if (p.priceRangeIndex < 0) e[`place_price_${i}`] = t.create_error_numbers_only;
       if (!p.duration || isNaN(parseInt(p.duration, 10))) e[`place_duration_${i}`] = t.create_error_numbers_only;
     });
 
-    // Check each travel has valid duration (skip if still loading '...')
-    travels.forEach((tr, i) => {
-      if (tr.duration === '...') e[`travel_duration_${i}`] = t.create_travel_loading || 'Calcul en cours...';
-      else if (!tr.duration || isNaN(parseInt(tr.duration, 10))) e[`travel_duration_${i}`] = t.create_error_numbers_only;
-    });
+    // Travels — pas de saisie en customize (Organize donne juste un mode
+    // global, pas par segment). On skip la validation.
+    if (!isCustomizing) {
+      travels.forEach((tr, i) => {
+        if (tr.duration === '...') e[`travel_duration_${i}`] = (t as any).create_travel_loading || 'Calcul en cours...';
+        else if (!tr.duration || isNaN(parseInt(tr.duration, 10))) e[`travel_duration_${i}`] = t.create_error_numbers_only;
+      });
+    }
 
     setErrors(e);
-    if (Object.keys(e).length > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    if (Object.keys(e).length > 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // Web : Alert.alert ne montre pas toujours de popup → on log
+      // explicitement pour aider au debug + on affiche le 1er.
+      console.warn('[CreateScreen] validate() failed:', e);
+    }
     return { ok: Object.keys(e).length === 0, errors: e };
   };
 
