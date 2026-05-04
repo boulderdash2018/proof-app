@@ -763,6 +763,13 @@ const Step1Identify: React.FC<Step1Props> = ({
 // STEP 2 — Cover photo
 // ══════════════════════════════════════════════════════════════
 
+/**
+ * Step 2 — cover photo. Frame éditoriale alignée pixel-perfect sur
+ * CreateScreen mode customize (s1Hero) : grosse zone hero terracotta50
+ * avec bordure dashed, cercle d'icône central, titre Fraunces 'Ajoute la
+ * photo', sous-titre, gros bouton 'Choisir une photo'. État rempli =
+ * photo full-bleed avec gradient + badge 'Changer'.
+ */
 const Step2Cover: React.FC<{
   coverUrl: string | null;
   uploadingCover: boolean;
@@ -772,32 +779,51 @@ const Step2Cover: React.FC<{
     <Text style={styles.sectionEyebrow}>PHOTO DE COUVERTURE</Text>
     <Text style={styles.sectionTitle}>La photo qui résume le plan</Text>
     <Text style={styles.sectionHelp}>
-      Choisis-en une qui donne envie. Tu peux la prendre depuis l'album du
-      groupe (photos partagées pendant la session) ou ta pellicule perso.
+      Tu peux la prendre depuis l'album du groupe (photos partagées
+      pendant la session) ou ta pellicule perso.
     </Text>
     <TouchableOpacity
-      style={styles.coverWrap}
+      style={styles.coverHero}
       onPress={onPickCover}
       activeOpacity={0.85}
       disabled={uploadingCover}
     >
       {coverUrl ? (
-        <Image source={{ uri: coverUrl }} style={styles.coverImage} resizeMode="cover" />
+        // Filled state — photo full bleed
+        <>
+          <Image source={{ uri: coverUrl }} style={styles.coverHeroImg} resizeMode="cover" />
+          {!uploadingCover && (
+            <View style={styles.coverEditBadge}>
+              <Ionicons name="create" size={12} color={Colors.textOnAccent} />
+              <Text style={styles.coverEditText}>Changer</Text>
+            </View>
+          )}
+        </>
       ) : (
-        <View style={styles.coverPlaceholder}>
-          <Ionicons name="image-outline" size={28} color={Colors.textTertiary} />
-          <Text style={styles.coverPlaceholderText}>Choisir une photo</Text>
+        // Empty state — éditorial dashed terracotta
+        <View style={styles.coverHeroEmpty}>
+          {uploadingCover ? (
+            <ActivityIndicator size="large" color={Colors.primary} />
+          ) : (
+            <>
+              <View style={styles.coverHeroIconCircle}>
+                <Ionicons name="image-outline" size={34} color={Colors.primary} />
+              </View>
+              <Text style={styles.coverHeroEmptyTitle}>Ajoute la photo</Text>
+              <Text style={styles.coverHeroEmptySub}>
+                Celle qui donne envie au premier coup d'œil
+              </Text>
+              <View style={styles.coverHeroEmptyCta}>
+                <Ionicons name="add" size={16} color={Colors.textOnAccent} />
+                <Text style={styles.coverHeroEmptyCtaText}>Choisir une photo</Text>
+              </View>
+            </>
+          )}
         </View>
       )}
-      {uploadingCover && (
+      {uploadingCover && coverUrl && (
         <View style={styles.coverOverlay}>
           <ActivityIndicator color={Colors.textOnAccent} />
-        </View>
-      )}
-      {coverUrl && !uploadingCover && (
-        <View style={styles.coverEditBadge}>
-          <Ionicons name="create" size={12} color={Colors.textOnAccent} />
-          <Text style={styles.coverEditText}>Changer</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -1109,27 +1135,74 @@ const styles = StyleSheet.create({
   },
   participantNameActive: { color: Colors.primary },
 
-  // STEP 2 — cover
-  coverWrap: {
-    height: 220,
-    borderRadius: 16,
-    backgroundColor: Colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+  // STEP 2 — cover photo (frame éditoriale alignée sur CreateScreen
+  // mode customize : grosse zone hero terracotta50 dashed avec cercle
+  // d'icône central, titre Fraunces, gros bouton CTA primary).
+  coverHero: {
+    width: '100%',
+    height: 320,
+    borderRadius: 24,
     overflow: 'hidden',
-    position: 'relative',
+    backgroundColor: Colors.bgTertiary,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    elevation: 10,
+    alignSelf: 'center',
   },
-  coverImage: { width: '100%', height: '100%' },
-  coverPlaceholder: {
+  coverHeroImg: { width: '100%', height: '100%' },
+  coverHeroEmpty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: Colors.terracotta200,
+    borderRadius: 24,
+    backgroundColor: Colors.terracotta50,
+    padding: 32,
   },
-  coverPlaceholderText: {
+  coverHeroIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.terracotta100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  coverHeroEmptyTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  coverHeroEmptySub: {
+    fontSize: 14,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 260,
+    marginBottom: 24,
+  },
+  coverHeroEmptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  coverHeroEmptyCtaText: {
     fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
-    color: Colors.textTertiary,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.1,
   },
   coverOverlay: {
     position: 'absolute',
@@ -1140,8 +1213,8 @@ const styles = StyleSheet.create({
   },
   coverEditBadge: {
     position: 'absolute',
-    bottom: 10,
-    right: 10,
+    bottom: 14,
+    right: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
