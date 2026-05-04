@@ -12,7 +12,7 @@ import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { useAuthStore } from '../store';
 import { RouteResult } from '../services/directionsService';
 import { fetchPlanById } from '../services/plansService';
-import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast } from '../components';
+import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
@@ -422,6 +422,41 @@ export const DoItNowScreen: React.FC = () => {
     }
   }, [userLoc, routeSessionId, currentPlace?.id]);
 
+  // ── Group session : inline souvenir capture (from the review card) ──
+  // Variant of handleSouvenirPhoto that opens the picker, posts to the
+  // group conv tagged with the current session + place, and returns
+  // the captured photo's data URL so the SouvenirCaptureCard can render
+  // its polaroid thumbnail in the confirmation state.
+  //
+  // Solo / non-group sessions : we still allow the user to open the
+  // picker so the photo lands at least in their own saved plan via the
+  // existing place-photo channel. For now the function early-returns
+  // null in solo (the card just shouldn't render in that case).
+  //
+  // Tracks how many photos this user has dropped in the current session
+  // so we can show the "Photographe officiel" badge after 3+.
+  const [souvenirCount, setSouvenirCount] = useState(0);
+  const captureSouvenirInline = useCallback(async (): Promise<string | null> => {
+    if (!groupConversationId || !user?.id || !routeSessionId) return null;
+    try {
+      const picked = await pickImage();
+      if (!picked) return null;
+      const placeName = currentPlace?.name || 'Souvenir';
+      await sendPhotoMessage(groupConversationId, user.id, {
+        imageDataUrl: picked.dataUrl,
+        width: picked.width,
+        height: picked.height,
+        caption: `📸 Souvenir — ${placeName}`,
+        sessionId: routeSessionId,
+      });
+      setSouvenirCount((n) => n + 1);
+      return picked.dataUrl;
+    } catch (err) {
+      console.warn('[DoItNow.web] inline souvenir capture failed:', err);
+      return null;
+    }
+  }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name]);
+
   // ── Group session : "Souvenir à plusieurs" photo handler ──
   const handleSouvenirPhoto = useCallback(async () => {
     if (!groupConversationId || !user?.id || !routeSessionId) {
@@ -778,6 +813,21 @@ export const DoItNowScreen: React.FC = () => {
                 <Ionicons name="checkmark" size={16} color={Colors.primary} />
               )}
             </TouchableOpacity>
+
+            {/* ── Souvenir collectif — gamified inline capture CTA ──
+                Only rendered in group mode (we have a sessionId + conv).
+                Encourages each member to drop a photo into the shared
+                album at the end of every step, with rotating copy + a
+                "Photographe officiel" badge after 3+ contributions. */}
+            {groupConversationId && routeSessionId && currentPlace && (
+              <SouvenirCaptureCard
+                placeName={currentPlace.name}
+                stepIndex={currentIndex}
+                totalSteps={plan.places.length}
+                contributionCount={souvenirCount}
+                onCapture={captureSouvenirInline}
+              />
+            )}
 
             {/* Sentence starters — tap one to seed the comment textarea
                 with a beginning the user can finish. Single-tap action

@@ -26,7 +26,7 @@ import { getDirections, decodePolyline, RouteResult } from '../services/directio
 import { fetchPlanById } from '../services/plansService';
 import { Plan, DoItNowTransport } from '../types';
 import { useCity } from '../hooks/useCity';
-import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast } from '../components';
+import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
@@ -418,6 +418,33 @@ export const DoItNowScreen: React.FC = () => {
     const trimmed = placeComment.trim();
     return trimmed.length > 0 ? trimmed : undefined;
   };
+
+  // ── Inline souvenir capture from the review-step card ──
+  // Returns the captured photo's data URL so the SouvenirCaptureCard
+  // can render its polaroid thumbnail in the confirmation state.
+  // Tracks how many photos this user has dropped in the session for
+  // the "Photographe officiel" badge after 3+ contributions.
+  const [souvenirCount, setSouvenirCount] = useState(0);
+  const captureSouvenirInline = useCallback(async (): Promise<string | null> => {
+    if (!groupConversationId || !user?.id || !routeSessionId) return null;
+    try {
+      const picked = await pickImage();
+      if (!picked) return null;
+      const placeName = currentPlace?.name || 'Souvenir';
+      await sendPhotoMessage(groupConversationId, user.id, {
+        imageDataUrl: picked.dataUrl,
+        width: picked.width,
+        height: picked.height,
+        caption: `📸 Souvenir — ${placeName}`,
+        sessionId: routeSessionId,
+      });
+      setSouvenirCount((n) => n + 1);
+      return picked.dataUrl;
+    } catch (err) {
+      console.warn('[DoItNow] inline souvenir capture failed:', err);
+      return null;
+    }
+  }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name]);
 
   // ── Group session : "Souvenir à plusieurs" photo handler ──
   // Opens the image picker → uploads via the existing chat photo flow
@@ -839,6 +866,19 @@ export const DoItNowScreen: React.FC = () => {
                 <Ionicons name="checkmark" size={16} color={Colors.primary} />
               )}
             </TouchableOpacity>
+
+            {/* ── Souvenir collectif — gamified inline capture CTA ──
+                Group sessions only (we have a sessionId + conv). See
+                DoItNowScreen.web.tsx for the design rationale. */}
+            {groupConversationId && routeSessionId && currentPlace && (
+              <SouvenirCaptureCard
+                placeName={currentPlace.name}
+                stepIndex={currentIndex}
+                totalSteps={plan.places.length}
+                contributionCount={souvenirCount}
+                onCapture={captureSouvenirInline}
+              />
+            )}
 
             {/* Sentence starters */}
             <Text style={[styles.reviewOverline, { marginTop: 22, marginBottom: 10 }]}>

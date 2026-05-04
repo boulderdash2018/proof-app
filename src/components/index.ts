@@ -42,6 +42,7 @@ export { CoPlanResolutionPill } from './CoPlanResolutionPill';
 export { CoPlanStatusBar } from './CoPlanStatusBar';
 export { GroupLiveMapSheet } from './GroupLiveMapSheet';
 export { SouvenirPromptToast } from './SouvenirPromptToast';
+export { SouvenirCaptureCard } from './SouvenirCaptureCard';
 export { SessionFloatingActions } from './SessionFloatingActions';
 export { FloatingSessionDock } from './FloatingSessionDock';
 export type { DockParticipant } from './FloatingSessionDock';
