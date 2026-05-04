@@ -530,19 +530,21 @@ export const OrganizeCompleteScreen: React.FC = () => {
         </View>
 
         {/* ═════════ PULL-QUOTE ═════════
-            Phrase rapide qui résume la journée, sans les 3 cards
-            trompeuses qui affichaient des stats brutes. */}
+            Phrase rapide qui résume la journée. Centrée sur la note
+            moyenne des lieux (pas le temps total — qui peut être à 0
+            dans une session organize sans Do It Now actif, ce qui
+            donnait '0 minute dans Paris' dans la version précédente). */}
         <View style={[hStyles.pullQuote, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
           <Text style={hStyles.pullQuoteText}>
-            « — {timeString} de {p.city || cityConfig.name} à ton rythme.
             {avgRating !== null ? (
               <>
-                {'\n'}Moyenne{' '}
+                « Moyenne{' '}
                 <Text style={hStyles.pullQuoteRating}>{avgRating}★</Text>
+                {' '}sur tes {p.places.length} lieu{p.places.length > 1 ? 'x' : ''}
                 {' '}— tu t'es fait du bien. »
               </>
             ) : (
-              " Tu t'es fait du bien. »"
+              `« Une journée à ${p.city || cityConfig.name} faite à ton rythme — note tes lieux pour t'en souvenir. »`
             )}
           </Text>
         </View>
