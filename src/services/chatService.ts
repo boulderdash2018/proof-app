@@ -96,11 +96,17 @@ export interface Conversation {
   pinnedBy: string[];
   /** User IDs that have muted this conversation. */
   mutedBy: string[];
-  /** User IDs that have archived this conversation FOR THEMSELVES. The
+  /** User IDs that have deleted this conversation FOR THEMSELVES. The
    *  conversation still exists on Firestore for the others, but it's
    *  filtered out of the chat list of every user in this array. Used
-   *  after a session ends to let each member tidy up individually. */
-  archivedBy: string[];
+   *  after a session ends to let each member decide individually
+   *  whether to keep the conv or remove it from their messages.
+   *
+   *  Semantics : per-user soft-delete (the doc is never destroyed).
+   *  We kept `archivedBy` as the legacy name during the v1 ship and
+   *  promoted it to `deletedBy` to match the user-facing "Supprimer"
+   *  action — both names are still read for backward compat. */
+  deletedBy: string[];
   /** ISO timestamp of the last fully-completed plan_session in this
    *  conversation. Set by markUserFinishedInSession when the last
    *  participant finishes. Used by the chat to hide "Démarrer la
@@ -219,7 +225,10 @@ export const findConversation = async (
         lastReadAt: data.lastReadAt || {},
         pinnedBy: Array.isArray(data.pinnedBy) ? data.pinnedBy : [],
         mutedBy: Array.isArray(data.mutedBy) ? data.mutedBy : [],
-        archivedBy: Array.isArray(data.archivedBy) ? data.archivedBy : [],
+        deletedBy: Array.from(new Set([
+          ...(Array.isArray(data.deletedBy) ? data.deletedBy : []),
+          ...(Array.isArray(data.archivedBy) ? data.archivedBy : []), // legacy field
+        ])),
         ...(data.lastSessionCompletedAt ? { lastSessionCompletedAt: toISO(data.lastSessionCompletedAt) } : {}),
         isGroup: false,
         lastMessageAt: toISO(data.lastMessageAt),
@@ -252,7 +261,7 @@ export const createConversation = async (
     lastReadAt: {},
     pinnedBy: [],
     mutedBy: [],
-    archivedBy: [],
+    deletedBy: [],
     isGroup: false,
     createdAt: serverTimestamp(),
   });
@@ -445,15 +454,19 @@ export const toggleMuteConversation = async (
 };
 
 /**
- * Archive a conversation FOR ONE USER. The conv is filtered out of the
- * user's chat list (subscribeConversations skips entries where
- * archivedBy includes the user id), but other participants still see
- * it normally. Idempotent — calling twice is a no-op.
+ * Soft-delete a conversation FOR ONE USER. The conv is filtered out of
+ * the user's chat list (subscribeConversations skips entries where
+ * deletedBy includes the user id), but other participants still see it
+ * normally. Idempotent — calling twice is a no-op.
  *
- * Used after a session ends : each member is offered the choice to
- * tidy their messages list ("Archiver" or "Garder").
+ * Per-user semantics : the doc itself is never destroyed, the user just
+ * stops seeing it in their messages. Used after a session ends : each
+ * member decides individually ("Supprimer" or "Garder").
+ *
+ * Reads BOTH `archivedBy` (legacy) and `deletedBy` for backward compat
+ * with conversations that were dismissed before the rename.
  */
-export const archiveConversationForUser = async (
+export const deleteConversationForUser = async (
   conversationId: string,
   userId: string,
 ): Promise<void> => {
@@ -461,14 +474,18 @@ export const archiveConversationForUser = async (
   const snap = await getDoc(convRef);
   if (!snap.exists()) return;
   const data = snap.data();
-  const archived: string[] = Array.isArray(data.archivedBy) ? [...data.archivedBy] : [];
-  if (archived.includes(userId)) return;
-  archived.push(userId);
-  await updateDoc(convRef, { archivedBy: archived });
+  const merged = new Set<string>([
+    ...(Array.isArray(data.deletedBy) ? data.deletedBy : []),
+    ...(Array.isArray(data.archivedBy) ? data.archivedBy : []),
+  ]);
+  if (merged.has(userId)) return;
+  merged.add(userId);
+  await updateDoc(convRef, { deletedBy: Array.from(merged) });
 };
 
-/** Unarchive — re-surfaces the conv in the user's chat list. */
-export const unarchiveConversationForUser = async (
+/** Restore — re-surfaces the conv in the user's chat list. Mirrors the
+ *  delete by writing back the cleaned-up `deletedBy` array. */
+export const restoreConversationForUser = async (
   conversationId: string,
   userId: string,
 ): Promise<void> => {
@@ -476,11 +493,13 @@ export const unarchiveConversationForUser = async (
   const snap = await getDoc(convRef);
   if (!snap.exists()) return;
   const data = snap.data();
-  const archived: string[] = Array.isArray(data.archivedBy) ? [...data.archivedBy] : [];
-  const idx = archived.indexOf(userId);
-  if (idx < 0) return;
-  archived.splice(idx, 1);
-  await updateDoc(convRef, { archivedBy: archived });
+  const merged = new Set<string>([
+    ...(Array.isArray(data.deletedBy) ? data.deletedBy : []),
+    ...(Array.isArray(data.archivedBy) ? data.archivedBy : []),
+  ]);
+  if (!merged.has(userId)) return;
+  merged.delete(userId);
+  await updateDoc(convRef, { deletedBy: Array.from(merged) });
 };
 
 /** Set typing status */
@@ -530,7 +549,10 @@ export const subscribeConversations = (
           lastReadAt: data.lastReadAt || {},
           pinnedBy: Array.isArray(data.pinnedBy) ? data.pinnedBy : [],
           mutedBy: Array.isArray(data.mutedBy) ? data.mutedBy : [],
-        archivedBy: Array.isArray(data.archivedBy) ? data.archivedBy : [],
+        deletedBy: Array.from(new Set([
+          ...(Array.isArray(data.deletedBy) ? data.deletedBy : []),
+          ...(Array.isArray(data.archivedBy) ? data.archivedBy : []), // legacy field
+        ])),
         ...(data.lastSessionCompletedAt ? { lastSessionCompletedAt: toISO(data.lastSessionCompletedAt) } : {}),
           isGroup,
           lastMessageAt: toISO(data.lastMessageAt),
@@ -540,7 +562,10 @@ export const subscribeConversations = (
       // Filter out conversations archived BY THIS USER. The doc itself
       // stays in Firestore for the other participants — archive is a
       // per-user view filter, not a destructive op.
-      const visible = conversations.filter((c) => !c.archivedBy.includes(userId));
+      // Filter out conversations soft-deleted BY THIS USER. The hydrate
+      // step merges the legacy `archivedBy` field into `deletedBy`, so
+      // both old and new entries are respected.
+      const visible = conversations.filter((c) => !c.deletedBy.includes(userId));
       visible.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
       onData(visible);
     },
@@ -815,7 +840,7 @@ export const createGroupConversation = async (
     lastReadAt: {},
     pinnedBy: [],
     mutedBy: [],
-    archivedBy: [],
+    deletedBy: [],
     isGroup: true,
     groupName: defaultName,
     createdBy: creator.userId,

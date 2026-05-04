@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts } from '../constants';
-import { archiveConversationForUser } from '../services/chatService';
+import { deleteConversationForUser } from '../services/chatService';
 
 interface Props {
   conversationId: string;
@@ -14,35 +14,37 @@ interface Props {
 
 /**
  * Action card surfaced right after a `session_completed` system event
- * in the chat. Offers each user the choice to archive the conversation
- * (it disappears from their messages list) or keep it. Decision is
- * personal — other members keep their own preference.
+ * in the chat. Offers each user the choice to delete the conversation
+ * (it disappears from their messages list — soft-delete, the doc
+ * stays for the others) or keep it. Decision is strictly personal :
+ * the other members keep the conv intact regardless of what I pick.
  *
  * The card collapses locally once the user picks ; tracked in component
- * state, no Firestore round-trip for "Garder". Archive itself writes
- * to conv.archivedBy via chatService.archiveConversationForUser, which
- * makes subscribeConversations skip the conv on the next snapshot.
+ * state, no Firestore round-trip for "Garder". Delete writes to
+ * conv.deletedBy via chatService.deleteConversationForUser, which
+ * makes subscribeConversations skip the conv on the next snapshot —
+ * the conv vanishes from MY list while staying live for the others.
  *
- * After archive, we briefly show a confirmation line before the conv
+ * After delete, we briefly show a confirmation line before the conv
  * dismounts naturally (the listener fires and the parent's chat list
- * removes this conversation).
+ * removes this conversation from the user's messages).
  */
 export const SessionEndedActions: React.FC<Props> = ({ conversationId, userId }) => {
-  type Status = 'idle' | 'archiving' | 'archived' | 'kept';
+  type Status = 'idle' | 'deleting' | 'deleted' | 'kept';
   const [status, setStatus] = useState<Status>('idle');
 
   if (!userId) return null;
   if (status === 'kept') return null;
 
-  const handleArchive = async () => {
+  const handleDelete = async () => {
     if (status !== 'idle') return;
-    setStatus('archiving');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setStatus('deleting');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
-      await archiveConversationForUser(conversationId, userId);
-      setStatus('archived');
+      await deleteConversationForUser(conversationId, userId);
+      setStatus('deleted');
     } catch (err) {
-      console.warn('[SessionEndedActions] archive failed:', err);
+      console.warn('[SessionEndedActions] delete failed:', err);
       setStatus('idle');
     }
   };
@@ -52,12 +54,12 @@ export const SessionEndedActions: React.FC<Props> = ({ conversationId, userId })
     setStatus('kept');
   };
 
-  if (status === 'archived') {
+  if (status === 'deleted') {
     return (
       <View style={styles.confirmedWrap}>
-        <Ionicons name="archive-outline" size={14} color={Colors.textTertiary} />
+        <Ionicons name="trash-outline" size={14} color={Colors.textTertiary} />
         <Text style={styles.confirmedText}>
-          Conversation archivée — tu peux la retrouver dans tes archives
+          Conversation supprimée de tes messages
         </Text>
       </View>
     );
@@ -67,9 +69,9 @@ export const SessionEndedActions: React.FC<Props> = ({ conversationId, userId })
     <View style={styles.wrap}>
       <Text style={styles.title}>Et maintenant ?</Text>
       <Text style={styles.subtitle}>
-        Le parcours est fini. Tu peux ranger cette conversation ou la
-        garder dans ta liste de messages — c{'’'}est ta décision, les
-        autres font comme ils veulent de leur côté.
+        Le parcours est fini. Tu peux supprimer cette conversation de tes
+        messages ou la garder — c{'’'}est ta décision, les autres font
+        comme ils veulent de leur côté.
       </Text>
       <View style={styles.btnRow}>
         <TouchableOpacity
@@ -83,16 +85,16 @@ export const SessionEndedActions: React.FC<Props> = ({ conversationId, userId })
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.btn, styles.btnPrimary, status !== 'idle' && { opacity: 0.6 }]}
-          onPress={handleArchive}
+          onPress={handleDelete}
           disabled={status !== 'idle'}
           activeOpacity={0.85}
         >
-          {status === 'archiving' ? (
+          {status === 'deleting' ? (
             <ActivityIndicator size="small" color={Colors.textOnAccent} />
           ) : (
             <>
-              <Ionicons name="archive-outline" size={14} color={Colors.textOnAccent} />
-              <Text style={styles.btnPrimaryText}>Archiver</Text>
+              <Ionicons name="trash-outline" size={14} color={Colors.textOnAccent} />
+              <Text style={styles.btnPrimaryText}>Supprimer</Text>
             </>
           )}
         </TouchableOpacity>
