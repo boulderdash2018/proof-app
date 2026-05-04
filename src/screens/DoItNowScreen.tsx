@@ -33,15 +33,19 @@ import { sendPhotoMessage, ConversationParticipant } from '../services/chatServi
 import { notifySessionAdvanced, markUserFinishedInSession } from '../services/planSessionService';
 import { pickImage } from '../utils';
 
-// Quick-word chips shown on the editorial review screen.
-const QUICK_WORDS: { key: string; label: string }[] = [
-  { key: 'ambiance',    label: 'Ambiance ✨' },
-  { key: 'service',     label: 'Service' },
-  { key: 'qp',          label: 'Bon rapport qualité-prix' },
-  { key: 'intimiste',   label: 'Intimiste' },
-  { key: 'revenir',     label: 'À revenir' },
-  { key: 'insta',       label: 'Instagrammable' },
-  { key: 'insolite',    label: 'Insolite' },
+// Sentence-starter chips shown on the editorial review screen.
+// Tap → seeds the comment textarea so the user can finish the thought.
+// See DoItNowScreen.web.tsx for the rationale (avoiding tag noise that
+// never re-surfaced anywhere in the app).
+const STARTERS: { key: string; label: string }[] = [
+  { key: 'ambiance',   label: 'L’ambiance était ' },
+  { key: 'recommande', label: 'Je recommande pour ' },
+  { key: 'mieux',      label: 'Le mieux c’est ' },
+  { key: 'parfait',    label: 'Parfait pour ' },
+  { key: 'conseil',    label: 'Petit conseil : ' },
+  { key: 'mention',    label: 'Mention spéciale pour ' },
+  { key: 'bemol',      label: 'Petit bémol : ' },
+  { key: 'refaire',    label: 'À refaire ' },
 ];
 
 const RATING_LABELS: Record<number, string> = {
@@ -158,7 +162,7 @@ export const DoItNowScreen: React.FC = () => {
   const [placeTime, setPlaceTime] = useState('');
   const [placeComment, setPlaceComment] = useState('');
   const [timeMode, setTimeMode] = useState<'none' | 'manual' | 'auto'>('none');
-  const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
+  const commentRef = useRef<RNTextInput>(null);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
   // Favorites — live subscribe to the store so the toggle re-renders instantly.
@@ -397,25 +401,22 @@ export const DoItNowScreen: React.FC = () => {
     }
   };
 
-  const toggleWord = (key: string) => {
+  // Tap a starter chip → seed the comment textarea with the beginning
+  // of a sentence the user can finish. Same behavior as the web variant
+  // (DoItNowScreen.web.tsx) — empty seeds, non-empty appends on a new
+  // line, then we re-focus the input so the user keeps typing.
+  const applyStarter = (label: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setSelectedWords((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+    setPlaceComment((current) => {
+      if (!current.trim()) return label;
+      return `${current.trimEnd()}\n${label}`;
     });
+    setTimeout(() => commentRef.current?.focus(), 30);
   };
 
   const buildCommentWithTags = (): string | undefined => {
-    const tagLabels = QUICK_WORDS
-      .filter((w) => selectedWords.has(w.key))
-      .map((w) => w.label);
-    const rawComment = placeComment.trim();
-    if (tagLabels.length === 0 && !rawComment) return undefined;
-    const prefix = tagLabels.length > 0 ? tagLabels.join(' · ') : '';
-    if (prefix && rawComment) return `${prefix}\n${rawComment}`;
-    return prefix || rawComment;
+    const trimmed = placeComment.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   };
 
   // ── Group session : "Souvenir à plusieurs" photo handler ──
@@ -453,7 +454,6 @@ export const DoItNowScreen: React.FC = () => {
     setPlacePrice('');
     setPlaceTime('');
     setPlaceComment('');
-    setSelectedWords(new Set());
     setTimeMode('none');
     setRoute(null);
     setRouteCoords([]);
@@ -840,40 +840,31 @@ export const DoItNowScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
-            {/* Quick words */}
+            {/* Sentence starters */}
             <Text style={[styles.reviewOverline, { marginTop: 22, marginBottom: 10 }]}>
-              UN MOT RAPIDE ?
+              POUR DÉMARRER
             </Text>
             <View style={styles.quickWordsWrap}>
-              {QUICK_WORDS.map((word) => {
-                const isSelected = selectedWords.has(word.key);
-                return (
-                  <TouchableOpacity
-                    key={word.key}
-                    style={[
-                      styles.quickWordChip,
-                      isSelected
-                        ? { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }
-                        : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
-                    ]}
-                    onPress={() => toggleWord(word.key)}
-                    activeOpacity={0.75}
-                  >
-                    <Text
-                      style={[
-                        styles.quickWordText,
-                        { color: isSelected ? Colors.terracotta700 : Colors.textPrimary },
-                      ]}
-                    >
-                      {word.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {STARTERS.map((s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={[
+                    styles.quickWordChip,
+                    { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
+                  ]}
+                  onPress={() => applyStarter(s.label)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.quickWordText, { color: Colors.textPrimary }]}>
+                    {s.label.trim()}…
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {/* Comment */}
             <RNTextInput
+              ref={commentRef}
               style={[styles.reviewCommentInput, { backgroundColor: Colors.bgSecondary, borderColor: placeComment.length > 0 ? Colors.primary : Colors.borderSubtle, color: Colors.textPrimary }]}
               placeholder="Un commentaire, une anecdote ? (optionnel)"
               placeholderTextColor={Colors.textTertiary}

@@ -20,15 +20,31 @@ import { notifySessionAdvanced, markUserFinishedInSession } from '../services/pl
 import { pickImage } from '../utils';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
-// Quick-word chips shown on the editorial review screen.
-const QUICK_WORDS: { key: string; label: string }[] = [
-  { key: 'ambiance',  label: 'Ambiance ✨' },
-  { key: 'service',   label: 'Service' },
-  { key: 'qp',        label: 'Bon rapport qualité-prix' },
-  { key: 'intimiste', label: 'Intimiste' },
-  { key: 'revenir',   label: 'À revenir' },
-  { key: 'insta',     label: 'Instagrammable' },
-  { key: 'insolite',  label: 'Insolite' },
+// Sentence-starter chips shown on the editorial review screen.
+//
+// Replaces the previous "tag" chips (Ambiance ✨ / Service / etc.) which
+// were collected as a prefix on the comment but never re-surfaced
+// anywhere in the app — they were essentially noise. Instead we now
+// offer SHORT BEGINNINGS that, when tapped, are injected into the
+// comment textarea so the user can finish the sentence. The result is
+// a real, useful comment that DOES surface (in the place's reviews,
+// in the saved plan, etc.).
+//
+// Tap behavior :
+//   • Empty textarea → starter becomes the seed (cursor after it)
+//   • Non-empty      → starter is appended on a new line
+//
+// Same list everywhere a quick-word strip currently lives (web + native
+// DoItNow review screen). Easy to extend later.
+const STARTERS: { key: string; label: string }[] = [
+  { key: 'ambiance',   label: 'L’ambiance était ' },
+  { key: 'recommande', label: 'Je recommande pour ' },
+  { key: 'mieux',      label: 'Le mieux c’est ' },
+  { key: 'parfait',    label: 'Parfait pour ' },
+  { key: 'conseil',    label: 'Petit conseil : ' },
+  { key: 'mention',    label: 'Mention spéciale pour ' },
+  { key: 'bemol',      label: 'Petit bémol : ' },
+  { key: 'refaire',    label: 'À refaire ' },
 ];
 
 const RATING_LABELS: Record<number, string> = {
@@ -224,7 +240,7 @@ export const DoItNowScreen: React.FC = () => {
   const [placeTime, setPlaceTime] = useState('');
   const [placeComment, setPlaceComment] = useState('');
   const [timeMode, setTimeMode] = useState<'none' | 'manual' | 'auto'>('none');
-  const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
+  const commentRef = useRef<RNTextInput>(null);
 
   // Favorites — live subscribe to the store so the toggle re-renders instantly.
   const savedPlaces = useSavedPlacesStore((s) => s.places);
@@ -502,25 +518,23 @@ export const DoItNowScreen: React.FC = () => {
     }
   };
 
-  const toggleWord = (key: string) => {
+  // Tap a starter chip → inject the beginning of the sentence into the
+  // comment textarea. Empty → seed it. Non-empty → append on a new line
+  // so the user can layer ideas without losing what they wrote. The
+  // textarea is auto-focused so they can keep typing immediately.
+  const applyStarter = (label: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setSelectedWords((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+    setPlaceComment((current) => {
+      if (!current.trim()) return label;
+      return `${current.trimEnd()}\n${label}`;
     });
+    // Defer focus so RN-Web has time to update the value first.
+    setTimeout(() => commentRef.current?.focus(), 30);
   };
 
   const buildCommentWithTags = (): string | undefined => {
-    const tagLabels = QUICK_WORDS
-      .filter((w) => selectedWords.has(w.key))
-      .map((w) => w.label);
-    const rawComment = placeComment.trim();
-    if (tagLabels.length === 0 && !rawComment) return undefined;
-    const prefix = tagLabels.length > 0 ? tagLabels.join(' · ') : '';
-    if (prefix && rawComment) return `${prefix}\n${rawComment}`;
-    return prefix || rawComment;
+    const trimmed = placeComment.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   };
 
   const resetPlaceModeUi = () => {
@@ -528,7 +542,6 @@ export const DoItNowScreen: React.FC = () => {
     setPlacePrice('');
     setPlaceTime('');
     setPlaceComment('');
-    setSelectedWords(new Set());
     setTimeMode('none');
     setRoute(null);
   };
@@ -766,40 +779,34 @@ export const DoItNowScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
-            {/* Quick words */}
+            {/* Sentence starters — tap one to seed the comment textarea
+                with a beginning the user can finish. Single-tap action
+                (no toggle state) ; if there's already a comment, the
+                starter is appended on a new line. */}
             <Text style={[styles.reviewOverline, { marginTop: 22, marginBottom: 10 }]}>
-              UN MOT RAPIDE ?
+              POUR DÉMARRER
             </Text>
             <View style={styles.quickWordsWrap}>
-              {QUICK_WORDS.map((word) => {
-                const isSelected = selectedWords.has(word.key);
-                return (
-                  <TouchableOpacity
-                    key={word.key}
-                    style={[
-                      styles.quickWordChip,
-                      isSelected
-                        ? { backgroundColor: Colors.terracotta100, borderColor: Colors.primary }
-                        : { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
-                    ]}
-                    onPress={() => toggleWord(word.key)}
-                    activeOpacity={0.75}
-                  >
-                    <Text
-                      style={[
-                        styles.quickWordText,
-                        { color: isSelected ? Colors.terracotta700 : Colors.textPrimary },
-                      ]}
-                    >
-                      {word.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {STARTERS.map((s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={[
+                    styles.quickWordChip,
+                    { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
+                  ]}
+                  onPress={() => applyStarter(s.label)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.quickWordText, { color: Colors.textPrimary }]}>
+                    {s.label.trim()}…
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {/* Comment */}
             <RNTextInput
+              ref={commentRef}
               style={[styles.reviewCommentInput, { backgroundColor: Colors.bgSecondary, borderColor: placeComment.length > 0 ? Colors.primary : Colors.borderSubtle, color: Colors.textPrimary }]}
               placeholder="Un commentaire, une anecdote ? (optionnel)"
               placeholderTextColor={Colors.textTertiary}
