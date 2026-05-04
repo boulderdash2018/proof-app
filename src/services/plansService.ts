@@ -203,16 +203,19 @@ export const updatePlan = async (
  *
  * À ce stade le Plan existe déjà en `visibility:'private'` (créé au lock
  * du brouillon). Le user a vécu le plan avec son groupe et choisit de
- * le rendre public — on update les champs enrichis :
+ * le rendre public — on update **uniquement** les champs enrichis dans
+ * un seul updateDoc atomique :
  *   • visibility    → 'public' (le plan apparaît sur le feed)
  *   • coAuthors     → liste des participants taggés (multi-author byline)
  *   • coverPhotos   → photos choisies par l'auteur
  *   • title         → titre potentiellement modifié à la publication
  *   • authorTip     → conseil créateur (signature)
+ *   • places        → places enrichis (custom photo, durée, prix par lieu)
  *
- * Pas de cleanup côté Firestore — tout passe par un seul updateDoc
- * atomique, le Plan apparaît instantanément dans le feed à la
- * prochaine fetchFeedPlans (le store coté client peut aussi refetcher).
+ * Important : on garde le payload aussi minimal que possible pour
+ * minimiser les chances de tomber sur une rule Firestore restrictive
+ * (les rules peuvent limiter quels fields un user peut modifier sur un
+ * plan existant — ex: bloquer l'écriture sur authorId, createdAt, etc.).
  */
 export const publishCoPlan = async (
   planId: string,
@@ -221,6 +224,7 @@ export const publishCoPlan = async (
     coverPhotos?: string[];
     authorTip?: string;
     coAuthors?: import('../types').CoAuthor[];
+    places?: Place[];
   },
 ): Promise<void> => {
   const payload: Record<string, any> = {
@@ -238,7 +242,10 @@ export const publishCoPlan = async (
   if (data.coAuthors && data.coAuthors.length > 0) {
     payload.coAuthors = data.coAuthors;
   }
-  await updateDoc(doc(db, PLANS, planId), payload);
+  if (data.places && data.places.length > 0) {
+    payload.places = stripUndefined(data.places);
+  }
+  await updateDoc(doc(db, PLANS, planId), stripUndefined(payload));
 };
 
 /** Fetch all plans for the feed (ordered by date), optionally filtered by city */

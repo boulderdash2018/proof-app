@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Colors, Fonts } from '../constants';
 import { storage } from '../services/firebaseConfig';
-import { fetchPlanById, publishCoPlan, updatePlan } from '../services/plansService';
+import { fetchPlanById, publishCoPlan } from '../services/plansService';
 import { fetchPlanDraft } from '../services/planDraftService';
 import { notifyTaggedInPlan } from '../services/notificationsService';
 import { pickImage } from '../utils/pickImage';
@@ -285,6 +285,8 @@ export const CoPlanPublishScreen: React.FC = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
     try {
+      console.log('[CoPlanPublishScreen] publish START — planId:', planId);
+
       // 1. Merge per-place edits dans plan.places.
       const enrichedPlaces: Place[] = plan.places.map((p) => {
         const edit = placeEdits[p.id];
@@ -300,21 +302,7 @@ export const CoPlanPublishScreen: React.FC = () => {
         };
       });
 
-      // 2. Update places via updatePlan (existant — accepte places enrichis).
-      await updatePlan(planId, {
-        title: plan.title,
-        tags: plan.tags,
-        places: enrichedPlaces,
-        price: plan.price,
-        duration: plan.duration,
-        transport: plan.transport,
-        travelSegments: plan.travelSegments || [],
-        coverPhotos: coverUrl ? [coverUrl] : (plan.coverPhotos || []),
-        city: plan.city,
-        authorTip: tip.trim(),
-      });
-
-      // 3. CoAuthors selon choix étape 1.
+      // 2. CoAuthors selon choix étape 1.
       const coAuthors: CoAuthor[] = identifyMembers
         ? otherParticipants
             .filter((p) => selectedParticipantIds.has(p.userId))
@@ -329,26 +317,47 @@ export const CoPlanPublishScreen: React.FC = () => {
             }))
         : [];
 
-      // 4. Publish — visibility:'public' + coAuthors + meta.
-      await publishCoPlan(planId, {
-        title: plan.title,
-        coverPhotos: coverUrl ? [coverUrl] : undefined,
-        authorTip: tip.trim() || undefined,
-        coAuthors,
-      });
+      // 3. Publication atomique : un seul updateDoc avec UNIQUEMENT les
+      //    fields modifiés (visibility, coAuthors, coverPhotos, places,
+      //    authorTip). On évite updatePlan() qui réécrivait title/tags/
+      //    transport/etc. — ces fields n'ont pas changé, et certaines
+      //    rules Firestore peuvent restreindre les writes à un ensemble
+      //    limité de fields, ce qui faisait crasher l'opération en
+      //    'Missing or insufficient permissions'.
+      console.log('[CoPlanPublishScreen] step 3 — publishCoPlan...');
+      try {
+        await publishCoPlan(planId, {
+          coverPhotos: coverUrl ? [coverUrl] : undefined,
+          authorTip: tip.trim() || undefined,
+          coAuthors,
+          places: enrichedPlaces,
+        });
+        console.log('[CoPlanPublishScreen] step 3 OK');
+      } catch (e) {
+        console.error('[CoPlanPublishScreen] step 3 (publishCoPlan) FAILED:', e);
+        throw e;
+      }
 
       // 5. Notifs taggués (best-effort, on bloque pas la publication).
+      //    Wrapped en try/catch interne — si la rule notifications
+      //    bloque, le plan est déjà public, on ne veut pas rollback.
       if (me && coAuthors.length > 0) {
+        console.log('[CoPlanPublishScreen] step 5 — sending', coAuthors.length, 'notifs...');
         const planForNotif: Plan = {
           ...plan,
           coverPhotos: coverUrl ? [coverUrl] : plan.coverPhotos,
         };
         Promise.all(
-          coAuthors.map((co) => notifyTaggedInPlan(me, co.id, planForNotif)),
-        ).catch((err) => console.warn('[CoPlanPublishScreen] notif fail:', err));
+          coAuthors.map((co) =>
+            notifyTaggedInPlan(me, co.id, planForNotif).catch((err) => {
+              console.warn('[CoPlanPublishScreen] notif failed for', co.id, ':', err);
+            }),
+          ),
+        );
       }
 
       // 6. Retour feed.
+      console.log('[CoPlanPublishScreen] DONE — navigating back to feed');
       navigation.reset({
         index: 0,
         routes: [{ name: 'Main' }] as any,
