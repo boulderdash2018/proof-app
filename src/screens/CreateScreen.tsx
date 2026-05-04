@@ -1860,66 +1860,43 @@ export const CreateScreen: React.FC = () => {
                   <Text style={styles.tlNodeText}>{index + 1}</Text>
                 </View>
 
-                {/* Card — en customize mode le tap sur la frame n'ouvre PLUS
-                    le menu déroulant (l'expand inline). Toutes les actions
-                    (photo, durée, prix, réservation) sont accessibles via
-                    chips dédiés OU via le bouton "Personnaliser ce lieu" du
-                    photo modal pour le commentaire / QAs. Désactiver l'expand
-                    évite les ouvertures accidentelles et alignera l'UX avec
-                    la sobriété demandée. */}
+                {/* Card — UI unifiée fresh + customize.
+                    Le tap sur la frame n'ouvre PLUS le menu déroulant
+                    inline. Toutes les actions passent par les chips et
+                    sheets. Long-press réservé au drag-to-reorder en fresh
+                    seulement (en customize le plan est déjà vécu, l'ordre
+                    ne se réorganise plus). */}
                 <Pressable
-                  onPress={isCustomizeMode ? undefined : () => togglePlaceExpand(place.id)}
+                  onPress={undefined}
                   onLongPress={isCustomizeMode ? undefined : () => handleLongPressPlace(place.id)}
                   delayLongPress={350}
-                  style={({ pressed }) => [
+                  style={[
                     styles.tlCard,
-                    isExpanded && styles.tlCardExpanded,
                     isDragging && styles.tlCardDragging,
-                    pressed && !isExpanded && !isCustomizeMode && styles.tlCardPressed,
                   ]}
                 >
                   {/* Top row: thumb + name + remove
-                      En customize mode, le thumb est cliquable et ouvre
-                      directement le modal de personnalisation (photo + comment
-                      + QAs) — c'est le seul endroit où l'user peut ajouter
-                      sa propre photo. Le placeholder devient explicite. */}
+                      Le thumb est cliquable et ouvre directement le modal
+                      de personnalisation (photo + comment + QAs). Placeholder
+                      dashed terracotta avec icône caméra invitante. UI unifiée
+                      entre fresh et customize. */}
                   <View style={styles.tlCardTop}>
-                    {isCustomizeMode ? (
-                      <TouchableOpacity
-                        style={styles.tlThumb}
-                        onPress={(e) => { e.stopPropagation(); editPlaceCustomization(index); }}
-                        activeOpacity={0.85}
-                      >
-                        {hasPhoto ? (
-                          <Image
-                            source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
-                            style={styles.tlThumbImg}
-                          />
-                        ) : (
-                          <View style={[styles.tlThumbImg, styles.tlThumbPlaceholder]}>
-                            <Ionicons name="camera" size={18} color={Colors.primary} />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={styles.tlThumb}>
-                        {hasPhoto ? (
-                          <Image
-                            source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
-                            style={styles.tlThumbImg}
-                          />
-                        ) : (
-                          <LinearGradient
-                            colors={[Colors.terracotta300, Colors.terracotta500]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.tlThumbImg}
-                          >
-                            <Ionicons name="location" size={20} color={Colors.textOnAccent} />
-                          </LinearGradient>
-                        )}
-                      </View>
-                    )}
+                    <TouchableOpacity
+                      style={styles.tlThumb}
+                      onPress={(e) => { e.stopPropagation(); editPlaceCustomization(index); }}
+                      activeOpacity={0.85}
+                    >
+                      {hasPhoto ? (
+                        <Image
+                          source={{ uri: (place.customPhoto || place.previewPhotoUrl) as string }}
+                          style={styles.tlThumbImg}
+                        />
+                      ) : (
+                        <View style={[styles.tlThumbImg, styles.tlThumbPlaceholder]}>
+                          <Ionicons name="camera" size={18} color={Colors.primary} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
 
                     <View style={styles.tlCardInfo}>
                       <Text style={styles.tlPlaceName} numberOfLines={1}>{place.name}</Text>
@@ -1931,9 +1908,7 @@ export const CreateScreen: React.FC = () => {
                     {/* Croix de suppression — uniquement en mode fresh.
                         En customize, le plan a déjà été vécu IRL : tous les
                         lieux ajoutés ont été visités, on ne veut pas les
-                        retirer (sinon le plan publié ne reflète plus la
-                        réalité de la session). Le user peut toujours retirer
-                        un lieu en revenant au flow Organize. */}
+                        retirer. */}
                     {!isCustomizeMode && (
                       <TouchableOpacity
                         onPress={(e) => { e.stopPropagation(); removePlace(place.id); }}
@@ -1945,200 +1920,137 @@ export const CreateScreen: React.FC = () => {
                     )}
                   </View>
 
-                  {/* Meta row — deux variantes selon le mode :
-                      • customize : 3 chips CTA explicites (photo / durée / prix)
-                        + jauge "N/3" pour pousser à compléter chaque champ
-                      • fresh : pills compactes (UX historique inchangée) */}
-                  {isCustomizeMode ? (
-                    (() => {
-                      const photoFilled = !!(place.customPhoto || place.previewPhotoUrl);
-                      const durationFilled = !!place.duration;
-                      const priceFilled = place.priceRangeIndex >= 0;
-                      const filledCount = (photoFilled ? 1 : 0) + (durationFilled ? 1 : 0) + (priceFilled ? 1 : 0);
-                      const allFilled = filledCount === 3;
-                      const priceLabel = priceFilled
-                        ? (() => {
-                            const r = PRICE_RANGES[place.priceRangeIndex];
-                            return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
-                          })()
-                        : null;
-                      return (
-                        <>
-                          {/* Jauge complétion : N/3 + 3 pastilles */}
-                          <View style={styles.czGauge}>
-                            <View style={styles.czGaugeDots}>
-                              {[photoFilled, durationFilled, priceFilled].map((on, i) => (
-                                <View
-                                  key={i}
-                                  style={[
-                                    styles.czGaugeDot,
-                                    on && styles.czGaugeDotOn,
-                                  ]}
-                                />
-                              ))}
-                            </View>
-                            <Text style={[
-                              styles.czGaugeText,
-                              allFilled && { color: Colors.primary },
-                            ]}>
-                              {allFilled ? 'Tout est rempli ✓' : `${filledCount}/3 infos`}
-                            </Text>
+                  {/* Meta — UI unifiée fresh + customize : jauge 3/3 +
+                      chips CTA + toggle 'Réservation conseillée'. Système
+                      de référence pour la saisie de prix/durée dans toute
+                      l'app. */}
+                  {(() => {
+                    const photoFilled = !!(place.customPhoto || place.previewPhotoUrl);
+                    const durationFilled = !!place.duration;
+                    const priceFilled = place.priceRangeIndex >= 0;
+                    const filledCount = (photoFilled ? 1 : 0) + (durationFilled ? 1 : 0) + (priceFilled ? 1 : 0);
+                    const allFilled = filledCount === 3;
+                    const priceLabel = priceFilled
+                      ? (() => {
+                          const r = PRICE_RANGES[place.priceRangeIndex];
+                          return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
+                        })()
+                      : null;
+                    return (
+                      <>
+                        {/* Jauge complétion : N/3 + 3 pastilles */}
+                        <View style={styles.czGauge}>
+                          <View style={styles.czGaugeDots}>
+                            {[photoFilled, durationFilled, priceFilled].map((on, i) => (
+                              <View
+                                key={i}
+                                style={[styles.czGaugeDot, on && styles.czGaugeDotOn]}
+                              />
+                            ))}
                           </View>
-
-                          {/* 3 chips CTA dimensionnés */}
-                          <View style={styles.czChipsRow}>
-                            <TouchableOpacity
-                              style={[styles.czChip, photoFilled && styles.czChipFilled]}
-                              onPress={(e) => { e.stopPropagation(); editPlaceCustomization(index); }}
-                              activeOpacity={0.85}
-                            >
-                              <Ionicons
-                                name={photoFilled ? 'image' : 'image-outline'}
-                                size={14}
-                                color={photoFilled ? Colors.terracotta700 : Colors.primary}
-                              />
-                              <Text style={[
-                                styles.czChipText,
-                                photoFilled && styles.czChipTextFilled,
-                              ]} numberOfLines={1}>
-                                {photoFilled ? 'Photo OK' : 'Ajoute une photo'}
-                              </Text>
-                              {photoFilled && (
-                                <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
-                              )}
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.czChip, durationFilled && styles.czChipFilled]}
-                              onPress={(e) => { e.stopPropagation(); setDurationPickerPlaceId(place.id); }}
-                              activeOpacity={0.85}
-                            >
-                              <Ionicons
-                                name={durationFilled ? 'time' : 'time-outline'}
-                                size={14}
-                                color={durationFilled ? Colors.terracotta700 : Colors.primary}
-                              />
-                              <Text style={[
-                                styles.czChipText,
-                                durationFilled && styles.czChipTextFilled,
-                              ]} numberOfLines={1}>
-                                {durationFilled ? formatDurationLabel(place.duration) : 'Combien de temps ?'}
-                              </Text>
-                              {durationFilled && (
-                                <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
-                              )}
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.czChip, priceFilled && styles.czChipFilled]}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                setPricePickerPlaceId(place.id);
-                              }}
-                              activeOpacity={0.85}
-                            >
-                              <Ionicons
-                                name={priceFilled ? 'wallet' : 'wallet-outline'}
-                                size={14}
-                                color={priceFilled ? Colors.terracotta700 : Colors.primary}
-                              />
-                              <Text style={[
-                                styles.czChipText,
-                                priceFilled && styles.czChipTextFilled,
-                              ]} numberOfLines={1}>
-                                {priceLabel ?? 'Combien ça coûte ?'}
-                              </Text>
-                              {priceFilled && (
-                                <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
-                              )}
-                            </TouchableOpacity>
-                          </View>
-
-                          {/* Toggle "Réserver à l'avance" — discret, sous les
-                              chips, opt-in. Sert au lecteur du plan publié à
-                              savoir s'il vaut mieux booker. Optionnel —
-                              n'entre pas dans la jauge 3/3. */}
-                          <TouchableOpacity
-                            style={styles.czReserveRow}
-                            onPress={(e) => { e.stopPropagation(); toggleReservation(place.id); }}
-                            activeOpacity={0.7}
-                          >
-                            <View style={styles.czReserveLabel}>
-                              <Ionicons
-                                name={place.reservationRecommended ? 'bookmark' : 'bookmark-outline'}
-                                size={13}
-                                color={place.reservationRecommended ? Colors.primary : Colors.textTertiary}
-                              />
-                              <Text style={[
-                                styles.czReserveText,
-                                place.reservationRecommended && styles.czReserveTextActive,
-                              ]}>
-                                Réservation conseillée
-                              </Text>
-                            </View>
-                            <View style={[styles.czSwitch, place.reservationRecommended && styles.czSwitchOn]}>
-                              <View style={[
-                                styles.czSwitchThumb,
-                                place.reservationRecommended && styles.czSwitchThumbOn,
-                              ]} />
-                            </View>
-                          </TouchableOpacity>
-                        </>
-                      );
-                    })()
-                  ) : (
-                    <View style={styles.tlMetaRow}>
-                      {place.duration ? (
-                        <View style={styles.tlMetaItem}>
-                          <Ionicons name="time-outline" size={11} color={Colors.terracotta500} />
-                          <Text style={styles.tlMetaText}>{formatDurationLabel(place.duration)}</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.tlMetaAddPill}>
-                          <Ionicons name="add" size={11} color={Colors.terracotta600} />
-                          <Ionicons name="time-outline" size={11} color={Colors.terracotta600} />
-                          <Text style={styles.tlMetaAddText}>Durée</Text>
-                        </View>
-                      )}
-                      <Text style={styles.tlMetaSep}>·</Text>
-                      {place.priceRangeIndex >= 0 ? (
-                        <View style={styles.tlMetaItem}>
-                          <Ionicons name="wallet-outline" size={11} color={Colors.terracotta500} />
-                          <Text style={styles.tlMetaText}>
-                            {(() => {
-                              const r = PRICE_RANGES[place.priceRangeIndex];
-                              return r.max === 0 ? r.label : r.max === Infinity ? `${r.min}${cityConfig.currency}+` : `${r.label}${cityConfig.currency}`;
-                            })()}
+                          <Text style={[
+                            styles.czGaugeText,
+                            allFilled && { color: Colors.primary },
+                          ]}>
+                            {allFilled ? 'Tout est rempli ✓' : `${filledCount}/3 infos`}
                           </Text>
                         </View>
-                      ) : (
-                        <View style={styles.tlMetaAddPill}>
-                          <Ionicons name="add" size={11} color={Colors.terracotta600} />
-                          <Ionicons name="wallet-outline" size={11} color={Colors.terracotta600} />
-                          <Text style={styles.tlMetaAddText}>Prix</Text>
-                        </View>
-                      )}
-                      {place.reservationRecommended && (
-                        <>
-                          <Text style={styles.tlMetaSep}>·</Text>
-                          <View style={styles.tlMetaItem}>
-                            <Ionicons name="bookmark" size={11} color={Colors.terracotta500} />
-                            <Text style={styles.tlMetaText}>Réserver</Text>
-                          </View>
-                        </>
-                      )}
-                      {hasCustom && (
-                        <View style={styles.tlCustomBadge}>
-                          <Text style={styles.tlCustomBadgeText}>✨ Perso</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
 
-                  {/* Expanded section */}
-                  {/* Pas d'expand en customize mode — tout passe par les
-                      chips et les sheets. Mode fresh garde l'expand. */}
-                  {isExpanded && !isCustomizeMode && renderPlaceExpanded(place, index)}
+                        {/* 3 chips CTA dimensionnés — tap → sheet correspondant */}
+                        <View style={styles.czChipsRow}>
+                          <TouchableOpacity
+                            style={[styles.czChip, photoFilled && styles.czChipFilled]}
+                            onPress={(e) => { e.stopPropagation(); editPlaceCustomization(index); }}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons
+                              name={photoFilled ? 'image' : 'image-outline'}
+                              size={14}
+                              color={photoFilled ? Colors.terracotta700 : Colors.primary}
+                            />
+                            <Text style={[
+                              styles.czChipText,
+                              photoFilled && styles.czChipTextFilled,
+                            ]} numberOfLines={1}>
+                              {photoFilled ? 'Photo OK' : 'Ajoute une photo'}
+                            </Text>
+                            {photoFilled && (
+                              <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
+                            )}
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.czChip, durationFilled && styles.czChipFilled]}
+                            onPress={(e) => { e.stopPropagation(); setDurationPickerPlaceId(place.id); }}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons
+                              name={durationFilled ? 'time' : 'time-outline'}
+                              size={14}
+                              color={durationFilled ? Colors.terracotta700 : Colors.primary}
+                            />
+                            <Text style={[
+                              styles.czChipText,
+                              durationFilled && styles.czChipTextFilled,
+                            ]} numberOfLines={1}>
+                              {durationFilled ? formatDurationLabel(place.duration) : 'Combien de temps ?'}
+                            </Text>
+                            {durationFilled && (
+                              <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
+                            )}
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.czChip, priceFilled && styles.czChipFilled]}
+                            onPress={(e) => { e.stopPropagation(); setPricePickerPlaceId(place.id); }}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons
+                              name={priceFilled ? 'wallet' : 'wallet-outline'}
+                              size={14}
+                              color={priceFilled ? Colors.terracotta700 : Colors.primary}
+                            />
+                            <Text style={[
+                              styles.czChipText,
+                              priceFilled && styles.czChipTextFilled,
+                            ]} numberOfLines={1}>
+                              {priceLabel ?? 'Combien ça coûte ?'}
+                            </Text>
+                            {priceFilled && (
+                              <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
+                            )}
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Toggle "Réservation conseillée" — opt-in, hors jauge */}
+                        <TouchableOpacity
+                          style={styles.czReserveRow}
+                          onPress={(e) => { e.stopPropagation(); toggleReservation(place.id); }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.czReserveLabel}>
+                            <Ionicons
+                              name={place.reservationRecommended ? 'bookmark' : 'bookmark-outline'}
+                              size={13}
+                              color={place.reservationRecommended ? Colors.primary : Colors.textTertiary}
+                            />
+                            <Text style={[
+                              styles.czReserveText,
+                              place.reservationRecommended && styles.czReserveTextActive,
+                            ]}>
+                              Réservation conseillée
+                            </Text>
+                          </View>
+                          <View style={[styles.czSwitch, place.reservationRecommended && styles.czSwitchOn]}>
+                            <View style={[
+                              styles.czSwitchThumb,
+                              place.reservationRecommended && styles.czSwitchThumbOn,
+                            ]} />
+                          </View>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  })()}
                 </Pressable>
               </Animated.View>
 
