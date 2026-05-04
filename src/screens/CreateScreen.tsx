@@ -1312,7 +1312,18 @@ export const CreateScreen: React.FC = () => {
   const publishOpacity = useRef(new Animated.Value(1)).current;
   const [isFlying, setIsFlying] = useState(false);
 
-  const canPublish = title.trim().length > 0 && coverPhotos.length > 0 && selectedTags.length > 0 && places.length >= 2 && authorTip.trim().length >= TIP_MIN_CHARS;
+  // Validation finale pour publier. En mode customize (depuis Organize),
+  // le user a déjà vécu le plan IRL — peu importe s'il y a 1 ou 5 lieux,
+  // ça reflète sa réalité. Donc on relâche la contrainte places.length >= 2
+  // (qui n'a de sens qu'en construction depuis zéro).
+  const _isCustomizing = ((route.params?.draftId || '') as string).startsWith('organize-');
+  const _placeCountOk = _isCustomizing ? places.length >= 1 : places.length >= 2;
+  const canPublish =
+    title.trim().length > 0 &&
+    coverPhotos.length > 0 &&
+    selectedTags.length > 0 &&
+    _placeCountOk &&
+    authorTip.trim().length >= TIP_MIN_CHARS;
 
   // Missing criteria for bottom sheet
   const missingCriteria = useMemo(() => {

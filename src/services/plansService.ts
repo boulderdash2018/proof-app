@@ -162,7 +162,11 @@ export const createPlan = async (
   return plan;
 };
 
-/** Update an existing plan in Firestore (edit flow) */
+/** Update an existing plan in Firestore (edit flow).
+ *  Strip-undefined sur tout le payload — Firestore rejette les undefined
+ *  en strict mode et Place a beaucoup de champs optionnels (phoneNumber,
+ *  website, photoUrls…) qui peuvent arriver à undefined quand un Place
+ *  vient d'un co-plan brouillon plutôt que d'un createPlan classique. */
 export const updatePlan = async (
   planId: string,
   data: {
@@ -179,18 +183,19 @@ export const updatePlan = async (
   }
 ): Promise<void> => {
   const ref = doc(db, PLANS, planId);
-  await updateDoc(ref, {
+  const payload: Record<string, any> = {
     title: data.title,
     tags: data.tags,
-    places: data.places,
+    places: stripUndefined(data.places),
     price: data.price,
     duration: data.duration,
     transport: data.transport,
-    travelSegments: data.travelSegments || [],
+    travelSegments: stripUndefined(data.travelSegments || []),
     coverPhotos: data.coverPhotos || [],
     ...(data.city && { city: data.city }),
     ...(data.authorTip !== undefined && { authorTip: data.authorTip.trim() }),
-  });
+  };
+  await updateDoc(ref, stripUndefined(payload));
 };
 
 /**

@@ -353,9 +353,14 @@ export const CoPlanPublishScreen: React.FC = () => {
         index: 0,
         routes: [{ name: 'Main' }] as any,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[CoPlanPublishScreen] publish error:', err);
-      Alert.alert('Oups', "La publication a échoué. Réessaye.");
+      // Surface le vrai message d'erreur pour aider au debug — un
+      // 'Oups' générique cachait des problèmes Firestore (undefined
+      // dans places, permissions rules, etc.) qui se résolvent vite
+      // une fois identifiés.
+      const msg = err?.message || String(err) || 'Erreur inconnue';
+      Alert.alert('La publication a échoué', msg);
     } finally {
       setSubmitting(false);
     }
