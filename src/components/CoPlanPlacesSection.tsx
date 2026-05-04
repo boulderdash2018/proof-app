@@ -10,6 +10,7 @@ import { Colors, Fonts } from '../constants';
 import { Avatar } from './Avatar';
 import { useAuthStore } from '../store';
 import { useCoPlanStore } from '../store/coPlanStore';
+import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import {
   searchPlacesAutocomplete,
   getPlaceDetails,
@@ -703,6 +704,9 @@ const PlacePickerModal: React.FC<PickerProps> = ({ visible, onClose, onPick }) =
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // Lieux favoris du user — affichés en suggestions par défaut quand
+  // la barre de recherche est vide (UX cohérente avec OrganizeScreen).
+  const savedPlaces = useSavedPlacesStore((s) => s.places);
 
   useEffect(() => {
     if (!visible) {
@@ -732,6 +736,13 @@ const PlacePickerModal: React.FC<PickerProps> = ({ visible, onClose, onPick }) =
     }, 280);
     return () => clearTimeout(t);
   }, [query, visible]);
+
+  // Décide quoi afficher : si query vide → favoris (suggestions),
+  // sinon résultats de recherche.
+  const showFavorites = query.trim().length < 2;
+  const dataToShow: Suggestion[] = showFavorites
+    ? savedPlaces.map((sp) => ({ placeId: sp.placeId, name: sp.name, address: sp.address }))
+    : results;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
@@ -775,12 +786,17 @@ const PlacePickerModal: React.FC<PickerProps> = ({ visible, onClose, onPick }) =
           </View>
         ) : (
           <FlatList
-            data={results}
+            data={dataToShow}
             keyExtractor={(item) => item.placeId}
             contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
             ItemSeparatorComponent={() => (
               <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle, marginLeft: 52 }} />
             )}
+            ListHeaderComponent={
+              showFavorites && savedPlaces.length > 0 ? (
+                <Text style={pickerStyles.sectionHeader}>LIEUX SAUVEGARDÉS</Text>
+              ) : null
+            }
             renderItem={({ item }) => (
               <Pressable
                 style={pickerStyles.row}
@@ -788,7 +804,11 @@ const PlacePickerModal: React.FC<PickerProps> = ({ visible, onClose, onPick }) =
                 android_ripple={{ color: Colors.borderSubtle }}
               >
                 <View style={pickerStyles.rowIcon}>
-                  <Ionicons name="location" size={15} color={Colors.primary} />
+                  <Ionicons
+                    name={showFavorites ? 'star' : 'location'}
+                    size={15}
+                    color={showFavorites ? Colors.gold : Colors.primary}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={pickerStyles.rowName} numberOfLines={1}>{item.name}</Text>
@@ -803,7 +823,11 @@ const PlacePickerModal: React.FC<PickerProps> = ({ visible, onClose, onPick }) =
                 </View>
               ) : (
                 <View style={pickerStyles.emptyWrap}>
-                  <Text style={pickerStyles.emptyText}>Tape au moins 2 caractères</Text>
+                  <Text style={pickerStyles.emptyText}>
+                    {savedPlaces.length === 0
+                      ? 'Tape au moins 2 caractères'
+                      : 'Tape pour chercher un autre lieu'}
+                  </Text>
                 </View>
               )
             }
@@ -1173,6 +1197,16 @@ const pickerStyles = StyleSheet.create({
   },
   emptyWrap: { paddingVertical: 40, alignItems: 'center' },
   emptyText: { fontSize: 13, fontFamily: Fonts.body, color: Colors.textSecondary },
+  sectionHeader: {
+    fontSize: 10,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
 });
 
 // ── Contextual long-press menu styles ──
