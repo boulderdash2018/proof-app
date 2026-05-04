@@ -206,6 +206,67 @@ export const OrganizeCompleteScreen: React.FC = () => {
   };
 
   /**
+   * "Ajouter à 'fait'" — crée le plan en visibility:'private' et l'ajoute
+   * directement dans les saves du user (onglet 'Fait'), sans publication
+   * sur le feed. L'user voit ensuite son plan dans son SavesScreen comme
+   * un plan vécu, sans qu'il soit découvrable par les autres.
+   *
+   * Variant simplifiée de handlePublish — pas de cover photos custom,
+   * pas de stats détaillées, pas de Proof It modal. Juste 'archiver
+   * comme fait pour me souvenir'.
+   */
+  const handleAddToDone = async () => {
+    if (!currentUser) return;
+    setIsPublishing(true);
+    setPublishError(null);
+    try {
+      const enrichedPlaces = p.places.map((place) => {
+        const visit = s.placesVisited.find((v) => v.placeId === place.id);
+        const cleaned: Record<string, any> = {};
+        for (const [k, v] of Object.entries(place)) {
+          if (v !== undefined) cleaned[k] = v;
+        }
+        cleaned.placePrice = visit?.pricePaid || 0;
+        cleaned.placeDuration = visit?.timeSpentMinutes || 0;
+        if (!cleaned.reviews) cleaned.reviews = [];
+        if (!cleaned.ratingDistribution) cleaned.ratingDistribution = [0, 0, 0, 0, 0];
+        return cleaned;
+      });
+      // Cover photos minimaux : 1ère photo de chaque lieu (pas de fetch
+      // Google supplémentaire pour ne pas alourdir 'Ajouter à fait').
+      const firstPerPlace = enrichedPlaces
+        .map((pl: any) => (pl.photoUrls && pl.photoUrls.length > 0 ? pl.photoUrls[0] : null))
+        .filter(Boolean) as string[];
+
+      const createdPlan = await createPlan(
+        {
+          title: s.organizeTitle || s.planTitle,
+          tags: s.organizeTags || [],
+          places: enrichedPlaces as any,
+          price: `${totalPrice}${cityConfig.currency}`,
+          duration: formatDuration(totalMinutes || enrichedPlaces.reduce((sum: number, pl: any) => sum + (pl.placeDuration || 0), 0)),
+          transport: mapTransport(s.transport),
+          travelSegments: [],
+          coverPhotos: firstPerPlace.slice(0, 3),
+          visibility: 'private',
+        },
+        currentUser,
+      );
+      // addCreatedPlan : ajoute en saves avec isDone:true → l'apparaît
+      // dans l'onglet 'Fait' du SavesScreen.
+      addCreatedPlan(createdPlan);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      clearSession();
+      navigation.popToTop();
+    } catch (err: any) {
+      console.error('[OrganizeCompleteScreen] addToDone error:', err);
+      setPublishError(`Erreur: ${err?.message || 'Impossible d\'ajouter le plan.'}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  /**
    * Partage natif simple — au stade 'fin organize', le plan n'est pas
    * encore créé en DB. On utilise donc Share.share avec un texte de
    * teaser plutôt qu'un deep-link vers PlanDetail. L'utilisateur peut
@@ -403,12 +464,12 @@ export const OrganizeCompleteScreen: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity
           style={footerStyles.ghostBtn}
-          onPress={handleGoHome}
+          onPress={handleAddToDone}
           activeOpacity={0.7}
           disabled={isPublishing}
         >
-          <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
-          <Text style={footerStyles.ghostBtnText}>Sauvegarder</Text>
+          <Ionicons name="checkmark-circle-outline" size={14} color={Colors.textPrimary} />
+          <Text style={footerStyles.ghostBtnText}>Ajouter à « fait »</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[footerStyles.primaryBtn, { opacity: isPublishing ? 0.7 : 1 }]}
@@ -526,7 +587,7 @@ const footerStyles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   primaryBtn: {
-    flex: 1.2,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

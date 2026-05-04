@@ -194,6 +194,50 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const savedEntry = savedPlans.find((sp) => sp.planId === plan.id);
   const isAlreadyProofed = !!savedEntry?.isDone && savedEntry.proofStatus === 'validated';
 
+  /**
+   * Co-plan only — "Ajouter à 'fait'" : marque le plan comme fait dans
+   * les saves (isDone:true) SANS passer par le Proof It modal. Le co-plan
+   * est un plan que le groupe vient de créer ensemble — il n'y a pas de
+   * 'validation' à faire (le Proof It valide qu'on a bien refait le plan
+   * d'un autre, ce qui ne s'applique pas ici).
+   *
+   * Submit aussi les reviews/photos saisies pendant la session si le
+   * user en a posé, comme handleFinalize le fait.
+   */
+  const handleAddToDone = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      // Submit reviews seulement si le user en a saisi (sinon no-op).
+      const reviewsToSubmit = Object.entries(ratings).filter(([, r]) => r > 0);
+      if (currentUser && reviewsToSubmit.length > 0) {
+        const sessionPlaces = (session?.placesVisited || []).map((v) => {
+          const fullPlace = plan.places.find((p) => p.id === v.placeId);
+          return {
+            placeId: v.placeId,
+            googlePlaceId: fullPlace?.googlePlaceId,
+            planId: plan.id,
+            rating: ratings[v.placeId] || 0,
+            text: comments[v.placeId] || undefined,
+          };
+        }).filter((r) => r.rating > 0);
+        if (sessionPlaces.length > 0) {
+          submitPlaceReviews(sessionPlaces, currentUser, 'do_it_now').catch(
+            (err) => console.warn('[DoItNowCompleteScreen] reviews submit:', err),
+          );
+        }
+      }
+      // Marquer done sans proofStatus — c'est juste 'ajouté à fait',
+      // pas une validation Proof It.
+      useSavesStore.getState().markAsDone(plan.id);
+      clearSession();
+      navigation.popToTop();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // "Fin" = submit reviews, then open the Proof It stamp ceremony modal.
   // The actual markAsDone + proofCount bump happens in `handleProofConfirmed`
   // after the user confirms the stamp. Enforces one-proof-per-plan.
@@ -574,10 +618,11 @@ export const DoItNowCompleteScreen: React.FC = () => {
 
         {isCoPlan ? (
           <>
-            {/* Sauvegarder uniquement — déclenche handleFinalize qui
-                ouvre le ProofSurveyModal (validation de la session,
-                ajout aux saves), équivalent du 'Fin' historique. Le
-                plan reste private (pas publié sur le feed). */}
+            {/* Ajouter à 'fait' — markAsDone DIRECT (sans ouvrir le
+                Proof It modal). Le co-plan n'a pas à être 'validé' au
+                Proof It (qui sert à confirmer qu'on a refait le plan
+                de quelqu'un d'autre) — ici c'est SON plan, on l'ajoute
+                juste à l'onglet 'Fait' des saves. */}
             <TouchableOpacity
               style={[
                 styles.ghostBtn,
@@ -586,12 +631,12 @@ export const DoItNowCompleteScreen: React.FC = () => {
                   opacity: isSubmitting ? 0.7 : 1,
                 },
               ]}
-              onPress={handleFinalize}
+              onPress={handleAddToDone}
               activeOpacity={0.7}
               disabled={isSubmitting}
             >
-              <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
-              <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Sauvegarder</Text>
+              <Ionicons name="checkmark-circle-outline" size={14} color={Colors.textPrimary} />
+              <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Ajouter à « fait »</Text>
             </TouchableOpacity>
             {/* Publier sur le feed — navigate vers CoPlanPublishScreen
                 où le user enrichit (cover, tags, tip) avant publication. */}
@@ -937,27 +982,30 @@ const styles = StyleSheet.create({
     color: Colors.textOnAccent,
   },
 
+  // Footer 3 boutons — pill rounded, taille égale (flex:1 partout) pour
+  // cohérence avec OrganizeCompleteScreen + équilibre visuel.
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     backgroundColor: Colors.bgPrimary,
   },
   ghostBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 11,
+    borderRadius: 99,
     borderWidth: 1,
+    backgroundColor: Colors.bgSecondary,
   },
   ghostBtnText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontFamily: Fonts.bodySemiBold,
   },
   primaryBtn: {
@@ -965,12 +1013,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 44,
-    borderRadius: 12,
+    gap: 5,
+    paddingVertical: 11,
+    borderRadius: 99,
   },
   primaryBtnText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textOnAccent,
   },
