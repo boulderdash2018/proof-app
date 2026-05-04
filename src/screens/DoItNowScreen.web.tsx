@@ -19,6 +19,7 @@ import { sendPhotoMessage, ConversationParticipant } from '../services/chatServi
 import { notifySessionAdvanced, markUserFinishedInSession } from '../services/planSessionService';
 import { pickImage } from '../utils';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
+import { useProofCamera } from '../components/ProofCamera';
 
 // Sentence-starter chips shown on the editorial review screen.
 //
@@ -221,6 +222,12 @@ export const DoItNowScreen: React.FC = () => {
   // Group-session UI state
   const [mapSheetOpen, setMapSheetOpen] = useState(false);
   const souvenirPrompts = useSouvenirPrompts();
+  // Proof Camera — fullscreen branded camera that REPLACES the system
+  // picker for the souvenir capture flow. The hook gives us an async
+  // open() returning a captured + filtered photo (or null on cancel),
+  // plus a Host component to mount somewhere in the tree (we drop it
+  // at the screen root, see end of the JSX).
+  const proofCamera = useProofCamera();
   const activeGroupSession = useGroupSessionStore((s) => s.activeSession);
   const groupConversationId = routeConversationId || activeGroupSession?.conversationId;
   const mapDivRef = useRef<HTMLDivElement>(null);
@@ -443,16 +450,16 @@ export const DoItNowScreen: React.FC = () => {
       });
       return null;
     }
-    console.log('[souvenir] step 1 — opening picker');
+    console.log('[souvenir] step 1 — opening Proof Camera');
     let picked;
     try {
-      picked = await pickImage();
+      picked = await proofCamera.open();
     } catch (err) {
-      console.error('[souvenir] picker threw:', err);
+      console.error('[souvenir] Proof Camera threw:', err);
       return null;
     }
     if (!picked) {
-      console.log('[souvenir] picker cancelled by user');
+      console.log('[souvenir] Proof Camera cancelled by user');
       return null;
     }
     console.log('[souvenir] step 2 — picked image', {
@@ -491,7 +498,7 @@ export const DoItNowScreen: React.FC = () => {
           : err?.message || 'Échec de l’envoi — réessaie';
       throw new Error(friendly);
     }
-  }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name]);
+  }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name, proofCamera]);
 
   // ── Group session : "Souvenir à plusieurs" photo handler ──
   const handleSouvenirPhoto = useCallback(async () => {
@@ -1025,6 +1032,11 @@ export const DoItNowScreen: React.FC = () => {
           />
         </>
       )}
+
+      {/* Proof Camera host — mounted at root so the modal overlays the
+          whole screen. Triggered imperatively by proofCamera.open()
+          from the souvenir capture handler. */}
+      <proofCamera.ProofCameraHost />
     </View>
   );
 };
