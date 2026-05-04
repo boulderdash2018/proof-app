@@ -65,7 +65,9 @@ type RowKind = 'social' | 'mention' | 'follow' | 'validation';
 const classifyRow = (type: NotificationType): RowKind => {
   if (type === 'new_follower') return 'follow';
   if (type === 'new_proof_it' || type === 'plan_recreated' || type === 'friend_completed') return 'validation';
-  if (type === 'mention') return 'mention';
+  // 'tagged_in_plan' = identification co-auteur ; même bucket sémantique
+  // qu'une mention (le user est nommément référencé dans une publication).
+  if (type === 'mention' || type === 'tagged_in_plan') return 'mention';
   return 'social';
 };
 

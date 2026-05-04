@@ -232,7 +232,10 @@ export type NotificationType =
   | 'plan_recreated' | 'plan_saved' | 'mention'
   | 'rank_up' | 'badge_unlocked' | 'xp_milestone'
   | 'plan_trending' | 'plan_milestone' | 'first_in_city'
-  | 'friend_posted' | 'friend_completed';
+  | 'friend_posted' | 'friend_completed'
+  /** Le user a été tagué comme co-auteur d'un plan publié (via l'étape
+   *  "Identifier les membres" du wizard de publication co-plan). */
+  | 'tagged_in_plan';
 
 export interface Notification {
   id: string;

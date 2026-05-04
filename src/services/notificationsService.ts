@@ -238,6 +238,27 @@ export const notifyMention = async (
   });
 };
 
+/**
+ * Notify a user that they were tagged as co-author of a published plan.
+ * Tap on the notif → opens PlanDetail (handled generically by NotifScreen
+ * via the planId field).
+ */
+export const notifyTaggedInPlan = async (
+  sender: User,
+  recipientId: string,
+  plan: Plan,
+): Promise<void> => {
+  await createNotification({
+    recipientId,
+    sender,
+    type: 'tagged_in_plan',
+    content: `${sender.username} t'a identifié dans son plan « ${plan.title} »`,
+    planId: plan.id,
+    planTitle: plan.title,
+    planCover: plan.coverPhotos?.[0] ?? null,
+  });
+};
+
 /** Resolve @usernames to user IDs via Firestore (batched, case-insensitive). */
 export const resolveMentionedUsers = async (
   usernames: string[],
