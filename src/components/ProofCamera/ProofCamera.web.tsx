@@ -348,8 +348,16 @@ export const ProofCamera: React.FC<Props> = ({
                     onPress={handlePickFromGallery}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="images" size={20} color="#FFFFFF" />
-                    <Text style={styles.galleryTileLabel}>Pellicule</Text>
+                    {/* Renamed from "Pellicule" → "Importer" on web :
+                        a system file input on macOS opens Finder (no
+                        "photo library" concept), and on iOS Safari it
+                        opens a sheet that includes "Take photo" along
+                        with the library. The honest label is "import a
+                        photo from your device". On native Phase 2
+                        we'll rename back to "Pellicule" with a real
+                        photo-library accessor (expo-media-library). */}
+                    <Ionicons name="image-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.galleryTileLabel}>Importer</Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.galleryTile} />
