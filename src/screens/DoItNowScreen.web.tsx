@@ -437,23 +437,59 @@ export const DoItNowScreen: React.FC = () => {
   // so we can show the "Photographe officiel" badge after 3+.
   const [souvenirCount, setSouvenirCount] = useState(0);
   const captureSouvenirInline = useCallback(async (): Promise<string | null> => {
-    if (!groupConversationId || !user?.id || !routeSessionId) return null;
+    if (!groupConversationId || !user?.id || !routeSessionId) {
+      console.warn('[souvenir] missing group context — aborting', {
+        groupConversationId, userId: user?.id, routeSessionId,
+      });
+      return null;
+    }
+    console.log('[souvenir] step 1 — opening picker');
+    let picked;
     try {
-      const picked = await pickImage();
-      if (!picked) return null;
-      const placeName = currentPlace?.name || 'Souvenir';
-      await sendPhotoMessage(groupConversationId, user.id, {
+      picked = await pickImage();
+    } catch (err) {
+      console.error('[souvenir] picker threw:', err);
+      return null;
+    }
+    if (!picked) {
+      console.log('[souvenir] picker cancelled by user');
+      return null;
+    }
+    console.log('[souvenir] step 2 — picked image', {
+      hasDataUrl: !!picked.dataUrl,
+      dataUrlPrefix: picked.dataUrl?.slice(0, 30),
+      sizeKb: Math.round((picked.dataUrl?.length || 0) / 1024),
+      width: picked.width,
+      height: picked.height,
+    });
+    const placeName = currentPlace?.name || 'Souvenir';
+    try {
+      console.log('[souvenir] step 3 — uploading to conv', groupConversationId);
+      const t0 = Date.now();
+      const msgId = await sendPhotoMessage(groupConversationId, user.id, {
         imageDataUrl: picked.dataUrl,
         width: picked.width,
         height: picked.height,
         caption: `📸 Souvenir — ${placeName}`,
         sessionId: routeSessionId,
       });
+      console.log('[souvenir] step 4 — DONE', {
+        msgId,
+        durationMs: Date.now() - t0,
+      });
       setSouvenirCount((n) => n + 1);
       return picked.dataUrl;
-    } catch (err) {
-      console.warn('[DoItNow.web] inline souvenir capture failed:', err);
-      return null;
+    } catch (err: any) {
+      console.error('[souvenir] sendPhotoMessage failed:', err);
+      // Rethrow with a user-friendly message so the card surfaces an
+      // actionable error (was silently returning null before, which
+      // looked like "tap did nothing").
+      const friendly = err?.code === 'storage/unauthorized'
+        ? 'Permission refusée par le stockage'
+        : err?.code?.startsWith('storage/')
+          ? 'Échec de l’envoi — réessaie'
+          : err?.message || 'Échec de l’envoi — réessaie';
+      throw new Error(friendly);
     }
   }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name]);
 

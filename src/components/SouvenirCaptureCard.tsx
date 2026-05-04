@@ -115,9 +115,12 @@ export const SouvenirCaptureCard: React.FC<Props> = ({
     });
   };
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const handleTap = async () => {
     if (status !== 'idle') return;
     setStatus('capturing');
+    setErrorMsg(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       const dataUrl = await onCapture();
@@ -127,11 +130,17 @@ export const SouvenirCaptureCard: React.FC<Props> = ({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         burstConfetti();
       } else {
+        // null = user cancelled the picker, no error to surface.
         setStatus('idle');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[SouvenirCaptureCard] capture failed:', err);
+      // Show a clear error state with a retry button — better than
+      // silently going back to idle (the user thinks the tap did
+      // nothing).
+      setErrorMsg(err?.message || 'L’envoi a échoué — réessaie');
       setStatus('idle');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     }
   };
 
@@ -257,10 +266,19 @@ export const SouvenirCaptureCard: React.FC<Props> = ({
           ) : (
             <>
               <Ionicons name="camera" size={16} color={Colors.textOnAccent} />
-              <Text style={styles.primaryBtnText}>Prendre une photo</Text>
+              <Text style={styles.primaryBtnText}>
+                {errorMsg ? 'Réessayer' : 'Prendre une photo'}
+              </Text>
             </>
           )}
         </TouchableOpacity>
+
+        {errorMsg && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={12} color={Colors.error} />
+            <Text style={styles.errorText} numberOfLines={2}>{errorMsg}</Text>
+          </View>
+        )}
       </View>
     </Animated.View>
   );
@@ -447,5 +465,26 @@ const styles = StyleSheet.create({
   },
   confettiEmoji: {
     fontSize: 22,
+  },
+
+  // ── Error banner (shown after a failed upload) ──
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.errorBg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.errorBorder,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.error,
+    letterSpacing: 0.05,
   },
 });
