@@ -148,8 +148,12 @@ export const CoPlanPublishScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // Préfill une fois plan + draft chargés.
+  // Note : on ne pré-remplit PAS la cover photo depuis plan.coverPhotos
+  //   — ce serait la photo Google par défaut du 1er lieu, pas un choix
+  //   du user. L'étape 2 doit démarrer vide pour forcer un choix
+  //   explicite (pellicule perso ou album du groupe), comme dans
+  //   OrganizeCompleteScreen → CreateScreen mode customize.
   useEffect(() => {
-    if (plan && coverUrl === null && plan.coverPhotos?.[0]) setCoverUrl(plan.coverPhotos[0]);
     if (plan && tip === '' && typeof plan.authorTip === 'string') setTip(plan.authorTip);
     if (draft && me && selectedParticipantIds.size === 0) {
       const all = new Set<string>();
@@ -827,8 +831,14 @@ const Step3Places: React.FC<Step3Props> = ({
     <View style={{ gap: 12, marginTop: 4 }}>
       {plan.places.map((place, idx) => {
         const edit = placeEdits[place.id] || {};
-        const photoUrl = edit.customPhoto || place.photoUrls?.[0];
-        const photoFilled = !!photoUrl;
+        // Photo Google par défaut affichée comme thumb (pour ne pas
+        // laisser un placeholder vide quand Google a fourni une image),
+        // MAIS le chip 'Widgets' n'est considéré rempli QUE si l'user
+        // a posé sa propre customPhoto. Sinon le user croit qu'il a
+        // déjà ajouté quelque chose alors qu'il s'agit juste de la photo
+        // Google par défaut.
+        const thumbUrl = edit.customPhoto || place.photoUrls?.[0];
+        const photoFilled = !!edit.customPhoto;
         const durationFilled = !!edit.duration;
         const priceFilled = (edit.priceRangeIndex ?? -1) >= 0;
         const filledCount = (photoFilled ? 1 : 0) + (durationFilled ? 1 : 0) + (priceFilled ? 1 : 0);
@@ -853,8 +863,8 @@ const Step3Places: React.FC<Step3Props> = ({
                   <View style={[styles.placeThumbImg, styles.placeThumbPlaceholder]}>
                     <ActivityIndicator size="small" color={Colors.primary} />
                   </View>
-                ) : photoFilled ? (
-                  <Image source={{ uri: photoUrl! }} style={styles.placeThumbImg} />
+                ) : thumbUrl ? (
+                  <Image source={{ uri: thumbUrl }} style={styles.placeThumbImg} />
                 ) : (
                   <View style={[styles.placeThumbImg, styles.placeThumbPlaceholder]}>
                     <Ionicons name="camera" size={18} color={Colors.primary} />
@@ -896,7 +906,7 @@ const Step3Places: React.FC<Step3Props> = ({
                   color={photoFilled ? Colors.terracotta700 : Colors.primary}
                 />
                 <Text style={[styles.chipText, photoFilled && styles.chipTextFilled]} numberOfLines={1}>
-                  {photoFilled ? 'Photo OK' : 'Ajoute une photo'}
+                  {photoFilled ? 'Widgets ✓' : 'Widgets'}
                 </Text>
                 {photoFilled && <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />}
               </TouchableOpacity>

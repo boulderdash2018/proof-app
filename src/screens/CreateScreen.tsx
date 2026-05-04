@@ -2001,7 +2001,7 @@ export const CreateScreen: React.FC = () => {
                               styles.czChipText,
                               photoFilled && styles.czChipTextFilled,
                             ]} numberOfLines={1}>
-                              {photoFilled ? 'Photo OK' : 'Ajoute une photo'}
+                              {photoFilled ? 'Widgets ✓' : 'Widgets'}
                             </Text>
                             {photoFilled && (
                               <Ionicons name="checkmark-circle" size={12} color={Colors.primary} />
