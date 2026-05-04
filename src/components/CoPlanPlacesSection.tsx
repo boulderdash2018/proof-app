@@ -386,12 +386,16 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
       // No onPress — taps inside the row hit specific buttons (vote, X, etc).
       // Pressable here only captures the long-press gesture for the contextual menu.
     >
-      {/* Thumbnail */}
+      {/* Thumbnail — placeholder dashed terracotta + camera icon (UI
+          alignée sur la carte de référence dans CreateScreen). La photo
+          est auto-fetchée depuis Google Places à la proposition, le
+          placeholder s'affiche surtout pendant le fetch ou si Google
+          n'a pas de photo. */}
       {place.photoUrl ? (
         <Image source={{ uri: place.photoUrl }} style={rowStyles.thumb} />
       ) : (
         <View style={[rowStyles.thumb, rowStyles.thumbFallback]}>
-          <Ionicons name="location" size={16} color={Colors.primary} />
+          <Ionicons name="camera" size={16} color={Colors.primary} />
         </View>
       )}
 
@@ -422,9 +426,9 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             >
               <Ionicons
-                name="time-outline"
-                size={11}
-                color={hasOverride ? Colors.primary : Colors.textTertiary}
+                name={hasOverride ? 'time' : 'time-outline'}
+                size={12}
+                color={hasOverride ? Colors.terracotta700 : Colors.primary}
               />
               <Text style={[rowStyles.durationText, hasOverride && rowStyles.durationTextCustom]}>
                 {formatDurationLabel(place.estimatedDurationMin)}
@@ -936,6 +940,10 @@ const rowStyles = StyleSheet.create({
   thumbFallback: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.primary,
   },
   body: { flex: 1, minWidth: 0 },
   name: {
@@ -951,33 +959,35 @@ const rowStyles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Duration chip — tappable, opens the picker
+  // Duration chip — tappable, opens the picker. Style aligné sur la
+  // carte de référence (czChip dans CreateScreen) : par défaut bord
+  // terracotta primary + bg crème, état "rempli/override" → terracotta
+  // plus saturé.
   durationChip: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 99,
-    backgroundColor: Colors.bgPrimary,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: 1,
+    borderColor: Colors.primary,
     marginTop: 6,
   },
   durationChipCustom: {
-    backgroundColor: Colors.terracotta50,
-    borderColor: Colors.terracotta200,
+    backgroundColor: Colors.terracotta100,
+    borderColor: Colors.terracotta300,
   },
   durationText: {
-    fontSize: 10.5,
-    fontFamily: Fonts.bodyMedium,
-    color: Colors.textTertiary,
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.primary,
     letterSpacing: 0.05,
   },
   durationTextCustom: {
-    color: Colors.primary,
-    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta700,
   },
   durationAvatar: {
     marginLeft: 2,
