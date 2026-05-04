@@ -1972,36 +1972,61 @@ export const ConversationScreen: React.FC = () => {
                       {activeConv.linkedPlanTitle || 'Plan'}
                     </Text>
                     <View style={styles.pinnedPlanMeta}>
-                      {/* Calendar line — tappable. Stops bubbling so the
-                          parent card's onPress (open PlanDetail) doesn't
-                          fire. Shows "Date à fixer" in terracotta to
-                          invite the action when no date is set yet. */}
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          // RN-Web : stopPropagation so the parent card
-                          // doesn't navigate to PlanDetail when the user
-                          // taps the date line.
-                          (e as any).stopPropagation?.();
-                          setDateSheetOpen(true);
-                        }}
-                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 8 }}
-                        style={styles.pinnedPlanMetaPressable}
-                        activeOpacity={0.6}
-                      >
-                        <Ionicons
-                          name="calendar-outline"
-                          size={11}
-                          color={activeConv.meetupAt ? Colors.textSecondary : Colors.primary}
-                        />
-                        <Text
-                          style={[
-                            styles.pinnedPlanMetaText,
-                            !activeConv.meetupAt && { color: Colors.primary, fontFamily: Fonts.bodySemiBold },
-                          ]}
-                        >
-                          {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
-                        </Text>
-                      </TouchableOpacity>
+                      {/* Calendar line — tappable to set/change the date
+                          UNLESS the session is locked in :
+                            • activeSessionId → un parcours tourne, la
+                              date est figée à "maintenant"
+                            • lastSessionCompletedAt → la session est
+                              terminée, plus rien à modifier
+                          Dans ces deux cas la ligne reste affichée mais
+                          devient non-cliquable (et le ton terracotta est
+                          remplacé par le gris secondaire pour ne plus
+                          inviter à l'action). */}
+                      {(() => {
+                        const dateLocked = !!activeConv.activeSessionId || !!activeConv.lastSessionCompletedAt;
+                        if (dateLocked) {
+                          return (
+                            <View style={styles.pinnedPlanMetaPressable}>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={11}
+                                color={Colors.textSecondary}
+                              />
+                              <Text style={styles.pinnedPlanMetaText}>
+                                {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
+                              </Text>
+                            </View>
+                          );
+                        }
+                        return (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              // RN-Web : stopPropagation so the parent card
+                              // doesn't navigate to PlanDetail when the user
+                              // taps the date line.
+                              (e as any).stopPropagation?.();
+                              setDateSheetOpen(true);
+                            }}
+                            hitSlop={{ top: 6, bottom: 6, left: 4, right: 8 }}
+                            style={styles.pinnedPlanMetaPressable}
+                            activeOpacity={0.6}
+                          >
+                            <Ionicons
+                              name="calendar-outline"
+                              size={11}
+                              color={activeConv.meetupAt ? Colors.textSecondary : Colors.primary}
+                            />
+                            <Text
+                              style={[
+                                styles.pinnedPlanMetaText,
+                                !activeConv.meetupAt && { color: Colors.primary, fontFamily: Fonts.bodySemiBold },
+                              ]}
+                            >
+                              {activeConv.meetupAt ? formatMeetupShort(activeConv.meetupAt) : 'Date à fixer'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })()}
                       <Text style={styles.pinnedPlanMetaSep}>·</Text>
                       <Ionicons name="people-outline" size={11} color={Colors.textSecondary} />
                       <Text style={styles.pinnedPlanMetaText}>
