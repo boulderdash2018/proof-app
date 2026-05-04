@@ -36,6 +36,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { CategoryTag, TransportMode, TravelSegment, Plan } from '../types';
 import { createPlan, updatePlan } from '../services/plansService';
 import { pickImage, pickImageFromSource, pickMultipleImages } from '../utils';
+import { useProofCamera } from '../components/ProofCamera';
 import { SavedPlanPickerSheet } from '../components/SavedPlanPickerSheet';
 import { CreatorTipInput } from '../components/publish/CreatorTipInput';
 import { DurationPickerSheet } from '../components/DurationPickerSheet';
@@ -284,6 +285,11 @@ export const CreateScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const user = useAuthStore((s) => s.user);
+  // Proof Camera — used for cover photo + per-place spot photos.
+  // Multi-photo album (pickMultipleImages) stays on the system picker
+  // for now since ProofCamera is single-shot — multi-select would mean
+  // taking photos one-by-one which is more friction.
+  const proofCamera = useProofCamera();
   const addPlan = useFeedStore((s) => s.addPlan);
   const addCreatedPlan = useSavesStore((s) => s.addCreatedPlan);
   const savedPlacesList = useSavedPlacesStore((s) => s.places);
@@ -833,10 +839,11 @@ export const CreateScreen: React.FC = () => {
     return getDownloadURL(storageRef);
   };
 
-  // Single-photo picker — replaces the unique cover photo (step 2 UX)
-  // Asks the user between camera & library on both native and web.
+  // Single-photo picker — replaces the unique cover photo (step 2 UX).
+  // Goes through the Proof Camera now (branded fullscreen capture +
+  // filter editor). The output is already filtered + JPEG-encoded.
   const pickSingleCoverPhoto = async () => {
-    const picked = await pickImage({ quality: 0.7 });
+    const picked = await proofCamera.open();
     if (!picked) return;
     setIsUploadingPhotos(true);
     try {
@@ -1168,9 +1175,12 @@ export const CreateScreen: React.FC = () => {
   }, [pendingPlace, places, customPhoto, customComment, customQAs, editingPlaceIndex]);
 
   const pickCustomPhoto = useCallback(async () => {
-    const picked = await pickImage({ quality: 0.7, allowsEditing: true, aspect: [4, 3] });
+    // Spot photo per place — 4:3 aspect to match the editorial card
+    // layout. Proof Camera handles the crop + filters in one fullscreen
+    // step (replaces the legacy "allowsEditing: true" system crop).
+    const picked = await proofCamera.open({ aspect: [4, 3] });
     if (picked) setCustomPhoto(picked.dataUrl);
-  }, []);
+  }, [proofCamera]);
 
   const toggleTag = (tag: CategoryTag) => {
     setSelectedTags((prev) =>
@@ -3239,6 +3249,9 @@ export const CreateScreen: React.FC = () => {
         )}
 
       </View>
+      {/* Proof Camera host — fullscreen branded camera triggered by
+          cover & spot photo CTAs. */}
+      <proofCamera.ProofCameraHost />
     </KeyboardAvoidingView>
   );
 };

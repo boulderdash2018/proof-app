@@ -21,6 +21,7 @@ import { useAuthStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { pickImage as pickImageUtil, pickImageFromSource } from '../utils';
+import { useProofCamera } from '../components/ProofCamera';
 
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -29,6 +30,8 @@ export const EditProfileScreen: React.FC = () => {
   const updateProfile = useAuthStore((s) => s.updateProfile);
   const C = useColors();
   const { t } = useTranslation();
+  // Proof Camera — branded fullscreen capture for the avatar (1:1 aspect).
+  const proofCamera = useProofCamera();
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [bio, setBio] = useState(user?.bio || '');
@@ -37,12 +40,14 @@ export const EditProfileScreen: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Avatar picker — camera or library on both web + native.
-  const pickAvatar = async (source?: 'camera' | 'library') => {
+  // Avatar picker — Proof Camera fullscreen with a 1:1 crop. The
+  // legacy split between camera/library + the native Alert menu is
+  // gone : the camera UI itself offers both paths (live capture via
+  // the big terracotta button, "Importer" tile to pull from the
+  // device).
+  const pickAvatar = async () => {
     try {
-      const picked = source
-        ? await pickImageFromSource(source, { quality: 0.4, allowsEditing: true, aspect: [1, 1] })
-        : await pickImageUtil({ quality: 0.4, allowsEditing: true, aspect: [1, 1] });
+      const picked = await proofCamera.open({ aspect: [1, 1] });
       if (!picked) return;
       setIsUploading(true);
       setAvatarUrl(picked.dataUrl);
@@ -55,21 +60,20 @@ export const EditProfileScreen: React.FC = () => {
   };
 
   const handlePhotoPress = () => {
-    if (Platform.OS === 'web') {
-      // On web, the OS already shows a native menu (Photothèque / Prendre une photo /
-      // Choisir le fichier on iOS). No need for a custom pre-step.
-      pickAvatar();
-    } else {
+    // If the user already has an avatar, give them the choice between
+    // "remove" and "change". Otherwise just open the camera straight.
+    if (avatarUrl) {
       Alert.alert(
         t.edit_profile_photo_title,
         '',
         [
-          { text: '📷 Prendre une photo', onPress: () => pickAvatar('camera') },
-          { text: '🖼️ Choisir dans la galerie', onPress: () => pickAvatar('library') },
-          ...(avatarUrl ? [{ text: t.edit_profile_photo_remove, style: 'destructive' as const, onPress: () => setAvatarUrl(null) }] : []),
+          { text: '📷 Changer la photo', onPress: pickAvatar },
+          { text: t.edit_profile_photo_remove, style: 'destructive' as const, onPress: () => setAvatarUrl(null) },
           { text: t.cancel, style: 'cancel' as const },
-        ]
+        ],
       );
+    } else {
+      pickAvatar();
     }
   };
 
@@ -161,6 +165,7 @@ export const EditProfileScreen: React.FC = () => {
           <PrimaryButton label={isSaving ? t.edit_profile_uploading : t.save} onPress={handleSave} loading={isSaving} />
         </ScrollView>
       </View>
+      <proofCamera.ProofCameraHost />
     </KeyboardAvoidingView>
   );
 };

@@ -23,6 +23,7 @@ import { fetchPlanById, publishCoPlan } from '../services/plansService';
 import { fetchPlanDraft } from '../services/planDraftService';
 import { notifyTaggedInPlan } from '../services/notificationsService';
 import { pickImage } from '../utils/pickImage';
+import { useProofCamera } from '../components/ProofCamera';
 import { CreatorTipInput } from '../components/publish/CreatorTipInput';
 import { DurationPickerSheet } from '../components/DurationPickerSheet';
 import { PricePickerSheet } from '../components/PricePickerSheet';
@@ -97,6 +98,9 @@ export const CoPlanPublishScreen: React.FC = () => {
   const planId = route.params?.planId as string;
   const me = useAuthStore((s) => s.user);
   const cityConfig = useCity();
+  // Proof Camera — branded fullscreen capture for cover + per-place
+  // spot photos.
+  const proofCamera = useProofCamera();
 
   // ── Data fetch ──
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -226,7 +230,7 @@ export const CoPlanPublishScreen: React.FC = () => {
   };
   const handlePickCoverFromLibrary = async () => {
     setCoverSourceSheetOpen(false);
-    const picked = await pickImage({ quality: 0.7 });
+    const picked = await proofCamera.open();
     if (!picked) return;
     setUploadingCover(true);
     try {
@@ -264,7 +268,7 @@ export const CoPlanPublishScreen: React.FC = () => {
   };
 
   const handlePickPlacePhoto = async (placeId: string) => {
-    const picked = await pickImage({ quality: 0.7 });
+    const picked = await proofCamera.open({ aspect: [4, 3] });
     if (!picked) return;
     setPhotoUploadingForId(placeId);
     try {
@@ -604,6 +608,9 @@ export const CoPlanPublishScreen: React.FC = () => {
           />
         );
       })()}
+      {/* Proof Camera host — branded fullscreen camera for cover +
+          per-place spot photos. */}
+      <proofCamera.ProofCameraHost />
     </View>
   );
 };

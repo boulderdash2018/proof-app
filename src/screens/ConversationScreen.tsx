@@ -22,6 +22,7 @@ import { createGroupSession } from '../services/planSessionService';
 import { fetchPlanById } from '../services/plansService';
 import { useDoItNowStore } from '../store/doItNowStore';
 import { pickImage } from '../utils';
+import { useProofCamera } from '../components/ProofCamera';
 
 const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👏'];
 const HEART_EMOJI = '❤️';
@@ -1332,6 +1333,9 @@ export const ConversationScreen: React.FC = () => {
   // ── Session handlers (multi-user DoItNow) ──
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  // Proof Camera — replaces the system picker for in-chat photo
+  // capture. Same imperative pattern used in DoItNow's souvenir card.
+  const proofCamera = useProofCamera();
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
@@ -1416,7 +1420,7 @@ export const ConversationScreen: React.FC = () => {
     setAttachMenuOpen(false);
     if (isUploadingPhoto) return;
     try {
-      const picked = await pickImage({ quality: 0.7 });
+      const picked = await proofCamera.open();
       if (!picked) return;
       setIsUploadingPhoto(true);
       await sendPhoto({
@@ -1430,7 +1434,7 @@ export const ConversationScreen: React.FC = () => {
     } finally {
       setIsUploadingPhoto(false);
     }
-  }, [isUploadingPhoto, sendPhoto, activeConv?.activeSessionId]);
+  }, [isUploadingPhoto, sendPhoto, activeConv?.activeSessionId, proofCamera]);
 
   const handleStartSession = useCallback(async () => {
     if (!user?.id || !activeConv?.linkedPlanId || isStartingSession) return;
@@ -2446,6 +2450,11 @@ export const ConversationScreen: React.FC = () => {
           onClear={handleClearMeetupAt}
         />
       )}
+
+      {/* Proof Camera host — fullscreen branded camera triggered by
+          the chat's "+" menu. Same instance used everywhere a photo
+          is needed in the app. */}
+      <proofCamera.ProofCameraHost />
 
       {/* Rename modal (groups only) */}
       {isGroup && (

@@ -32,6 +32,7 @@ import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
 import { notifySessionAdvanced, markUserFinishedInSession } from '../services/planSessionService';
 import { pickImage } from '../utils';
+import { useProofCamera } from '../components/ProofCamera';
 
 // Sentence-starter chips shown on the editorial review screen.
 // Tap → seeds the comment textarea so the user can finish the thought.
@@ -115,6 +116,10 @@ export const DoItNowScreen: React.FC = () => {
   // ── Group-session UI state (only relevant when routeSessionId is set) ──
   const [mapSheetOpen, setMapSheetOpen] = useState(false);
   const souvenirPrompts = useSouvenirPrompts();
+  // Proof Camera — native fallback wraps expo-image-picker for now ;
+  // will swap to vision-camera + Skia in Phase 2 without touching the
+  // call site.
+  const proofCamera = useProofCamera();
   const activeGroupSession = useGroupSessionStore((s) => s.activeSession);
   const groupConversationId = routeConversationId || activeGroupSession?.conversationId;
 
@@ -432,12 +437,12 @@ export const DoItNowScreen: React.FC = () => {
       });
       return null;
     }
-    console.log('[souvenir] step 1 — opening picker');
+    console.log('[souvenir] step 1 — opening Proof Camera');
     let picked;
     try {
-      picked = await pickImage();
+      picked = await proofCamera.open();
     } catch (err) {
-      console.error('[souvenir] picker threw:', err);
+      console.error('[souvenir] Proof Camera threw:', err);
       return null;
     }
     if (!picked) {
@@ -475,7 +480,7 @@ export const DoItNowScreen: React.FC = () => {
           : err?.message || 'Échec de l’envoi — réessaie';
       throw new Error(friendly);
     }
-  }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name]);
+  }, [groupConversationId, user?.id, routeSessionId, currentPlace?.name, proofCamera]);
 
   // ── Group session : "Souvenir à plusieurs" photo handler ──
   // Opens the image picker → uploads via the existing chat photo flow
@@ -1069,6 +1074,7 @@ export const DoItNowScreen: React.FC = () => {
           />
         </>
       )}
+      <proofCamera.ProofCameraHost />
     </View>
   );
 };
