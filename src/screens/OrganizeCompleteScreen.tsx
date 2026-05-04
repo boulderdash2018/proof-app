@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -204,6 +205,24 @@ export const OrganizeCompleteScreen: React.FC = () => {
     navigation.popToTop();
   };
 
+  /**
+   * Partage natif simple — au stade 'fin organize', le plan n'est pas
+   * encore créé en DB. On utilise donc Share.share avec un texte de
+   * teaser plutôt qu'un deep-link vers PlanDetail. L'utilisateur peut
+   * raconter à ses amis avant de décider si publier ou non.
+   */
+  const handleShare = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const title = s.organizeTitle || s.planTitle || 'Ma journée';
+    const placesLabel = `${placesVisited} lieu${placesVisited > 1 ? 'x' : ''}`;
+    const message = `Je viens de finir « ${title } » sur Proof — ${placesLabel}, ${timeString}.`;
+    try {
+      await Share.share({ title, message });
+    } catch (err) {
+      console.warn('[OrganizeCompleteScreen] share failed:', err);
+    }
+  };
+
   const handleRatingDone = () => {
     setShowRating(false);
     setPublished(true);
@@ -362,43 +381,51 @@ export const OrganizeCompleteScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Actions */}
+        <View style={{ height: 20 }} />
+      </ScrollView>
+
+      {/* ═════════ FOOTER — 3 actions (aligné DoItNowComplete) ═════════
+          Partager   → partage natif (le plan n'est pas encore en DB)
+          Sauvegarder uniquement → ferme sans publier (plan non créé,
+                                  reste accessible via brouillons)
+          Publier sur le feed   → handleCustomize, ouvre le wizard
+                                  CreateScreen mode customize pour
+                                  enrichir avant publication */}
+      <View style={[footerStyles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
-          style={[styles.publishBtn, { backgroundColor: C.primary }]}
-          onPress={handlePublish}
-          activeOpacity={0.8}
+          style={footerStyles.ghostBtn}
+          onPress={handleShare}
+          activeOpacity={0.7}
+          disabled={isPublishing}
+        >
+          <Ionicons name="paper-plane-outline" size={14} color={Colors.textPrimary} />
+          <Text style={footerStyles.ghostBtnText}>Partager</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={footerStyles.ghostBtn}
+          onPress={handleGoHome}
+          activeOpacity={0.7}
+          disabled={isPublishing}
+        >
+          <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
+          <Text style={footerStyles.ghostBtnText}>Sauvegarder</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[footerStyles.primaryBtn, { opacity: isPublishing ? 0.7 : 1 }]}
+          onPress={handleCustomize}
+          activeOpacity={0.85}
           disabled={isPublishing}
         >
           {isPublishing ? (
-            <ActivityIndicator color={Colors.textOnAccent} />
+            <ActivityIndicator color={Colors.textOnAccent} size="small" />
           ) : (
             <>
-              <Ionicons name="share-outline" size={18} color={Colors.textOnAccent} />
-              <Text style={styles.publishBtnText}>Publier le plan</Text>
+              <Ionicons name="paper-plane" size={14} color={Colors.textOnAccent} />
+              <Text style={footerStyles.primaryBtnText}>Publier</Text>
             </>
           )}
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.customizeBtn, { borderColor: C.primary }]}
-          onPress={handleCustomize}
-          activeOpacity={0.7}
-          disabled={isPublishing}
-        >
-          <Ionicons name="create-outline" size={18} color={C.primary} />
-          <Text style={[styles.customizeBtnText, { color: C.primary }]}>Personnaliser ce plan</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.closeBtn, { borderColor: C.borderLight }]}
-          onPress={handleGoHome}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.closeBtnText, { color: C.gray600 }]}>Fermer sans publier</Text>
-        </TouchableOpacity>
-
-        <View style={{ height: insets.bottom + 20 }} />
-      </ScrollView>
+      </View>
 
       {publishedPlanRef.current && (
         <ProofSurveyModal
@@ -466,4 +493,51 @@ const styles = StyleSheet.create({
   customizeBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   closeBtn: { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 10, borderWidth: 1.5 },
   closeBtnText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
+});
+
+// Styles footer 3-boutons — alignés sur DoItNowCompleteScreen (mêmes
+// proportions, même paddings, mêmes couleurs) pour cohérence UX entre
+// 'fin organize solo' et 'fin do it now co-plan'.
+const footerStyles = StyleSheet.create({
+  footer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgPrimary,
+  },
+  ghostBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 11,
+    borderRadius: 99,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderMedium,
+  },
+  ghostBtnText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+  },
+  primaryBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 11,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  primaryBtnText: {
+    fontSize: 12,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+  },
 });

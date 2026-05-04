@@ -97,14 +97,9 @@ export const DoItNowCompleteScreen: React.FC = () => {
   // visibility:'private') — propose à l'utilisateur de PUBLIER le plan
   // sur le feed via la page dédiée, ou de juste SAUVEGARDER (= ne rien
   // faire de plus, le plan reste dans ses saves via le Proof It standard).
-  // L'utilisateur peut explicitement la dismiss pour sortir de cette
-  // décision et continuer le flow "Fin" classique.
-  const [coPlanCardDismissed, setCoPlanCardDismissed] = useState(false);
-  const isCoPlanCandidate = !!(
-    plan?.sourceDraftId &&
-    plan?.visibility === 'private' &&
-    !coPlanCardDismissed
-  );
+  // Maintenant intégré dans le footer (plus de carte intermédiaire) :
+  // les 2 boutons remplacent 'Refaire' et 'Fin' du footer historique.
+  const isCoPlan = !!(plan?.sourceDraftId && plan?.visibility === 'private');
 
   // Hydrate from existing session rating/reviews (from DoItNowScreen inline review screen)
   useEffect(() => {
@@ -562,94 +557,89 @@ export const DoItNowCompleteScreen: React.FC = () => {
           );
         })}
 
-        {/* ═════════ CO-PLAN — choix Sauver / Publier ═════════
-            N'apparaît que si le plan vient d'un co-plan privé (créé au
-            lock du brouillon, pas encore publié). Donne un choix clair :
-              • Sauvegarder uniquement  → dismiss la carte, reste dans les
-                saves du user via le Proof It standard
-              • Publier sur le feed     → navigate vers CoPlanPublishScreen
-                où le user enrichit le plan (cover, tags, tip) avant de le
-                rendre public. */}
-        {isCoPlanCandidate && plan && (
-          <View style={styles.coPlanCard}>
-            <View style={styles.coPlanCardHeaderRow}>
-              <View style={styles.coPlanCardIconWrap}>
-                <Ionicons name="people" size={16} color={Colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.coPlanCardEyebrow}>PLAN DE GROUPE TERMINÉ</Text>
-                <Text style={styles.coPlanCardTitle}>Tu veux le partager ?</Text>
-              </View>
-            </View>
-            <Text style={styles.coPlanCardSubtitle}>
-              Tu peux publier ce plan sur le feed pour le rendre découvrable
-              par d'autres, ou simplement le garder dans tes plans
-              sauvegardés.
-            </Text>
-            <View style={styles.coPlanCardActions}>
-              <TouchableOpacity
-                style={styles.coPlanCardBtnGhost}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setCoPlanCardDismissed(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
-                <Text style={styles.coPlanCardBtnGhostText}>Sauvegarder uniquement</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.coPlanCardBtnPrimary}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  navigation.navigate('CoPlanPublish', { planId: plan.id });
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="paper-plane" size={14} color={Colors.textOnAccent} />
-                <Text style={styles.coPlanCardBtnPrimaryText}>Publier sur le feed</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* ═════════ FOOTER — 3 actions ═════════ */}
+      {/* ═════════ FOOTER — 3 actions ═════════
+          En mode co-plan (plan privé issu d'un brouillon de groupe), le
+          footer remplace 'Refaire' / 'Fin' par les 2 boutons de la carte
+          'Plan de groupe terminé' (devenue redondante, retirée).
+          En mode solo classique, le footer historique reste : Partager /
+          Refaire / Fin. */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12, borderTopColor: Colors.borderSubtle }]}>
         <TouchableOpacity style={[styles.ghostBtn, { borderColor: Colors.borderMedium }]} onPress={handleShare} activeOpacity={0.7}>
           <Ionicons name="paper-plane-outline" size={14} color={Colors.textPrimary} />
           <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Partager</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.ghostBtn, { borderColor: Colors.borderMedium }]} onPress={handleRedo} activeOpacity={0.7}>
-          <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
-          <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Refaire</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.primaryBtn,
-            {
-              backgroundColor: isAlreadyProofed ? Colors.bgTertiary : Colors.primary,
-              opacity: isSubmitting ? 0.7 : 1,
-            },
-          ]}
-          onPress={handleFinalize}
-          activeOpacity={0.85}
-          disabled={isSubmitting}
-        >
-          {isAlreadyProofed ? (
-            <>
-              <Ionicons name="checkmark-circle" size={14} color={Colors.textSecondary} />
-              <Text style={[styles.primaryBtnText, { color: Colors.textSecondary }]}>Déjà validé</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.primaryBtnText}>Fin</Text>
-              <Ionicons name="sparkles" size={14} color={Colors.textOnAccent} />
-            </>
-          )}
-        </TouchableOpacity>
+
+        {isCoPlan ? (
+          <>
+            {/* Sauvegarder uniquement — déclenche handleFinalize qui
+                ouvre le ProofSurveyModal (validation de la session,
+                ajout aux saves), équivalent du 'Fin' historique. Le
+                plan reste private (pas publié sur le feed). */}
+            <TouchableOpacity
+              style={[
+                styles.ghostBtn,
+                {
+                  borderColor: Colors.borderMedium,
+                  opacity: isSubmitting ? 0.7 : 1,
+                },
+              ]}
+              onPress={handleFinalize}
+              activeOpacity={0.7}
+              disabled={isSubmitting}
+            >
+              <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
+              <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Sauvegarder</Text>
+            </TouchableOpacity>
+            {/* Publier sur le feed — navigate vers CoPlanPublishScreen
+                où le user enrichit (cover, tags, tip) avant publication. */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: Colors.primary }]}
+              onPress={() => {
+                if (!plan) return;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                navigation.navigate('CoPlanPublish', { planId: plan.id });
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="paper-plane" size={14} color={Colors.textOnAccent} />
+              <Text style={styles.primaryBtnText}>Publier</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity style={[styles.ghostBtn, { borderColor: Colors.borderMedium }]} onPress={handleRedo} activeOpacity={0.7}>
+              <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
+              <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Refaire</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                {
+                  backgroundColor: isAlreadyProofed ? Colors.bgTertiary : Colors.primary,
+                  opacity: isSubmitting ? 0.7 : 1,
+                },
+              ]}
+              onPress={handleFinalize}
+              activeOpacity={0.85}
+              disabled={isSubmitting}
+            >
+              {isAlreadyProofed ? (
+                <>
+                  <Ionicons name="checkmark-circle" size={14} color={Colors.textSecondary} />
+                  <Text style={[styles.primaryBtnText, { color: Colors.textSecondary }]}>Déjà validé</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.primaryBtnText}>Fin</Text>
+                  <Ionicons name="sparkles" size={14} color={Colors.textOnAccent} />
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Share sheet */}
