@@ -38,6 +38,7 @@ export { CoPlanPlacesCard } from './CoPlanPlacesCard';
 export { CoPlanCompactEvent } from './CoPlanCompactEvent';
 export { CoPlanDetailsConfirmedCard } from './CoPlanDetailsConfirmedCard';
 export { DoItNowDateSheet } from './DoItNowDateSheet';
+export { BlockingClosedPlacesAlert } from './BlockingClosedPlacesAlert';
 export { CoPlanResolutionPill } from './CoPlanResolutionPill';
 export { CoPlanStatusBar } from './CoPlanStatusBar';
 export { GroupLiveMapSheet } from './GroupLiveMapSheet';

@@ -2448,6 +2448,9 @@ export const ConversationScreen: React.FC = () => {
           currentMeetupAt={activeConv.meetupAt ?? null}
           onConfirm={handleSetMeetupAt}
           onClear={handleClearMeetupAt}
+          // Lazy-fetch the linked plan on confirm to validate that
+          // none of its places are closed at the picked date.
+          linkedPlanId={activeConv.linkedPlanId}
         />
       )}
 

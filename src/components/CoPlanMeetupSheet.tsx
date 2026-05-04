@@ -16,6 +16,8 @@ import { Colors, Fonts } from '../constants';
 import { useCoPlanStore } from '../store/coPlanStore';
 import { useAuthStore } from '../store/authStore';
 import { formatMeetupForTitle } from '../services/planDraftService';
+import { checkPlacesClosedAtDate, PlaceOpenAtDateStatus } from '../services/googlePlacesService';
+import { BlockingClosedPlacesAlert } from './BlockingClosedPlacesAlert';
 
 interface Props {
   visible: boolean;
@@ -56,6 +58,9 @@ export const CoPlanMeetupSheet: React.FC<Props> = ({ visible, onClose }) => {
   const [selectedDay, setSelectedDay] = useState<string>(''); // YYYY-MM-DD
   const [selectedHour, setSelectedHour] = useState<number>(18);
   const [submitting, setSubmitting] = useState(false);
+  // Blocking-alert state when one or more places would be closed at
+  // the chosen date. Visible = list non-empty.
+  const [closedPlaces, setClosedPlaces] = useState<PlaceOpenAtDateStatus[] | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -89,6 +94,24 @@ export const CoPlanMeetupSheet: React.FC<Props> = ({ visible, onClose }) => {
     setSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
+      // ── Pre-flight : block the date if any place would be closed ──
+      // Hard rule for co-plans : you cannot propose a date where a
+      // place is closed (different from DoItNow's soft warn). The
+      // check fetches periods from Google Places per place ; we run
+      // them in parallel + cap with a 7s timeout each so a slow API
+      // can't hang the confirm.
+      const placesToCheck = (draft.proposedPlaces || [])
+        .filter((p) => p.googlePlaceId)
+        .map((p) => ({ googlePlaceId: p.googlePlaceId, name: p.name }));
+      if (placesToCheck.length > 0) {
+        const closed = await checkPlacesClosedAtDate(placesToCheck, new Date(iso));
+        if (closed.length > 0) {
+          setClosedPlaces(closed);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       if (isCreator) {
         await setMeetupAtProposed(iso);
         onClose();
@@ -274,6 +297,16 @@ export const CoPlanMeetupSheet: React.FC<Props> = ({ visible, onClose }) => {
           )}
         </Pressable>
       </Pressable>
+
+      {/* Blocking alert when the chosen date hits closed places. The
+          alert dismisses without persisting → the user lands back on
+          the picker and can choose another slot. */}
+      <BlockingClosedPlacesAlert
+        visible={!!closedPlaces && closedPlaces.length > 0}
+        closedPlaces={closedPlaces ?? []}
+        targetDateLabel={previewIso ? formatMeetupForTitle(previewIso) : 'à cette date'}
+        onDismiss={() => setClosedPlaces(null)}
+      />
     </Modal>
   );
 };

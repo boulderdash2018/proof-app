@@ -13,6 +13,9 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { formatMeetupForTitle } from '../services/planDraftService';
+import { checkPlacesClosedAtDate, PlaceOpenAtDateStatus } from '../services/googlePlacesService';
+import { fetchPlanById } from '../services/plansService';
+import { BlockingClosedPlacesAlert } from './BlockingClosedPlacesAlert';
 
 interface Props {
   visible: boolean;
@@ -26,6 +29,16 @@ interface Props {
   /** Eyebrow / title overrides. Defaults : "QUAND ?" / "Fixe la date du départ". */
   title?: string;
   eyebrow?: string;
+  /** Places attached to the linked plan/draft. When provided, the
+   *  sheet runs the closed-at-date check on confirm and BLOCKS the
+   *  persist if any place would be closed at the chosen date+time.
+   *  Falsy / empty → no check (same as before). */
+  placesToCheck?: Array<{ googlePlaceId: string; name: string }>;
+  /** Alternative to placesToCheck — pass a planId and the sheet will
+   *  lazy-fetch the Plan on confirm. Convenient for callers (chat
+   *  pinned card) that don't have the places pre-loaded. Ignored if
+   *  `placesToCheck` is also passed. */
+  linkedPlanId?: string;
 }
 
 /**
@@ -49,10 +62,13 @@ export const DoItNowDateSheet: React.FC<Props> = ({
   visible, onClose, currentMeetupAt, onConfirm, onClear,
   title = 'Fixe la date du départ',
   eyebrow = 'QUAND ?',
+  placesToCheck,
+  linkedPlanId,
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>('');
   const [selectedHour, setSelectedHour] = useState<number>(18);
   const [submitting, setSubmitting] = useState(false);
+  const [closedPlaces, setClosedPlaces] = useState<PlaceOpenAtDateStatus[] | null>(null);
 
   // Re-init when the sheet opens, or when the upstream meetup changes.
   useEffect(() => {
@@ -88,6 +104,33 @@ export const DoItNowDateSheet: React.FC<Props> = ({
     setSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
+      // Pre-flight closed-at-date check — same blocking rule as
+      // CoPlanMeetupSheet. Resolves places either from the explicit
+      // `placesToCheck` prop or, as a fallback, by lazy-fetching the
+      // linked plan via `linkedPlanId`. Skipped if neither is set.
+      let resolvedPlaces: Array<{ googlePlaceId: string; name: string }> | null = null;
+      if (placesToCheck && placesToCheck.length > 0) {
+        resolvedPlaces = placesToCheck;
+      } else if (linkedPlanId) {
+        try {
+          const plan = await fetchPlanById(linkedPlanId);
+          if (plan) {
+            resolvedPlaces = (plan.places || [])
+              .filter((p) => !!p.googlePlaceId)
+              .map((p) => ({ googlePlaceId: p.googlePlaceId!, name: p.name }));
+          }
+        } catch (err) {
+          console.warn('[DoItNowDateSheet] linkedPlan fetch failed:', err);
+        }
+      }
+      if (resolvedPlaces && resolvedPlaces.length > 0) {
+        const closed = await checkPlacesClosedAtDate(resolvedPlaces, new Date(iso));
+        if (closed.length > 0) {
+          setClosedPlaces(closed);
+          setSubmitting(false);
+          return;
+        }
+      }
       await onConfirm(iso);
       onClose();
     } catch (err) {
@@ -240,6 +283,14 @@ export const DoItNowDateSheet: React.FC<Props> = ({
           )}
         </Pressable>
       </Pressable>
+
+      {/* Blocking alert when the chosen date hits closed places. */}
+      <BlockingClosedPlacesAlert
+        visible={!!closedPlaces && closedPlaces.length > 0}
+        closedPlaces={closedPlaces ?? []}
+        targetDateLabel={previewIso ? formatMeetupForTitle(previewIso) : 'à cette date'}
+        onDismiss={() => setClosedPlaces(null)}
+      />
     </Modal>
   );
 };

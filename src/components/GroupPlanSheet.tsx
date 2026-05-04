@@ -11,6 +11,9 @@ import { Avatar } from './Avatar';
 import { useAuthStore } from '../store';
 import { getMutualFollowIds } from '../services/friendsService';
 import { ConversationParticipant, createGroupConversation } from '../services/chatService';
+import { checkPlacesClosedAtDate, PlaceOpenAtDateStatus } from '../services/googlePlacesService';
+import { fetchPlanById } from '../services/plansService';
+import { BlockingClosedPlacesAlert } from './BlockingClosedPlacesAlert';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 import { User } from '../types';
@@ -128,6 +131,7 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
   const [selectedHour, setSelectedHour] = useState<number>(initialDate.hour);
   const [message, setMessage] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [closedPlaces, setClosedPlaces] = useState<PlaceOpenAtDateStatus[] | null>(null);
 
   // Cached day strip + hour grid (both stable for the whole session).
   const days = useMemo(() => buildDays(21), []);
@@ -246,6 +250,31 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
       }));
       const meetupAt = buildIsoFrom(selectedDay, selectedHour) || undefined;
       const trimmedMessage = message.trim() || undefined;
+
+      // Pre-flight closed-at-date check — same blocking rule as the
+      // co-plan flows. Lazy-fetch the source Plan to get its places,
+      // then verify none are closed at the chosen date+time.
+      if (meetupAt) {
+        try {
+          const sourcePlan = await fetchPlanById(planId);
+          const placesToCheck = (sourcePlan?.places || [])
+            .filter((p) => !!p.googlePlaceId)
+            .map((p) => ({ googlePlaceId: p.googlePlaceId!, name: p.name }));
+          if (placesToCheck.length > 0) {
+            const closed = await checkPlacesClosedAtDate(placesToCheck, new Date(meetupAt));
+            if (closed.length > 0) {
+              setClosedPlaces(closed);
+              setIsCreating(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[GroupPlanSheet] closed-at-date check failed:', err);
+          // Soft-fail : if the check itself errors, we let the user
+          // proceed (don't block on infra issues). The downstream
+          // Group session date picker will re-validate anyway.
+        }
+      }
 
       const convId = await createGroupConversation({
         creator: me,
@@ -580,6 +609,23 @@ export const GroupPlanSheet: React.FC<GroupPlanSheetProps> = ({
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Blocking alert when the picked date hits closed places. */}
+      <BlockingClosedPlacesAlert
+        visible={!!closedPlaces && closedPlaces.length > 0}
+        closedPlaces={closedPlaces ?? []}
+        targetDateLabel={(() => {
+          const iso = buildIsoFrom(selectedDay, selectedHour);
+          if (!iso) return 'à cette date';
+          try {
+            const d = new Date(iso);
+            return `le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
+          } catch {
+            return 'à cette date';
+          }
+        })()}
+        onDismiss={() => setClosedPlaces(null)}
+      />
     </Modal>
   );
 };

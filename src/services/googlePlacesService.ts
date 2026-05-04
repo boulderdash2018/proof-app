@@ -282,6 +282,155 @@ export async function checkPlaceOpenStatus(placeId: string, placeName: string): 
   }
 }
 
+/**
+ * Result of checking if a place would be open at a SPECIFIC future
+ * date+time. Same shape as `PlaceOpenStatus` minus `nextOpenTime`
+ * (we don't compute a "next open" for a future check — the caller
+ * already chose a date and we just answer yes/no/unknown).
+ */
+export interface PlaceOpenAtDateStatus {
+  placeId: string;
+  name: string;
+  /** true = open at the target date, false = closed, null = unknown
+   *  (no opening hours data for this place — we don't block on null). */
+  isOpen: boolean | null;
+  /** Place is permanently closed regardless of date — always treated
+   *  as a hard block. */
+  isPermanentlyClosed: boolean;
+}
+
+/**
+ * Check whether a place is OPEN at a specific future date+time.
+ *
+ * Used by the co-plan flows to block scheduling a meetup on a date
+ * where any place would be closed (different from `checkPlaceOpenStatus`
+ * which only checks "right now"). Reads `regularOpeningHours.periods`
+ * from Google Places and walks the periods to see if the target day-
+ * of-week + minute-of-day falls inside any open window.
+ *
+ * Returns `isOpen: null` when the place has no opening hours data —
+ * the caller should treat null as "unknown, don't block" (Google
+ * sometimes lacks data for certain place types like parks, viewpoints,
+ * etc., and we don't want to block on that).
+ */
+export async function checkPlaceOpenAtDate(
+  placeId: string,
+  placeName: string,
+  targetDate: Date,
+): Promise<PlaceOpenAtDateStatus> {
+  const fallback: PlaceOpenAtDateStatus = {
+    placeId, name: placeName, isOpen: null, isPermanentlyClosed: false,
+  };
+  const fields = ['id', 'businessStatus', 'regularOpeningHours', 'currentOpeningHours'];
+
+  try {
+    const url = isWeb
+      ? `${API_BASE_URL}/api/places-details?placeId=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields.join(','))}`
+      : `${BASE_URL}/${placeId}`;
+    const headers: Record<string, string> = isWeb
+      ? {}
+      : { 'X-Goog-Api-Key': API_KEY, 'X-Goog-FieldMask': fields.join(',') };
+
+    // Same 7s timeout pattern as getPlaceDetails — without it a stale
+    // fetch could hang the whole "set the date" flow.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    let data: any;
+    try {
+      const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+      data = await res.json();
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (
+      data.businessStatus === 'CLOSED_PERMANENTLY' ||
+      data.businessStatus === 'CLOSED_TEMPORARILY'
+    ) {
+      return { placeId, name: placeName, isOpen: false, isPermanentlyClosed: true };
+    }
+
+    // Prefer regularOpeningHours for a future-date check (currentOpeningHours
+    // may include holiday-specific overrides but is centered on "now").
+    const hours = data.regularOpeningHours || data.currentOpeningHours;
+    const periods: any[] | undefined = hours?.periods;
+    if (!Array.isArray(periods) || periods.length === 0) {
+      // No structured periods → unknown. Don't block.
+      return fallback;
+    }
+
+    // Special case : a place that's open 24/7 typically returns a single
+    // period with `{ open: { day: 0, hour: 0, minute: 0 } }` and NO close.
+    // Treat as always open.
+    const isAlways24_7 = periods.length === 1 && !periods[0].close
+      && periods[0].open?.day === 0
+      && (periods[0].open?.hour ?? 0) === 0
+      && (periods[0].open?.minute ?? 0) === 0;
+    if (isAlways24_7) {
+      return { placeId, name: placeName, isOpen: true, isPermanentlyClosed: false };
+    }
+
+    const targetDay = targetDate.getDay(); // 0 = Sunday
+    const targetMins = targetDate.getHours() * 60 + targetDate.getMinutes();
+
+    // Walk each period and check if the target falls inside.
+    // A period can SPAN MIDNIGHT (e.g. open Friday 22:00, close Saturday
+    // 02:00) — handle by treating close.day !== open.day as a wrap.
+    for (const period of periods) {
+      if (!period.open) continue;
+      const openDay = period.open.day ?? 0;
+      const openMins = (period.open.hour ?? 0) * 60 + (period.open.minute ?? 0);
+      // If `close` is missing AND open.day = 0/hour = 0 we covered it
+      // above. Otherwise treat missing close as "open until end of day".
+      const closeDay = period.close?.day ?? openDay;
+      const closeMins = period.close
+        ? (period.close.hour ?? 0) * 60 + (period.close.minute ?? 0)
+        : 24 * 60;
+
+      // Build absolute "minutes since Sunday 00:00" for comparison,
+      // wrapping the close around the week if it precedes the open.
+      const openAbs = openDay * 24 * 60 + openMins;
+      let closeAbs = closeDay * 24 * 60 + closeMins;
+      if (closeAbs <= openAbs) closeAbs += 7 * 24 * 60; // crosses week boundary
+
+      const targetAbs = targetDay * 24 * 60 + targetMins;
+      // Also try the target shifted by +7 days for ranges that started
+      // last week and continue into "this week" relative to the period.
+      const targetAbsNextWeek = targetAbs + 7 * 24 * 60;
+
+      const inRange = (t: number) => t >= openAbs && t < closeAbs;
+      if (inRange(targetAbs) || inRange(targetAbsNextWeek)) {
+        return { placeId, name: placeName, isOpen: true, isPermanentlyClosed: false };
+      }
+    }
+
+    // No matching period → closed at that date+time.
+    return { placeId, name: placeName, isOpen: false, isPermanentlyClosed: false };
+  } catch (err) {
+    console.warn('[checkPlaceOpenAtDate] error:', err);
+    return fallback;
+  }
+}
+
+/**
+ * Batch version : check multiple places in parallel and return ONLY
+ * the ones that would be closed at the target date. `unknown` (isOpen
+ * = null) is NOT considered closed — we don't block on missing data.
+ *
+ * Used by every co-plan date-setter to enforce the rule "you can't
+ * propose a date where a place is closed".
+ */
+export async function checkPlacesClosedAtDate(
+  places: Array<{ googlePlaceId: string; name: string }>,
+  targetDate: Date,
+): Promise<PlaceOpenAtDateStatus[]> {
+  if (places.length === 0) return [];
+  const results = await Promise.all(
+    places.map((p) => checkPlaceOpenAtDate(p.googlePlaceId, p.name, targetDate)),
+  );
+  return results.filter((r) => r.isPermanentlyClosed || r.isOpen === false);
+}
+
 // ==================== TEXT SEARCH ====================
 export async function searchPlacesNearby(
   query: string,
