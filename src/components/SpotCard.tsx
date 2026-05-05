@@ -41,21 +41,27 @@ const CARD_RADIUS = 22;
 const SPOT_BORDER_COLOR = Colors.primary;
 const SPOT_BORDER_WIDTH = 2.5;
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
-
-/** Build une URL Google Static Maps avec un marker rouge centré sur lat/lng.
- *  Le DPI 2 garde la qualité retina sans doubler le coût (Google compte 1
- *  appel par fetch, peu importe scale). */
+/** URL d'une mini-map statique passant par notre proxy /api/static-map.
+ *  Pourquoi un proxy ? Mêmes raisons que places-photo :
+ *    1. La clé API ne part jamais côté client (pas de leak / pas d'abus).
+ *    2. Évite les contraintes referer / CORS de l'endpoint Google direct
+ *       qui faisait que l'image silencieusement ne se chargeait pas (le
+ *       <Image> tombait sur le bg primary, donnait l'illusion que rien ne
+ *       s'affichait — exactement le bug remonté).
+ *    3. Cache CDN 24h côté Vercel.
+ *
+ *  En natif (iOS/Android) on tape la même route — Vercel la sert pour les
+ *  deux. Si le projet n'est pas déployé en prod (env de dev), on fallback
+ *  sur l'URL Google directe. */
 const buildStaticMapUrl = (lat: number, lng: number, w: number, h: number): string => {
-  const size = `${Math.round(w)}x${Math.round(h)}`;
-  return (
-    `https://maps.googleapis.com/maps/api/staticmap?` +
-    `center=${lat},${lng}` +
-    `&zoom=15&size=${size}&scale=2` +
-    `&markers=color:0xC4704B%7C${lat},${lng}` +
-    `&style=feature:poi%7Cvisibility:simplified` +
-    `&key=${GOOGLE_MAPS_API_KEY}`
-  );
+  const safeW = Math.min(640, Math.max(64, Math.round(w)));
+  const safeH = Math.min(640, Math.max(64, Math.round(h)));
+  // Web: chemin relatif → résolu sur le même origin que l'app (Vercel).
+  // Native: pas de window — fallback sur l'URL absolue prod (configurable).
+  const apiBase = Platform.OS === 'web'
+    ? ''
+    : (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://proof-app.vercel.app');
+  return `${apiBase}/api/static-map?lat=${lat}&lng=${lng}&w=${safeW}&h=${safeH}`;
 };
 
 /**
@@ -322,6 +328,11 @@ const BackFace: React.FC<BackFaceProps> = ({
   const lat = details?.latitude ?? spot.latitude;
   const lng = details?.longitude ?? spot.longitude;
 
+  // Fallback gracieux si l'image static map échoue (Maps Static API
+  // désactivée côté projet GCP, ou erreur réseau). On affiche un
+  // placeholder cliquable plutôt qu'un rectangle vide.
+  const [mapFailed, setMapFailed] = useState(false);
+
   const handleOpenMaps = () => {
     if (!lat || !lng) return;
     const url = Platform.select({
@@ -414,14 +425,27 @@ const BackFace: React.FC<BackFaceProps> = ({
               </View>
             )}
 
-            {/* Mini-map */}
-            {lat != null && lng != null && GOOGLE_MAPS_API_KEY && (
+            {/* Mini-map static — passe par /api/static-map (proxy Vercel).
+                Si l'image échoue (Maps Static API non activée, hors-réseau),
+                on bascule sur un placeholder décoratif tout en gardant le
+                Pressable cliquable vers Maps natif. */}
+            {lat != null && lng != null && (
               <Pressable onPress={handleOpenMaps} style={backStyles.mapWrap}>
-                <Image
-                  source={{ uri: buildStaticMapUrl(lat, lng, mapW, mapH) }}
-                  style={backStyles.mapImg}
-                  resizeMode="cover"
-                />
+                {!mapFailed ? (
+                  <Image
+                    source={{ uri: buildStaticMapUrl(lat, lng, mapW, mapH) }}
+                    style={backStyles.mapImg}
+                    resizeMode="cover"
+                    onError={() => setMapFailed(true)}
+                  />
+                ) : (
+                  <View style={[backStyles.mapImg, backStyles.mapFallback]}>
+                    <Ionicons name="map-outline" size={26} color={Colors.terracotta400} />
+                    <Text style={backStyles.mapFallbackText} numberOfLines={1}>
+                      {spot.placeAddress || spot.placeName}
+                    </Text>
+                  </View>
+                )}
                 <View style={backStyles.mapOverlay} pointerEvents="none">
                   <Ionicons name="navigate-outline" size={13} color={Colors.textOnAccent} />
                   <Text style={backStyles.mapOverlayText}>Ouvrir dans Maps</Text>
@@ -767,6 +791,22 @@ const backStyles = StyleSheet.create({
     borderColor: Colors.borderSubtle,
   },
   mapImg: { width: '100%', height: '100%' },
+  // Affiché quand le static-map a fail (réseau / API désactivée). Garde
+  // une présence visuelle pour ne pas avoir de rectangle vide trompeur.
+  mapFallback: {
+    backgroundColor: Colors.terracotta50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  mapFallbackText: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.terracotta700,
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
   mapOverlay: {
     position: 'absolute',
     bottom: 8,
