@@ -1095,6 +1095,16 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         {/* Sticky "Do it now" CTA was moved to FeedScreen — it lives at the
             screen level so it can sit above the bottom tab bar without being
             clipped by the card's overflow:hidden. */}
+
+        {/* ── Type badge "PLAN" — top-left, vert sauge, discret ──
+            Pendant du badge "SPOT" terracotta dans SpotCard. Permet de
+            distinguer en un coup d'œil un Plan d'un Spot dans le feed.
+            pointerEvents:'none' pour ne pas bloquer les taps sur le
+            ScrollView en dessous. */}
+        <View style={styles.typeBadge} pointerEvents="none">
+          <Ionicons name="map" size={11} color={Colors.textOnAccent} />
+          <Text style={styles.typeBadgeText}>PLAN</Text>
+        </View>
       </View>
 
       {/* ── Collaborators sheet — opens when the byline is tapped on a
@@ -1139,6 +1149,29 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+
+  // ── Type badge "PLAN" — top-left, vert sauge ──
+  // Pendant du badge "SPOT" terracotta dans SpotCard. La couleur vert
+  // sauge (Colors.success) reste discrète vs la palette terracotta
+  // dominante de l'app — pas de risque de confusion avec un Spot.
+  typeBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 99,
+    backgroundColor: Colors.success,
+  },
+  typeBadgeText: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.2,
+    color: Colors.textOnAccent,
   },
 
   // ── Image layer ────────────────────────────────────────────
