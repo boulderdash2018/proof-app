@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
-import { Colors, Fonts, getRankForProofs } from '../constants';
+import { Colors, Fonts, getRankForProofs, shouldHideRankBadge } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
 import { MiniStampIcon } from './MiniStampIcon';
@@ -172,7 +172,9 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const coverUrl =
     plan.coverPhotos?.[0] ||
     plan.places?.find((p) => p.photoUrls?.length)?.photoUrls?.[0];
-  const rank = getRankForProofs(plan.author?.total_proof_validations || 0);
+  const rawRank = getRankForProofs(plan.author?.total_proof_validations || 0);
+  // null = ne pas afficher le RankBadge (ex: 'newcomer' caché pour @leo_trann)
+  const rank = shouldHideRankBadge(plan.author?.username, rawRank) ? null : rawRank;
 
   // ── Chevron pulse (2.5 s loop) ─────────────────────────────
   const chevronBounce = useRef(new Animated.Value(0)).current;

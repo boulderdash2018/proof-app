@@ -29,6 +29,19 @@ export const getRankForProofs = (proofs: number): RankDef => {
   return RANKS[0];
 };
 
+/**
+ * Règle métier : ne pas afficher le rank badge "Newcomer" pour le compte
+ * fondateur @leo_trann — il porte déjà un FounderBadge spécifique, et un
+ * libellé "Newcomer" à côté serait incohérent. À utiliser sur TOUS les
+ * sites d'affichage de RankBadge (profil perso, profil autre, cards de
+ * plans, etc.) pour rester cohérent.
+ *
+ * Renvoie true si le badge doit rester caché.
+ */
+export const shouldHideRankBadge = (username: string | undefined | null, rank: RankDef): boolean => {
+  return username === 'leo_trann' && rank.id === 'newcomer';
+};
+
 export const getNextRank = (rank: RankDef): RankDef | null => {
   const idx = RANKS.findIndex((r) => r.id === rank.id);
   return idx < RANKS.length - 1 ? RANKS[idx + 1] : null;

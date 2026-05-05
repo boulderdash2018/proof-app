@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
+import { Colors, Layout, Fonts, getRankForProofs, shouldHideRankBadge } from '../constants';
 import { Avatar, RankBadge, FounderBadge, SpotCard } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
@@ -184,7 +184,11 @@ export const ProfileScreen: React.FC = () => {
           <Text style={[styles.displayName, { color: Colors.textPrimary }]}>{user.displayName}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
             {user.isFounder && <FounderBadge />}
-            <RankBadge rank={getRankForProofs(totalProofs)} />
+            {(() => {
+              const rank = getRankForProofs(totalProofs);
+              if (shouldHideRankBadge(user.username, rank)) return null;
+              return <RankBadge rank={rank} />;
+            })()}
           </View>
           {user.bio ? <Text style={[styles.bio, { color: Colors.textSecondary }]}>{user.bio}</Text> : null}
         </View>

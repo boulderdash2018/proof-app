@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
+import { Colors, Layout, Fonts, getRankForProofs, shouldHideRankBadge } from '../constants';
 import { Avatar, RankBadge, FounderBadge, PrimaryButton, SecondaryButton, LoadingSkeleton, SpotCard } from '../components';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -268,7 +268,11 @@ export const OtherProfileScreen: React.FC = () => {
           <Text style={[styles.displayName, { color: C.black }]}>{user.displayName}</Text>
           <View style={styles.badgeRow}>
             {user.isFounder && <FounderBadge small />}
-            <RankBadge rank={getRankForProofs(user.total_proof_validations ?? 0)} small />
+            {(() => {
+              const rank = getRankForProofs(user.total_proof_validations ?? 0);
+              if (shouldHideRankBadge(user.username, rank)) return null;
+              return <RankBadge rank={rank} small />;
+            })()}
           </View>
           {canSeeContent && user.bio ? (
             <Text style={[styles.bio, { color: C.gray800 }]}>{user.bio}</Text>

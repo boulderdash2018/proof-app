@@ -17,7 +17,7 @@ import ReAnimated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Plan, TransportMode, CoAuthor } from '../types';
-import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
+import { Colors, Layout, Fonts, getRankForProofs, shouldHideRankBadge } from '../constants';
 import { useColors } from '../hooks/useColors';
 import { useTrendingStore } from '../store/trendingStore';
 import { Avatar } from './Avatar';
@@ -251,7 +251,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           </Text>
         </View>
         {plan.author.isFounder && <FounderBadge small />}
-        <RankBadge rank={getRankForProofs(plan.author.total_proof_validations ?? 0)} small />
+        {(() => {
+          const rank = getRankForProofs(plan.author.total_proof_validations ?? 0);
+          if (shouldHideRankBadge(plan.author.username, rank)) return null;
+          return <RankBadge rank={rank} small />;
+        })()}
       </TouchableOpacity>
 
       <Animated.View style={{ transform: [{ translateY: peekY }] }}>

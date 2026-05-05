@@ -6,7 +6,7 @@ export { CATEGORIES } from './categories';
 export type { CategoryDef } from './categories';
 export { EXPLORE_GROUPS, PERSON_FILTERS } from './exploreCategories';
 export type { ExploreGroup, ExploreSection, ExploreCategoryItem, ExploreLayout, PersonFilter } from './exploreCategories';
-export { RANKS, getRankForProofs, getNextRank, getRankProgress } from './ranks';
+export { RANKS, getRankForProofs, getNextRank, getRankProgress, shouldHideRankBadge } from './ranks';
 export type { RankDef, RankId } from './ranks';
 export { ACHIEVEMENTS, TOTAL_ACHIEVEMENTS, ACHIEVEMENTS_BY_CATEGORY } from './achievements';
 export type { AchievementDef, AchievementId, AchievementCategory } from './achievements';
