@@ -27,7 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
 import { TITLE_SUGGESTIONS, pickRandomSuggestions } from '../constants/suggestions';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PrimaryButton, Chip, TextInput, PlanCard, CoPlanDraftsList } from '../components';
+import { PrimaryButton, Chip, TextInput, PlanCard } from '../components';
 import { PhotoEditorSheet } from '../components/PhotoEditorSheet';
 import { useAuthStore, useFeedStore, useSavesStore, useDraftStore, useSavedPlacesStore } from '../store';
 import { activeCreateSession } from '../store/draftStore';
@@ -2241,11 +2241,6 @@ export const CreateScreen: React.FC = () => {
                 )}
                 <Text style={styles.s0Counter}>{title.length}/80</Text>
               </View>
-
-              {/* Active co-plan drafts — discoverable re-entry for brouillons en cours. */}
-              <CoPlanDraftsList
-                onOpenDraft={(draftId) => navigation.navigate('CoPlanWorkspace', { draftId })}
-              />
 
               {/* Inspiration suggestions — design aligné sur CoPlanInviteSheet :
                   chips horizontaux compacts (flex-wrap), couleur primaryDeep,
