@@ -25,6 +25,7 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, CATEGORIES, EXPLORE_GROUPS, PERSON_FILTERS, getCityCoordinates } from '../constants';
+import { TITLE_SUGGESTIONS, pickRandomSuggestions } from '../constants/suggestions';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton, Chip, TextInput, PlanCard, CoPlanDraftsList } from '../components';
 import { PhotoEditorSheet } from '../components/PhotoEditorSheet';
@@ -335,6 +336,17 @@ export const CreateScreen: React.FC = () => {
   // Prefilling is non-destructive : si le user a déjà tapé un titre, on
   // l'écrase volontairement (intent assumed : "je repars de zéro depuis ce plan").
   const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
+
+  // Inspirations de titres — 3 piochées au hasard parmi ~50, re-shuffle
+  // au mount + via le bouton ↻ (l'user peut tomber sur des nouvelles
+  // idées sans rien faire de plus).
+  const [titleIdeas, setTitleIdeas] = useState<string[]>(() =>
+    pickRandomSuggestions(TITLE_SUGGESTIONS, 3),
+  );
+  const reshuffleTitleIdeas = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
+  };
 
   /**
    * Préfill complet du wizard à partir d'un Plan sauvegardé. Recopie
@@ -2226,10 +2238,20 @@ export const CreateScreen: React.FC = () => {
                 onOpenDraft={(draftId) => navigation.navigate('CoPlanWorkspace', { draftId })}
               />
 
-              {/* Inspiration suggestions */}
+              {/* Inspiration suggestions — 3 idées re-randomisées au mount.
+                  Tap sur l'icône ↻ pour re-shuffle 3 nouvelles idées. */}
               <View style={styles.s0Inspirations}>
-                <Text style={styles.s0InspirationLabel}>QUELQUES IDÉES</Text>
-                {['Dimanche parfait à Belleville', 'Soirée intimiste dans le 11e', 'Brunch & shopping au Marais'].map((idea) => (
+                <View style={styles.s0InspirationHeader}>
+                  <Text style={styles.s0InspirationLabel}>QUELQUES IDÉES</Text>
+                  <TouchableOpacity
+                    onPress={reshuffleTitleIdeas}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    activeOpacity={0.6}
+                  >
+                    <Ionicons name="refresh-outline" size={13} color={Colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+                {titleIdeas.map((idea) => (
                   <TouchableOpacity
                     key={idea}
                     style={styles.s0InspirationChip}
@@ -3574,6 +3596,12 @@ const styles = StyleSheet.create({
   s0Inspirations: {
     gap: 10,
   } as any,
+  s0InspirationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   s0ImportBtn: {
     flexDirection: 'row',
     alignItems: 'center',

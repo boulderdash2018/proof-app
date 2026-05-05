@@ -21,6 +21,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, EXPLORE_GROUPS, PERSON_FILTERS } from '../constants';
+import { TITLE_SUGGESTIONS, pickRandomSuggestions } from '../constants/suggestions';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
 import { useAuthStore } from '../store/authStore';
@@ -120,6 +121,16 @@ export const OrganizeScreen: React.FC = () => {
     fromSaved: ['places', 'title', 'vibe',  'recap'],
   };
   const stepKey: StepKey = FLOW_ORDER[flowMode][step - 1];
+
+  // Inspirations de titres — 3 piochées au hasard parmi ~50, re-shuffle
+  // au mount + via le bouton ↻.
+  const [titleIdeas, setTitleIdeas] = useState<string[]>(() =>
+    pickRandomSuggestions(TITLE_SUGGESTIONS, 3),
+  );
+  const reshuffleTitleIdeas = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
+  };
 
   const canProceedFromStepKey = (k: StepKey): boolean => {
     if (k === 'title')  return title.trim().length >= 3;
@@ -549,22 +560,26 @@ export const OrganizeScreen: React.FC = () => {
               </View>
               <Text style={[styles.charCount, { color: Colors.textTertiary }]}>{title.length}/60</Text>
 
-              <Text style={[styles.inspLabel, { marginTop: 22 }]}>INSPIRATIONS</Text>
+              <View style={styles.inspHeader}>
+                <Text style={styles.inspLabel}>INSPIRATIONS</Text>
+                <TouchableOpacity
+                  onPress={reshuffleTitleIdeas}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="refresh-outline" size={13} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
               <View style={styles.inspWrap}>
-                {[
-                  { emoji: '🎨', label: 'Journée culture au Marais' },
-                  { emoji: '☕', label: 'Brunch dominical tranquille' },
-                  { emoji: '💕', label: 'Sortie cocooning à deux' },
-                  { emoji: '🌿', label: 'Pause nature dans Paris' },
-                ].map((insp) => (
+                {titleIdeas.map((label) => (
                   <TouchableOpacity
-                    key={insp.label}
+                    key={label}
                     style={[styles.inspChip, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTitle(insp.label); }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTitle(label); }}
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.inspEmoji}>{insp.emoji}</Text>
-                    <Text style={[styles.inspText, { color: Colors.textPrimary }]} numberOfLines={1}>{insp.label}</Text>
+                    <Ionicons name="sparkles-outline" size={14} color={Colors.terracotta600} />
+                    <Text style={[styles.inspText, { color: Colors.textPrimary }]} numberOfLines={1}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1071,12 +1086,18 @@ const styles = StyleSheet.create({
   // ─────────────────────────────────────────────────────────────
   // Step 1 — title inspirations
   // ─────────────────────────────────────────────────────────────
+  inspHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 22,
+    marginBottom: 10,
+  },
   inspLabel: {
     fontSize: 10,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textTertiary,
     letterSpacing: 1.3,
-    marginBottom: 10,
   },
   inspWrap: { gap: 8 },
   inspChip: {
