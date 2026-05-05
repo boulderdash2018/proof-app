@@ -122,8 +122,9 @@ export const OrganizeScreen: React.FC = () => {
   };
   const stepKey: StepKey = FLOW_ORDER[flowMode][step - 1];
 
-  // Inspirations de titres — 3 piochées au hasard parmi ~50, re-shuffle
-  // au mount + via le bouton ↻.
+  // Inspirations de titres — re-shuffle au mount, au focus de l'écran
+  // ET au tap sur le bouton ↻ (l'écran organize peut rester mounté
+  // entre 2 utilisations, useFocusEffect garantit du nouveau contenu).
   const [titleIdeas, setTitleIdeas] = useState<string[]>(() =>
     pickRandomSuggestions(TITLE_SUGGESTIONS, 3),
   );
@@ -131,6 +132,11 @@ export const OrganizeScreen: React.FC = () => {
     Haptics.selectionAsync().catch(() => {});
     setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
   };
+  useFocusEffect(
+    React.useCallback(() => {
+      setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
+    }, []),
+  );
 
   const canProceedFromStepKey = (k: StepKey): boolean => {
     if (k === 'title')  return title.trim().length >= 3;
@@ -574,12 +580,12 @@ export const OrganizeScreen: React.FC = () => {
                 {titleIdeas.map((label) => (
                   <TouchableOpacity
                     key={label}
-                    style={[styles.inspChip, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+                    style={[styles.inspChip, { backgroundColor: Colors.terracotta50, borderColor: Colors.terracotta100 }]}
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTitle(label); }}
                     activeOpacity={0.75}
                   >
-                    <Ionicons name="sparkles-outline" size={14} color={Colors.terracotta600} />
-                    <Text style={[styles.inspText, { color: Colors.textPrimary }]} numberOfLines={1}>{label}</Text>
+                    <Ionicons name="sparkles-outline" size={13} color={Colors.primaryDeep} />
+                    <Text style={[styles.inspText, { color: Colors.primaryDeep }]} numberOfLines={1}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1099,18 +1105,21 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     letterSpacing: 1.3,
   },
-  inspWrap: { gap: 8 },
+  // Design aligné sur CoPlanInviteSheet : chips horizontaux compacts
+  // (flex-wrap), couleur primaryDeep, fond terracotta50, hairline
+  // border. Les anciens chips full-width ont été retirés.
+  inspWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   inspChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   inspEmoji: { fontSize: 18 },
-  inspText: { flex: 1, fontSize: 13.5, fontFamily: Fonts.body },
+  inspText: { fontSize: 12.5, fontFamily: Fonts.bodyMedium },
 
   // "Partir d'un plan sauvegardé" — bouton step 1
   importBtn: {

@@ -7,6 +7,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
+import { TITLE_SUGGESTIONS, pickRandomSuggestions } from '../constants/suggestions';
 import { Avatar } from './Avatar';
 import { useAuthStore } from '../store';
 import { getMutualFollowIds } from '../services/friendsService';
@@ -53,6 +54,16 @@ export const CoPlanInviteSheet: React.FC<CoPlanInviteSheetProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 3 idées de titre piochées au hasard parmi ~50. Re-shuffle à chaque
+  // ouverture du sheet ET au tap sur le bouton ↻ — l'user voit donc
+  // des idées différentes chaque fois.
+  const [titleIdeas, setTitleIdeas] = useState<string[]>(() =>
+    pickRandomSuggestions(TITLE_SUGGESTIONS, 3),
+  );
+  const reshuffleTitleIdeas = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
+  };
 
   // Reset whenever the sheet opens
   useEffect(() => {
@@ -63,6 +74,9 @@ export const CoPlanInviteSheet: React.FC<CoPlanInviteSheetProps> = ({
       setSearch('');
       setSelectedIds(new Set());
       setIsSubmitting(false);
+      // Re-shuffle 3 nouvelles idées à chaque ouverture du sheet —
+      // c'est le moment où l'user a besoin d'inspiration fraîche.
+      setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
     }
   }, [visible, user?.id]);
 
@@ -250,10 +264,19 @@ export const CoPlanInviteSheet: React.FC<CoPlanInviteSheetProps> = ({
                   Indicatif — tout le monde pourra le modifier plus tard.
                 </Text>
 
-                {/* Quick ideas — tap to set */}
-                <Text style={[styles.sectionLabel, { marginTop: 20 }]}>QUELQUES IDÉES</Text>
+                {/* Quick ideas — random pick parmi ~50, re-shuffle au ↻ */}
+                <View style={styles.ideasHeader}>
+                  <Text style={styles.sectionLabel}>QUELQUES IDÉES</Text>
+                  <TouchableOpacity
+                    onPress={reshuffleTitleIdeas}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    activeOpacity={0.6}
+                  >
+                    <Ionicons name="refresh-outline" size={13} color={Colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
                 <View style={styles.ideasWrap}>
-                  {['Samedi Marais', 'Dimanche brunch', 'Afterwork Belleville'].map((idea) => (
+                  {titleIdeas.map((idea) => (
                     <TouchableOpacity
                       key={idea}
                       style={styles.ideaChip}
@@ -480,6 +503,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
+  // Idea chips header (label + bouton ↻ alignés)
+  ideasHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    marginBottom: 8,
+  },
   // Idea chips
   ideasWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   ideaChip: {

@@ -19,7 +19,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../services/firebaseConfig';
@@ -337,9 +337,13 @@ export const CreateScreen: React.FC = () => {
   // l'écrase volontairement (intent assumed : "je repars de zéro depuis ce plan").
   const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
 
-  // Inspirations de titres — 3 piochées au hasard parmi ~50, re-shuffle
-  // au mount + via le bouton ↻ (l'user peut tomber sur des nouvelles
-  // idées sans rien faire de plus).
+  // Inspirations de titres — 3 piochées au hasard parmi ~50.
+  // Re-shuffle :
+  //   • à chaque mount (initial state lazy)
+  //   • à chaque focus de l'écran (utile car le tab Create reste mounté
+  //     entre les visites — sans focus reshuffle, l'user reverrait les
+  //     mêmes 3 idées tant qu'il n'a pas reload l'app)
+  //   • au tap sur le bouton ↻
   const [titleIdeas, setTitleIdeas] = useState<string[]>(() =>
     pickRandomSuggestions(TITLE_SUGGESTIONS, 3),
   );
@@ -347,6 +351,11 @@ export const CreateScreen: React.FC = () => {
     Haptics.selectionAsync().catch(() => {});
     setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
   };
+  useFocusEffect(
+    React.useCallback(() => {
+      setTitleIdeas(pickRandomSuggestions(TITLE_SUGGESTIONS, 3));
+    }, []),
+  );
 
   /**
    * Préfill complet du wizard à partir d'un Plan sauvegardé. Recopie
@@ -2238,8 +2247,9 @@ export const CreateScreen: React.FC = () => {
                 onOpenDraft={(draftId) => navigation.navigate('CoPlanWorkspace', { draftId })}
               />
 
-              {/* Inspiration suggestions — 3 idées re-randomisées au mount.
-                  Tap sur l'icône ↻ pour re-shuffle 3 nouvelles idées. */}
+              {/* Inspiration suggestions — design aligné sur CoPlanInviteSheet :
+                  chips horizontaux compacts (flex-wrap), couleur primaryDeep,
+                  re-shuffle 3 nouvelles idées au tap sur ↻. */}
               <View style={styles.s0Inspirations}>
                 <View style={styles.s0InspirationHeader}>
                   <Text style={styles.s0InspirationLabel}>QUELQUES IDÉES</Text>
@@ -2251,20 +2261,22 @@ export const CreateScreen: React.FC = () => {
                     <Ionicons name="refresh-outline" size={13} color={Colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
-                {titleIdeas.map((idea) => (
-                  <TouchableOpacity
-                    key={idea}
-                    style={styles.s0InspirationChip}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setTitle(idea);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="sparkles-outline" size={14} color={Colors.terracotta600} />
-                    <Text style={styles.s0InspirationText}>{idea}</Text>
-                  </TouchableOpacity>
-                ))}
+                <View style={styles.s0IdeasWrap}>
+                  {titleIdeas.map((idea) => (
+                    <TouchableOpacity
+                      key={idea}
+                      style={styles.s0IdeaChip}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setTitle(idea);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="sparkles-outline" size={13} color={Colors.primaryDeep} />
+                      <Text style={styles.s0IdeaChipText}>{idea}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
           )}
@@ -3594,13 +3606,31 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
   s0Inspirations: {
-    gap: 10,
+    gap: 8,
   } as any,
   s0InspirationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 4,
+  },
+  // Chips d'idées de titre — design CoPlanInviteSheet (compact, primaryDeep)
+  s0IdeasWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  s0IdeaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 99,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.terracotta100,
+  },
+  s0IdeaChipText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.primaryDeep,
   },
   s0ImportBtn: {
     flexDirection: 'row',
