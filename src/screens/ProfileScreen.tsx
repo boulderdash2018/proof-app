@@ -17,7 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs } from '../constants';
-import { Avatar, RankBadge, BadgeGrid, FounderBadge, SpotCard } from '../components';
+import { Avatar, RankBadge, FounderBadge, SpotCard } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -26,7 +26,6 @@ import { fetchUserPlans } from '../services/plansService';
 import { fetchSpotsByUser } from '../services/spotsService';
 import { Spot } from '../types';
 import { checkAndUnlockBadges } from '../services/badgeService';
-import { useLanguageStore } from '../store/languageStore';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP = 2;
@@ -63,9 +62,9 @@ export const ProfileScreen: React.FC = () => {
   const [userSpots, setUserSpots] = useState<Spot[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  // totalProofs alimente le RankBadge inline (ghost / newcomer / etc) à
+  // côté du nom — on le garde même après suppression de l'onglet badges.
   const [totalProofs, setTotalProofs] = useState(0);
-  const lang = useLanguageStore((s) => s.language) as 'fr' | 'en';
 
   useEffect(() => {
     if (user) {
@@ -76,9 +75,10 @@ export const ProfileScreen: React.FC = () => {
       getFollowerIds(user.id).then(ids => setFollowersCount(ids.length));
       getFollowingIds(user.id).then(ids => setFollowingCount(ids.length));
       fetchSaves(user.id);
-      // Check badges
-      checkAndUnlockBadges(user.id, user).then(({ allBadges, totalProofs: tp }) => {
-        setUnlockedAchievements(allBadges);
+      // checkAndUnlockBadges renvoie aussi `allBadges` (badges Proof
+      // débloqués) — on n'en a plus besoin depuis la suppression de
+      // l'onglet badges. On garde juste totalProofs pour le RankBadge.
+      checkAndUnlockBadges(user.id, user).then(({ totalProofs: tp }) => {
         setTotalProofs(tp);
       }).catch(() => {});
     }
@@ -93,8 +93,7 @@ export const ProfileScreen: React.FC = () => {
         fetchUserPlans(user.id).then(setUserPlans);
         fetchSpotsByUser(user.id).then(setUserSpots).catch(() => {});
         fetchSaves(user.id);
-        checkAndUnlockBadges(user.id, user).then(({ allBadges, totalProofs: tp }) => {
-          setUnlockedAchievements(allBadges);
+        checkAndUnlockBadges(user.id, user).then(({ totalProofs: tp }) => {
           setTotalProofs(tp);
         }).catch(() => {});
       }
@@ -105,7 +104,7 @@ export const ProfileScreen: React.FC = () => {
   const todoPlans = savedPlans.filter((sp) => !sp.isDone);
 
   // Profile tabs — "spots" is the lightweight format alongside plans (premium content)
-  const [profileTab, setProfileTab] = useState<'plans' | 'spots' | 'drafts' | 'badges'>('plans');
+  const [profileTab, setProfileTab] = useState<'plans' | 'spots' | 'drafts'>('plans');
   const [draftCategory, setDraftCategory] = useState<'publish' | 'organize' | null>(null);
 
   // Compute real stats from fetched plans
@@ -273,13 +272,12 @@ export const ProfileScreen: React.FC = () => {
 
         {/* ═══ Tab bar ═══ */}
         <View style={[styles.profileTabBar, { borderBottomColor: Colors.borderSubtle }]}>
-          {(['plans', 'spots', 'drafts', 'badges'] as const).map((tab) => {
+          {(['plans', 'spots', 'drafts'] as const).map((tab) => {
             const isActive = profileTab === tab;
             const iconMap: Record<string, { active: string; inactive: string }> = {
               plans: { active: 'map', inactive: 'map-outline' },
               spots: { active: 'sparkles', inactive: 'sparkles-outline' },
               drafts: { active: 'document-text', inactive: 'document-text-outline' },
-              badges: { active: 'ribbon', inactive: 'ribbon-outline' },
             };
             const icon = iconMap[tab];
             return (
@@ -515,11 +513,6 @@ export const ProfileScreen: React.FC = () => {
           </>
         )}
 
-        {profileTab === 'badges' && (
-          <View style={styles.section}>
-            <BadgeGrid unlockedIds={unlockedAchievements} lang={lang} />
-          </View>
-        )}
       </ScrollView>
     </View>
   );
