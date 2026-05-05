@@ -1,8 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import { Text, StyleSheet, Animated, Easing, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { Fonts } from '../constants';
+import React from 'react';
+import { Text, StyleSheet, View } from 'react-native';
+import { Colors, Fonts } from '../constants';
 
 interface Props {
   /** Compact variant for inline contexts (feed card author row, etc.) */
@@ -10,153 +8,70 @@ interface Props {
 }
 
 /**
- * Premium Founder badge — signature visual for early adopters.
+ * Founder badge — design 'Double-line chevron'.
  *
- * Composition:
- *  - Warm gold gradient background (subtle, not gaudy)
- *  - Crisp amber border that breathes with the shimmer
- *  - A tilted sparkle icon leading the label
- *  - A moving highlight band sweeping across the surface (Apple-Card style)
- *  - Soft gold glow shadow
+ * Composition (très éditorial, palette stricte de l'app) :
+ *  - Texte 'FOUNDER' en Fraunces italique, capitales, terracotta700,
+ *    letter-spacing serré pour un look heritage / press-mark
+ *  - Bordures top + bottom uniquement (pas de left/right) en
+ *    terracotta700 → effet 'chevron' éditorial
+ *  - Petits losanges 4×4 (rotation 45°) aux deux extrémités, qui
+ *    encadrent le label sans le surcharger
+ *  - Aucun fond coloré, aucune animation — sobriété assumée. Le badge
+ *    se fond avec la composition de la card sans la dominer.
+ *
+ * Anciennement : pill or shimmer animée (sweep + breathing border).
+ * Retiré : effet 'gold luxe' jugé trop clinquant et hors-palette.
  */
 export const FounderBadge: React.FC<Props> = ({ small }) => {
-  const shimmer = useRef(new Animated.Value(0)).current;
-  const sweep = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Slow border/glow pulse — used for the breathing effect
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        Animated.timing(shimmer, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-      ])
-    ).start();
-
-    // Light sweep across the badge — faster, creates the "premium card" feel
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sweep, { toValue: 1, duration: 2800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.delay(900),
-        Animated.timing(sweep, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-
-  const borderColor = shimmer.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: ['#D4A94A', '#F0CC6A', '#D4A94A'],
-  });
-
-  const shadowOpacity = shimmer.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.22, 0.4, 0.22],
-  });
-
-  // Sweep travels from -60 to +140 (% of badge width) for a diagonal light pass
-  const sweepTranslate = sweep.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-60, 140],
-  });
-  const sweepOpacity = sweep.interpolate({
-    inputRange: [0, 0.15, 0.85, 1],
-    outputRange: [0, 0.7, 0.7, 0],
-  });
-
   return (
-    <Animated.View
-      style={[
-        styles.badge,
-        small && styles.badgeSmall,
-        {
-          borderColor,
-          shadowColor: '#D4AF37',
-          shadowOffset: { width: 0, height: 2 },
-          shadowRadius: 10,
-          shadowOpacity,
-          elevation: 5,
-        },
-      ]}
-    >
-      {/* Warm gold gradient base */}
-      <LinearGradient
-        colors={['#FFF4D6', '#F8E3A8', '#F2CF7A', '#E8B74A']}
-        locations={[0, 0.35, 0.7, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Moving highlight sweep */}
-      <Animated.View
-        style={[
-          styles.sweep,
-          {
-            opacity: sweepOpacity,
-            transform: [{ translateX: sweepTranslate }, { skewX: '-22deg' }],
-          },
-        ]}
-        pointerEvents="none"
-      >
-        <LinearGradient
-          colors={['transparent', 'rgba(255, 255, 255, 0.85)', 'transparent']}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-
-      {/* Content */}
-      <View style={styles.inner}>
-        <Ionicons
-          name="sparkles"
-          size={small ? 8 : 10}
-          color="#8B5F10"
-          style={styles.sparkle}
-        />
-        <Text style={[styles.label, small && styles.labelSmall]}>FOUNDER</Text>
-      </View>
-    </Animated.View>
+    <View style={[styles.badge, small && styles.badgeSmall]}>
+      <View style={[styles.diamond, small && styles.diamondSmall]} />
+      <Text style={[styles.label, small && styles.labelSmall]}>FOUNDER</Text>
+      <View style={[styles.diamond, small && styles.diamondSmall]} />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   badge: {
-    borderRadius: 99,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1.5,
-    overflow: 'hidden',
+    paddingVertical: 3,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.terracotta700,
     alignSelf: 'flex-start',
+    backgroundColor: 'transparent',
   },
   badgeSmall: {
     paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 99,
-  },
-  inner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingVertical: 2,
     gap: 4,
   },
-  sparkle: {
-    // Slight offset for visual balance
-    marginTop: -0.5,
+  diamond: {
+    width: 4,
+    height: 4,
+    backgroundColor: Colors.terracotta700,
+    transform: [{ rotate: '45deg' }],
+  },
+  diamondSmall: {
+    width: 3,
+    height: 3,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: Colors.terracotta700,
     letterSpacing: 1.6,
-    color: '#6B4A0A',
-    fontFamily: Fonts.bodyBold,
-    fontWeight: '800' as const,
+    // textTransform avec une font italique : Fraunces gère le rendu en
+    // capitales nativement via la propriété, ce qui garde l'italique.
+    textTransform: 'uppercase',
   },
   labelSmall: {
-    fontSize: 8.5,
+    fontSize: 9,
     letterSpacing: 1.2,
-  },
-  sweep: {
-    position: 'absolute',
-    top: -4,
-    bottom: -4,
-    width: 28,
   },
 });
