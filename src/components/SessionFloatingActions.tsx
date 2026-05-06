@@ -9,23 +9,24 @@ import { useAuthStore } from '../store';
 interface Props {
   /** Conv id linked to the session — for the chat shortcut. */
   conversationId?: string;
-  /** Tap "Le groupe" → opens the GroupLiveMapSheet. */
+  /** Tap "Le groupe" → opens the GroupSessionPanel (filter chips +
+   *  participants list with progress + tap-to-fly callbacks). */
   onOpenMap: () => void;
   /** Tap "Discussion" → navigates to the conv screen. */
   onOpenChat: () => void;
   /** Number of friends visible on the map (for the badge label). */
   friendCount: number;
-  /** When the live-map sheet is open, the "Le groupe" FAB hides
-   *  (you're already viewing the group — having a button to open it
-   *  again was confusing per user feedback). */
+  /** When the panel is open, the "Le groupe" FAB hides — you're
+   *  already viewing the group, having a button to re-open the same
+   *  surface was confusing per user feedback. */
   mapSheetOpen?: boolean;
 }
 
 /**
  * Stacked vertical FAB cluster anchored bottom-right of the active
  * session screen. Up to two buttons :
- *   • Le groupe (people-circle) → opens GroupLiveMapSheet — auto-hides
- *     while the sheet is already open so the affordance is unique
+ *   • Le groupe (people-circle) → opens GroupSessionPanel — auto-hides
+ *     while the panel is already open so the affordance is unique
  *   • Discussion (chat) → navigates back to the conversation, with
  *     unread badge
  *

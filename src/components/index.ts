@@ -41,7 +41,6 @@ export { DoItNowDateSheet } from './DoItNowDateSheet';
 export { BlockingClosedPlacesAlert } from './BlockingClosedPlacesAlert';
 export { CoPlanResolutionPill } from './CoPlanResolutionPill';
 export { CoPlanStatusBar } from './CoPlanStatusBar';
-export { GroupLiveMapSheet } from './GroupLiveMapSheet';
 export { GroupSessionPanel } from './GroupSessionPanel';
 export { SouvenirPromptToast } from './SouvenirPromptToast';
 export { SouvenirCaptureCard } from './SouvenirCaptureCard';
