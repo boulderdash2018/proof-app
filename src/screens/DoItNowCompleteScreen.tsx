@@ -141,11 +141,6 @@ export const DoItNowCompleteScreen: React.FC = () => {
   const avgRating = averageRating(plan.places);
   const dateBadge = formatDateBadge(new Date(), plan.city || cityConfig.name);
 
-  // ── Top photo strip — first 3 (or 2) places ────────────────────────────
-  const stripPlaces = plan.places.slice(0, Math.min(3, plan.places.length));
-  const stripPhotoFor = (p: Place): string | undefined =>
-    p.customPhoto || p.photoUrls?.[0];
-
   // ── Handlers ───────────────────────────────────────────────────────────
   const setRating = (placeId: string, rating: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -181,12 +176,10 @@ export const DoItNowCompleteScreen: React.FC = () => {
     setShowShare(true);
   };
 
-  const handleRedo = () => {
-    // Navigate back to the plan detail — user can re-launch Do-It-Now from there.
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    clearSession();
-    navigation.replace('PlanDetail', { planId: plan.id });
-  };
+  // Note : `handleRedo` (= "Refaire le plan") a été retiré du nouveau
+  // design — la fin de plan se concentre maintenant sur partager /
+  // publier / terminer. Si on veut le réintroduire un jour, on peut
+  // le caser dans une troisième actionCard ou un menu contextuel.
 
   // Already-proofed guard : a plan can only be Proof-It'd once.
   // When a saved entry exists with isDone + proofStatus='validated', the user
@@ -407,6 +400,45 @@ export const DoItNowCompleteScreen: React.FC = () => {
     navigation.popToTop();
   };
 
+  /**
+   * "Publier sur le feed" — secondary action card in the body.
+   * Sémantique adaptée selon le mode :
+   *  - co-plan (mon plan) → ouvre la page de publication enrichie où
+   *    l'utilisateur ajoute cover/tags/tip avant de rendre le plan
+   *    visible dans le feed public.
+   *  - solo (plan de quelqu'un d'autre, je le refais) → ouvre la
+   *    cérémonie Proof It qui injecte ma proof dans le feed
+   *    (proofCount + recreatedByIds).
+   */
+  const handlePublish = () => {
+    if (!plan) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (isCoPlan) {
+      navigation.navigate('CoPlanPublish', { planId: plan.id });
+    } else {
+      handleFinalize();
+    }
+  };
+
+  /**
+   * "Terminer" — sticky CTA en bas de la page, action de sortie.
+   * Sémantique : marquer le plan comme fait dans les saves (sans
+   * publier ni proof, l'user choisira ces actions explicitement via
+   * les cartes "Et après ?"), puis fermer.
+   *  - co-plan → handleAddToDone (markAsDone simple, sans status).
+   *  - solo → handleProofDeclined (markAsDone sans proofStatus).
+   * Les deux valident silencieusement l'expérience sans la pousser
+   * sur le feed — l'user a explicitement choisi de "juste finir".
+   */
+  const handleTerminer = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (isCoPlan) {
+      handleAddToDone();
+    } else {
+      handleProofDeclined();
+    }
+  };
+
   // ── Render stars row for a place ───────────────────────────────────────
   const renderStars = (placeId: string) => {
     const currentRating = ratings[placeId] ?? 0;
@@ -431,6 +463,12 @@ export const DoItNowCompleteScreen: React.FC = () => {
   };
 
   // ── Main render ────────────────────────────────────────────────────────
+  // Hero photo : on prend la cover du plan en priorité, fallback sur la
+  // photo du premier lieu (custom > Google), fallback dégradé terracotta.
+  const heroPhoto = plan.coverPhotos?.[0]
+    || plan.places[0]?.customPhoto
+    || plan.places[0]?.photoUrls?.[0];
+
   return (
     <View style={[styles.container, { backgroundColor: Colors.bgPrimary }]}>
       <ScrollView
@@ -438,82 +476,63 @@ export const DoItNowCompleteScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ═════════ TOP PHOTO STRIP ═════════ */}
-        <View style={styles.photoStrip}>
-          {stripPlaces.map((p, i) => {
-            const photo = stripPhotoFor(p);
-            return (
-              <View key={p.id || i} style={styles.photoTile}>
-                {photo ? (
-                  <Image source={{ uri: photo }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                ) : (
-                  <LinearGradient
-                    colors={[Colors.terracotta300, Colors.terracotta500]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                )}
-              </View>
-            );
-          })}
+        {/* ═════════ HERO — single cover photo with title overlay ═════════ */}
+        <View style={styles.hero}>
+          {heroPhoto ? (
+            <Image source={{ uri: heroPhoto }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+          ) : (
+            <LinearGradient
+              colors={[Colors.terracotta300, Colors.terracotta500]}
+              style={StyleSheet.absoluteFillObject}
+            />
+          )}
 
-          {/* Dark gradient fade at the bottom */}
+          {/* Bottom→top dark gradient pour la lisibilité du titre. */}
           <LinearGradient
-            colors={['transparent', 'rgba(44, 36, 32, 0.1)', 'rgba(245, 240, 232, 1)']}
-            locations={[0, 0.6, 1]}
-            style={styles.photoFade}
+            colors={['transparent', 'rgba(44, 36, 32, 0.55)', 'rgba(44, 36, 32, 0.85)']}
+            locations={[0.4, 0.78, 1]}
+            style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
 
-          {/* Close icon (top-left) */}
+          {/* × — close top-left */}
           <TouchableOpacity
-            style={[styles.circleBtn, { top: insets.top + 8, left: 16 }]}
+            style={[styles.heroCloseBtn, { top: insets.top + 12 }]}
             onPress={handleClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="close" size={18} color="#FFF" />
           </TouchableOpacity>
 
-          {/* Share icon (top-right) */}
-          <TouchableOpacity
-            style={[styles.circleBtn, { top: insets.top + 8, right: 16 }]}
-            onPress={handleShare}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="paper-plane-outline" size={17} color="#FFF" />
-          </TouchableOpacity>
-
-          {/* Date badge overlay (top-center) */}
-          <View style={[styles.dateBadge, { top: insets.top + 10 }]}>
-            <Text style={styles.dateBadgeText}>{dateBadge}</Text>
+          {/* Title block — eyebrow (date · ville · PLAN VÉCU) + grand titre. */}
+          <View style={styles.heroText}>
+            <Text style={styles.heroEyebrow}>{dateBadge} · PLAN VÉCU</Text>
+            <Text style={styles.heroTitle} numberOfLines={2}>{plan.title}</Text>
           </View>
         </View>
 
-        {/* ═════════ EDITORIAL TITLE ═════════ */}
-        <View style={styles.titleBlock}>
-          <Text style={styles.overline}>— PLAN VÉCU</Text>
-          <Text style={styles.editorialTitle}>{plan.title}.</Text>
+        {/* ═════════ STATS CARD ═════════ */}
+        <View style={[styles.statsCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
+          <View style={styles.statBlock}>
+            <Text style={styles.statValue}>{plan.places.length}</Text>
+            <Text style={styles.statLabel}>ÉTAPES</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: Colors.borderSubtle }]} />
+          <View style={styles.statBlock}>
+            <Text style={[styles.statValue, { color: Colors.terracotta700 }]}>
+              {avgRating !== null ? `${avgRating}★` : '—'}
+            </Text>
+            <Text style={styles.statLabel}>MOYENNE</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: Colors.borderSubtle }]} />
+          <View style={styles.statBlock}>
+            <Text style={styles.statValue}>{totalCreatorDuration}</Text>
+            <Text style={styles.statLabel}>DURÉE</Text>
+          </View>
         </View>
 
-        {/* ═════════ PULL-QUOTE ═════════ */}
-        <View style={[styles.pullQuote, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}>
-          <Text style={styles.pullQuoteText}>
-            « {totalCreatorDuration} de {plan.city || cityConfig.name} à ton rythme.
-            {avgRating !== null ? (
-              <>
-                {'\n'}Moyenne{' '}
-                <Text style={styles.pullQuoteRating}>{avgRating}★</Text>
-                {' '}— tu t'es fait du bien. »
-              </>
-            ) : (
-              " Tu t'es fait du bien. »"
-            )}
-          </Text>
-        </View>
-
-        {/* ═════════ RECAP HEADER ═════════ */}
-        <Text style={[styles.overline, { marginTop: 18, marginBottom: 10 }]}>
-          — RÉCAP · {plan.places.length} ÉTAPE{plan.places.length > 1 ? 'S' : ''}
-        </Text>
+        {/* ═════════ TES ÉTAPES ═════════ */}
+        <Text style={styles.sectionEyebrow}>— TES ÉTAPES</Text>
 
         {/* ═════════ PLACES LIST ═════════ */}
         {plan.places.map((place, i) => {
@@ -601,90 +620,84 @@ export const DoItNowCompleteScreen: React.FC = () => {
           );
         })}
 
+        {/* ═════════ ET APRÈS ? — secondary actions in body ═════════ */}
+        <Text style={[styles.sectionEyebrow, { marginTop: 22 }]}>— ET APRÈS ?</Text>
+
+        {/* Partager à des amis — toujours visible (solo + co-plan). */}
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle }]}
+          onPress={handleShare}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: Colors.bgPrimary }]}>
+            <Ionicons name="paper-plane" size={16} color={Colors.textPrimary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.actionTitle}>Partager à des amis</Text>
+            <Text style={styles.actionSub}>iMessage, WhatsApp, lien direct</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+        </TouchableOpacity>
+
+        {/* Publier sur le feed — sémantique adaptée au mode :
+            co-plan → CoPlanPublish (enrichir avant publication)
+            solo    → Proof It modal (publier ma proof sur le plan).
+            Cf. doc de handlePublish plus haut.
+            Caché en solo si déjà proofed (action terminée). */}
+        {(isCoPlan || !isAlreadyProofed) && (
+          <TouchableOpacity
+            style={[
+              styles.actionCard,
+              {
+                backgroundColor: Colors.bgSecondary,
+                borderColor: Colors.borderSubtle,
+                opacity: isSubmitting ? 0.7 : 1,
+              },
+            ]}
+            onPress={handlePublish}
+            activeOpacity={0.85}
+            disabled={isSubmitting}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: Colors.terracotta50 }]}>
+              <Ionicons name="share-social" size={16} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.actionTitle}>Publier sur le feed</Text>
+              <Text style={styles.actionSub}>
+                {isCoPlan
+                  ? 'Visible par toute la communauté Proof'
+                  : 'Confirme avoir fait ce plan et apparais dans les Proof'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* ═════════ FOOTER — 3 actions ═════════
-          En mode co-plan (plan privé issu d'un brouillon de groupe), le
-          footer remplace 'Refaire' / 'Fin' par les 2 boutons de la carte
-          'Plan de groupe terminé' (devenue redondante, retirée).
-          En mode solo classique, le footer historique reste : Partager /
-          Refaire / Fin. */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12, borderTopColor: Colors.borderSubtle }]}>
-        <TouchableOpacity style={[styles.ghostBtn, { borderColor: Colors.borderMedium }]} onPress={handleShare} activeOpacity={0.7}>
-          <Ionicons name="paper-plane-outline" size={14} color={Colors.textPrimary} />
-          <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Partager</Text>
+      {/* ═════════ STICKY FOOTER — single primary CTA "Terminer" ═════════
+          Action de sortie discrète : marque le plan fait dans les saves
+          sans le pousser sur le feed (= l'user a déjà eu l'opportunité
+          via la carte "Publier sur le feed" au-dessus s'il le voulait).
+          En mode solo + déjà proofed, l'action ferme simplement. */}
+      <View style={[styles.footerSticky, { paddingBottom: insets.bottom + 12, borderTopColor: Colors.borderSubtle }]}>
+        <TouchableOpacity
+          style={[
+            styles.terminerBtn,
+            {
+              backgroundColor: Colors.primary,
+              opacity: isSubmitting ? 0.7 : 1,
+            },
+          ]}
+          onPress={isAlreadyProofed && !isCoPlan ? handleClose : handleTerminer}
+          activeOpacity={0.85}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.terminerText}>
+            {isAlreadyProofed && !isCoPlan ? 'Fermer' : 'Terminer'}
+          </Text>
         </TouchableOpacity>
-
-        {isCoPlan ? (
-          <>
-            {/* Ajouter à 'fait' — markAsDone DIRECT (sans ouvrir le
-                Proof It modal). Le co-plan n'a pas à être 'validé' au
-                Proof It (qui sert à confirmer qu'on a refait le plan
-                de quelqu'un d'autre) — ici c'est SON plan, on l'ajoute
-                juste à l'onglet 'Fait' des saves. */}
-            <TouchableOpacity
-              style={[
-                styles.ghostBtn,
-                {
-                  borderColor: Colors.borderMedium,
-                  opacity: isSubmitting ? 0.7 : 1,
-                },
-              ]}
-              onPress={handleAddToDone}
-              activeOpacity={0.7}
-              disabled={isSubmitting}
-            >
-              <Ionicons name="checkmark-circle-outline" size={14} color={Colors.textPrimary} />
-              <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Ajouter à « fait »</Text>
-            </TouchableOpacity>
-            {/* Publier sur le feed — navigate vers CoPlanPublishScreen
-                où le user enrichit (cover, tags, tip) avant publication. */}
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: Colors.primary }]}
-              onPress={() => {
-                if (!plan) return;
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                navigation.navigate('CoPlanPublish', { planId: plan.id });
-              }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="paper-plane" size={14} color={Colors.textOnAccent} />
-              <Text style={styles.primaryBtnText}>Publier</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity style={[styles.ghostBtn, { borderColor: Colors.borderMedium }]} onPress={handleRedo} activeOpacity={0.7}>
-              <Ionicons name="bookmark-outline" size={14} color={Colors.textPrimary} />
-              <Text style={[styles.ghostBtnText, { color: Colors.textPrimary }]}>Refaire</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                {
-                  backgroundColor: isAlreadyProofed ? Colors.bgTertiary : Colors.primary,
-                  opacity: isSubmitting ? 0.7 : 1,
-                },
-              ]}
-              onPress={handleFinalize}
-              activeOpacity={0.85}
-              disabled={isSubmitting}
-            >
-              {isAlreadyProofed ? (
-                <>
-                  <Ionicons name="checkmark-circle" size={14} color={Colors.textSecondary} />
-                  <Text style={[styles.primaryBtnText, { color: Colors.textSecondary }]}>Déjà validé</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.primaryBtnText}>Fin</Text>
-                  <Ionicons name="sparkles" size={14} color={Colors.textOnAccent} />
-                </>
-              )}
-            </TouchableOpacity>
-          </>
-        )}
       </View>
 
       {/* Share sheet */}
@@ -716,95 +729,126 @@ export const DoItNowCompleteScreen: React.FC = () => {
 // ─────────────────────────────────────────────────────────────
 // Styles
 // ─────────────────────────────────────────────────────────────
-const PHOTO_STRIP_H = 270;
+const HERO_H = 320;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 16 },
 
-  // Photo strip top
-  photoStrip: {
+  // Hero — single big cover photo with title overlay
+  hero: {
     width: '100%',
-    height: PHOTO_STRIP_H,
-    flexDirection: 'row',
+    height: HERO_H,
     position: 'relative',
     backgroundColor: '#2C2420',
-  },
-  photoTile: {
-    flex: 1,
-    height: '100%',
-    position: 'relative',
     overflow: 'hidden',
   },
-  photoFade: {
+  heroCloseBtn: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 90,
-  },
-  circleBtn: {
-    position: 'absolute',
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    left: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(44, 36, 32, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dateBadge: {
+  heroText: {
     position: 'absolute',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(44, 36, 32, 0.72)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 99,
+    left: 20,
+    right: 20,
+    bottom: 22,
   },
-  dateBadgeText: {
-    fontSize: 10.5,
+  heroEyebrow: {
+    fontSize: 11,
     fontFamily: Fonts.bodySemiBold,
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 1.4,
+    marginBottom: 8,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontFamily: Fonts.displaySemiBoldItalic,
     color: '#FFF',
-    letterSpacing: 1.2,
+    letterSpacing: -0.5,
+    lineHeight: 36,
   },
 
-  // Editorial title under the strip
-  titleBlock: {
-    paddingHorizontal: 20,
-    marginTop: -30,
+  // Stats card — 3 colonnes (étapes / moyenne / durée) sous le hero
+  statsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  overline: {
+  statBlock: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 20,
+    fontFamily: Fonts.displaySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 1.4,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 28,
+  },
+
+  // Section eyebrows ("— TES ÉTAPES", "— ET APRÈS ?")
+  sectionEyebrow: {
     fontSize: 11,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textTertiary,
     letterSpacing: 1.3,
     textTransform: 'uppercase',
-  },
-  editorialTitle: {
-    fontSize: 34,
-    fontFamily: Fonts.displaySemiBoldItalic,
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-    lineHeight: 38,
-    marginTop: 4,
+    marginHorizontal: 20,
+    marginTop: 22,
+    marginBottom: 12,
   },
 
-  // Pull-quote card
-  pullQuote: {
-    marginHorizontal: 20,
-    marginTop: 14,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
+  // Action cards (Partager / Publier) dans la section "ET APRÈS ?"
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  pullQuoteText: {
-    fontSize: 15,
-    fontFamily: Fonts.displayItalic,
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionTitle: {
+    fontSize: 14.5,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
-    lineHeight: 22,
+    letterSpacing: -0.1,
   },
-  pullQuoteRating: {
-    color: Colors.primary,
-    fontFamily: Fonts.displaySemiBoldItalic,
+  actionSub: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 
   // Place card
@@ -899,127 +943,30 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
   },
 
-  // Footer
-  // ── Co-plan publish card ──
-  coPlanCard: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: Colors.terracotta50,
-    borderWidth: 1,
-    borderColor: Colors.terracotta200,
-  },
-  coPlanCardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  coPlanCardIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.bgSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coPlanCardEyebrow: {
-    fontSize: 9.5,
-    fontFamily: Fonts.bodyBold,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: Colors.primary,
-    marginBottom: 2,
-  },
-  coPlanCardTitle: {
-    fontSize: 15,
-    fontFamily: Fonts.displaySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  coPlanCardSubtitle: {
-    fontSize: 12.5,
-    fontFamily: Fonts.body,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  coPlanCardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  coPlanCardBtnGhost: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 11,
-    borderRadius: 99,
-    backgroundColor: Colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-  },
-  coPlanCardBtnGhostText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-  },
-  coPlanCardBtnPrimary: {
-    flex: 1.3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 11,
-    borderRadius: 99,
-    backgroundColor: Colors.primary,
-  },
-  coPlanCardBtnPrimaryText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textOnAccent,
-  },
-
-  // Footer 3 boutons — pill rounded, taille égale (flex:1 partout) pour
-  // cohérence avec OrganizeCompleteScreen + équilibre visuel.
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  // Sticky footer — un seul gros CTA "Terminer" en bas de page,
+  // au-dessus de la zone safe. Le reste des actions (Partager,
+  // Publier) est dans le corps via les actionCards.
+  footerSticky: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     backgroundColor: Colors.bgPrimary,
   },
-  ghostBtn: {
-    flex: 1,
-    flexDirection: 'row',
+  terminerBtn: {
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 11,
-    borderRadius: 99,
-    borderWidth: 1,
-    backgroundColor: Colors.bgSecondary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  ghostBtnText: {
-    fontSize: 12,
-    fontFamily: Fonts.bodySemiBold,
-  },
-  primaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 11,
-    borderRadius: 99,
-  },
-  primaryBtnText: {
-    fontSize: 12,
+  terminerText: {
+    fontSize: 15,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textOnAccent,
+    letterSpacing: 0.1,
   },
 });
