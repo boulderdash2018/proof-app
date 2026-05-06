@@ -15,10 +15,8 @@ import {
   searchPlacesAutocomplete,
   getPlaceDetails,
 } from '../services/googlePlacesService';
-import { CoPlanProposedPlace, CoPlanParticipant, CoPlanProposal, Plan } from '../types';
+import { CoPlanProposedPlace, CoPlanParticipant, CoPlanProposal } from '../types';
 import { DurationPickerSheet } from './DurationPickerSheet';
-import { SavedPlanPickerSheet } from './SavedPlanPickerSheet';
-import { makeLocalId } from '../services/planDraftService';
 
 interface Props {
   participants: Record<string, CoPlanParticipant>;
@@ -51,64 +49,11 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
   const [proposingForId, setProposingForId] = useState<string | null>(null);
   /** Place currently targeted by the duration picker sheet, or null. */
   const [durationTarget, setDurationTarget] = useState<CoPlanProposedPlace | null>(null);
-  /** Saved-plan picker — only available pre-group, only to the creator. */
-  const [savedPickerOpen, setSavedPickerOpen] = useState(false);
-
-  const replaceAllProposedPlaces = useCoPlanStore((s) => s.replaceAllProposedPlaces);
-
-  // Gate du bouton "Importer depuis un plan sauvegardé" :
-  // 1. Le brouillon doit être en phase "solo" (pas encore de conv créée)
-  // 2. L'utilisateur courant doit être le créateur du brouillon
-  // C'est volontairement strict — une fois que le groupe existe, importer
-  // un plan complet écraserait les contributions des autres, ce qui est
-  // contraire à l'esprit collaboratif du workspace.
-  const isCreatorPreGroup = !!(
-    draft &&
-    user &&
-    draft.createdBy === user.id &&
-    !draft.conversationId &&
-    !draft.publishedConvId
-  );
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setPickerOpen(true);
   };
-
-  /**
-   * Bulk import : remplace tous les proposedPlaces actuels par les lieux
-   * d'un Plan sauvegardé. Le user a explicitement choisi ce plan via le
-   * sheet, donc on n'affiche pas de confirm — c'est l'intent direct.
-   *
-   * Conversion : Plan.places (Place[]) → CoPlanProposedPlace[]. Chaque
-   * lieu est marqué `proposedBy = user.id` et `votes = [user.id]`
-   * (auto-upvote, comme proposePlace standard).
-   */
-  const handleImportFromSavedPlan = useCallback(
-    async (sourcePlan: Plan) => {
-      if (!user) return;
-      const now = new Date().toISOString();
-      const newPlaces: CoPlanProposedPlace[] = (sourcePlan.places || []).map((p, idx) => ({
-        id: makeLocalId(),
-        googlePlaceId: p.googlePlaceId || '',
-        name: p.name,
-        address: p.address,
-        photoUrl: p.photoUrls?.[0],
-        category: p.type,
-        priceLevel: p.priceLevel,
-        estimatedDurationMin: p.placeDuration,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        proposedBy: user.id,
-        proposedAt: now,
-        votes: [user.id],
-        orderIndex: idx + 1,
-      }));
-      await replaceAllProposedPlaces(newPlaces);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    },
-    [user, replaceAllProposedPlaces],
-  );
 
   const handleVote = useCallback((placeId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -149,37 +94,6 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
 
   return (
     <View>
-      {/* "Importer depuis un plan sauvegardé" — visible UNIQUEMENT en
-          phase solo (avant la création du groupe) ET au créateur du
-          brouillon. Une fois la conv créée, cette option disparaît :
-          écraser les lieux quand d'autres ont déjà contribué irait à
-          l'encontre de l'esprit collaboratif. */}
-      {isCreatorPreGroup && (
-        <TouchableOpacity
-          style={styles.importBtn}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-            setSavedPickerOpen(true);
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={styles.importIconWrap}>
-            <Ionicons name="bookmark" size={14} color={Colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.importTitle}>
-              Importer depuis un plan sauvegardé
-            </Text>
-            <Text style={styles.importHint}>
-              {places.length > 0
-                ? 'Les lieux actuels seront remplacés'
-                : 'Démarre vite avec les lieux d\'un plan existant'}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={Colors.gray500} />
-        </TouchableOpacity>
-      )}
-
       {/* Primary action — promoted to the TOP of the section so the move
           to "propose something" feels like the natural next step, not an
           afterthought hidden under an empty state. */}
@@ -303,17 +217,6 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
             console.warn('[CoPlanPlacesSection] pick error:', err);
           }
         }}
-      />
-
-      {/* Saved-plan picker (creator + pre-group only) */}
-      <SavedPlanPickerSheet
-        visible={savedPickerOpen}
-        onClose={() => setSavedPickerOpen(false)}
-        onPick={(plan) => {
-          handleImportFromSavedPlan(plan);
-        }}
-        title="Importer depuis un plan sauvegardé"
-        subtitle="Tous les lieux du plan choisi remplaceront ceux du brouillon."
       />
     </View>
   );
@@ -879,38 +782,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Default (= already has places) — outlined dashed button.
-  importBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: Colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: Colors.terracotta300,
-    marginBottom: 8,
-  },
-  importIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.terracotta50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  importTitle: {
-    fontSize: 13,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-    marginBottom: 1,
-  },
-  importHint: {
-    fontSize: 11,
-    fontFamily: Fonts.body,
-    color: Colors.textSecondary,
-  },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -332,9 +332,31 @@ export const CreateScreen: React.FC = () => {
   const [pricePickerPlaceId, setPricePickerPlaceId] = useState<string | null>(null);
 
   // "Partir d'un plan sauvegardé" picker state — opened from step 1.
-  // Prefilling is non-destructive : si le user a déjà tapé un titre, on
-  // l'écrase volontairement (intent assumed : "je repars de zéro depuis ce plan").
+  // Après import on bascule en `flowMode='fromSaved'` et on saute
+  // DIRECTEMENT à l'étape "lieux" pour que le user perçoive l'action
+  // (sinon il a l'impression que rien ne se passe — le sheet se ferme
+  // mais l'écran reste sur la step "titre").
   const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
+
+  /**
+   * Le wizard a deux flows distincts :
+   *   • 'fresh'     — création depuis zéro : titre → cover → catégories → lieux → tip
+   *   • 'fromSaved' — préfill depuis un Plan sauvegardé : on commence par
+   *     les LIEUX (préremplis, le user ajoute/retire/réordonne), puis
+   *     titre VIDE (avec un breadcrumb du plan source), puis cover, puis
+   *     catégories, puis tip.
+   *
+   * Mirror de la même logique qu'OrganizeScreen — quand on importe un
+   * plan, le user veut d'abord ajuster les LIEUX à sa sauce, et ensuite
+   * lui donner SON nom (pas celui du plan source).
+   */
+  type FlowMode = 'fresh' | 'fromSaved';
+  const [flowMode, setFlowMode] = useState<FlowMode>('fresh');
+  /** Titre du plan source — affiché comme breadcrumb sur l'étape titre
+   *  en mode `fromSaved` pour donner du contexte au user (ex. "Tu pars
+   *  de Dimanche au Marais — donne-lui ton angle"). Null en flow fresh
+   *  ou si le plan importé n'avait pas de titre. */
+  const [importedSourceTitle, setImportedSourceTitle] = useState<string | null>(null);
 
   /**
    * Préfill complet du wizard à partir d'un Plan sauvegardé. Recopie
@@ -345,9 +367,17 @@ export const CreateScreen: React.FC = () => {
    * Pas de coverPhotos en duplicata : on copie le tableau original (URLs
    * Firebase Storage déjà uploadées, partagées entre les deux plans —
    * acceptable car ce sont des assets publics figés).
+   *
+   * Le titre est volontairement VIDÉ : le plan modifié n'est pas le
+   * même que l'original, donc garder le titre serait trompeur. Le user
+   * est invité à choisir son propre nom à l'étape titre (qui passe
+   * MAINTENANT après les lieux dans le flow `fromSaved`).
    */
   const prefillFromSavedPlan = (src: Plan) => {
-    setTitle(src.title || '');
+    // Titre VIDE — le plan modifié mérite un nom propre. Le breadcrumb
+    // garde le contexte : "Tu pars de '${src.title}'".
+    setTitle('');
+    setImportedSourceTitle(src.title || null);
     setCoverPhotos(src.coverPhotos || []);
     setSelectedTags(src.tags || []);
     setAuthorTip(src.authorTip || '');
@@ -393,6 +423,13 @@ export const CreateScreen: React.FC = () => {
     setTravels(newTravels);
     // Reset error state — toute valeur précédente devient obsolète.
     setErrors({});
+    // Bascule de flow : on saute MAINTENANT à l'étape "lieux" (step 4)
+    // pour que le user perçoive l'action et puisse modifier la liste
+    // tout de suite. ACTIVE_STEPS sera réordonné à [4, 1, 2, 3, 5] —
+    // après les lieux on demande SON titre, puis cover, puis catégories,
+    // puis tip. Cf. la définition de ACTIVE_STEPS plus bas.
+    setFlowMode('fromSaved');
+    setStep(4);
   };
 
   // ========== 5-STEP WIZARD (1: title, 2: cover, 3: categories, 4: places, 5: creator tip) ==========
@@ -420,11 +457,18 @@ export const CreateScreen: React.FC = () => {
    */
   const isCustomizeMode = (route.params?.draftId || '').startsWith('organize-');
 
-  /** Indices d'étape ACTIVES selon le mode. Un wizard fresh utilise les
-   *  5 étapes ; le mode customize en utilise 3. L'ordre est conservé.
+  /** Indices d'étape ACTIVES selon le mode + flow.
+   *  - `customize` (depuis OrganizeCompleteScreen) : 3 étapes (cover, lieux, tip)
+   *  - `fromSaved` (après import d'un plan sauvegardé) : 5 étapes RÉORDONNÉES
+   *    pour que les LIEUX viennent en premier, le TITRE après — sinon le user
+   *    a l'impression que rien ne se passe quand il importe.
+   *  - `fresh` (création standard) : ordre naturel [1..5].
    *  Le `step` stocké reste l'index du composant render (pour ne pas
    *  toucher tout le code des `step === N`). */
-  const ACTIVE_STEPS: Step[] = isCustomizeMode ? [2, 4, 5] : [1, 2, 3, 4, 5];
+  const ACTIVE_STEPS: Step[] =
+    isCustomizeMode ? [2, 4, 5] :
+    flowMode === 'fromSaved' ? [4, 1, 2, 3, 5] :
+    [1, 2, 3, 4, 5];
 
   /** Position 1-based dans la séquence active (utilisé pour "ÉTAPE X SUR Y"). */
   const stepPosition = ACTIVE_STEPS.indexOf(step) + 1;
@@ -2169,34 +2213,55 @@ export const CreateScreen: React.FC = () => {
           {/* ═══════ STEP 1: Title only — editorial composer ═══════ */}
           {step === 1 && (
             <View style={styles.s0Container}>
-              <Text style={styles.s0Prompt}>Qu'est-ce que tu proposes ?</Text>
+              <Text style={styles.s0Prompt}>
+                {flowMode === 'fromSaved' ? 'Donne-lui ton nom' : 'Qu\'est-ce que tu proposes ?'}
+              </Text>
               <Text style={styles.s0Helper}>
-                Un titre court et précis vaut mieux qu'un long descriptif.
+                {flowMode === 'fromSaved'
+                  ? 'Tu as adapté les lieux à ta sauce — choisis maintenant un titre qui te ressemble.'
+                  : 'Un titre court et précis vaut mieux qu\'un long descriptif.'}
               </Text>
 
               {/* "Partir d'un plan sauvegardé" — bouton pour préfiller le
                   wizard depuis un plan existant. Placé EN HAUT (avant
                   l'input qui ouvre le clavier en autoFocus) sinon il est
-                  poussé sous le viewport et invisible. */}
-              <TouchableOpacity
-                style={styles.s0ImportBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setShowSavedPlanPicker(true);
-                }}
-                activeOpacity={0.85}
-              >
-                <View style={styles.s0ImportIconWrap}>
-                  <Ionicons name="bookmark" size={16} color={Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.s0ImportTitle}>Partir d'un plan sauvegardé</Text>
-                  <Text style={styles.s0ImportHint}>
-                    Re-utilise un plan existant et modifie ce que tu veux
+                  poussé sous le viewport et invisible.
+                  Caché en mode `fromSaved` : on est déjà parti d'un plan,
+                  ré-importer écraserait les modifs en cours. */}
+              {flowMode === 'fresh' && (
+                <TouchableOpacity
+                  style={styles.s0ImportBtn}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setShowSavedPlanPicker(true);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.s0ImportIconWrap}>
+                    <Ionicons name="bookmark" size={16} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.s0ImportTitle}>Partir d'un plan sauvegardé</Text>
+                    <Text style={styles.s0ImportHint}>
+                      Re-utilise un plan existant et modifie ce que tu veux
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
+                </TouchableOpacity>
+              )}
+
+              {/* Breadcrumb du plan source (mode `fromSaved` uniquement).
+                  Donne du contexte sans inciter à reprendre tel quel le
+                  titre original — qui n'est plus exact maintenant que les
+                  lieux ont été modifiés. */}
+              {flowMode === 'fromSaved' && importedSourceTitle && (
+                <View style={styles.s0SourceBreadcrumb}>
+                  <Ionicons name="bookmark" size={13} color={Colors.terracotta600} />
+                  <Text style={styles.s0SourceBreadcrumbText} numberOfLines={2}>
+                    Tu pars de <Text style={styles.s0SourceBreadcrumbTitle}>« {importedSourceTitle} »</Text>
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
-              </TouchableOpacity>
+              )}
 
               <View style={styles.s0InputWrap}>
                 <RNTextInput
@@ -3047,18 +3112,19 @@ export const CreateScreen: React.FC = () => {
           </View>
         </Modal>
 
-        {/* ========== SAVED PLAN PICKER (step 1) ========== */}
+        {/* ========== SAVED PLAN PICKER ==========
+            Disponible UNIQUEMENT à l'étape titre en mode `fresh`. Au pick,
+            `prefillFromSavedPlan` préremplit tout, bascule en `fromSaved`
+            et saute à l'étape "lieux" (cf. son implémentation plus haut)
+            pour que l'action soit perceptible. */}
         <SavedPlanPickerSheet
           visible={showSavedPlanPicker}
           onClose={() => setShowSavedPlanPicker(false)}
           onPick={(plan) => {
             prefillFromSavedPlan(plan);
-            // Navigation : on reste sur l'étape 1 — c'est plus safe, le user
-            // valide le titre puis avance lui-même. Évite un saut perçu si
-            // le plan source avait un titre vide ou imprévu.
           }}
           title="Partir d'un plan sauvegardé"
-          subtitle="Tous les détails sont préremplis. Tu peux modifier ce que tu veux ensuite."
+          subtitle="Tu pourras ajuster les lieux, puis donner ton propre nom au plan."
         />
 
         {/* ========== DURATION PICKER (customize mode — étape lieux) ========== */}
@@ -3604,6 +3670,30 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
+  },
+  // Breadcrumb du plan source — affiché en haut de l'étape titre quand
+  // l'user arrive après un import. Plus discret que le bouton import :
+  // c'est juste un rappel contextuel ("tu pars de X"), pas un CTA.
+  s0SourceBreadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: Colors.terracotta50,
+    marginBottom: 14,
+  },
+  s0SourceBreadcrumbText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  s0SourceBreadcrumbTitle: {
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta600,
   },
   s0InspirationLabel: {
     fontSize: 10,

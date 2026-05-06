@@ -71,6 +71,12 @@ export const OrganizeScreen: React.FC = () => {
   // partir d'un Plan déjà bookmark. Ouvert depuis l'étape 1.
   const [showSavedPlanPicker, setShowSavedPlanPicker] = useState(false);
 
+  /** Titre du plan source — affiché comme breadcrumb sur l'étape titre
+   *  en mode `fromSaved` pour donner du contexte au user (ex. "Tu pars
+   *  de Dimanche au Marais — donne-lui ton angle"). Null en flow fresh
+   *  ou si le plan importé n'avait pas de titre. */
+  const [importedSourceTitle, setImportedSourceTitle] = useState<string | null>(null);
+
   /**
    * Préfill : tags + places à partir d'un Plan source. Le user choisira
    * son propre titre — sinon il aurait l'impression de copier le plan
@@ -82,6 +88,7 @@ export const OrganizeScreen: React.FC = () => {
    */
   const prefillFromSavedPlan = (src: Plan) => {
     setTitle(''); // titre VIDE — le user crée le sien
+    setImportedSourceTitle(src.title || null);
     setSelectedTags(src.tags || []);
     const newPlaces: PlaceEntry[] = (src.places || []).map((p, idx) => ({
       id: `prefill-${Date.now()}-${idx}`,
@@ -507,7 +514,11 @@ export const OrganizeScreen: React.FC = () => {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.stepHint}>Le nom court qui résume l'ambiance. Tu pourras le changer plus tard.</Text>
+              <Text style={styles.stepHint}>
+                {flowMode === 'fromSaved'
+                  ? 'Tu as adapté les lieux à ta sauce — donne-lui maintenant un nom qui te ressemble.'
+                  : 'Le nom court qui résume l\'ambiance. Tu pourras le changer plus tard.'}
+              </Text>
 
               {/* "Partir d'un plan sauvegardé" — préfill du wizard depuis
                   un plan déjà sauvegardé. Placé en HAUT (avant l'input qui
@@ -533,6 +544,18 @@ export const OrganizeScreen: React.FC = () => {
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={Colors.gray500} />
                 </TouchableOpacity>
+              )}
+
+              {/* Breadcrumb du plan source — donne du contexte au user
+                  qui arrive sur l'étape titre après import + édition des
+                  lieux. Affiché UNIQUEMENT en mode `fromSaved`. */}
+              {flowMode === 'fromSaved' && importedSourceTitle && (
+                <View style={styles.sourceBreadcrumb}>
+                  <Ionicons name="bookmark" size={13} color={Colors.terracotta600} />
+                  <Text style={styles.sourceBreadcrumbText} numberOfLines={2}>
+                    Tu pars de <Text style={styles.sourceBreadcrumbTitle}>« {importedSourceTitle} »</Text>
+                  </Text>
+                </View>
               )}
 
               <View style={[styles.inputWrap, { backgroundColor: Colors.bgSecondary, borderColor: title.length > 0 ? Colors.primary : Colors.borderSubtle, marginTop: 16 }]}>
@@ -1122,6 +1145,31 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
+  },
+  // Breadcrumb du plan source — affiché en haut de l'étape titre quand
+  // l'user arrive après un import. Discret (pas un CTA), juste un
+  // rappel contextuel "tu pars de X".
+  sourceBreadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: Colors.terracotta50,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  sourceBreadcrumbText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  sourceBreadcrumbTitle: {
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.terracotta600,
   },
 
   // ─────────────────────────────────────────────────────────────
