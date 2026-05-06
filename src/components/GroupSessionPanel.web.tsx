@@ -17,24 +17,43 @@ import {
   ParticipantStatus,
 } from '../utils/groupSessionProgress';
 
+export type MapFilter = 'all' | 'places' | 'people';
+
 interface Props {
   visible: boolean;
   sessionId: string;
-  myLocation?: { lat: number; lng: number } | null;
+  /** Current map filter — controlled by parent. */
+  filter: MapFilter;
+  /** User picked a filter chip → parent applies it on the embedded map. */
+  onFilterChange: (filter: MapFilter) => void;
+  /** User tapped a participant row → parent pans the EMBEDDED map to that
+   *  participant's live position, then auto-closes the panel so the user
+   *  can see the result. */
+  onParticipantTap: (userId: string) => void;
   onClose: () => void;
 }
 
 /**
- * Native variant — list-only fallback for the unified group session map.
+ * Group session control panel — replaces the old `GroupLiveMapSheet`
+ * AND the misguided `GroupSessionMap` (which carried its own map and
+ * thus DOUBLED the map surface — exactly what the user complained about).
  *
- * The web variant (`GroupSessionMap.web.tsx`) renders a Google Map with
- * places + avatars + filter chips. On native we'd need react-native-maps
- * which isn't wired in this commit — the list still delivers the key
- * value (per-participant progress + step + ETA), and the same drawer
- * pattern as the web variant. When native maps land, this file can
- * grow a MapView above the drawer without changing the API.
+ * This panel is a bottom slide-up sheet that has NO map of its own.
+ * The single source-of-truth map is the embedded one in DoItNowScreen.web,
+ * which renders BOTH places AND friend-avatar overlays. The panel just
+ * exposes :
+ *   • filter chips (Tous / Lieux / Amis) — re-fits + applies visibility
+ *     constraints on the embedded map via `onFilterChange`
+ *   • participants list with progress (step chip "2/4" + status badge +
+ *     "À 230m du Café X" line)
+ *   • tap-to-fly on any participant → parent pans the embedded map +
+ *     closes the panel so the result is visible
+ *
+ * Result : ONE map. The panel is purely a control + browse surface.
  */
-export const GroupSessionMap: React.FC<Props> = ({ visible, sessionId, onClose }) => {
+export const GroupSessionPanel: React.FC<Props> = ({
+  visible, sessionId, filter, onFilterChange, onParticipantTap, onClose,
+}) => {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const { presences, optInStatus, optIn, optOut } = useLivePresence(visible ? sessionId : undefined);
@@ -49,19 +68,30 @@ export const GroupSessionMap: React.FC<Props> = ({ visible, sessionId, onClose }
 
   const participantRows = useMemo(() => {
     if (!session || !plan) return [];
-    return Object.values(session.participants).map((p) => {
-      const live = presences.find((lp) => lp.userId === p.userId) || null;
-      const progress = computeParticipantProgress(p, session.placeOrder, placesById, live);
-      return { participant: p, live, progress };
-    });
+    return Object.values(session.participants)
+      .map((p) => {
+        const live = presences.find((lp) => lp.userId === p.userId) || null;
+        const progress = computeParticipantProgress(p, session.placeOrder, placesById, live);
+        return { participant: p, live, progress };
+      })
+      // Live participants first (more interesting / actionable), then
+      // those without a shared position. Within each group, sort by
+      // step desc so the leader appears first — soft-race feel.
+      .sort((a, b) => {
+        if (!!a.live !== !!b.live) return a.live ? -1 : 1;
+        return b.progress.stepIdx - a.progress.stepIdx;
+      });
   }, [session, plan, presences, placesById]);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 14 }]} onPress={() => {}}>
           <View style={styles.grabber} />
 
+          {/* Header */}
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.eyebrow}>EN GROUPE</Text>
@@ -72,29 +102,62 @@ export const GroupSessionMap: React.FC<Props> = ({ visible, sessionId, onClose }
             </TouchableOpacity>
           </View>
 
+          {/* Filter chips — drive what's visible on the EMBEDDED map. */}
+          <View style={styles.filterRow}>
+            {([
+              { key: 'all',    label: 'Tous',  icon: 'apps-outline'      as const },
+              { key: 'places', label: 'Lieux', icon: 'location-outline'  as const },
+              { key: 'people', label: 'Amis',  icon: 'people-outline'    as const },
+            ]).map((opt) => {
+              const active = filter === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => onFilterChange(opt.key as MapFilter)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name={opt.icon} size={13} color={active ? Colors.textOnAccent : Colors.textSecondary} />
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Opt-in CTA */}
           {optInStatus === 'pending' && (
             <View style={styles.optInBox}>
-              <Text style={styles.optInTitle}>Partager ta position avec le groupe ?</Text>
-              <Text style={styles.optInBody}>
-                Tes amis verront ton point sur la carte. Tu peux te retirer à tout moment.
-              </Text>
-              <View style={styles.optInRow}>
-                <TouchableOpacity style={styles.optInGhost} onPress={optOut} activeOpacity={0.7}>
-                  <Text style={styles.optInGhostText}>Pas maintenant</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.optInPrimary} onPress={optIn} activeOpacity={0.85}>
-                  <Text style={styles.optInPrimaryText}>Partager</Text>
-                </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optInTitle}>Partager ta position ?</Text>
+                <Text style={styles.optInBody}>
+                  Tes amis te verront sur la carte, et tu pourras les suivre en temps réel.
+                </Text>
               </View>
+              <TouchableOpacity style={styles.optInPrimary} onPress={optIn} activeOpacity={0.85}>
+                <Text style={styles.optInPrimaryText}>Partager</Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={{ paddingTop: 4 }}>
+          {/* Participants list */}
+          <ScrollView
+            style={{ maxHeight: 420 }}
+            contentContainerStyle={{ paddingTop: 4 }}
+            showsVerticalScrollIndicator={false}
+          >
             {participantRows.map(({ participant: p, live, progress }) => {
               const isMe = p.userId === user?.id;
+              const tappable = !!live;
               const statusBadgeStyle = badgeStyleFor(progress.status);
               return (
-                <View key={p.userId} style={styles.row}>
+                <Pressable
+                  key={p.userId}
+                  onPress={() => tappable && onParticipantTap(p.userId)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    pressed && tappable && { backgroundColor: Colors.bgPrimary },
+                  ]}
+                >
                   <Avatar
                     initials={p.initials}
                     bg={p.avatarBg}
@@ -112,20 +175,25 @@ export const GroupSessionMap: React.FC<Props> = ({ visible, sessionId, onClose }
                           {formatStepChip(progress)}
                         </Text>
                       </View>
+                      {progress.status === 'on_site' && (
+                        <View style={styles.liveDot} />
+                      )}
                     </View>
                     <Text style={styles.rowMeta} numberOfLines={1}>
-                      {formatProgressLine(progress)}
+                      {live ? formatProgressLine(progress) : 'Position non partagée'}
                     </Text>
                   </View>
-                  <View style={[styles.statusDot, live ? styles.statusDotLive : styles.statusDotOff]} />
-                </View>
+                  {tappable && (
+                    <Ionicons name="locate" size={16} color={Colors.primary} />
+                  )}
+                </Pressable>
               );
             })}
           </ScrollView>
 
           {optInStatus === 'opted-in' && (
             <TouchableOpacity style={styles.optOutFooter} onPress={optOut} activeOpacity={0.7}>
-              <Ionicons name="eye-off-outline" size={14} color={Colors.textTertiary} />
+              <Ionicons name="eye-off-outline" size={13} color={Colors.textTertiary} />
               <Text style={styles.optOutFooterText}>Arrêter de partager ma position</Text>
             </TouchableOpacity>
           )}
@@ -168,7 +236,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 18,
     paddingTop: 8,
-    maxHeight: '90%',
+    maxHeight: '85%',
   },
   grabber: {
     alignSelf: 'center',
@@ -197,51 +265,76 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     letterSpacing: -0.2,
   },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.bgPrimary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  chipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  chipText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+    letterSpacing: -0.05,
+  },
+  chipTextActive: { color: Colors.textOnAccent },
   optInBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: Colors.terracotta50,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.terracotta200,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   optInTitle: {
-    fontSize: 14,
-    fontFamily: Fonts.displaySemiBold,
+    fontSize: 13,
+    fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
-    letterSpacing: -0.15,
-    marginBottom: 6,
+    marginBottom: 2,
   },
   optInBody: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
-    lineHeight: 17,
-    marginBottom: 12,
+    lineHeight: 15,
   },
-  optInRow: { flexDirection: 'row', gap: 8 },
-  optInGhost: {
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: 'transparent',
-  },
-  optInGhostText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, color: Colors.textSecondary },
   optInPrimary: {
-    flex: 1,
+    paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: Colors.primary,
-    alignItems: 'center',
   },
-  optInPrimaryText: { fontSize: 13, fontFamily: Fonts.bodySemiBold, color: Colors.textOnAccent },
+  optInPrimaryText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 10,
+    paddingHorizontal: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.borderSubtle,
+    borderRadius: 8,
   },
   rowText: { flex: 1, minWidth: 0 },
   rowNameLine: {
@@ -266,27 +359,31 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
     letterSpacing: 0.2,
   },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
   rowMeta: {
     fontSize: 12,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusDotLive: { backgroundColor: Colors.success },
-  statusDotOff: { backgroundColor: Colors.borderMedium },
   optOutFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingTop: 12,
+    paddingBottom: 6,
     marginTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.borderSubtle,
   },
   optOutFooterText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: Fonts.bodyMedium,
     color: Colors.textTertiary,
   },

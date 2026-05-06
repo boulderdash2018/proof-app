@@ -42,7 +42,7 @@ export { BlockingClosedPlacesAlert } from './BlockingClosedPlacesAlert';
 export { CoPlanResolutionPill } from './CoPlanResolutionPill';
 export { CoPlanStatusBar } from './CoPlanStatusBar';
 export { GroupLiveMapSheet } from './GroupLiveMapSheet';
-export { GroupSessionMap } from './GroupSessionMap';
+export { GroupSessionPanel } from './GroupSessionPanel';
 export { SouvenirPromptToast } from './SouvenirPromptToast';
 export { SouvenirCaptureCard } from './SouvenirCaptureCard';
 export { SessionFloatingActions } from './SessionFloatingActions';

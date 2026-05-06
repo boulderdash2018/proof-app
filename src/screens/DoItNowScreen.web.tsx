@@ -12,9 +12,11 @@ import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { useAuthStore } from '../store';
 import { RouteResult } from '../services/directionsService';
 import { fetchPlanById } from '../services/plansService';
-import { GroupSessionLayer, GroupSessionMap, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import { GroupSessionLayer, GroupSessionPanel, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import type { MapFilter } from '../components/GroupSessionPanel.web';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
+import { useLivePresence } from '../hooks/useLivePresence';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
 import { notifySessionAdvanced, markUserFinishedInSession } from '../services/planSessionService';
 import { pickImage } from '../utils';
@@ -221,6 +223,10 @@ export const DoItNowScreen: React.FC = () => {
 
   // Group-session UI state
   const [mapSheetOpen, setMapSheetOpen] = useState(false);
+  // Filter applied to the EMBEDDED map (not a separate map !) — driven
+  // by the GroupSessionPanel filter chips. 'all' shows places + amis,
+  // 'places' hides the avatar overlays, 'people' fades the place markers.
+  const [mapFilter, setMapFilter] = useState<MapFilter>('all');
   const souvenirPrompts = useSouvenirPrompts();
   // Proof Camera — fullscreen branded camera that REPLACES the system
   // picker for the souvenir capture flow. The hook gives us an async
@@ -230,13 +236,20 @@ export const DoItNowScreen: React.FC = () => {
   const proofCamera = useProofCamera();
   const activeGroupSession = useGroupSessionStore((s) => s.activeSession);
   const groupConversationId = routeConversationId || activeGroupSession?.conversationId;
+  // Subscribe to live presences ONLY when we have a group session id.
+  // The hook is no-op when sessionId is undefined.
+  const { presences: friendPresences } = useLivePresence(routeSessionId || undefined);
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapObjRef = useRef<any>(null);
   const directionsServiceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const polylineRef = useRef<any>(null);
   const watchIdRef = useRef<number | null>(null);
   const userOverlayRef = useRef<any>(null);
   const justAdvancedRef = useRef(false);
+  // Friend avatar overlays — keyed by userId so we can reconcile on
+  // each presence tick without redrawing the map.
+  const friendOverlaysRef = useRef<Record<string, any>>({});
 
   const [loading, setLoading] = useState(true);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -298,6 +311,9 @@ export const DoItNowScreen: React.FC = () => {
       });
 
       // Plan route polyline via DirectionsService (terracotta, all places connected)
+      // Stocké dans polylineRef pour pouvoir le toggle on/off depuis l'effect
+      // de filtre (cf. plus bas — quand le filter passe sur "Amis", on cache
+      // les markers + la polyline pour ne laisser que les avatars).
       if (validPlaces.length >= 2) {
         const ds = new gm.DirectionsService();
         const origin = { lat: validPlaces[0].latitude, lng: validPlaces[0].longitude };
@@ -312,13 +328,18 @@ export const DoItNowScreen: React.FC = () => {
           optimizeWaypoints: false,
         }, (result: any, status: string) => {
           if (status === 'OK' && result) {
+            const path: any[] = [];
             result.routes[0].legs.forEach((leg: any) => {
-              const path = leg.steps.reduce((acc: any[], step: any) => acc.concat(step.path), []);
-              new gm.Polyline({ path, strokeColor: '#C4704B', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50 });
+              leg.steps.forEach((step: any) => {
+                step.path.forEach((pt: any) => path.push(pt));
+              });
+            });
+            polylineRef.current = new gm.Polyline({
+              path, strokeColor: '#C4704B', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50,
             });
           } else {
             // Fallback: straight lines
-            new gm.Polyline({
+            polylineRef.current = new gm.Polyline({
               path: validPlaces.map((p: any) => ({ lat: p.latitude, lng: p.longitude })),
               strokeColor: '#C4704B', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, map, zIndex: 50,
             });
@@ -338,6 +359,98 @@ export const DoItNowScreen: React.FC = () => {
       setLoading(false);
     });
   }, []);
+
+  // ── Friend avatar overlays (group session) ─────────────────────
+  // Watch friend live presences and reconcile avatar overlays on the
+  // EMBEDDED map. C'est CE qui transforme la map embedded en map
+  // unifiée : plus besoin d'un modal séparé, les amis apparaissent
+  // directement à côté des lieux. La logique d'overlay est extraite
+  // dans `utils/avatarMapOverlay.web` (réutilisée par l'ancien
+  // GroupLiveMapSheet aussi pendant la transition).
+  useEffect(() => {
+    if (!routeSessionId) return;
+    const gm = (window as any).google?.maps;
+    if (!gm || !mapObjRef.current) return;
+    let cancelled = false;
+
+    // Lazy-load to avoid bundling on solo flow.
+    import('../utils/avatarMapOverlay.web').then(({ getAvatarOverlayClass, makeAvatarMarkerHtml }) => {
+      if (cancelled) return;
+      const AvatarOverlayClass = getAvatarOverlayClass(gm);
+      const seen: Record<string, true> = {};
+
+      // Filter "places" → on n'affiche PAS les amis sur la map.
+      const showFriends = mapFilter !== 'places';
+
+      if (showFriends) {
+        const session = activeGroupSession;
+        friendPresences.forEach((lp) => {
+          const p = session?.participants[lp.userId];
+          // On masque "moi" — déjà représenté par le 🚶 overlay GPS.
+          if (lp.userId === user?.id) return;
+          const stale = Date.now() - lp.ts > 120_000;
+          const html = makeAvatarMarkerHtml({
+            userId: lp.userId,
+            lat: lp.lat,
+            lng: lp.lng,
+            initials: p?.initials || '?',
+            avatarBg: p?.avatarBg || '#C4704B',
+            avatarColor: p?.avatarColor || '#FFF8F0',
+            avatarUrl: p?.avatarUrl ?? null,
+            ts: lp.ts,
+          }, stale);
+          const position = new gm.LatLng(lp.lat, lp.lng);
+          const existing = friendOverlaysRef.current[lp.userId];
+          if (existing) {
+            existing.update(position, html);
+          } else {
+            const overlay = new AvatarOverlayClass(position, html);
+            overlay.setMap(mapObjRef.current);
+            friendOverlaysRef.current[lp.userId] = overlay;
+          }
+          seen[lp.userId] = true;
+        });
+      }
+      // Tear down overlays for users who left, opted-out, or are
+      // hidden by the current filter.
+      Object.keys(friendOverlaysRef.current).forEach((uid) => {
+        if (!seen[uid]) {
+          friendOverlaysRef.current[uid].setMap(null);
+          delete friendOverlaysRef.current[uid];
+        }
+      });
+    });
+    return () => { cancelled = true; };
+  }, [routeSessionId, friendPresences, mapFilter, activeGroupSession, user?.id]);
+
+  // ── Apply mapFilter to place markers + polyline ────────────────
+  // 'all' / 'places' → places visibles. 'people' → on cache pour
+  // mettre l'accent sur les amis. (Les avatars eux-mêmes sont gérés
+  // dans l'effect ci-dessus selon le même filtre.)
+  useEffect(() => {
+    const gm = (window as any).google?.maps;
+    if (!gm || !mapObjRef.current) return;
+    const showPlaces = mapFilter !== 'people';
+    markersRef.current.forEach((m) => m.setMap(showPlaces ? mapObjRef.current : null));
+    if (polylineRef.current) {
+      polylineRef.current.setMap(showPlaces ? mapObjRef.current : null);
+    }
+  }, [mapFilter]);
+
+  /** Pan the EMBEDDED map to a participant's live position + zoom in.
+   *  Appelé par le GroupSessionPanel quand le user tape sur une
+   *  rangée. Si on était sur le filter "Lieux", on bascule auto en
+   *  "Tous" pour que l'avatar soit visible. */
+  const panToParticipant = useCallback((userId: string) => {
+    const lp = friendPresences.find((p) => p.userId === userId);
+    if (!lp || !mapObjRef.current) return;
+    const gm = (window as any).google?.maps;
+    if (!gm) return;
+    if (mapFilter === 'places') setMapFilter('all');
+    mapObjRef.current.panTo(new gm.LatLng(lp.lat, lp.lng));
+    mapObjRef.current.setZoom(16);
+    setMapSheetOpen(false); // close panel so the user sees the pan
+  }, [friendPresences, mapFilter]);
 
   // ── Watch GPS — custom 🚶 overlay ──
   useEffect(() => {
@@ -1007,14 +1120,18 @@ export const DoItNowScreen: React.FC = () => {
             }}
           />
 
-          {/* Unified group session map — fusionne lieux + amis en une
-              seule surface, avec filter chips + drawer participants
-              (avancement, ETA, tap-to-fly). Remplace l'ancien
-              GroupLiveMapSheet (qui ne montrait que les amis). */}
-          <GroupSessionMap
+          {/* Unified group session — UN seul map (la map embedded ci-
+              dessus, qui rend ET les lieux ET les avatars amis live).
+              Le panel est juste une slide-up qui pilote ce map :
+                • filter chips → toggle visibilité places/avatars
+                • tap sur un participant → pan la map + close panel
+              Pas de map dans le panel — finie la duplication ! */}
+          <GroupSessionPanel
             visible={mapSheetOpen}
             sessionId={routeSessionId}
-            myLocation={userLoc ? { lat: userLoc.lat, lng: userLoc.lng } : null}
+            filter={mapFilter}
+            onFilterChange={setMapFilter}
+            onParticipantTap={panToParticipant}
             onClose={() => setMapSheetOpen(false)}
           />
 

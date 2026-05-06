@@ -26,7 +26,8 @@ import { getDirections, decodePolyline, RouteResult } from '../services/directio
 import { fetchPlanById } from '../services/plansService';
 import { Plan, DoItNowTransport } from '../types';
 import { useCity } from '../hooks/useCity';
-import { GroupSessionLayer, GroupSessionMap, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import { GroupSessionLayer, GroupSessionPanel, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import type { MapFilter } from '../components/GroupSessionPanel';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
@@ -115,6 +116,12 @@ export const DoItNowScreen: React.FC = () => {
 
   // ── Group-session UI state (only relevant when routeSessionId is set) ──
   const [mapSheetOpen, setMapSheetOpen] = useState(false);
+  // Filter applied to the (future) embedded map. Sur natif on n'a pas
+  // encore de map embedded react-native-maps, donc le filter reste un
+  // état contrôlé que le panel honore visuellement (les chips s'allument)
+  // sans effet visible sur fond — intéressant à conserver pour parité
+  // d'API quand la map natale sera wirée.
+  const [mapFilter, setMapFilter] = useState<MapFilter>('all');
   const souvenirPrompts = useSouvenirPrompts();
   // Proof Camera — native fallback wraps expo-image-picker for now ;
   // will swap to vision-camera + Skia in Phase 2 without touching the
@@ -1049,14 +1056,21 @@ export const DoItNowScreen: React.FC = () => {
             }}
           />
 
-          {/* Unified group session map — see GroupSessionMap.web.tsx
-              pour le rendu riche (places + avatars + filter chips). Sur
-              natif on retombe pour l'instant sur la liste seule (le
-              port react-native-maps viendra dans un commit ultérieur). */}
-          <GroupSessionMap
+          {/* Unified group session panel — see GroupSessionPanel.web.tsx
+              pour le rendu riche (filter chips + drawer participants
+              avec progress + tap-to-fly). Sur natif la liste suffit
+              en attendant le port react-native-maps. */}
+          <GroupSessionPanel
             visible={mapSheetOpen}
             sessionId={routeSessionId}
-            myLocation={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : null}
+            filter={mapFilter}
+            onFilterChange={setMapFilter}
+            onParticipantTap={() => {
+              // Sur natif on n'a pas encore de map embedded à panner,
+              // on ferme juste le panel — l'utilisateur retombe dans
+              // l'écran de session. À wirer quand la map natale arrive.
+              setMapSheetOpen(false);
+            }}
             onClose={() => setMapSheetOpen(false)}
           />
 
