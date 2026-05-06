@@ -448,25 +448,16 @@ export const FeedScreen: React.FC = () => {
   const renderItem = useCallback(
     ({ item, index }: { item: FeedItem; index: number }) => {
       if (item.type === 'spot') {
-        // Spot page: clear the floating header on top, then vertically center
-        // the card in the remaining space so it reads as its own paginated unit
-        // (not visually anchored to the top edge). The SpotCard provides its
-        // own horizontal margin — wrapper stays edge-to-edge.
+        // Spot card — full-bleed comme un Plan (mêmes width/height pour
+        // que la pagination du feed soit homogène). Différenciation
+        // visuelle gérée à l'intérieur de SpotCard via un contour
+        // terracotta + un badge type 'SPOT' top-left.
         return (
-          <View
-            style={[
-              styles.spotPage,
-              {
-                width: SCREEN_W,
-                height: listH,
-                paddingTop: (headerH || 100),
-              },
-            ]}
-          >
-            <View style={styles.spotPageInner}>
-              <SpotCard spot={item.spot} />
-            </View>
-          </View>
+          <SpotCard
+            spot={item.spot}
+            width={SCREEN_W}
+            height={listH}
+          />
         );
       }
       const plan = item.plan;
@@ -1091,20 +1082,6 @@ const styles = StyleSheet.create({
   },
   listArea: {
     flex: 1,
-  },
-
-  // ── Spot page (full-screen wrapper around the SpotCard) ────────
-  // The SpotCard is a compact ~320px-tall card. We center it vertically
-  // in the space below the floating header so it reads as its own
-  // paginated unit, distinct from the full-bleed ImmersiveCard for
-  // plans. Soft cream background reinforces the "secondary, lighter"
-  // hierarchy. SpotCard owns its horizontal margin — wrapper edge-to-edge.
-  spotPage: {
-    backgroundColor: Colors.bgPrimary,
-  },
-  spotPageInner: {
-    flex: 1,
-    justifyContent: 'center',
   },
 
   // ── Loading / Empty ────────────────────────────────────────

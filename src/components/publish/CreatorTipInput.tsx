@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,10 @@ import {
   TextInput as RNTextInput,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Colors, Fonts } from '../../constants';
+import { CREATOR_TIP_SUGGESTIONS, pickRandomSuggestions } from '../../constants/suggestions';
 
 interface Props {
   value: string;
@@ -29,11 +32,8 @@ interface Props {
   autoFocus?: boolean;
 }
 
-const DEFAULT_SUGGESTIONS = [
-  'Le meilleur moment, c\'est vers 18h quand la lumière est dingue',
-  'Demande le menu caché au bar, ils ont des plats non listés',
-  'Réserve la table du fond, c\'est la plus intime',
-];
+// Note : DEFAULT_SUGGESTIONS hardcodées remplacées par un sample
+// aléatoire de CREATOR_TIP_SUGGESTIONS au mount (cf. component body).
 
 /**
  * CreatorTipInput — bloc "signature du créateur" avec suggestions
@@ -55,11 +55,23 @@ export const CreatorTipInput: React.FC<Props> = ({
   overline = 'LA SIGNATURE DU CRÉATEUR',
   title = 'Partage ton conseil',
   subtitle = "Une phrase que toi seul(e) peux dire. Ce qui rend ce plan spécial, le détail qu'on ne trouve pas sur Google.",
-  suggestions = DEFAULT_SUGGESTIONS,
+  suggestions,
   autoFocus = true,
 }) => {
   const trimmedLen = value.trim().length;
   const tooShort = trimmedLen < minChars;
+
+  // Si le caller ne passe pas de suggestions explicites, on en pioche
+  // 3 au hasard parmi ~50 candidats. Re-shuffle au tap sur le bouton ↻.
+  const [randomSuggestions, setRandomSuggestions] = useState<string[]>(() =>
+    pickRandomSuggestions(CREATOR_TIP_SUGGESTIONS, 3),
+  );
+  const reshuffleSuggestions = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setRandomSuggestions(pickRandomSuggestions(CREATOR_TIP_SUGGESTIONS, 3));
+  };
+  const finalSuggestions = suggestions ?? randomSuggestions;
+  const showReshuffle = !suggestions; // Pas de bouton ↻ si caller a forcé sa liste
   return (
     <View>
       <View style={styles.header}>
@@ -90,8 +102,19 @@ export const CreatorTipInput: React.FC<Props> = ({
       </View>
 
       <View style={styles.suggestions}>
-        <Text style={styles.suggestionsLabel}>Inspirations</Text>
-        {suggestions.map((sug) => (
+        <View style={styles.suggestionsHeader}>
+          <Text style={styles.suggestionsLabel}>Inspirations</Text>
+          {showReshuffle && (
+            <TouchableOpacity
+              onPress={reshuffleSuggestions}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="refresh-outline" size={13} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {finalSuggestions.map((sug) => (
           <TouchableOpacity
             key={sug}
             style={styles.suggestionChip}
@@ -189,12 +212,17 @@ const styles = StyleSheet.create({
   suggestions: {
     gap: 6,
   },
+  suggestionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   suggestionsLabel: {
     fontSize: 10,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textTertiary,
     letterSpacing: 1.1,
-    marginBottom: 4,
     textTransform: 'uppercase',
   },
   suggestionChip: {

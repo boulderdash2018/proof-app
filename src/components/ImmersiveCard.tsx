@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
-import { Colors, Fonts, getRankForProofs } from '../constants';
+import { Colors, Fonts, getRankForProofs, shouldHideRankBadge } from '../constants';
 import { FloatingAvatars } from './FloatingAvatars';
 import { RankBadge } from './RankBadge';
 import { MiniStampIcon } from './MiniStampIcon';
@@ -85,6 +85,11 @@ const BELOW_CARD_H = 0;   // Removed — no more meta/tags below the card
 const IMAGE_HEADER_RATIO = 0.35;
 // Extra vertical growth of the frame when detail panel opens (feed mode = 0)
 const FRAME_EXTRA_DETAIL = 80;
+// Sticky action bar height — frame is permanently extended by this amount so
+// the bar can be positioned absolutely at `bottom: ACTION_BAR_H` (covering the
+// bottom 64px of the visible card area when detail is open). The +64 of frame
+// height beyond the visible area is hidden behind the tab bar.
+const ACTION_BAR_H = 64;
 
 // ── Gesture thresholds ───────────────────────────────────────
 const VEL_THRESHOLD = 0.4;
@@ -167,20 +172,30 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const coverUrl =
     plan.coverPhotos?.[0] ||
     plan.places?.find((p) => p.photoUrls?.length)?.photoUrls?.[0];
-  const rank = getRankForProofs(plan.author?.total_proof_validations || 0);
+  const rawRank = getRankForProofs(plan.author?.total_proof_validations || 0);
+  // null = ne pas afficher le RankBadge (ex: 'newcomer' caché pour @leo_trann)
+  const rank = shouldHideRankBadge(plan.author?.username, rawRank) ? null : rawRank;
 
   // ── Chevron pulse (2.5 s loop) ─────────────────────────────
   const chevronBounce = useRef(new Animated.Value(0)).current;
 
-  // ── Dynamic frame growth (feed = 0 extra, detail = FRAME_EXTRA_DETAIL extra) ──
-  // JS-driven (useNativeDriver:false) because it animates the layout `height`.
+  // ── Frame height ─────────────────────────────────────────────
+  // The frame is permanently extended by ACTION_BAR_H so we have stable
+  // 64px of vertical real estate to position the sticky bar with
+  // `bottom: ACTION_BAR_H`. The +64 lives below the visible area (under the
+  // tab bar) — pure layout allocation, never rendered to the user.
+  // We keep `frameExtra` as a no-op to preserve the existing call-sites in
+  // commitToDetail / returnToFeed (kept for future re-enable of dynamic
+  // growth without re-touching those code paths).
   const frameExtra = useRef(new Animated.Value(0)).current;
-  const animatedFrameHeight = frameExtra.interpolate({
-    inputRange: [0, FRAME_EXTRA_DETAIL],
-    outputRange: [height, height + FRAME_EXTRA_DETAIL],
-  });
+  const frameHeight = height + ACTION_BAR_H;
 
-  // ── Action bar micro-interactions (inline bar in detail) ────────────────
+  // ── Sticky action bar (fades in when detail panel opens) ────────────────
+  // useNativeDriver:false to keep touch recognizers responsive on Android
+  // when the bar fades from 0→1 (some Android builds lose tap targets when
+  // opacity is animated on the native thread).
+  const barOpacity = useRef(new Animated.Value(0)).current;
+  // Per-button micro-interactions
   const likeScale = useRef(new Animated.Value(1)).current;
   const saveScale = useRef(new Animated.Value(1)).current;
   const commentScale = useRef(new Animated.Value(1)).current;
@@ -357,6 +372,16 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
       useNativeDriver: false,
     }).start();
 
+    // Fade the sticky action bar in (slight delay so it lands once the panel
+    // has begun opening — feels like the bar is anchoring the new context
+    // rather than appearing out of thin air).
+    Animated.timing(barOpacity, {
+      toValue: 1,
+      duration: 350,
+      delay: 200,
+      useNativeDriver: false,
+    }).start();
+
     (scrollRef.current as any)?.scrollTo({ y: DETAIL_SNAP, animated: true });
     setTimeout(() => {
       isCommitting.current = false;
@@ -378,6 +403,14 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
       onHeaderHideChange?.(false);
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Fade the sticky action bar out FIRST (faster than the scroll return so
+    // the bar disappears before the card image fully reclaims the bottom).
+    Animated.timing(barOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
 
     // Shrink frame back to classic feed size
     Animated.timing(frameExtra, {
@@ -456,6 +489,9 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         frameExtra.setValue(0);
         (scrollRef.current as any)?.scrollTo({ y: 0, animated: false });
       }
+      // Always reset the sticky bar — guarantees a clean state if the user
+      // swipes horizontally mid-animation.
+      barOpacity.setValue(0);
     }
   }, [isActive]);
 
@@ -469,9 +505,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   const d5 = makeDetailAnim(5);
 
   return (
-    <Animated.View style={[styles.frame, { width, height: animatedFrameHeight }]}>
+    <View style={[styles.frame, { width, height: frameHeight }]}>
       {/* ── Card container ── */}
-      {/* Explicit height so the card stays put (same image area) when the frame grows */}
+      {/* Explicit height so the card always covers the visible area; the
+          extra ACTION_BAR_H of frame below is purely for the sticky bar's
+          absolute positioning, never visible content. */}
       <View style={[styles.card, { height: cardH }]}>
         {/* ─── Image layer (parallax + scale + dim) ─── */}
         <Animated.View
@@ -747,97 +785,11 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </View>
             </Animated.View>
 
-            {/* ═══════ ACTIONS ROW — like / comment / save / share ═══════ */}
-            <Animated.View
-              style={[styles.actionsRow, { opacity: d0.opacity, transform: [{ translateY: d0.translateY }] }]}
-            >
-              <TouchableOpacity
-                style={styles.actionBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  animPop(likeScale, 1.3);
-                  onLike();
-                }}
-              >
-                <Animated.View style={{ transform: [{ scale: likeScale }] }}>
-                  <Ionicons
-                    name={isLiked ? 'heart' : 'heart-outline'}
-                    size={22}
-                    color={isLiked ? Colors.primary : Colors.textSecondary}
-                  />
-                </Animated.View>
-                {likesCount > 0 && (
-                  <Text style={[styles.actionCount, isLiked && styles.actionCountActive]}>
-                    {likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1).replace('.0', '')}k` : likesCount}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  animPop(commentScale, 0.9);
-                  onComment();
-                }}
-              >
-                <Animated.View style={{ transform: [{ scale: commentScale }] }}>
-                  <Ionicons name="chatbubble-outline" size={21} color={Colors.textSecondary} />
-                </Animated.View>
-                {commentsCount > 0 && (
-                  <Text style={styles.actionCount}>
-                    {commentsCount >= 1000 ? `${(commentsCount / 1000).toFixed(1).replace('.0', '')}k` : commentsCount}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  animPop(saveScale, 1.25);
-                  onSave();
-                }}
-              >
-                <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-                  <Ionicons
-                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                    size={21}
-                    color={isSaved ? Colors.primary : Colors.textSecondary}
-                  />
-                </Animated.View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  Animated.sequence([
-                    Animated.parallel([
-                      Animated.timing(shareTransX, { toValue: 4, duration: 200, useNativeDriver: true }),
-                      Animated.timing(shareRot, { toValue: 15, duration: 200, useNativeDriver: true }),
-                    ]),
-                    Animated.parallel([
-                      Animated.timing(shareTransX, { toValue: 0, duration: 200, useNativeDriver: true }),
-                      Animated.timing(shareRot, { toValue: 0, duration: 200, useNativeDriver: true }),
-                    ]),
-                  ]).start();
-                  onShare();
-                }}
-              >
-                <Animated.View style={{ transform: [{ translateX: shareTransX }, { rotate: shareRotStr }] }}>
-                  <Ionicons name="paper-plane-outline" size={21} color={Colors.textSecondary} />
-                </Animated.View>
-              </TouchableOpacity>
-            </Animated.View>
+            {/* Actions row (like / comment / save / share) was moved out of
+                the scroll into a sticky bar at the bottom of the frame — see
+                the <Animated.View style={styles.actionBar}> at the very end
+                of this component. The bar is always visible while the detail
+                panel is open, regardless of scroll position. */}
 
             {/* ═══════ SECTION 2 — Metrics (horizontal line with fine separators) ═══════ */}
             <Animated.View
@@ -1095,7 +1047,141 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         {/* Sticky "Do it now" CTA was moved to FeedScreen — it lives at the
             screen level so it can sit above the bottom tab bar without being
             clipped by the card's overflow:hidden. */}
+
+        {/* ── Type badge "PLAN" — top-left, vert sauge, discret ──
+            Pendant du badge "SPOT" terracotta dans SpotCard. Permet de
+            distinguer en un coup d'œil un Plan d'un Spot dans le feed.
+            pointerEvents:'none' pour ne pas bloquer les taps sur le
+            ScrollView en dessous. */}
+        <View style={styles.typeBadge} pointerEvents="none">
+          <Ionicons name="map" size={11} color={Colors.textOnAccent} />
+          <Text style={styles.typeBadgeText}>PLAN</Text>
+        </View>
       </View>
+
+      {/* ════════════════════════════════════════════════════════════════
+          STICKY ACTION BAR — sits at bottom of the frame, NOT inside the
+          card. Why outside the card? The card has `overflow: hidden` (for
+          its rounded corners), so anything inside it would be clipped or
+          its tap recognizer intercepted by the ScrollView. Putting the
+          bar in the frame (which has no overflow:hidden) lets it remain
+          tappable while still rendering above the card visually.
+
+          Position: bottom: ACTION_BAR_H means the bar sits 64px from the
+          bottom of the frame — and since the frame is `height + 64` tall,
+          this puts the bar's bottom edge exactly at `height` (i.e. at the
+          bottom of the visible area, just above the system tab bar). The
+          bar therefore occupies [height-64, height], a 64px slice at the
+          very bottom of the visible card area.
+
+          Visibility: the bar fades in via `barOpacity` (commitToDetail
+          drives it 0→1 with a 200 ms delay) and fades out faster on
+          returnToFeed (200 ms). pointerEvents toggle prevents stray taps
+          while the bar is invisible / animating in.
+          ════════════════════════════════════════════════════════════════ */}
+      <Animated.View
+        style={[styles.actionBar, { opacity: barOpacity }]}
+        pointerEvents={isDetailOpen ? 'auto' : 'none'}
+      >
+        {/* Like */}
+        <TouchableOpacity
+          style={styles.abBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }
+            animPop(likeScale, 1.3);
+            onLike();
+          }}
+        >
+          <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+            <Ionicons
+              name={isLiked ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isLiked ? Colors.primary : Colors.textSecondary}
+            />
+          </Animated.View>
+          {likesCount > 0 && (
+            <Text style={[styles.abCount, isLiked && styles.abCountActive]}>
+              {likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1).replace('.0', '')}k` : likesCount}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Comment */}
+        <TouchableOpacity
+          style={styles.abBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }
+            animPop(commentScale, 0.9);
+            onComment();
+          }}
+        >
+          <Animated.View style={{ transform: [{ scale: commentScale }] }}>
+            <Ionicons name="chatbubble-outline" size={21} color={Colors.textSecondary} />
+          </Animated.View>
+          {commentsCount > 0 && (
+            <Text style={styles.abCount}>
+              {commentsCount >= 1000 ? `${(commentsCount / 1000).toFixed(1).replace('.0', '')}k` : commentsCount}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Save */}
+        <TouchableOpacity
+          style={styles.abBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }
+            animPop(saveScale, 1.25);
+            onSave();
+          }}
+        >
+          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+            <Ionicons
+              name={isSaved ? 'bookmark' : 'bookmark-outline'}
+              size={21}
+              color={isSaved ? Colors.primary : Colors.textSecondary}
+            />
+          </Animated.View>
+        </TouchableOpacity>
+
+        {/* Share — paper-plane "envoi" animation: translate right + slight rotate */}
+        <TouchableOpacity
+          style={styles.abBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }
+            Animated.sequence([
+              Animated.parallel([
+                Animated.timing(shareTransX, { toValue: 4, duration: 200, useNativeDriver: true }),
+                Animated.timing(shareRot, { toValue: 15, duration: 200, useNativeDriver: true }),
+              ]),
+              Animated.parallel([
+                Animated.timing(shareTransX, { toValue: 0, duration: 200, useNativeDriver: true }),
+                Animated.timing(shareRot, { toValue: 0, duration: 200, useNativeDriver: true }),
+              ]),
+            ]).start();
+            onShare();
+          }}
+        >
+          <Animated.View style={{ transform: [{ translateX: shareTransX }, { rotate: shareRotStr }] }}>
+            <Ionicons name="paper-plane-outline" size={21} color={Colors.textSecondary} />
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* ── Collaborators sheet — opens when the byline is tapped on a
             co-authored plan. Lists every author with avatar + username,
@@ -1118,7 +1204,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
           onProfilePress={onProfilePress}
         />
       )}
-    </Animated.View>
+    </View>
   );
 };
 
@@ -1139,6 +1225,29 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+
+  // ── Type badge "PLAN" — top-left, vert sauge ──
+  // Pendant du badge "SPOT" terracotta dans SpotCard. La couleur vert
+  // sauge (Colors.success) reste discrète vs la palette terracotta
+  // dominante de l'app — pas de risque de confusion avec un Spot.
+  typeBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 99,
+    backgroundColor: Colors.success,
+  },
+  typeBadgeText: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodyBold,
+    letterSpacing: 1.2,
+    color: Colors.textOnAccent,
   },
 
   // ── Image layer ────────────────────────────────────────────
@@ -1730,37 +1839,51 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── Inline action row (right after hero in the detail panel) ──
-  // Clean horizontal row, no card, with a thin bottom separator. Always visible
-  // as soon as the user opens the detail — zero chance to miss it.
-  actionsRow: {
+  // ── Sticky action bar ─────────────────────────────────────
+  // Lives as a direct child of the frame (not the card). Position is
+  // `bottom: ACTION_BAR_H` so the bar's bottom edge coincides with the
+  // bottom of the visible card area — the +ACTION_BAR_H of frame height
+  // below sits behind the system tab bar. Rounded bottom corners match
+  // the card so the visual seam disappears when the bar overlays the
+  // card's bottom 64px.
+  actionBar: {
+    position: 'absolute',
+    bottom: ACTION_BAR_H,
+    left: CARD_H_PAD,
+    right: CARD_H_PAD,
+    height: ACTION_BAR_H,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 24,
-    paddingTop: 4,
-    paddingBottom: 20,
-    marginTop: -10,
-    marginBottom: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderSubtle,
-  },
-  actionBtn: {
+    paddingHorizontal: 20,
+    backgroundColor: Colors.bgSecondary,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderSubtle,
+    borderBottomLeftRadius: CARD_RADIUS,
+    borderBottomRightRadius: CARD_RADIUS,
+    zIndex: 50,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 12,
+  } as any,
+  abBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    minHeight: 44,
+    justifyContent: 'center',
+    gap: 6,
     minWidth: 44,
+    minHeight: 44,
     borderRadius: 12,
+    paddingHorizontal: 8,
   } as any,
-  actionCount: {
-    fontSize: 14,
+  abCount: {
+    fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textSecondary,
   },
-  actionCountActive: {
+  abCountActive: {
     color: Colors.primary,
   },
 });
