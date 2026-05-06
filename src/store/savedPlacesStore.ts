@@ -11,6 +11,12 @@ export interface SavedPlace {
   reviewCount: number;
   photoUrl: string | null;
   savedAt: number;
+  /** Coords Google Places — optional pour rester rétrocompatible avec
+   *  les saved places créés avant l'ajout de ces champs. Quand absentes,
+   *  le lieu n'apparaît juste pas sur la wishlist map (mais reste dans
+   *  la liste des saved places sans dégradation visible). */
+  latitude?: number;
+  longitude?: number;
 }
 
 interface SavedPlacesStore {

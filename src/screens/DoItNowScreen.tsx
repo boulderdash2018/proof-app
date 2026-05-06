@@ -409,6 +409,7 @@ export const DoItNowScreen: React.FC = () => {
         reviewCount: currentPlace.reviewCount || 0,
         photoUrl: currentPlace.customPhoto || currentPlace.photoUrls?.[0] || null,
         savedAt: Date.now(),
+        ...(currentPlace.latitude && currentPlace.longitude ? { latitude: currentPlace.latitude, longitude: currentPlace.longitude } : {}),
       });
     }
   };

@@ -232,6 +232,7 @@ export const SearchScreen: React.FC = () => {
                 reviewCount: place.reviewCount,
                 photoUrl: place.photoUrls.length > 0 ? place.photoUrls[0] : null,
                 savedAt: Date.now(),
+                ...(place.latitude && place.longitude ? { latitude: place.latitude, longitude: place.longitude } : {}),
               });
             }
           }}

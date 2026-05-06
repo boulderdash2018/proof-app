@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants';
 import { useCity } from '../hooks/useCity';
 import { useSocialProofStore } from '../store/socialProofStore';
-import { useAuthStore, useSavedPlacesStore } from '../store';
+import { useAuthStore, useSavedPlacesStore, useSavesStore, useFeedStore } from '../store';
 import { fetchFriendsMapPlans } from '../services/plansService';
 import { fetchMyPlansForMap } from '../services/myPlacesService';
 import { Avatar } from '../components/Avatar';
@@ -60,7 +60,16 @@ const MAP_STYLE = [
 // ── Domain types ──
 // ────────────────────────────────────────────────────────────
 
-type MapMode = 'mine' | 'friends';
+/**
+ * 3 modes de la map principale :
+ *  - 'mine'     : mes plans (créés ou faits) — comportement historique
+ *  - 'wishlist' : ma "to-do list" géographique — agrège les plans
+ *                 saved !isDone, mes saved places, et mes spots savés.
+ *                 C'est LA vue "qu'est-ce qu'il y a autour de moi à
+ *                 faire" quand tu es dehors et tu cherches une idée.
+ *  - 'friends'  : plans des amis suivis — comportement historique
+ */
+type MapMode = 'mine' | 'wishlist' | 'friends';
 
 interface PlanRef {
   planId: string;
@@ -164,6 +173,95 @@ const buildMapPlaces = (
         });
       }
     }
+  }
+
+  return Array.from(byKey.values());
+};
+
+/**
+ * Build wishlist map places — agrège 3 sources de "lieux à faire" :
+ *  1. Plans savés non-faits (`useSavesStore`, isDone === false) — pour
+ *     chaque, on extrait les places ayant des coords. Le PlanRef pointe
+ *     vers le plan source pour qu'un tap puisse rouvrir PlanDetail.
+ *  2. Saved places solo (`useSavedPlacesStore`) — lieux bookmarkés sans
+ *     plan associé. On les fait apparaître comme des "lieux orphelins"
+ *     (plans:[] mais le marker les affiche quand même via la photo).
+ *  3. Spots savés par le user (`useFeedStore.spots`, savedByIds inclut
+ *     l'user) — same shape, treated comme des lieux orphelins aussi.
+ *
+ * Dédup par googlePlaceId : si un même lieu apparaît dans un saved plan
+ * ET dans un saved place, il n'apparaîtra qu'une fois sur la map (les
+ * planRefs sont fusionnés pour le sheet).
+ */
+const buildWishlistMapPlaces = (
+  savedPlans: { plan: Plan; isDone: boolean }[],
+  savedPlacesWithCoords: { placeId: string; name: string; latitude: number; longitude: number; photoUrl: string | null }[],
+  savedSpots: { googlePlaceId: string; placeName: string; latitude: number; longitude: number; photoUrl?: string | null }[],
+  favoriteSet: Set<string>,
+): MapPlace[] => {
+  const byKey = new Map<string, MapPlace>();
+
+  // Source 1 : plans !isDone — explosés en places.
+  for (const sp of savedPlans) {
+    if (sp.isDone) continue;
+    const planRef: PlanRef = {
+      planId: sp.plan.id,
+      planTitle: sp.plan.title,
+      planCover: sp.plan.coverPhotos?.[0],
+    };
+    for (const place of sp.plan.places || []) {
+      if (!place.latitude || !place.longitude) continue;
+      const key = place.googlePlaceId || place.id;
+      const existing = byKey.get(key);
+      if (existing) {
+        if (!existing.plans.find((p) => p.planId === planRef.planId)) {
+          existing.plans.push(planRef);
+        }
+      } else {
+        byKey.set(key, {
+          placeId: key,
+          name: place.name,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          photoUrl: pickPhotoUrl(place, planRef.planCover),
+          plans: [planRef],
+          friends: [],
+          isFavorite: favoriteSet.has(key),
+        });
+      }
+    }
+  }
+
+  // Source 2 : saved places solo (avec coords).
+  for (const sp of savedPlacesWithCoords) {
+    const existing = byKey.get(sp.placeId);
+    if (existing) continue; // déjà présent via un saved plan
+    byKey.set(sp.placeId, {
+      placeId: sp.placeId,
+      name: sp.name,
+      latitude: sp.latitude,
+      longitude: sp.longitude,
+      photoUrl: sp.photoUrl ?? undefined,
+      plans: [], // lieu orphelin — pas de plan associé
+      friends: [],
+      isFavorite: true, // par définition, c'est un saved place = favori
+    });
+  }
+
+  // Source 3 : spots savés par l'user.
+  for (const spot of savedSpots) {
+    const existing = byKey.get(spot.googlePlaceId);
+    if (existing) continue;
+    byKey.set(spot.googlePlaceId, {
+      placeId: spot.googlePlaceId,
+      name: spot.placeName,
+      latitude: spot.latitude,
+      longitude: spot.longitude,
+      photoUrl: spot.photoUrl ?? undefined,
+      plans: [],
+      friends: [],
+      isFavorite: favoriteSet.has(spot.googlePlaceId),
+    });
   }
 
   return Array.from(byKey.values());
@@ -494,6 +592,64 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
 
     (async () => {
       try {
+        // ── Mode 'wishlist' ── purement local : pas de fetch réseau,
+        // tout vient des stores existants. C'est instantané, parfait
+        // pour le use-case "je suis dehors, je cherche une idée".
+        if (mode === 'wishlist') {
+          if (!currentUser?.id) {
+            if (!cancelled) {
+              setAllPlaces([]);
+              setClusters([]);
+              setIsLoading(false);
+            }
+            return;
+          }
+          const savedPlansLocal = useSavesStore.getState().savedPlans;
+          const savedPlacesAll = useSavedPlacesStore.getState().places;
+          const spotsAll = useFeedStore.getState().spots;
+
+          // Saved places ne sont gardés que s'ils ont des coords (les
+          // entrées créées avant l'ajout de lat/lng sont skippées —
+          // dégradation gracieuse, pas d'erreur visible).
+          const savedPlacesWithCoords = savedPlacesAll
+            .filter((p) => typeof p.latitude === 'number' && typeof p.longitude === 'number')
+            .map((p) => ({
+              placeId: p.placeId,
+              name: p.name,
+              latitude: p.latitude as number,
+              longitude: p.longitude as number,
+              photoUrl: p.photoUrl,
+            }));
+
+          // Spots savés par le user — filtrés par savedByIds. On garde
+          // les spots qui ont des coords ET qui sont dans la ville
+          // courante (le store ne charge déjà que la ville courante,
+          // donc city filter est implicite mais on reste safe).
+          const savedSpots = spotsAll
+            .filter((s) => s.savedByIds.includes(currentUser.id))
+            .filter((s) => typeof s.latitude === 'number' && typeof s.longitude === 'number')
+            .map((s) => ({
+              googlePlaceId: s.googlePlaceId,
+              placeName: s.placeName,
+              latitude: s.latitude as number,
+              longitude: s.longitude as number,
+              photoUrl: s.photoUrl ?? null,
+            }));
+
+          const places = buildWishlistMapPlaces(
+            savedPlansLocal,
+            savedPlacesWithCoords,
+            savedSpots,
+            favoriteSet,
+          );
+          if (cancelled) return;
+          setAllPlaces(places);
+          const vis = filterByBounds(places, regionRef.current);
+          setClusters(clusterPlaces(vis, regionRef.current));
+          setIsLoading(false);
+          return;
+        }
+
         let plans: Plan[] = [];
 
         if (mode === 'friends') {
@@ -612,6 +768,9 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
         ? 'Suis des amis pour voir leurs lieux apparaître ici.'
         : `Tes amis n'ont pas encore exploré ${cityConfig.name}.`;
     }
+    if (mode === 'wishlist') {
+      return 'Sauvegarde des lieux, des plans ou des spots pour les retrouver ici. ✦';
+    }
     return `Tu n'as pas encore exploré ${cityConfig.name}. Lance ton premier plan. ✦`;
   }, [mode, followingIds.length, cityConfig.name]);
 
@@ -636,6 +795,12 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
               label="Mes lieux"
               active={mode === 'mine'}
               onPress={() => setMode('mine')}
+            />
+            <ToggleSegment
+              icon="bookmark"
+              label="À faire"
+              active={mode === 'wishlist'}
+              onPress={() => setMode('wishlist')}
             />
             <ToggleSegment
               icon="people"

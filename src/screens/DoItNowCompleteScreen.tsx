@@ -167,6 +167,7 @@ export const DoItNowCompleteScreen: React.FC = () => {
         reviewCount: place.reviewCount || 0,
         photoUrl: place.customPhoto || place.photoUrls?.[0] || null,
         savedAt: Date.now(),
+        ...(place.latitude && place.longitude ? { latitude: place.latitude, longitude: place.longitude } : {}),
       });
     }
   };
