@@ -17,7 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts, getRankForProofs, shouldHideRankBadge } from '../constants';
-import { Avatar, RankBadge, FounderBadge, SpotCard } from '../components';
+import { Avatar, RankBadge, FounderBadge } from '../components';
 import { useAuthStore, useFriendsStore, useSavesStore, useDraftStore } from '../store';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
@@ -343,11 +343,44 @@ export const ProfileScreen: React.FC = () => {
         {profileTab === 'spots' && (
           <>
             {userSpots.length > 0 ? (
-              <View style={styles.spotsList}>
+              // Grid Insta-style — même structure que les plans pour
+              // garder la cohérence visuelle dans l'app. Petit badge
+              // ✦ terracotta top-right pour différencier d'un plan
+              // (équivalent au pin badge des plans épinglés). Tap
+              // ouvre la fiche du lieu directement (PlaceDetail) —
+              // l'expérience de flip cinématique est réservée au feed.
+              <View style={styles.instaGrid}>
                 {userSpots.map((spot) => (
-                  <View key={spot.id} style={styles.spotsListItem}>
-                    <SpotCard spot={spot} />
-                  </View>
+                  <TouchableOpacity
+                    key={spot.id}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('PlaceDetail', { googlePlaceId: spot.googlePlaceId })}
+                  >
+                    <View style={styles.instaCell}>
+                      {spot.photoUrl ? (
+                        <Image source={{ uri: spot.photoUrl }} style={styles.instaCellImage} />
+                      ) : (
+                        <LinearGradient
+                          colors={[Colors.terracotta300, Colors.terracotta500]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={StyleSheet.absoluteFill}
+                        />
+                      )}
+                      <LinearGradient colors={['transparent', 'rgba(44,36,32,0.65)']} style={styles.instaCellOverlay} />
+                      <View style={styles.spotBadge}>
+                        <Ionicons name="sparkles" size={10} color={Colors.textOnAccent} />
+                      </View>
+                      <View style={styles.instaCellBottom}>
+                        <Text style={styles.instaCellTitle} numberOfLines={2}>{spot.placeName}</Text>
+                        {!!spot.placeCategory && (
+                          <Text style={styles.instaCellSubtle} numberOfLines={1}>
+                            {spot.placeCategory.toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             ) : (
@@ -564,8 +597,9 @@ const styles = StyleSheet.create({
   },
   // Spots tab — vertical stack of SpotCards, each in a full-width container
   // with comfortable padding so the flip mechanic has room to breathe.
-  spotsList: { paddingHorizontal: Layout.screenPadding, paddingTop: 14, gap: 16 } as any,
-  spotsListItem: {},
+  // Note : spotsList / spotsListItem retirés — les spots sont
+  // maintenant rendus dans la même grille Insta que les plans
+  // (instaGrid + instaCell), pour cohérence visuelle.
   section: { paddingHorizontal: Layout.screenPadding, paddingTop: 18 },
   sectionLabel: { fontSize: 10, fontFamily: Fonts.bodySemiBold, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 },
   completionSection: { paddingHorizontal: Layout.screenPadding, paddingTop: 16, paddingBottom: 4 },
@@ -601,4 +635,11 @@ const styles = StyleSheet.create({
   instaCellLikes: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
   instaCellLikesText: { color: Colors.textOnAccent, fontSize: 10, fontFamily: Fonts.bodySemiBold, textShadowColor: 'rgba(44,36,32,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   pinBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(44,36,32,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  // Badge ✦ pour les cellules Spot — pendant terracotta du pinBadge
+  // (taupe-foncé) des plans. Permet de différencier en un coup d'œil
+  // un spot d'un plan dans la grille du profil sans surcharger.
+  spotBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  // Sous-titre catégorie en bas de la cellule spot (vs likesCount
+  // pour les plans) — terracotta-200 pour rester subtil.
+  instaCellSubtle: { color: 'rgba(255,255,255,0.78)', fontSize: 9, fontFamily: Fonts.bodySemiBold, letterSpacing: 1.1, marginTop: 3, textShadowColor: 'rgba(44,36,32,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 });
