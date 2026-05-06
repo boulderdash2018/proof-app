@@ -13,7 +13,7 @@ import { useAuthStore } from '../store';
 import { RouteResult } from '../services/directionsService';
 import { fetchPlanById } from '../services/plansService';
 import { GroupSessionLayer, GroupSessionPanel, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
-import type { MapFilter } from '../components/GroupSessionPanel.web';
+import type { MapFilter } from '../components/GroupSessionPanel';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { useLivePresence } from '../hooks/useLivePresence';
