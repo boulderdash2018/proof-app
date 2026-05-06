@@ -1024,17 +1024,17 @@ export const DoItNowScreen: React.FC = () => {
             />
           </ScrollView>
 
-          {/* Footer — Passer / Étape suivante */}
+          {/* Footer — un seul CTA "Étape suivante / Terminer".
+              "Passer" a été retiré : il faisait essentiellement la même
+              chose que ce bouton (avancer à l'étape suivante / clore
+              la session sur le dernier lieu) mais sans sauver la note,
+              donc en perdait juste les éventuels reviews déjà saisis.
+              Le CTA principal sauve la note SI elle existe et avance ;
+              s'il n'y a pas de note, il avance simplement comme le
+              "Passer" précédent. Un seul bouton couvre les deux cas. */}
           <View style={[styles.reviewFooter, { borderTopColor: Colors.borderSubtle }]}>
             <TouchableOpacity
-              style={styles.reviewSkipBtn}
-              onPress={handleSkipReview}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.reviewSkipText, { color: Colors.textSecondary }]}>Passer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.reviewNextBtn, { backgroundColor: Colors.primary }]}
+              style={[styles.reviewNextBtn, { backgroundColor: Colors.primary, flex: 1 }]}
               onPress={handleNext}
               activeOpacity={0.85}
             >
