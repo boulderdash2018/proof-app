@@ -78,7 +78,13 @@ export const SavesScreen: React.FC = () => {
       <TouchableOpacity
         style={styles.item}
         activeOpacity={0.92}
-        onPress={() => navigation.navigate('PlanDetail', { planId: item.planId })}
+        onPress={() => navigation.navigate('PlanDetail', {
+          planId: item.planId,
+          // Hint au PlanDetail screen pour adapter le menu 3-points :
+          // dans la catégorie "déjà fait" on veut Publier / Archiver /
+          // Supprimer (pas Épingler ni Modifier qui sont profile-only).
+          from: item.isDone ? 'saves-done' : 'saves-todo',
+        })}
       >
         {/* ── Hero image (full bleed, ~240px) ── */}
         <View style={styles.hero}>

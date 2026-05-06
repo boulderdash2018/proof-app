@@ -93,7 +93,15 @@ export const PlanDetailModal: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { planId, openMap: openMapOnMount } = route.params as { planId: string; openMap?: boolean };
+  const { planId, openMap: openMapOnMount, from: routeFrom } = route.params as {
+    planId: string;
+    openMap?: boolean;
+    /** Contexte d'arrivée — adapte le menu 3-points :
+     *  - 'saves-done' : Publier / Archiver / Supprimer (pas Épingler ni Modifier)
+     *  - undefined / autre : menu profile classique (Épingler / Modifier / Archiver / Supprimer) */
+    from?: string;
+  };
+  const isFromSavesDone = routeFrom === 'saves-done';
   const C = useColors();
   const cityConfig = useCity();
   const { t } = useTranslation();
@@ -259,6 +267,28 @@ export const PlanDetailModal: React.FC = () => {
       navigation.goBack();
     });
   };
+
+  /**
+   * "Publier" — emmène vers le flow de publication enrichi
+   * (CoPlanPublishScreen) où l'user ajoute cover/tags/tip avant de
+   * rendre le plan public dans le feed. Utilisé depuis le menu
+   * 3-points en contexte "saves-done" pour les plans dont l'user est
+   * propriétaire ET qui ne sont pas encore publics. Disabled si déjà
+   * publié.
+   */
+  const handlePublishPlan = () => {
+    if (!plan) return;
+    setShowPlanMenu(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    navigation.navigate('CoPlanPublish', { planId: plan.id });
+  };
+
+  /** Plan déjà publié (visibility:'public') ? S'il l'est, on grise le
+   *  bouton "Publier" dans le menu — pas d'action possible. */
+  const isAlreadyPublished = !!(plan && (plan as any).visibility === 'public');
+  /** Plan déjà archivé ? Stocké comme flag direct sur le doc Firestore.
+   *  Le helper archivePlan() écrit `archived: true`. */
+  const isAlreadyArchived = !!(plan && (plan as any).archived === true);
 
   const handleEditPlan = () => {
     if (!plan) return;
@@ -526,8 +556,53 @@ export const PlanDetailModal: React.FC = () => {
         </View>
       </View>
 
-      {/* Owner menu dropdown */}
-      {showPlanMenu && (
+      {/* Owner menu dropdown — deux variantes selon le contexte d'arrivée :
+          - depuis Saves "déjà fait" (`from: 'saves-done'`) : Publier /
+            Archiver / Supprimer. "Publier" grisé si déjà public,
+            "Archiver" grisé si déjà archivé.
+          - sinon (depuis Feed, Profile, etc.) : menu historique
+            Épingler / Modifier / Archiver / Supprimer. */}
+      {showPlanMenu && isFromSavesDone && (
+        <View style={[st.planMenu, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderMedium, top: insets.top + 52 }]}>
+          <TouchableOpacity
+            style={[st.planMenuItem, isAlreadyPublished && st.planMenuItemDisabled]}
+            onPress={isAlreadyPublished ? undefined : handlePublishPlan}
+            disabled={isAlreadyPublished}
+            activeOpacity={isAlreadyPublished ? 1 : 0.7}
+          >
+            <Ionicons
+              name="paper-plane-outline"
+              size={18}
+              color={isAlreadyPublished ? Colors.textTertiary : Colors.primary}
+            />
+            <Text style={[st.planMenuText, { color: isAlreadyPublished ? Colors.textTertiary : Colors.primary }]}>
+              {isAlreadyPublished ? 'Déjà publié' : 'Publier'}
+            </Text>
+          </TouchableOpacity>
+          <View style={[st.planMenuDivider, { backgroundColor: Colors.borderSubtle }]} />
+          <TouchableOpacity
+            style={[st.planMenuItem, isAlreadyArchived && st.planMenuItemDisabled]}
+            onPress={isAlreadyArchived ? undefined : handleArchivePlan}
+            disabled={isAlreadyArchived}
+            activeOpacity={isAlreadyArchived ? 1 : 0.7}
+          >
+            <Ionicons
+              name="archive-outline"
+              size={18}
+              color={isAlreadyArchived ? Colors.textTertiary : Colors.textSecondary}
+            />
+            <Text style={[st.planMenuText, { color: isAlreadyArchived ? Colors.textTertiary : Colors.textPrimary }]}>
+              {isAlreadyArchived ? 'Déjà archivé' : 'Archiver'}
+            </Text>
+          </TouchableOpacity>
+          <View style={[st.planMenuDivider, { backgroundColor: Colors.borderSubtle }]} />
+          <TouchableOpacity style={st.planMenuItem} onPress={handleDeletePlan} activeOpacity={0.7}>
+            <Ionicons name="trash-outline" size={18} color={Colors.error} />
+            <Text style={[st.planMenuText, { color: Colors.error }]}>Supprimer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {showPlanMenu && !isFromSavesDone && (
         <View style={[st.planMenu, { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderMedium, top: insets.top + 52 }]}>
           <TouchableOpacity style={st.planMenuItem} onPress={handleTogglePin}>
             <Ionicons name={isPinned ? 'pin-outline' : 'pin'} size={18} color={isPinned ? Colors.textSecondary : Colors.primary} />
@@ -1297,6 +1372,7 @@ const st = StyleSheet.create({
   // Owner menu
   planMenu: { position: 'absolute', right: 16, borderRadius: 14, borderWidth: 1, paddingVertical: 4, zIndex: 999, elevation: 10, shadowColor: 'rgba(44, 36, 32, 0.25)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, minWidth: 160 },
   planMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  planMenuItemDisabled: { opacity: 0.55 },
   planMenuText: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   planMenuDivider: { height: 1, marginHorizontal: 10 },
 
