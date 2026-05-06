@@ -711,18 +711,6 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
               </Animated.View>
               <Text style={styles.chevronText}>Glisse pour voir le plan</Text>
             </Animated.View>
-
-            {/* ── Type badge "PLAN" — top-left, vert sauge.
-                Placé À L'INTÉRIEUR du cover spacer (donc dans la
-                ScrollView) pour qu'il défile naturellement avec
-                l'image cover quand l'user descend dans le détail.
-                Avant il était sibling de la ScrollView (frame-level)
-                donc il restait sticky en haut de l'écran — pas propre
-                visuellement quand le user lit le détail. */}
-            <View style={styles.typeBadge} pointerEvents="none">
-              <Ionicons name="map" size={11} color={Colors.textOnAccent} />
-              <Text style={styles.typeBadgeText}>PLAN</Text>
-            </View>
           </View>
 
           {/* ══ DETAIL CONTENT — editorial layout (hero → metrics → pull-quote → timeline → tags → comments → CTA) ══ */}
@@ -1060,10 +1048,16 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
         {/* Sticky "Do it now" CTA was moved to FeedScreen — it lives at the
             screen level so it can sit above the bottom tab bar without being
             clipped by the card's overflow:hidden. */}
-        {/* Note : le badge "PLAN" vit maintenant À L'INTÉRIEUR de la
-            ScrollView (dans le cover spacer) pour défiler avec le
-            contenu — cf. son rendu dans la section "Chevron hint" plus
-            haut. Ne plus rendre de badge ici (sticky frame-level). */}
+
+        {/* ── Type badge "PLAN" — top-left, vert sauge, discret ──
+            Pendant du badge "SPOT" terracotta dans SpotCard. Permet de
+            distinguer en un coup d'œil un Plan d'un Spot dans le feed.
+            pointerEvents:'none' pour ne pas bloquer les taps sur le
+            ScrollView en dessous. */}
+        <View style={styles.typeBadge} pointerEvents="none">
+          <Ionicons name="map" size={11} color={Colors.textOnAccent} />
+          <Text style={styles.typeBadgeText}>PLAN</Text>
+        </View>
       </View>
 
       {/* ════════════════════════════════════════════════════════════════
