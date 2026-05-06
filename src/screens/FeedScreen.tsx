@@ -136,6 +136,24 @@ export const FeedScreen: React.FC = () => {
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const flatListRef = useRef<FlatList<FeedItem>>(null);
 
+  // ── Hide bottom tab bar when in plan detail mode ──
+  // Le user veut que sur le détail d'un plan, la barre du bas (Home /
+  // Explore / + / Saves / Profil) disparaisse pour laisser place à la
+  // barre d'actions interne de la card (like / commentaire / save /
+  // share). Comme ça le détail se sent comme un écran dédié, pas comme
+  // un overlay sur le feed avec deux barres redondantes.
+  useEffect(() => {
+    const parent = navigation.getParent?.();
+    if (!parent) return;
+    parent.setOptions({
+      tabBarStyle: isDetailOpen ? { display: 'none' } : undefined,
+    });
+    return () => {
+      // Cleanup au démontage du screen — restaure la barre par défaut.
+      parent.setOptions({ tabBarStyle: undefined });
+    };
+  }, [isDetailOpen, navigation]);
+
   // ── Comment sheet ─────────────────────────────────────────────
   const [commentPlan, setCommentPlan] = useState<Plan | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
