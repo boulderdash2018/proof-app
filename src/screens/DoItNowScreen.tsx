@@ -26,7 +26,7 @@ import { getDirections, decodePolyline, RouteResult } from '../services/directio
 import { fetchPlanById } from '../services/plansService';
 import { Plan, DoItNowTransport } from '../types';
 import { useCity } from '../hooks/useCity';
-import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import { GroupSessionLayer, GroupSessionMap, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
@@ -1049,7 +1049,11 @@ export const DoItNowScreen: React.FC = () => {
             }}
           />
 
-          <GroupLiveMapSheet
+          {/* Unified group session map — see GroupSessionMap.web.tsx
+              pour le rendu riche (places + avatars + filter chips). Sur
+              natif on retombe pour l'instant sur la liste seule (le
+              port react-native-maps viendra dans un commit ultérieur). */}
+          <GroupSessionMap
             visible={mapSheetOpen}
             sessionId={routeSessionId}
             myLocation={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : null}

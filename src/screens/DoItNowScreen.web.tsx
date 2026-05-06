@@ -12,7 +12,7 @@ import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { useAuthStore } from '../store';
 import { RouteResult } from '../services/directionsService';
 import { fetchPlanById } from '../services/plansService';
-import { GroupSessionLayer, GroupLiveMapSheet, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import { GroupSessionLayer, GroupSessionMap, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { sendPhotoMessage, ConversationParticipant } from '../services/chatService';
@@ -1007,7 +1007,11 @@ export const DoItNowScreen: React.FC = () => {
             }}
           />
 
-          <GroupLiveMapSheet
+          {/* Unified group session map — fusionne lieux + amis en une
+              seule surface, avec filter chips + drawer participants
+              (avancement, ETA, tap-to-fly). Remplace l'ancien
+              GroupLiveMapSheet (qui ne montrait que les amis). */}
+          <GroupSessionMap
             visible={mapSheetOpen}
             sessionId={routeSessionId}
             myLocation={userLoc ? { lat: userLoc.lat, lng: userLoc.lng } : null}
