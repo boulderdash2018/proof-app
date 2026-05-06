@@ -5,6 +5,7 @@ import {
   CoPlanProposedPlace,
   CoPlanProposal,
 } from '../types';
+import { validatePlaceForCoPlan } from '../utils/coPlanValidation';
 import {
   subscribePlanDraft,
   proposePlace as svcProposePlace,
@@ -359,6 +360,17 @@ export const useCoPlanStore = create<CoPlanStore>((set, get) => ({
   proposePlace: async (input) => {
     const { draftId, draft, _userId } = get();
     if (!draftId || !draft || !_userId) return;
+    // Safety net : vérifie les règles de validation même si l'UI a déjà
+    // dû le faire. Bloque doublons / max / villes entières au cas où un
+    // futur code path bypasse la validation côté composant.
+    const validation = validatePlaceForCoPlan(
+      { googlePlaceId: input.googlePlaceId, category: input.category },
+      draft.proposedPlaces,
+    );
+    if (!validation.ok) {
+      console.warn('[coPlanStore] proposePlace blocked by validation:', validation.code, validation.reason);
+      return;
+    }
     // Firestore rejects objects containing `undefined`. We spread optional
     // fields conditionally so absent values simply don't exist on the doc
     // rather than being serialised as undefined.

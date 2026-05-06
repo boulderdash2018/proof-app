@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Modal,
   FlatList, ActivityIndicator, Image, Pressable,
@@ -18,6 +18,7 @@ import {
 import { CoPlanProposedPlace, CoPlanParticipant, CoPlanProposal } from '../types';
 import { DurationPickerSheet } from './DurationPickerSheet';
 import { formatPlaceDurationLabel } from '../utils/coPlanEstimates';
+import { validatePlaceForCoPlan } from '../utils/coPlanValidation';
 
 interface Props {
   participants: Record<string, CoPlanParticipant>;
@@ -50,6 +51,23 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
   const [proposingForId, setProposingForId] = useState<string | null>(null);
   /** Place currently targeted by the duration picker sheet, or null. */
   const [durationTarget, setDurationTarget] = useState<CoPlanProposedPlace | null>(null);
+  /** Inline error banner — pour signaler quand une règle de validation
+   *  bloque un ajout (doublon, max atteint, lieu = ville entière…).
+   *  Auto-dismiss après 4s. */
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showValidationError = useCallback((reason: string) => {
+    setValidationError(reason);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setValidationError(null), 4000);
+  }, []);
+
+  // Cleanup du timer si le composant se démonte pendant l'affichage.
+  useEffect(() => () => {
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+  }, []);
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -95,6 +113,26 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
 
   return (
     <View>
+      {/* Inline validation error — apparaît quand un ajout est bloqué
+          (doublon, max, ville entière). Auto-dismiss 4s après affichage.
+          Placé au-dessus du CTA pour que le user voie immédiatement
+          pourquoi son tap n'a pas eu d'effet. */}
+      {validationError && (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={14} color={Colors.terracotta700} />
+          <Text style={styles.errorText} numberOfLines={2}>{validationError}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+              setValidationError(null);
+            }}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="close" size={13} color={Colors.terracotta700} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Primary action — promoted to the TOP of the section so the move
           to "propose something" feels like the natural next step, not an
           afterthought hidden under an empty state. */}
@@ -203,6 +241,22 @@ export const CoPlanPlacesSection: React.FC<Props> = ({ participants }) => {
           try {
             const details = await getPlaceDetails(placeId);
             if (!details) return;
+            // Validation : doublon, max, ville entière. On regarde tous
+            // les types Google (pas juste types[0]) — un lieu peut
+            // avoir 'tourist_attraction' en premier et 'locality'
+            // ailleurs ; on veut bloquer dans les deux cas.
+            const validation = validatePlaceForCoPlan(
+              {
+                googlePlaceId: details.placeId,
+                category: details.types?.[0],
+                types: details.types,
+              },
+              places,
+            );
+            if (!validation.ok) {
+              showValidationError(validation.reason);
+              return;
+            }
             await proposePlace({
               googlePlaceId: details.placeId,
               name: details.name,
@@ -817,6 +871,27 @@ const styles = StyleSheet.create({
   },
   addBtnTextPrimary: {
     color: Colors.textOnAccent,
+  },
+  // Validation error banner — terracotta-on-bg pour signaler un blocage
+  // sans alarme excessive. Pas de modal — le user reste dans le flow.
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.terracotta200,
+    marginBottom: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.terracotta700,
+    lineHeight: 16,
   },
 });
 
