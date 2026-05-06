@@ -344,7 +344,15 @@ const BackFace: React.FC<BackFaceProps> = ({
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    // Pressable racine — un tap dans une zone "vide" du back face flip
+    // back vers le front (symétrique au front qui flip vers le back).
+    // Les TouchableOpacity/Pressable internes (header btns, téléphone,
+    // site web, map, "Voir en détail") capturent leurs propres taps et
+    // n'arrivent JAMAIS jusqu'à ce Pressable parent — c'est la sémantique
+    // standard du touch-responder de React Native (premier handler gagne).
+    // Le ScrollView non plus ne déclenche pas ce onPress quand l'user
+    // scroll : un drag n'est pas un tap. Donc le geste reste safe.
+    <Pressable onPress={onFlipBack} style={{ flex: 1 }}>
       {/* Header : ← back + nom du lieu */}
       <View style={backStyles.header}>
         <TouchableOpacity
@@ -465,7 +473,7 @@ const BackFace: React.FC<BackFaceProps> = ({
           </>
         )}
       </ScrollView>
-    </View>
+    </Pressable>
   );
 };
 
