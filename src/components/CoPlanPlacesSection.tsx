@@ -17,6 +17,7 @@ import {
 } from '../services/googlePlacesService';
 import { CoPlanProposedPlace, CoPlanParticipant, CoPlanProposal } from '../types';
 import { DurationPickerSheet } from './DurationPickerSheet';
+import { formatPlaceDurationLabel } from '../utils/coPlanEstimates';
 
 interface Props {
   participants: Record<string, CoPlanParticipant>;
@@ -253,16 +254,13 @@ interface PlaceRowProps {
   totalParticipants?: number;
 }
 
-/** Format the duration chip label : "1h sur place" by default, "2h30
- *  sur place" / "45 min sur place" when overridden. */
-const formatDurationLabel = (minutes?: number): string => {
-  const m = minutes ?? 60;
-  if (m < 60) return `${m} min sur place`;
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  const dur = r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
-  return `${dur} sur place`;
-};
+// Note : `formatPlaceDurationLabel` (importé depuis utils/coPlanEstimates)
+// remplace l'ancien helper local — il prend la PLACE entière (pas juste
+// les minutes) pour pouvoir consulter `category` et appliquer le même
+// fallback que le footer. C'est CE point qui résout le mismatch :
+// - avant : row affichait 60min par défaut, footer sommait 75min pour
+//   un restaurant → 1h × 2 rows ≠ 2h30 footer.
+// - après : les deux utilisent la même heuristique → toujours en accord.
 
 const PlaceRow: React.FC<PlaceRowProps> = ({
   place, index, total, proposer, currentUserId, onVote, onMoveUp, onMoveDown, onRemove,
@@ -335,7 +333,7 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
                 color={hasOverride ? Colors.terracotta700 : Colors.primary}
               />
               <Text style={[rowStyles.durationText, hasOverride && rowStyles.durationTextCustom]}>
-                {formatDurationLabel(place.estimatedDurationMin)}
+                {formatPlaceDurationLabel(place)}
               </Text>
               {durationSetter && hasOverride && (
                 <View style={rowStyles.durationAvatar}>
