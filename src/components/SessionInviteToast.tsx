@@ -13,8 +13,29 @@ import { GroupMosaicAvatar } from './GroupMosaicAvatar';
  * groups AND I'm not currently viewing that conversation.
  *
  * Auto-dismisses after 10s. Tap = open the conversation.
+ *
+ * "Live-only" semantics : ce toast doit notifier UN événement temps réel,
+ * pas restituer un état déjà connu. Deux garde-fous coopèrent :
+ *
+ *   1. Initial-load snapshot — la première fois que conversations
+ *      arrive non-vide (= chargement initial depuis Firestore au démarrage),
+ *      on enregistre TOUTES les sessions actives existantes comme déjà
+ *      "vues". Conséquence : aucune rafale de toasts à l'ouverture pour
+ *      les sessions qui tournaient déjà — l'utilisateur les retrouve
+ *      naturellement dans sa chat list.
+ *
+ *   2. Freshness gate — pour toute session non-vue détectée APRÈS le
+ *      chargement initial, on vérifie que `lastMessageAt` est < 60s. Au-
+ *      delà, on marque comme vu sans toaster. Couvre les cas tordus :
+ *      re-subscription Firestore après reconnexion réseau, retour de
+ *      cache, etc.
+ *
+ * Effet net : le toast n'apparaît que quand un participant démarre une
+ * session ALORS QUE l'app est ouverte. Exactement le comportement attendu
+ * pour une notification "intra-app".
  */
 const TOAST_DURATION_MS = 10_000;
+const FRESHNESS_WINDOW_MS = 60_000;
 
 interface ToastState {
   conversationId: string;
@@ -34,6 +55,10 @@ export const SessionInviteToast: React.FC = () => {
   // Tracks which {convId: sessionId} pairs we've already shown, so we don't re-toast
   // the same session when conversations list re-renders.
   const seenRef = useRef<Record<string, string>>({});
+  // True une fois qu'on a fait le snapshot des sessions actives existantes
+  // au chargement initial. Tant qu'il est false, on ne toaste rien — on
+  // se contente de remplir seenRef. Cf. doc en haut de fichier.
+  const initialSnapshotDoneRef = useRef(false);
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const translateY = useRef(new Animated.Value(-120)).current;
@@ -42,6 +67,22 @@ export const SessionInviteToast: React.FC = () => {
   // ── Detect new active sessions in my groups ──
   useEffect(() => {
     if (!user?.id) return;
+
+    // Snapshot du chargement initial : la première fois que conversations
+    // arrive non-vide, on marque toutes les sessions actives existantes
+    // comme "vues" SANS toaster. C'est ce qui résout la rafale à
+    // l'ouverture — sans ce garde-fou, chaque session déjà en cours
+    // déclenchait un toast au démarrage de l'app.
+    if (!initialSnapshotDoneRef.current && conversations.length > 0) {
+      for (const conv of conversations) {
+        if (conv.isGroup && conv.activeSessionId) {
+          seenRef.current[conv.id] = conv.activeSessionId;
+        }
+      }
+      initialSnapshotDoneRef.current = true;
+      return;
+    }
+
     for (const conv of conversations) {
       if (!conv.isGroup) continue;
       if (!conv.activeSessionId) continue;
@@ -53,6 +94,17 @@ export const SessionInviteToast: React.FC = () => {
       // Only toast if I didn't start it myself.
       const starterMsg = conv.lastMessageSenderId;
       if (starterMsg === user.id) {
+        seenRef.current[conv.id] = conv.activeSessionId;
+        continue;
+      }
+
+      // Freshness gate : ne toaste que si l'événement est récent (<60s).
+      // Couvre les re-subscriptions Firestore, retours de cache, etc.,
+      // qui pourraient sinon faire revivre une session qui tourne déjà
+      // depuis un moment. On marque comme vu pour éviter une re-éval.
+      const lastMsgTs = Date.parse(conv.lastMessageAt || '');
+      const ageMs = Date.now() - lastMsgTs;
+      if (Number.isNaN(lastMsgTs) || ageMs > FRESHNESS_WINDOW_MS) {
         seenRef.current[conv.id] = conv.activeSessionId;
         continue;
       }
