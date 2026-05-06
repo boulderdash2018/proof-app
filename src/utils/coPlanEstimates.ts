@@ -170,12 +170,26 @@ export function formatDurationMinutes(min: number): string {
 
 /** Format the per-place duration chip on a CoPlan row.
  *  Uses the shared duration estimator so the per-row default matches
- *  the footer total — always. */
+ *  the footer total — always.
+ *
+ *  Préfixe "≈" quand la valeur vient de l'heuristique (catégorie ou
+ *  fallback) plutôt que d'un override explicite : visuel net pour
+ *  signaler "c'est une estimation, modifie si tu veux du précis".
+ *  Le formatage 'h:mm' est cohérent avec `formatDurationMinutes` du
+ *  footer pour que les deux surfaces parlent EXACTEMENT le même
+ *  langage (ex. row "≈ 45 min sur place", footer "Durée 1h30"). */
 export function formatPlaceDurationLabel(place: EstimateInput): string {
+  const explicit = place.estimatedDurationMin;
+  const isExplicit = typeof explicit === 'number' && explicit > 0;
   const m = estimatePlaceDurationMin(place);
-  if (m < 60) return `${m} min sur place`;
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  const dur = r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
-  return `${dur} sur place`;
+  let body: string;
+  if (m < 60) {
+    body = `${m} min sur place`;
+  } else {
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    const dur = r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
+    body = `${dur} sur place`;
+  }
+  return isExplicit ? body : `≈ ${body}`;
 }
