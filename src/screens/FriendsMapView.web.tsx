@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -756,6 +757,30 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
     [navigation, onClose, closeSheet],
   );
 
+  /**
+   * "Itinéraire" — ouvre Google Maps avec une route pré-rentrée vers
+   * le lieu sélectionné. La position actuelle de l'user est utilisée
+   * automatiquement comme origine par Google Maps (l'API URL ne
+   * spécifie pas d'origine → fallback sur "Ma position").
+   *
+   * On passe à la fois `destination=LAT,LNG` (précis, marche toujours)
+   * ET `destination_place_id` (active la fiche Google Places riche
+   * avec photos / horaires / reviews côté Maps). Si le placeId n'est
+   * pas un Google Place ID valide (= cas où on a fallback sur
+   * place.id en interne), Maps ignore juste ce paramètre.
+   *
+   * Sur web : ouvre maps.google.com dans un nouvel onglet.
+   * Sur natif iOS / Android : ouvre directement l'app Google Maps si
+   * elle est installée, sinon le navigateur sur maps.google.com.
+   */
+  const handleOpenItinerary = useCallback((place: MapPlace) => {
+    const dest = `${place.latitude},${place.longitude}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&destination_place_id=${encodeURIComponent(place.placeId)}`;
+    Linking.openURL(url).catch((err) => {
+      console.warn('[FriendsMapView.web] openURL failed:', err);
+    });
+  }, []);
+
   const sheetTitle = useMemo(() => {
     if (!selectedCluster) return '';
     if (selectedCluster.places.length === 1) return selectedCluster.places[0].name;
@@ -870,12 +895,29 @@ export const FriendsMapView: React.FC<Props> = ({ visible, onClose }) => {
                       pIdx < selectedCluster.places.length - 1 && styles.placeDivider,
                     ]}
                   >
-                    {/* Place header (only when cluster has multiple places) */}
-                    {selectedCluster.places.length > 1 && (
-                      <Text style={styles.placeName} numberOfLines={1}>
-                        {place.isFavorite ? '★ ' : ''}{place.name}
-                      </Text>
-                    )}
+                    {/* Place header — nom (si cluster multi-lieux) +
+                        bouton "Itinéraire" qui ouvre Google Maps avec
+                        l'itinéraire pré-rentré depuis ma position
+                        actuelle. Visible dans tous les modes (Mes
+                        lieux / À faire / Amis) — utile partout. */}
+                    <View style={styles.placeHeaderRow}>
+                      {selectedCluster.places.length > 1 ? (
+                        <Text style={styles.placeName} numberOfLines={1}>
+                          {place.isFavorite ? '★ ' : ''}{place.name}
+                        </Text>
+                      ) : (
+                        <View style={{ flex: 1 }} />
+                      )}
+                      <TouchableOpacity
+                        style={styles.itineraryBtn}
+                        onPress={() => handleOpenItinerary(place)}
+                        activeOpacity={0.85}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Ionicons name="navigate" size={12} color={Colors.textOnAccent} />
+                        <Text style={styles.itineraryBtnText}>Itinéraire</Text>
+                      </TouchableOpacity>
+                    </View>
 
                     {/* Friends row (amis mode only) */}
                     {mode === 'friends' && place.friends.length > 0 && (
@@ -1147,11 +1189,39 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.borderSubtle,
     marginBottom: 14,
   },
+  // Header row : nom du lieu (gauche) + bouton Itinéraire (droite).
+  // Aligné center pour que le bouton compact pill soit toujours
+  // vertically-centered avec le nom même quand celui-ci wrap.
+  placeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
   placeName: {
+    flex: 1,
     fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
     color: Colors.textPrimary,
-    marginBottom: 10,
+  },
+  // Bouton "Itinéraire" — pill compacte terracotta, icône + label.
+  // Volontairement court visuellement pour que la sheet reste
+  // dense (multi-lieux par cluster). Le tap déclenche
+  // handleOpenItinerary qui ouvre Google Maps direction.
+  itineraryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: Colors.primary,
+  },
+  itineraryBtnText: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textOnAccent,
+    letterSpacing: 0.1,
   },
 
   friendsRow: {
