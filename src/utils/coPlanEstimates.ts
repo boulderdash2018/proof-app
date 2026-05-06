@@ -169,27 +169,31 @@ export function formatDurationMinutes(min: number): string {
 }
 
 /** Format the per-place duration chip on a CoPlan row.
- *  Uses the shared duration estimator so the per-row default matches
- *  the footer total — always.
  *
- *  Préfixe "≈" quand la valeur vient de l'heuristique (catégorie ou
- *  fallback) plutôt que d'un override explicite : visuel net pour
- *  signaler "c'est une estimation, modifie si tu veux du précis".
- *  Le formatage 'h:mm' est cohérent avec `formatDurationMinutes` du
- *  footer pour que les deux surfaces parlent EXACTEMENT le même
- *  langage (ex. row "≈ 45 min sur place", footer "Durée 1h30"). */
-export function formatPlaceDurationLabel(place: EstimateInput): string {
+ *  Retourne `null` quand la durée n'a PAS été explicitement posée par
+ *  un participant (= c'est une estimation) — la chip n'affichera pas
+ *  de chiffre, juste le crayon + un CTA "Définir la durée".
+ *  Cette décision UX vient du fait que toute valeur affichée sur la
+ *  row était lue par le user comme contractuelle, et créait un
+ *  mismatch perçu avec le total estimé du footer (qui agrège selon
+ *  la même heuristique mais peut différer si une catégorie tombe
+ *  sur 45min vs 60min default). En supprimant le chiffre tant que
+ *  rien n'est posé, on garde une seule source de vérité pour la
+ *  durée affichée : le footer (qui s'adapte automatiquement) et
+ *  les lieux qui ont une valeur EXPLICITE.
+ *
+ *  Override → "1h30 sur place" / "45 min sur place" — affiché tel
+ *  quel, c'est ce que le participant a posé.
+ *  Pas d'override → null → la row affiche un libellé alternatif (ex.
+ *  "Définir la durée") + le crayon. */
+export function formatPlaceDurationLabel(place: EstimateInput): string | null {
   const explicit = place.estimatedDurationMin;
-  const isExplicit = typeof explicit === 'number' && explicit > 0;
-  const m = estimatePlaceDurationMin(place);
-  let body: string;
-  if (m < 60) {
-    body = `${m} min sur place`;
-  } else {
-    const h = Math.floor(m / 60);
-    const r = m % 60;
-    const dur = r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
-    body = `${dur} sur place`;
+  if (!(typeof explicit === 'number' && explicit > 0)) {
+    return null;
   }
-  return isExplicit ? body : `≈ ${body}`;
+  if (explicit < 60) return `${explicit} min sur place`;
+  const h = Math.floor(explicit / 60);
+  const r = explicit % 60;
+  const dur = r > 0 ? `${h}h${r.toString().padStart(2, '0')}` : `${h}h`;
+  return `${dur} sur place`;
 }

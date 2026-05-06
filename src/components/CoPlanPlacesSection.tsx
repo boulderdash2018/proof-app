@@ -314,12 +314,17 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
         </Text>
         <Text style={rowStyles.address} numberOfLines={1}>{place.address}</Text>
 
-        {/* Duration chip — tappable. Shows the override when set, the
-            default "1h sur place" otherwise. The pencil icon is the
-            affordance. When someone overrode the duration, their
-            avatar appears next to the chip (attribution). */}
+        {/* Duration chip — tappable.
+            - Override posé : affiche la valeur (ex. "1h30 sur place")
+              en terracotta, avec l'avatar de l'auteur en attribution.
+            - Pas d'override : affiche juste le crayon + "Définir la
+              durée" (CTA explicite, pas de chiffre).
+            On retire volontairement le chiffre estimé sur la row pour
+            éviter le mismatch perçu avec le total du footer (qui lui
+            reste l'unique source de vérité pour la durée totale). */}
         {(() => {
           const hasOverride = typeof place.estimatedDurationMin === 'number';
+          const overrideLabel = formatPlaceDurationLabel(place);
           return (
             <TouchableOpacity
               style={[rowStyles.durationChip, hasOverride && rowStyles.durationChipCustom]}
@@ -328,12 +333,12 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             >
               <Ionicons
-                name={hasOverride ? 'time' : 'time-outline'}
+                name={hasOverride ? 'time' : 'pencil-outline'}
                 size={12}
                 color={hasOverride ? Colors.terracotta700 : Colors.primary}
               />
               <Text style={[rowStyles.durationText, hasOverride && rowStyles.durationTextCustom]}>
-                {formatPlaceDurationLabel(place)}
+                {hasOverride && overrideLabel ? overrideLabel : 'Définir la durée'}
               </Text>
               {durationSetter && hasOverride && (
                 <View style={rowStyles.durationAvatar}>
@@ -346,7 +351,9 @@ const PlaceRow: React.FC<PlaceRowProps> = ({
                   />
                 </View>
               )}
-              <Ionicons name="pencil" size={9} color={Colors.textTertiary} style={rowStyles.durationPencil} />
+              {hasOverride && (
+                <Ionicons name="pencil" size={9} color={Colors.textTertiary} style={rowStyles.durationPencil} />
+              )}
             </TouchableOpacity>
           );
         })()}

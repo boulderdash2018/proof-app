@@ -27,19 +27,6 @@ export const CoPlanSummaryFooter: React.FC = () => {
     [places],
   );
 
-  // Toute valeur estimée (≠ override explicite) → on affiche "≈" pour
-  // que le user comprenne que c'est une approximation. Cohérent avec
-  // le préfixe "≈" sur les chips per-row : si la chip est précédée d'un
-  // "≈", cette valeur est comprise dans le total également préfixé.
-  const durationIsEstimate = useMemo(
-    () => places.some((p) => !(typeof p.estimatedDurationMin === 'number' && p.estimatedDurationMin > 0)),
-    [places],
-  );
-  const budgetIsEstimate = useMemo(
-    () => places.some((p) => !(typeof p.priceLevel === 'number' && p.priceLevel >= 1 && p.priceLevel <= 4)),
-    [places],
-  );
-
   if (places.length === 0) return null;
 
   // Budget can be 0-0 only if every place explicitly maps to free
@@ -52,9 +39,7 @@ export const CoPlanSummaryFooter: React.FC = () => {
       <View style={styles.pill}>
         <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
         <Text style={styles.pillLabel}>Durée</Text>
-        <Text style={styles.pillValue}>
-          {durationIsEstimate ? `≈ ${formatDurationMinutes(durationMin)}` : formatDurationMinutes(durationMin)}
-        </Text>
+        <Text style={styles.pillValue}>{formatDurationMinutes(durationMin)}</Text>
       </View>
       <View style={styles.pill}>
         <Ionicons name="cash-outline" size={13} color={Colors.textSecondary} />
@@ -64,9 +49,7 @@ export const CoPlanSummaryFooter: React.FC = () => {
             ? 'Gratuit'
             : budgetMin === budgetMax
               ? `≈ ${budgetMin}€`
-              : budgetIsEstimate
-                ? `≈ ${budgetMin}-${budgetMax}€`
-                : `${budgetMin}-${budgetMax}€`}
+              : `${budgetMin}-${budgetMax}€`}
         </Text>
         {!isFree && <Text style={styles.pillHint}>/ pers.</Text>}
       </View>
