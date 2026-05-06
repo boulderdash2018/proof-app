@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput as RNTextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput as RNTextInput, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +13,7 @@ import { useSavedPlacesStore } from '../store/savedPlacesStore';
 import { useAuthStore } from '../store';
 import { RouteResult } from '../services/directionsService';
 import { fetchPlanById } from '../services/plansService';
-import { GroupSessionLayer, GroupSessionPanel, SessionFloatingActions, SouvenirPromptToast, SouvenirCaptureCard } from '../components';
+import { GroupSessionLayer, GroupSessionPanel, SessionFloatingActions, SouvenirPromptToast } from '../components';
 import type { MapFilter } from '../components/GroupSessionPanel';
 import { useSouvenirPrompts } from '../hooks/useSouvenirPrompts';
 import { useGroupSessionStore } from '../store/groupSessionStore';
@@ -261,6 +262,10 @@ export const DoItNowScreen: React.FC = () => {
   const [placeComment, setPlaceComment] = useState('');
   const [timeMode, setTimeMode] = useState<'none' | 'manual' | 'auto'>('none');
   const commentRef = useRef<RNTextInput>(null);
+  /** Sentence-starters chips : 4 visibles par défaut, 4 dans la
+   *  réserve — un tap sur "+ X suggestions" déplie tout. Compact
+   *  pour ne pas surcharger la review screen quand l'user arrive. */
+  const [showAllStarters, setShowAllStarters] = useState(false);
 
   // Favorites — live subscribe to the store so the toggle re-renders instantly.
   const savedPlaces = useSavedPlacesStore((s) => s.places);
@@ -882,167 +887,222 @@ export const DoItNowScreen: React.FC = () => {
 
       {/* ═════════════════ Place review mode — editorial layout ═════════════════ */}
       {placeMode && currentPlace ? (
-        <View style={[styles.reviewContainer, { backgroundColor: Colors.bgPrimary, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.reviewScroll}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Overline */}
-            <Text style={styles.reviewOverline}>
-              ÉTAPE {currentIndex + 1} / {plan.places.length} TERMINÉE
-            </Text>
+        <View style={[styles.reviewRoot, { backgroundColor: Colors.bgPrimary }]}>
+          {/* ═════ HERO — full-bleed photo (45% screen) avec overlays
+              cinematic. Le smiley 📸 disparaît, remplacé par une typo
+              éditoriale Fraunces italique sur dégradé sombre. ═════ */}
+          {(() => {
+            const heroPhoto = currentPlace.customPhoto || currentPlace.photoUrls?.[0];
+            return (
+              <View style={styles.reviewHero}>
+                {heroPhoto ? (
+                  <Image source={{ uri: heroPhoto }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: Colors.terracotta500 }]} />
+                )}
+                {/* Dégradé sombre vers le bas pour la lisibilité du
+                    titre éditorial blanc. */}
+                <LinearGradient
+                  colors={['rgba(44,36,32,0.35)', 'transparent', 'rgba(44,36,32,0.55)', 'rgba(44,36,32,0.85)']}
+                  locations={[0, 0.35, 0.7, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                  pointerEvents="none"
+                />
 
-            {/* Editorial title */}
-            <Text style={styles.reviewTitle}>
-              Alors,{'\n'}
-              <Text style={styles.reviewTitleQuote}>« {currentPlace.name} »</Text> ?
-            </Text>
+                {/* Top bar — back arrow + ÉTAPE x/y pill centré */}
+                <View style={[styles.reviewHeroTop, { top: insets.top + 8 }]} pointerEvents="box-none">
+                  <TouchableOpacity
+                    style={styles.reviewBackBtn}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      // Quitte la review sans avancer — l'user retombe
+                      // sur la map du plan. Il pourra revalider plus
+                      // tard via une nouvelle arrivée détectée OU le
+                      // bouton "J'y suis" du bottom card.
+                      setPlaceMode(null);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="chevron-back" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                  <View style={styles.reviewStepPill}>
+                    <View style={styles.reviewStepDot} />
+                    <Text style={styles.reviewStepText}>
+                      ÉTAPE {currentIndex + 1} / {plan.places.length}
+                    </Text>
+                  </View>
+                  <View style={{ width: 36 }} />
+                </View>
 
-            {/* Subtitle */}
-            <Text style={styles.reviewSubtitle}>
-              Ton retour aide la communauté à découvrir le vrai {cityConfig.name}.
-              {'\n'}Optionnel · tu peux passer.
-            </Text>
+                {/* Title block — bottom-left of hero */}
+                <View style={styles.reviewHeroTitleWrap}>
+                  <Text style={styles.reviewHeroEyebrow}>
+                    TU ES ARRIVÉ{currentPlace.type ? ` · ${currentPlace.type.toUpperCase()}` : ''}
+                  </Text>
+                  <Text style={styles.reviewHeroTitle} numberOfLines={2}>
+                    {currentPlace.name}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
 
-            {/* Big stars */}
-            <View style={styles.reviewStars}>
-              {[1, 2, 3, 4, 5].map((star) => (
+          {/* ═════ BOTTOM CARD — overlap sur le hero, rounded top, cream ═════ */}
+          <View style={styles.reviewCard}>
+            <View style={styles.reviewGrabber} />
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={[styles.reviewCardScroll, { paddingBottom: insets.bottom + 90 }]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Helper text — sobre, en haut */}
+              <Text style={styles.reviewCardHelper}>
+                Ton retour aide la communauté.{' '}
+                <Text style={styles.reviewCardHelperOptional}>Optionnel.</Text>
+              </Text>
+
+              {/* Stars XL */}
+              <View style={styles.reviewStarsRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      useDoItNowStore.getState().ratePlace(currentIndex, star);
+                      setPlaceMode({ ...placeMode, rating: star });
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Ionicons
+                      name={star <= placeMode.rating ? 'star' : 'star-outline'}
+                      size={32}
+                      color={star <= placeMode.rating ? Colors.primary : Colors.borderMedium}
+                      style={{ marginHorizontal: 4 }}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Rating label italic — change avec la note */}
+              <Text style={styles.reviewRatingLabelItalic}>
+                {placeMode.rating > 0 ? RATING_LABELS[placeMode.rating] : 'Note ton expérience'}
+              </Text>
+
+              {/* Action pills — Souvenir + Favori, compact, side by side */}
+              <View style={styles.reviewActionsRow}>
                 <TouchableOpacity
-                  key={star}
+                  style={styles.reviewActionPill}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    useDoItNowStore.getState().ratePlace(currentIndex, star);
-                    setPlaceMode({ ...placeMode, rating: star });
+                    // Mode group → flow inline qui poste dans le chat.
+                    // Mode solo → flow standard qui ajoute la photo aux
+                    // placesVisited de la session.
+                    if (groupConversationId && routeSessionId) {
+                      captureSouvenirInline().catch((err) =>
+                        console.warn('[DoItNow] souvenir inline error:', err),
+                      );
+                    } else {
+                      handleSouvenirPhoto();
+                    }
                   }}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="camera-outline" size={15} color={Colors.textPrimary} />
+                  <Text style={styles.reviewActionPillText}>Souvenir</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.reviewActionPill,
+                    isCurrentPlaceFavorite && styles.reviewActionPillActive,
+                  ]}
+                  onPress={toggleCurrentPlaceFavorite}
+                  activeOpacity={0.85}
                 >
                   <Ionicons
-                    name={star <= placeMode.rating ? 'star' : 'star-outline'}
-                    size={36}
-                    color={star <= placeMode.rating ? Colors.primary : Colors.borderMedium}
-                    style={{ marginHorizontal: 4 }}
+                    name={isCurrentPlaceFavorite ? 'star' : 'star-outline'}
+                    size={15}
+                    color={isCurrentPlaceFavorite ? Colors.gold : Colors.textPrimary}
                   />
-                </TouchableOpacity>
-              ))}
-            </View>
-            {placeMode.rating > 0 ? (
-              <Text style={styles.reviewRatingLabel}>{RATING_LABELS[placeMode.rating]}</Text>
-            ) : (
-              <Text style={styles.reviewRatingHint}>Note ton expérience</Text>
-            )}
-
-            {/* Favorite card — terracotta rempli (cohérent avec la palette de l'app) */}
-            <TouchableOpacity
-              style={[
-                styles.favCard,
-                isCurrentPlaceFavorite
-                  ? { backgroundColor: Colors.terracotta100, borderWidth: 1.5, borderColor: Colors.primary }
-                  : { backgroundColor: Colors.bgSecondary, borderWidth: 1, borderColor: Colors.borderMedium },
-              ]}
-              onPress={toggleCurrentPlaceFavorite}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="star"
-                size={16}
-                color={isCurrentPlaceFavorite ? Colors.gold : Colors.textPrimary}
-              />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.favCardTitle,
-                    { color: isCurrentPlaceFavorite ? Colors.terracotta700 : Colors.textPrimary },
-                  ]}
-                >
-                  {isCurrentPlaceFavorite ? 'Ajouté à tes favoris' : 'Ajouter aux favoris'}
-                </Text>
-                <Text
-                  style={[
-                    styles.favCardHint,
-                    { color: isCurrentPlaceFavorite ? Colors.terracotta600 : Colors.textSecondary },
-                  ]}
-                >
-                  Retrouve-le dans Plans → Lieux favoris
-                </Text>
-              </View>
-              {isCurrentPlaceFavorite && (
-                <Ionicons name="checkmark" size={16} color={Colors.primary} />
-              )}
-            </TouchableOpacity>
-
-            {/* ── Souvenir collectif — gamified inline capture CTA ──
-                Only rendered in group mode (we have a sessionId + conv).
-                Encourages each member to drop a photo into the shared
-                album at the end of every step, with rotating copy + a
-                "Photographe officiel" badge after 3+ contributions. */}
-            {groupConversationId && routeSessionId && currentPlace && (
-              <SouvenirCaptureCard
-                placeName={currentPlace.name}
-                stepIndex={currentIndex}
-                totalSteps={plan.places.length}
-                contributionCount={souvenirCount}
-                onCapture={captureSouvenirInline}
-              />
-            )}
-
-            {/* Sentence starters — tap one to seed the comment textarea
-                with a beginning the user can finish. Single-tap action
-                (no toggle state) ; if there's already a comment, the
-                starter is appended on a new line. */}
-            <Text style={[styles.reviewOverline, { marginTop: 22, marginBottom: 10 }]}>
-              POUR DÉMARRER
-            </Text>
-            <View style={styles.quickWordsWrap}>
-              {STARTERS.map((s) => (
-                <TouchableOpacity
-                  key={s.key}
-                  style={[
-                    styles.quickWordChip,
-                    { backgroundColor: Colors.bgSecondary, borderColor: Colors.borderSubtle },
-                  ]}
-                  onPress={() => applyStarter(s.label)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.quickWordText, { color: Colors.textPrimary }]}>
-                    {s.label.trim()}…
+                  <Text
+                    style={[
+                      styles.reviewActionPillText,
+                      isCurrentPlaceFavorite && { color: Colors.terracotta700 },
+                    ]}
+                  >
+                    {isCurrentPlaceFavorite ? 'Favori ✓' : 'Favori'}
                   </Text>
                 </TouchableOpacity>
-              ))}
+              </View>
+
+              <View style={styles.reviewDivider} />
+
+              {/* Sentence-starters compact — 4 visibles + "+ N suggestions"
+                  pour déplier le reste. Plus discret que la grille
+                  POUR DÉMARRER précédente. */}
+              <View style={styles.reviewStartersWrap}>
+                {(showAllStarters ? STARTERS : STARTERS.slice(0, 4)).map((s) => (
+                  <TouchableOpacity
+                    key={s.key}
+                    style={styles.reviewStarterChip}
+                    onPress={() => applyStarter(s.label)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.reviewStarterText} numberOfLines={1}>
+                      {s.label.trim()}…
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {!showAllStarters && STARTERS.length > 4 && (
+                  <TouchableOpacity
+                    style={styles.reviewStarterChipMore}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setShowAllStarters(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.reviewStarterMoreText}>
+                      + {STARTERS.length - 4} suggestions
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Comment input — sans carte, juste un input rounded sur fond cream */}
+              <RNTextInput
+                ref={commentRef}
+                style={[
+                  styles.reviewCommentInputClean,
+                  {
+                    borderColor: placeComment.length > 0 ? Colors.primary : Colors.borderSubtle,
+                  },
+                ]}
+                placeholder="Un commentaire, une anecdote ?"
+                placeholderTextColor={Colors.textTertiary}
+                value={placeComment}
+                onChangeText={setPlaceComment}
+                multiline
+                maxLength={300}
+                textAlignVertical="top"
+              />
+            </ScrollView>
+
+            {/* Sticky CTA — un seul bouton pleine largeur. Sauve la
+                note si posée puis avance / clôt sur le dernier lieu. */}
+            <View style={[styles.reviewStickyFooter, { paddingBottom: insets.bottom + 12 }]}>
+              <TouchableOpacity
+                style={styles.reviewNextBtnFull}
+                onPress={handleNext}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.reviewNextTextFull}>
+                  {isLastPlace ? 'Terminer' : 'Étape suivante →'}
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Comment */}
-            <RNTextInput
-              ref={commentRef}
-              style={[styles.reviewCommentInput, { backgroundColor: Colors.bgSecondary, borderColor: placeComment.length > 0 ? Colors.primary : Colors.borderSubtle, color: Colors.textPrimary }]}
-              placeholder="Un commentaire, une anecdote ? (optionnel)"
-              placeholderTextColor={Colors.textTertiary}
-              value={placeComment}
-              onChangeText={setPlaceComment}
-              multiline
-              maxLength={300}
-              textAlignVertical="top"
-            />
-          </ScrollView>
-
-          {/* Footer — un seul CTA "Étape suivante / Terminer".
-              "Passer" a été retiré : il faisait essentiellement la même
-              chose que ce bouton (avancer à l'étape suivante / clore
-              la session sur le dernier lieu) mais sans sauver la note,
-              donc en perdait juste les éventuels reviews déjà saisis.
-              Le CTA principal sauve la note SI elle existe et avance ;
-              s'il n'y a pas de note, il avance simplement comme le
-              "Passer" précédent. Un seul bouton couvre les deux cas. */}
-          <View style={[styles.reviewFooter, { borderTopColor: Colors.borderSubtle }]}>
-            <TouchableOpacity
-              style={[styles.reviewNextBtn, { backgroundColor: Colors.primary, flex: 1 }]}
-              onPress={handleNext}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.reviewNextText}>
-                {isLastPlace ? 'Terminer 🏁' : 'Étape suivante →'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       ) : null}
@@ -1099,8 +1159,12 @@ export const DoItNowScreen: React.FC = () => {
 
       {/* ── Group session : layer + floating actions + map sheet + souvenir toast ──
           Only mounted when we entered via "Démarrer/Rejoindre la session"
-          on a co-plan group conv (routeSessionId is set). */}
-      {routeSessionId && (
+          on a co-plan group conv (routeSessionId is set).
+          Pendant placeMode (= la review screen "tu es arrivé"), on cache
+          tout l'overlay groupe (GroupSessionLayer + SessionFloatingActions)
+          pour que la review soit une vue focus dédiée — back arrow +
+          hero photo + bottom card seulement. */}
+      {routeSessionId && !placeMode && (
         <>
           <View style={{ position: 'absolute', top: insets.top + 4, left: 0, right: 0, zIndex: 10 }} pointerEvents="box-none">
             <GroupSessionLayer sessionId={routeSessionId} placesCount={plan.places.length} />
@@ -1200,128 +1264,243 @@ const styles = StyleSheet.create({
   nextBtn: { width: '100%', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 16 },
   nextBtnText: { color: Colors.textOnAccent, fontSize: 16, fontFamily: Fonts.displaySemiBold },
 
-  // ─────────────────────────────────────────────────────────────
-  // Editorial review screen (web — matches native DoItNowScreen.tsx)
-  // ─────────────────────────────────────────────────────────────
-  reviewContainer: { flex: 1 },
-  reviewScroll: { paddingHorizontal: 24, paddingBottom: 24 },
-  reviewOverline: {
+  // ═════════════════════════════════════════════════════════════
+  // Review screen (refonte design Claude Design — V1 cinematique)
+  // Hero photo full-bleed en haut, bottom card cream qui overlap.
+  // Inspiration éditoriale Fraunces italique, pas d'emoji, pas de
+  // surcharge visuelle. Une seule carte (le bottom sheet) — tout le
+  // reste flotte sur le hero ou directement sur le fond.
+  // ═════════════════════════════════════════════════════════════
+  reviewRoot: { flex: 1 },
+
+  // ── Hero photo ──
+  reviewHero: {
+    height: '45%',
+    minHeight: 280,
+    width: '100%',
+    backgroundColor: '#1C1917',
+    overflow: 'hidden',
+  },
+  reviewHeroTop: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 5,
+  },
+  reviewBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(44,36,32,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewStepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: 'rgba(44,36,32,0.65)',
+  },
+  reviewStepDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
+  reviewStepText: {
     fontSize: 10.5,
     fontFamily: Fonts.bodySemiBold,
-    color: Colors.textTertiary,
-    letterSpacing: 1.3,
-    textTransform: 'uppercase',
-    marginTop: 4,
+    color: '#FFF',
+    letterSpacing: 1.4,
   },
-  reviewTitle: {
+  reviewHeroTitleWrap: {
+    position: 'absolute',
+    left: 22,
+    right: 22,
+    bottom: 38,
+  },
+  reviewHeroEyebrow: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 1.6,
+    marginBottom: 6,
+  },
+  reviewHeroTitle: {
     fontSize: 32,
-    fontFamily: Fonts.displaySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.6,
-    lineHeight: 38,
-    marginTop: 10,
-  },
-  reviewTitleQuote: {
     fontFamily: Fonts.displaySemiBoldItalic,
-    color: Colors.textPrimary,
+    color: '#FFF',
+    letterSpacing: -0.4,
+    lineHeight: 36,
   },
-  reviewSubtitle: {
+
+  // ── Bottom card (overlap le hero, rounded top) ──
+  reviewCard: {
+    flex: 1,
+    marginTop: -28,
+    backgroundColor: Colors.bgPrimary,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 10,
+    shadowColor: '#2C2420',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  reviewGrabber: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.borderMedium,
+    marginBottom: 14,
+  },
+  reviewCardScroll: {
+    paddingHorizontal: 22,
+    paddingTop: 4,
+  },
+  reviewCardHelper: {
     fontSize: 13,
     fontFamily: Fonts.body,
     color: Colors.textSecondary,
-    lineHeight: 19,
-    marginTop: 14,
+    textAlign: 'center',
+    lineHeight: 18,
   },
-  reviewStars: {
+  reviewCardHelperOptional: {
+    color: Colors.textTertiary,
+  },
+
+  // ── Stars XL + label italic ──
+  reviewStarsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 18,
   },
-  reviewRatingLabel: {
+  reviewRatingLabelItalic: {
     fontSize: 14,
-    fontFamily: Fonts.displayItalic,
+    fontFamily: Fonts.displaySemiBoldItalic,
     color: Colors.primary,
     textAlign: 'center',
     marginTop: 10,
+    letterSpacing: -0.1,
   },
-  reviewRatingHint: {
-    fontSize: 11.5,
-    fontFamily: Fonts.body,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-    marginTop: 10,
-    fontStyle: 'italic',
+
+  // ── Action pills (Souvenir + Favori) ──
+  reviewActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 22,
   },
-  favCard: {
+  reviewActionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 22,
-    padding: 14,
-    borderRadius: 14,
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 99,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderMedium,
   },
-  favCardTitle: {
-    fontSize: 14,
+  reviewActionPillActive: {
+    backgroundColor: Colors.terracotta50,
+    borderColor: Colors.terracotta300,
+  },
+  reviewActionPillText: {
+    fontSize: 13,
     fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.1,
   },
-  favCardHint: {
-    fontSize: 11.5,
-    fontFamily: Fonts.body,
-    marginTop: 2,
+
+  reviewDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.borderSubtle,
+    marginVertical: 22,
   },
-  quickWordsWrap: {
+
+  // ── Sentence-starters compact (4 visibles + expand) ──
+  reviewStartersWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  quickWordChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  reviewStarterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 99,
-    borderWidth: 1.5,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
   },
-  quickWordText: {
-    fontSize: 13,
-    fontFamily: Fonts.bodyMedium,
+  reviewStarterText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
   },
-  reviewCommentInput: {
+  reviewStarterChipMore: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: Colors.borderMedium,
+    borderStyle: 'dashed',
+  },
+  reviewStarterMoreText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+  },
+
+  // ── Comment input (clean — pas de carte) ──
+  reviewCommentInputClean: {
     marginTop: 14,
-    minHeight: 88,
+    minHeight: 84,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: StyleSheet.hairlineWidth,
     fontSize: 14,
     fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.bgSecondary,
   },
-  reviewFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  reviewSkipBtn: {
+
+  // ── Sticky CTA bottom ──
+  reviewStickyFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: 22,
-    paddingVertical: 14,
+    paddingTop: 10,
+    backgroundColor: Colors.bgPrimary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
   },
-  reviewSkipText: {
-    fontSize: 14,
-    fontFamily: Fonts.bodySemiBold,
-  },
-  reviewNextBtn: {
-    flex: 1,
+  reviewNextBtnFull: {
     height: 52,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderMedium,
   },
-  reviewNextText: {
-    color: Colors.textOnAccent,
+  reviewNextTextFull: {
     fontSize: 15,
     fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: 0.1,
   },
   bottomCard: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, borderTopWidth: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   bottomHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
