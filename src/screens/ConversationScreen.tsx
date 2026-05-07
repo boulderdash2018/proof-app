@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts } from '../constants';
-import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant, DoItNowDateSheet, SessionEndedActions } from '../components';
+import { Avatar, GroupMosaicAvatar, AddParticipantsSheet, GroupAlbumSheet, PollComposerSheet, CoPlanInlineVote, CoPlanProposalCard, CoPlanPlacesCard, CoPlanCompactEvent, CoPlanDetailsConfirmedCard, CoPlanResolutionPill, CoPlanStatusBar, FloatingSessionDock, DockParticipant, DoItNowDateSheet, SessionEndedActions, SharePhotoSheet } from '../components';
 import { useGroupSessionStore } from '../store/groupSessionStore';
 import { findDraftByConversationId } from '../services/planDraftService';
 import { useAuthStore } from '../store';
@@ -301,10 +301,10 @@ const PhotoBubble: React.FC<PhotoBubbleProps> = ({ url, width, height, caption, 
 };
 
 // ═══════════════════════════════════════════════
-// Photo Lightbox — viewer Instagram-style
-//   • Top    : X · avatar+pseudo+temps · save/forward/plus
-//   • Centre : photo portrait, bords arrondis, fond noir
-//   • Bottom : input 'Répondre…' + camera/photo/sticker
+// Photo Lightbox — viewer style Proof (cream + terracotta)
+//   • Top    : X · grand avatar+pseudo+temps · save/forward (icônes terracotta)
+//   • Centre : photo portrait, bords arrondis 18px
+//   • Bottom : bouton caméra terracotta + input 'Répondre…' fonctionnel
 // ═══════════════════════════════════════════════
 
 interface PhotoLightboxProps {
@@ -312,6 +312,10 @@ interface PhotoLightboxProps {
   onClose: () => void;
   insetsTop: number;
   insetsBottom: number;
+  /** Câblage à `sendText` du parent — la barre 'Répondre…' devient
+   *  vraiment fonctionnelle (envoie un message texte dans la conv en
+   *  cours quand l'utilisateur tap sur l'avion en papier). */
+  onSendReply: (text: string) => Promise<void>;
 }
 
 /** Format "il y a X" lisible (Instagram-style fr).
@@ -331,55 +335,101 @@ const formatRelativeTime = (dateStr: string): string => {
   return `Il y a ${weeks} semaine${weeks > 1 ? 's' : ''}`;
 };
 
-const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsTop, insetsBottom }) => {
+const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsTop, insetsBottom, onSendReply }) => {
   const { url, sender, createdAt } = payload;
   const senderName = sender?.username || sender?.displayName || 'Inconnu';
 
-  // Save photo to camera roll. Native = pas de lib MediaLibrary installée
-  // pour l'instant, donc on tombe sur un placeholder Alert. Web = on
-  // déclenche un download via <a download>. À remplacer par expo-media-
-  // library quand on l'ajoutera aux deps.
-  const handleSave = useCallback(() => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      Alert.alert(
-        'Bientôt disponible',
-        'L’enregistrement dans la pellicule sera ajouté dans une prochaine version.',
-        [{ text: 'OK' }],
-      );
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replySending, setReplySending] = useState(false);
+
+  // ── Save vers la pellicule du user ─────────────────────────────
+  // Pattern classique Expo : permission MediaLibrary → download via
+  // FileSystem.downloadAsync (cache temp) → MediaLibrary.saveToLibraryAsync.
+  // Sur web, on déclenche un fetch + blob download (le <a download> direct
+  // ne marche pas en cross-origin Firebase Storage).
+  const handleSave = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+    if (Platform.OS === 'web') {
+      try {
+        // Web : fetch + blob → download via <a> avec object URL pour
+        // contourner les restrictions cross-origin du download attribute.
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const objUrl = (globalThis as any).URL.createObjectURL(blob);
+        const a = (globalThis as any).document.createElement('a');
+        a.href = objUrl;
+        a.download = `photo-${Date.now()}.jpg`;
+        (globalThis as any).document.body.appendChild(a);
+        a.click();
+        (globalThis as any).document.body.removeChild(a);
+        (globalThis as any).URL.revokeObjectURL(objUrl);
+        Alert.alert('Téléchargée', 'Photo enregistrée dans tes téléchargements.');
+      } catch (err) {
+        console.warn('[PhotoLightbox] web download error:', err);
+        Alert.alert('Échec', 'Impossible de télécharger la photo.');
+      }
       return;
     }
+
     try {
-      const a = (globalThis as any).document?.createElement('a');
-      if (!a) return;
-      a.href = url;
-      a.download = `photo-${Date.now()}.jpg`;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      (globalThis as any).document.body.appendChild(a);
-      a.click();
-      (globalThis as any).document.body.removeChild(a);
-    } catch {
-      /* silent */
+      const MediaLibrary = await import('expo-media-library');
+      const FileSystem = await import('expo-file-system');
+
+      // 1. Permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Accès refusé',
+          'Active l’accès à la photothèque dans les Réglages pour enregistrer la photo.',
+        );
+        return;
+      }
+
+      // 2. Download dans le cache (URI local exigée par MediaLibrary native)
+      const filename = `proof_${Date.now()}.jpg`;
+      const localUri = `${FileSystem.cacheDirectory}${filename}`;
+      const dl = await FileSystem.downloadAsync(url, localUri);
+      if (dl.status !== 200) {
+        throw new Error(`download failed (${dl.status})`);
+      }
+
+      // 3. Save dans la pellicule
+      await MediaLibrary.saveToLibraryAsync(dl.uri);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert('Enregistrée', 'Photo enregistrée dans ta pellicule.');
+    } catch (err) {
+      console.warn('[PhotoLightbox] save error:', err);
+      Alert.alert('Échec', 'L’enregistrement a échoué. Réessaie dans un instant.');
     }
   }, [url]);
 
-  // Forward — utilise le système Share natif RN (UIActivityViewController
-  // sur iOS, Intent sur Android, navigator.share sur web supporté).
-  const handleForward = useCallback(async () => {
+  // ── Forward via SharePhotoSheet (sheet maison aligné sur le DA Proof,
+  //    pas le natif système) ───────────────────────────────────────
+  const handleForward = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setShareSheetOpen(true);
+  }, []);
+
+  // ── Reply (barre du bas) — câblage au sendText du parent ───────
+  const canSendReply = replyText.trim().length > 0 && !replySending;
+  const handleSendReply = useCallback(async () => {
+    if (!canSendReply) return;
+    const trimmed = replyText.trim();
+    setReplySending(true);
     try {
-      // Import dynamique pour éviter d'ajouter Share au top-level si jamais
-      // un jour on se passe de ce module.
-      const RN = await import('react-native');
-      await RN.Share.share({
-        message: `Regarde cette photo de ${senderName} : ${url}`,
-        url, // iOS uniquement
-      });
-    } catch {
-      /* user cancelled or no share UI */
+      await onSendReply(trimmed);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setReplyText('');
+      onClose(); // On ferme le lightbox une fois envoyé — UX naturelle.
+    } catch (err) {
+      console.warn('[PhotoLightbox] send reply error:', err);
+    } finally {
+      setReplySending(false);
     }
-  }, [url, senderName]);
+  }, [canSendReply, replyText, onSendReply, onClose]);
 
   return (
     <View style={[lightboxStyles.root, { paddingTop: insetsTop, paddingBottom: insetsBottom }]}>
@@ -390,13 +440,13 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsT
           style={lightboxStyles.iconBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="close" size={26} color="#FFF" />
+          <Ionicons name="close" size={26} color={Colors.textPrimary} />
         </TouchableOpacity>
 
         {sender && (
           <View style={lightboxStyles.senderBlock}>
             <Avatar
-              size="XS"
+              size="M"
               avatarUrl={sender.avatarUrl ?? undefined}
               bg={sender.avatarBg}
               color={sender.avatarColor}
@@ -412,17 +462,17 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsT
         <View style={lightboxStyles.topBarRight}>
           <TouchableOpacity
             onPress={handleSave}
-            style={lightboxStyles.iconBtn}
+            style={lightboxStyles.topActionBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="download-outline" size={22} color="#FFF" />
+            <Ionicons name="download-outline" size={20} color={Colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleForward}
-            style={lightboxStyles.iconBtn}
+            style={lightboxStyles.topActionBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="paper-plane-outline" size={20} color="#FFF" />
+            <Ionicons name="paper-plane-outline" size={19} color={Colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -436,25 +486,48 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsT
         />
       </Pressable>
 
-      {/* ── Bottom reply bar (visuel, taps désactivés pour éviter d'envoyer
-            depuis le viewer — la vraie input reste dans la conv) ── */}
-      <View style={lightboxStyles.bottomBar} pointerEvents="none">
-        <LinearGradient
-          colors={['#F58529', '#DD2A7B', '#8134AF']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={lightboxStyles.cameraBtn}
-        >
-          <Ionicons name="camera" size={18} color="#FFF" />
-        </LinearGradient>
-        <View style={lightboxStyles.replyInput}>
-          <Text style={lightboxStyles.replyPlaceholder}>Répondre…</Text>
+      {/* ── Reply bar — input fonctionnel + send terracotta ── */}
+      <View style={lightboxStyles.bottomBar}>
+        <View style={lightboxStyles.cameraBtn}>
+          <Ionicons name="camera" size={18} color={Colors.textOnAccent} />
         </View>
-        <View style={lightboxStyles.bottomIconsRight}>
-          <Ionicons name="mic-outline" size={20} color="rgba(255,255,255,0.85)" />
-          <Ionicons name="image-outline" size={20} color="rgba(255,255,255,0.85)" />
-          <Ionicons name="happy-outline" size={20} color="rgba(255,255,255,0.85)" />
+        <View style={lightboxStyles.replyInputWrap}>
+          <TextInput
+            style={lightboxStyles.replyInput}
+            placeholder="Répondre…"
+            placeholderTextColor={Colors.textTertiary}
+            value={replyText}
+            onChangeText={setReplyText}
+            multiline={false}
+            returnKeyType="send"
+            onSubmitEditing={handleSendReply}
+            editable={!replySending}
+          />
         </View>
+        {canSendReply ? (
+          <TouchableOpacity
+            style={lightboxStyles.sendBtn}
+            onPress={handleSendReply}
+            disabled={!canSendReply}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {replySending ? (
+              <ActivityIndicator size="small" color={Colors.textOnAccent} />
+            ) : (
+              <Ionicons name="paper-plane" size={16} color={Colors.textOnAccent} />
+            )}
+          </TouchableOpacity>
+        ) : null}
       </View>
+
+      {/* SharePhotoSheet — bottom sheet pour forward vers d'autres amis,
+          aligné DA Proof comme SharePlanSheet. */}
+      <SharePhotoSheet
+        visible={shareSheetOpen}
+        onClose={() => setShareSheetOpen(false)}
+        photoUrl={url}
+      />
     </View>
   );
 };
@@ -2580,6 +2653,12 @@ export const ConversationScreen: React.FC = () => {
             onClose={() => setLightboxPayload(null)}
             insetsTop={insets.top}
             insetsBottom={insets.bottom}
+            onSendReply={async (text: string) => {
+              // Wire la barre 'Répondre…' au sendText de la conv. La réponse
+              // arrive comme message texte normal (pas de quote du photo —
+              // on garde simple, l'utilisateur a déjà le contexte visuel).
+              await sendText(text);
+            }}
           />
         </Modal>
       )}
@@ -2769,13 +2848,12 @@ const kebabStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════
 
 const lightboxStyles = StyleSheet.create({
-  // Conteneur plein écran noir — flex column avec safe-area paddings
-  // injectés inline.
+  // Fond crème Proof — pas de noir IG. Cohérent avec le reste de l'app.
   root: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: Colors.bgPrimary,
   },
-  // ── Top bar : X · sender block · save+forward
+  // ── Top bar : X · grand avatar+pseudo+temps · save+forward terracotta
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2789,9 +2867,16 @@ const lightboxStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Sender block : avatar + nom (gras) + temps (italique léger). Layout
-  // horizontal compact, prend toute la largeur restante entre X et icônes
-  // de droite.
+  // Bouton "save" / "forward" en haut à droite — petit cercle terracotta
+  // léger pour matcher la DA des cards (boutons d'action discrets).
+  topActionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(196, 112, 75, 0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   senderBlock: {
     flex: 1,
     flexDirection: 'row',
@@ -2800,23 +2885,25 @@ const lightboxStyles = StyleSheet.create({
     minWidth: 0,
   } as any,
   senderName: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: Fonts.bodySemiBold,
-    color: '#FFF',
+    color: Colors.textPrimary,
     letterSpacing: -0.1,
   },
   senderTime: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: Fonts.body,
-    color: 'rgba(255,255,255,0.65)',
-    marginTop: 1,
+    color: Colors.textTertiary,
+    marginTop: 2,
   },
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   } as any,
-  // ── Photo wrap (zone tappable pour close)
+  // ── Photo wrap : la photo prend toute la place dispo entre header et
+  //    barre du bas. Bord arrondi 18px, fond crème pour éviter le contraste
+  //    noir → cohérent avec la card globale.
   imageWrap: {
     flex: 1,
     paddingHorizontal: 12,
@@ -2828,42 +2915,54 @@ const lightboxStyles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 18,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.bgTertiary,
   },
-  // ── Bottom reply bar (visuel uniquement)
+  // ── Reply bar : caméra terracotta + input + send terracotta. Plus de
+  //    mic / image / sticker — l'utilisateur a juste besoin de répondre.
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderSubtle,
   } as any,
   cameraBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  replyInput: {
+  replyInputWrap: {
     flex: 1,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.35)',
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgSecondary,
     paddingHorizontal: 16,
     justifyContent: 'center',
   },
-  replyPlaceholder: {
-    fontSize: 13,
+  replyInput: {
+    fontSize: 14,
     fontFamily: Fonts.body,
-    color: 'rgba(255,255,255,0.55)',
+    color: Colors.textPrimary,
+    paddingVertical: 0,
+    // Web : retire l'outline navigateur par défaut.
+    ...((Platform.OS === 'web' ? { outlineStyle: 'none' as any, outlineWidth: 0 } : {}) as any),
   },
-  bottomIconsRight: {
-    flexDirection: 'row',
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
-    gap: 14,
-  } as any,
+    justifyContent: 'center',
+  },
 });
 
 // ═══════════════════════════════════════════════

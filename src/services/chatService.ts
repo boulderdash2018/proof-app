@@ -701,6 +701,62 @@ export const sendPhotoMessage = async (
   return msgRef.id;
 };
 
+/**
+ * Forward an EXISTING photo (déjà uploadée dans Firebase Storage) vers une
+ * autre conversation. Skip l'étape upload — on insère simplement un message
+ * type 'photo' avec l'URL d'origine.
+ *
+ * Utilisé par SharePhotoSheet pour partager une photo reçue dans un DM
+ * vers d'autres amis. Le seul "coût" est la création d'un nouveau doc
+ * message — aucune duplication du fichier dans Storage.
+ */
+export const forwardPhotoMessage = async (
+  conversationId: string,
+  senderId: string,
+  options: { photoUrl: string; photoWidth?: number; photoHeight?: number; caption?: string },
+): Promise<string> => {
+  const { photoUrl, photoWidth, photoHeight, caption } = options;
+
+  const msgData: Record<string, any> = {
+    conversationId,
+    senderId,
+    type: 'photo',
+    content: caption?.trim() || '',
+    photoUrl,
+    reactions: [],
+    readBy: [senderId],
+    createdAt: serverTimestamp(),
+  };
+  if (typeof photoWidth === 'number') msgData.photoWidth = photoWidth;
+  if (typeof photoHeight === 'number') msgData.photoHeight = photoHeight;
+
+  const msgRef = await addDoc(
+    collection(db, CONVERSATIONS, conversationId, MESSAGES),
+    msgData,
+  );
+
+  // Update conversation preview + unread counts (même pattern que sendPhotoMessage)
+  const convRef = doc(db, CONVERSATIONS, conversationId);
+  const convSnap = await getDoc(convRef);
+  if (convSnap.exists()) {
+    const data = convSnap.data();
+    const newUnread: Record<string, number> = { ...data.unreadCount };
+    (data.participants as string[]).forEach((uid) => {
+      if (uid !== senderId) newUnread[uid] = (newUnread[uid] || 0) + 1;
+    });
+    await updateDoc(convRef, {
+      lastMessage: caption?.trim() || '📷 Photo',
+      lastMessageType: 'photo',
+      lastMessageSenderId: senderId,
+      lastMessageAt: serverTimestamp(),
+      unreadCount: newUnread,
+      [`typing.${senderId}`]: 0,
+    });
+  }
+
+  return msgRef.id;
+};
+
 // ═══════════════════════════════════════════════
 // Polls
 // ═══════════════════════════════════════════════

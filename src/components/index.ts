@@ -21,6 +21,7 @@ export { FounderBadge } from './FounderBadge';
 export { AccountPromptModal } from './AccountPromptModal';
 export { PlanMapModal } from './PlanMapModal';
 export { SharePlanSheet } from './SharePlanSheet';
+export { SharePhotoSheet } from './SharePhotoSheet';
 export { GroupPlanSheet } from './GroupPlanSheet';
 export { GroupMosaicAvatar } from './GroupMosaicAvatar';
 export { AddParticipantsSheet } from './AddParticipantsSheet';
