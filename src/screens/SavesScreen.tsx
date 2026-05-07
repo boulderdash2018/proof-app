@@ -245,6 +245,25 @@ export const SavesScreen: React.FC = () => {
   const searchInputRef = useRef<RNTextInput>(null);
   const searchSlide = useRef(new Animated.Value(0)).current;
 
+  // ── Animated tab indicator (pattern Feed) ──
+  // Les onglets À faire / Faites ont un trait terracotta qui slide
+  // d'un tab à l'autre via spring. Donne une transition fluide qui
+  // fait sentir le passage d'état, pas un toggle binaire.
+  const todoTabLayout = useRef({ x: 0, width: 0 });
+  const doneTabLayout = useRef({ x: 0, width: 0 });
+  const tabIndicatorLeft = useRef(new Animated.Value(0)).current;
+  const tabIndicatorWidth = useRef(new Animated.Value(0)).current;
+  const switchTab = (tab: 'todo' | 'done') => {
+    if (tab === activeTab) return;
+    Haptics.selectionAsync().catch(() => {});
+    setActiveTab(tab);
+    const target = tab === 'todo' ? todoTabLayout.current : doneTabLayout.current;
+    Animated.parallel([
+      Animated.spring(tabIndicatorLeft,  { toValue: target.x,     friction: 9, tension: 80, useNativeDriver: false }),
+      Animated.spring(tabIndicatorWidth, { toValue: target.width, friction: 9, tension: 80, useNativeDriver: false }),
+    ]).start();
+  };
+
   useEffect(() => {
     if (user) fetchSaves(user.id);
   }, [user?.id]);
@@ -332,28 +351,31 @@ export const SavesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
-      {/* Header — recherche à gauche, titre centré, lieux favoris à droite */}
+      {/* Header — pattern Explorer (eyebrow centré + carrés rounded
+          square aux extrémités). Cohérent avec le reste de l'app
+          (Explorer, etc.) — pas de Fraunces italique pour le titre,
+          on garde Fraunces pour les titres éditoriaux des cells. */}
       <View style={styles.headerRow}>
         <TouchableOpacity
-          style={[styles.starBtn, searchOpen && styles.starBtnActive]}
+          style={[styles.headerBtn, searchOpen && styles.headerBtnActive]}
           onPress={toggleSearch}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons
             name={searchOpen ? 'close' : 'search'}
-            size={16}
-            color={searchOpen ? Colors.textOnAccent : Colors.textPrimary}
+            size={17}
+            color={searchOpen ? Colors.textOnAccent : Colors.textSecondary}
           />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Plans</Text>
+        <Text style={styles.headerEyebrow}>PLANS</Text>
         <TouchableOpacity
-          style={styles.starBtn}
+          style={styles.headerBtn}
           onPress={() => navigation.navigate('SavedPlaces')}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="star" size={16} color={Colors.gold} />
+          <Ionicons name="star" size={17} color={Colors.gold} />
         </TouchableOpacity>
       </View>
 
@@ -418,30 +440,45 @@ export const SavesScreen: React.FC = () => {
         </ScrollView>
       </Animated.View>
 
-      {/* Tabs underline-style — moins lourd qu'un segment plein-largeur */}
-      <View style={styles.tabsRow}>
-        <TouchableOpacity style={styles.tabUnderline} onPress={() => setActiveTab('todo')} activeOpacity={0.7}>
-          <View style={styles.tabLabelRow}>
-            <Text style={[styles.tabText, activeTab === 'todo' && styles.tabTextActive]}>
-              {t.saves_tab_todo}
-            </Text>
-            <Text style={[styles.tabCount, activeTab === 'todo' && styles.tabCountActive]}>
-              {savedPlans.filter((sp) => !sp.isDone).length}
-            </Text>
-          </View>
-          {activeTab === 'todo' && <View style={styles.tabUnderlineBar} />}
+      {/* Tabs centrées — pattern Feed (Pour toi / Amis) avec
+          indicateur animé qui slide entre les 2. Garantit la
+          cohérence visuelle avec l'écran principal Feed. */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          onLayout={(e: any) => {
+            const { x, width } = e.nativeEvent.layout;
+            todoTabLayout.current = { x, width };
+            if (activeTab === 'todo') {
+              tabIndicatorLeft.setValue(x);
+              tabIndicatorWidth.setValue(width);
+            }
+          }}
+          onPress={() => switchTab('todo')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, { opacity: activeTab === 'todo' ? 1 : 0.5 }]}>
+            {t.saves_tab_todo}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tabUnderline} onPress={() => setActiveTab('done')} activeOpacity={0.7}>
-          <View style={styles.tabLabelRow}>
-            <Text style={[styles.tabText, activeTab === 'done' && styles.tabTextActive]}>
-              {t.saves_tab_done}
-            </Text>
-            <Text style={[styles.tabCount, activeTab === 'done' && styles.tabCountActive]}>
-              {savedPlans.filter((sp) => sp.isDone).length}
-            </Text>
-          </View>
-          {activeTab === 'done' && <View style={styles.tabUnderlineBar} />}
+        <TouchableOpacity
+          onLayout={(e: any) => {
+            const { x, width } = e.nativeEvent.layout;
+            doneTabLayout.current = { x, width };
+            if (activeTab === 'done') {
+              tabIndicatorLeft.setValue(x);
+              tabIndicatorWidth.setValue(width);
+            }
+          }}
+          onPress={() => switchTab('done')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, { opacity: activeTab === 'done' ? 1 : 0.5 }]}>
+            {t.saves_tab_done}
+          </Text>
         </TouchableOpacity>
+        <Animated.View
+          style={[styles.tabIndicator, { left: tabIndicatorLeft, width: tabIndicatorWidth }]}
+        />
       </View>
 
       {isLoading ? (
@@ -512,27 +549,29 @@ const SQ = (SCREEN_W - H_PAD * 2 - GAP * 2) / 3;
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Header
+  // Header — pattern Explorer : square rounded buttons + eyebrow centré
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: H_PAD,
     paddingTop: 6,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
-  pageTitle: {
-    fontSize: 22,
-    fontFamily: Fonts.displaySemiBoldItalic,
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
+  headerEyebrow: {
+    fontSize: 11,
+    fontFamily: Fonts.bodySemiBold,
+    fontWeight: '600',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
   },
-  starBtn: {
-    width: 34, height: 34, borderRadius: 17,
+  headerBtn: {
+    width: 38, height: 38, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.bgSecondary,
+    backgroundColor: Colors.bgTertiary,
   },
-  starBtnActive: {
+  headerBtnActive: {
     backgroundColor: Colors.primary,
   },
 
@@ -585,37 +624,30 @@ const styles = StyleSheet.create({
   },
   chipTextActive: { color: Colors.textOnAccent },
 
-  // Tabs underline
-  tabsRow: {
+  // Tabs centrées — pattern Feed (Pour toi / Amis) : indicateur
+  // animé qui slide entre les 2 tabs, opacity sur le label
+  // inactif au lieu d'un changement de couleur.
+  tabRow: {
     flexDirection: 'row',
-    paddingHorizontal: H_PAD,
-    gap: 22,
-    marginTop: 6,
-    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 6,
   },
-  tabUnderline: {
-    paddingVertical: 8,
-  },
-  tabLabelRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   tabText: {
-    fontSize: 14,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textTertiary,
-    letterSpacing: -0.05,
+    fontSize: 15,
+    fontFamily: Fonts.displayBold,
+    color: Colors.textPrimary,
   },
-  tabTextActive: { color: Colors.textPrimary },
-  tabCount: {
-    fontSize: 11,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textTertiary,
-  },
-  tabCountActive: { color: Colors.primary },
-  tabUnderlineBar: {
-    height: 2,
-    width: '100%',
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    height: 2.5,
+    borderRadius: 2,
     backgroundColor: Colors.primary,
-    borderRadius: 1,
-    marginTop: 6,
   },
 
   // ScrollView content
