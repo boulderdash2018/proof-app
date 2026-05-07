@@ -1073,14 +1073,18 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
             clipped by the card's overflow:hidden. */}
 
         {/* ── Type badge "PLAN" — top-left, vert sauge, discret ──
-            Pendant du badge "SPOT" terracotta dans SpotCard. Permet de
-            distinguer en un coup d'œil un Plan d'un Spot dans le feed.
+            Pendant du badge "SPOT" terracotta dans SpotCard. Visible
+            uniquement en mode feed (scroll = 0) — fade out dès que
+            l'utilisateur commence à tirer le détail (même rythme que
+            le chevron "Glisse pour voir le plan"). En détail ouvert,
+            le badge n'a plus de raison d'être visible : on est déjà
+            dans le contenu du plan, le contexte est implicite.
             pointerEvents:'none' pour ne pas bloquer les taps sur le
             ScrollView en dessous. */}
-        <View style={styles.typeBadge} pointerEvents="none">
+        <Animated.View style={[styles.typeBadge, { opacity: chevronOpacity }]} pointerEvents="none">
           <Ionicons name="map" size={11} color={Colors.textOnAccent} />
           <Text style={styles.typeBadgeText}>PLAN</Text>
-        </View>
+        </Animated.View>
       </View>
 
       {/* ════════════════════════════════════════════════════════════════
