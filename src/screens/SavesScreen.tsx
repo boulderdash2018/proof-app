@@ -9,6 +9,7 @@ import {
   Dimensions,
   ScrollView,
   Pressable,
+  TextInput as RNTextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -16,12 +17,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Layout, Fonts } from '../constants';
 import { LoadingSkeleton } from '../components';
 import { Plan } from '../types';
-import { useAuthStore, useSavesStore } from '../store';
+import { useAuthStore, useSavesStore, useSavedPlacesStore } from '../store';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../hooks/useColors';
 import { useTranslation } from '../hooks/useTranslation';
 import { SavedPlan } from '../types';
 import * as Haptics from 'expo-haptics';
+import { fuzzyMatchAny } from '../utils/fuzzySearch';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const H_PAD = Layout.screenPadding;
@@ -228,20 +230,90 @@ export const SavesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const { savedPlans, isLoading, fetchSaves } = useSavesStore();
+  const savedPlacesList = useSavedPlacesStore((s) => s.places);
   const [activeTab, setActiveTab] = useState<'todo' | 'done'>('todo');
   const C = useColors();
   const { t } = useTranslation();
+
+  // ── Search + filter state ──
+  // searchOpen = barre + chips visibles (toggle au tap loupe).
+  // searchQuery = ce que l'user tape (fuzzy match cf. utils/fuzzySearch).
+  // filter = chip actif parmi 'all' | 'solo' | 'group' | 'with-favs'.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'solo' | 'group' | 'with-favs'>('all');
+  const searchInputRef = useRef<RNTextInput>(null);
+  const searchSlide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (user) fetchSaves(user.id);
   }, [user?.id]);
 
-  // Filtre + tri par savedAt desc (= plus récents en premier)
+  // Set des googlePlaceId favoris — pour le filtre "Avec mes favoris"
+  // (un plan match si au moins une de ses places est dans mes favoris).
+  const favoriteSet = useMemo(
+    () => new Set(savedPlacesList.map((p) => p.placeId)),
+    [savedPlacesList],
+  );
+
+  // Filtre combiné : tab → chip → recherche fuzzy → tri savedAt desc
   const filteredPlans = useMemo(() => {
-    return savedPlans
-      .filter((sp) => activeTab === 'todo' ? !sp.isDone : sp.isDone)
-      .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
-  }, [savedPlans, activeTab]);
+    let list = savedPlans.filter((sp) => activeTab === 'todo' ? !sp.isDone : sp.isDone);
+
+    // Chip filter — co-plan vs solo vs avec favoris
+    if (filter === 'solo') {
+      list = list.filter((sp) =>
+        !sp.plan.sourceDraftId && (sp.plan.coAuthors?.length ?? 0) === 0,
+      );
+    } else if (filter === 'group') {
+      list = list.filter((sp) =>
+        !!sp.plan.sourceDraftId || (sp.plan.coAuthors?.length ?? 0) > 0,
+      );
+    } else if (filter === 'with-favs') {
+      list = list.filter((sp) =>
+        sp.plan.places.some((p) =>
+          (p.googlePlaceId && favoriteSet.has(p.googlePlaceId)) || favoriteSet.has(p.id),
+        ),
+      );
+    }
+
+    // Recherche fuzzy — sur titre + place names + tags. Le fuzzyMatchAny
+    // tolère 1 faute de frappe (Levenshtein ≤ 1) + l'accent-insensitivité.
+    if (searchQuery.trim().length > 0) {
+      list = list.filter((sp) => {
+        const haystacks: (string | undefined)[] = [
+          sp.plan.title,
+          ...(sp.plan.places || []).map((p) => p.name),
+          ...(sp.plan.tags || []).map((t) => String(t)),
+          sp.plan.author?.username,
+          sp.plan.author?.displayName,
+        ];
+        return fuzzyMatchAny(searchQuery, haystacks);
+      });
+    }
+
+    return list.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+  }, [savedPlans, activeTab, filter, searchQuery, favoriteSet]);
+
+  // Toggle search — anime la slide-down + autofocus le input quand ouvert.
+  const toggleSearch = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const next = !searchOpen;
+    setSearchOpen(next);
+    Animated.spring(searchSlide, {
+      toValue: next ? 1 : 0,
+      friction: 9,
+      tension: 80,
+      useNativeDriver: false, // height anim — peut pas être native
+    }).start();
+    if (next) {
+      setTimeout(() => searchInputRef.current?.focus(), 120);
+    } else {
+      // Fermeture → reset query + filter pour ne pas garder un état caché.
+      setSearchQuery('');
+      setFilter('all');
+    }
+  };
 
   // Split : 2 premiers = hero (large), reste = grid 3-col
   const heroPlans = filteredPlans.slice(0, 2);
@@ -260,9 +332,20 @@ export const SavesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: Colors.bgPrimary }]}>
-      {/* Header */}
+      {/* Header — recherche à gauche, titre centré, lieux favoris à droite */}
       <View style={styles.headerRow}>
-        <View style={{ width: 34 }} />
+        <TouchableOpacity
+          style={[styles.starBtn, searchOpen && styles.starBtnActive]}
+          onPress={toggleSearch}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={searchOpen ? 'close' : 'search'}
+            size={16}
+            color={searchOpen ? Colors.textOnAccent : Colors.textPrimary}
+          />
+        </TouchableOpacity>
         <Text style={styles.pageTitle}>Plans</Text>
         <TouchableOpacity
           style={styles.starBtn}
@@ -273,6 +356,67 @@ export const SavesScreen: React.FC = () => {
           <Ionicons name="star" size={16} color={Colors.gold} />
         </TouchableOpacity>
       </View>
+
+      {/* Search bar + filter chips — slide-down depuis le header */}
+      <Animated.View
+        style={[
+          styles.searchWrap,
+          {
+            maxHeight: searchSlide.interpolate({ inputRange: [0, 1], outputRange: [0, 110] }),
+            opacity: searchSlide,
+            paddingBottom: searchSlide.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }),
+          },
+        ]}
+        pointerEvents={searchOpen ? 'auto' : 'none'}
+      >
+        <View style={styles.searchInputWrap}>
+          <Ionicons name="search" size={14} color={Colors.textTertiary} />
+          <RNTextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Rechercher un plan, un lieu, un mot..."
+            placeholderTextColor={Colors.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {([
+            { key: 'all', label: 'Tous' },
+            { key: 'solo', label: 'Solo' },
+            { key: 'group', label: 'En groupe' },
+            { key: 'with-favs', label: 'Avec mes favoris' },
+          ] as const).map((opt) => {
+            const active = filter === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setFilter(opt.key);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </Animated.View>
 
       {/* Tabs underline-style — moins lourd qu'un segment plein-largeur */}
       <View style={styles.tabsRow}>
@@ -388,6 +532,58 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.bgSecondary,
   },
+  starBtnActive: {
+    backgroundColor: Colors.primary,
+  },
+
+  // Search bar + filter chips wrap (slide-down depuis le header)
+  searchWrap: {
+    paddingHorizontal: H_PAD,
+    overflow: 'hidden',
+  },
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    padding: 0,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingRight: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  chipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  chipText: {
+    fontSize: 11.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+    letterSpacing: -0.05,
+  },
+  chipTextActive: { color: Colors.textOnAccent },
 
   // Tabs underline
   tabsRow: {
