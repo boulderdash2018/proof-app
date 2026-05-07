@@ -391,38 +391,12 @@ export const FeedScreen: React.FC = () => {
   const recordSignalTaste = useTasteProfileStore((s) => s.recordSignal);
   const markSeenTaste = useTasteProfileStore((s) => s.markSeen);
 
-  // ── Refresh — re-shuffle algo + re-fetch posts ─────────────────
-  // Pattern Instagram-web : un bouton qui :
-  //   1. Bumpe le jitterSeed → l'ordre change même corpus identique
-  //   2. Flush les signaux pendants vers Firestore
-  //   3. Re-fetch les nouveaux posts si dispo
-  // Le rotate animation donne un feedback visuel (1 tour 600ms).
-  const [jitterSeed, setJitterSeed] = useState(() => Math.floor(Date.now() / (24 * 60 * 60 * 1000)));
-  const refreshRotateAnim = useRef(new Animated.Value(0)).current;
-  const refreshRotate = refreshRotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-  const flushTaste = useTasteProfileStore((s) => s.flush);
-  const handleRefresh = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    // Spin animation
-    refreshRotateAnim.setValue(0);
-    Animated.timing(refreshRotateAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-    // Bump jitter seed → re-shuffle exploration
-    setJitterSeed((s) => s + Math.floor(Math.random() * 1000) + 1);
-    // Flush profile signals + re-fetch
-    flushTaste().catch(() => {});
-    if (user?.id && cityConfig.name) {
-      try {
-        await fetchFeed(user.id, undefined, cityConfig.name);
-      } catch {}
-    }
-  }, [refreshRotateAnim, flushTaste, user?.id, cityConfig.name, fetchFeed]);
+  // Note : le bouton refresh manuel a été retiré du header
+  // (l'effet n'était pas perceptible avec peu de posts en base).
+  // Le re-shuffle de l'algo se fait maintenant automatiquement au
+  // jour le jour via le jitterSeed par défaut de feedRanking
+  // (= dayOfYear). On ré-introduira un refresh visible quand on
+  // aura plus de corpus à mélanger.
 
   // ── "Pas intéressé" — signal négatif fort ─────────────────────
   // Émet un event 'not_interested' qui :
@@ -471,12 +445,12 @@ export const FeedScreen: React.FC = () => {
       // Pas encore chargé → fallback chronologique mixte
       return interleaveFeed(plans, spots);
     }
-    const ranked = rankFeed(plans, spots, tasteProfile, seenInSession, { jitterSeed });
+    const ranked = rankFeed(plans, spots, tasteProfile, seenInSession);
     return ranked.map(({ item }) => {
       if (item.type === 'plan') return { type: 'plan' as const, id: item.id, plan: item.raw as Plan };
       return { type: 'spot' as const, id: item.id, spot: item.raw as Spot };
     });
-  }, [plans, spots, tasteProfile, seenInSession, jitterSeed]);
+  }, [plans, spots, tasteProfile, seenInSession]);
 
   const currentItems = React.useMemo<FeedItem[]>(
     () => activeTab === 'reco'
@@ -646,22 +620,6 @@ export const FeedScreen: React.FC = () => {
             proof<Text style={{ color: Colors.primary }}>.</Text>
           </Text>
           <View style={styles.headerIcons}>
-            {/* Refresh — re-fetch posts + re-shuffle l'algo (nouveau
-                jitterSeed → ordre différent même corpus identique).
-                Sur natif on aurait un pull-to-refresh, sur web le
-                bouton suffit (FlatList horizontale empêche le drag
-                vertical). Toujours visible sur l'onglet "Pour toi". */}
-            {!isGuest && activeTab === 'reco' && (
-              <TouchableOpacity
-                style={styles.headerIconBtn}
-                onPress={handleRefresh}
-                activeOpacity={0.7}
-              >
-                <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
-                  <Ionicons name="refresh-outline" size={18} color={Colors.textPrimary} />
-                </Animated.View>
-              </TouchableOpacity>
-            )}
             {isGuest ? (
               <TouchableOpacity
                 style={styles.headerIconBtn}
