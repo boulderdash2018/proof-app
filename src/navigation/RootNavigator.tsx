@@ -23,6 +23,7 @@ import { CoPlanPublishScreen } from '../screens/CoPlanPublishScreen';
 import { CreateSpotScreen } from '../screens/CreateSpotScreen';
 import { DoItNowCompleteScreen } from '../screens/DoItNowCompleteScreen';
 import { OrganizeCompleteScreen } from '../screens/OrganizeCompleteScreen';
+import { TasteOnboardingScreen } from '../screens/TasteOnboardingScreen';
 import { WaitingRoomScreen } from '../screens/WaitingRoomScreen';
 import { AccountPromptModal } from '../components/AccountPromptModal';
 import { SessionInviteToast } from '../components/SessionInviteToast';
@@ -72,6 +73,7 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="CreateSpot" component={CreateSpotScreen} options={{ animation: 'slide_from_bottom' }} />
               <Stack.Screen name="DoItNowComplete" component={DoItNowCompleteScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="OrganizeComplete" component={OrganizeCompleteScreen} options={{ animation: 'slide_from_right' }} />
+              <Stack.Screen name="TasteOnboarding" component={TasteOnboardingScreen} options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             </>
           )
         ) : wantsAuth ? (

@@ -73,6 +73,9 @@ export type RootStackParamList = {
    *  + coverPhotos + tags + creator tip à la confirmation. */
   CoPlanPublish: { planId: string };
   CreateSpot: undefined;
+  /** Onboarding 4 questions pour le taste profile — accessible via la
+   *  bannière cold-start sur le feed et (futur) depuis les settings. */
+  TasteOnboarding: undefined;
 };
 
 export type BottomTabParamList = {

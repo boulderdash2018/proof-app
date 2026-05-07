@@ -385,6 +385,67 @@ export const FeedScreen: React.FC = () => {
     setMapPlan(plan);
   }, []);
 
+  // ── Taste signal helpers — déclarés tôt car utilisés par
+  //     handleNotInterested ci-dessous ET par l'effect dwell-time
+  //     plus bas dans le composant. ──
+  const recordSignalTaste = useTasteProfileStore((s) => s.recordSignal);
+  const markSeenTaste = useTasteProfileStore((s) => s.markSeen);
+
+  // ── Refresh — re-shuffle algo + re-fetch posts ─────────────────
+  // Pattern Instagram-web : un bouton qui :
+  //   1. Bumpe le jitterSeed → l'ordre change même corpus identique
+  //   2. Flush les signaux pendants vers Firestore
+  //   3. Re-fetch les nouveaux posts si dispo
+  // Le rotate animation donne un feedback visuel (1 tour 600ms).
+  const [jitterSeed, setJitterSeed] = useState(() => Math.floor(Date.now() / (24 * 60 * 60 * 1000)));
+  const refreshRotateAnim = useRef(new Animated.Value(0)).current;
+  const refreshRotate = refreshRotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  const flushTaste = useTasteProfileStore((s) => s.flush);
+  const handleRefresh = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Spin animation
+    refreshRotateAnim.setValue(0);
+    Animated.timing(refreshRotateAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+    // Bump jitter seed → re-shuffle exploration
+    setJitterSeed((s) => s + Math.floor(Math.random() * 1000) + 1);
+    // Flush profile signals + re-fetch
+    flushTaste().catch(() => {});
+    if (user?.id && cityConfig.name) {
+      try {
+        await fetchFeed(user.id, undefined, cityConfig.name);
+      } catch {}
+    }
+  }, [refreshRotateAnim, flushTaste, user?.id, cityConfig.name, fetchFeed]);
+
+  // ── "Pas intéressé" — signal négatif fort ─────────────────────
+  // Émet un event 'not_interested' qui :
+  //  1. Cache définitivement ce post (hiddenPostIds)
+  //  2. Applique un malus à la catégorie (l'algo sera plus prudent
+  //     sur cette catégorie pour les prochains posts).
+  // Le post disparaît immédiatement du feed via le filtrage dans
+  // rankFeed (qui exclut les hiddenPostIds).
+  const handleNotInterested = useCallback((plan: Plan) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (Platform.OS === 'web') {
+      // Pas d'Alert sur web — confirm() natif pour rester safe.
+      const ok = window.confirm('Masquer ce plan et améliorer tes recommandations ?');
+      if (!ok) return;
+    }
+    recordSignalTaste({
+      type: 'not_interested',
+      postId: plan.id,
+      category: plan.tags?.[0]?.toLowerCase(),
+      authorId: plan.authorId,
+    });
+  }, [recordSignalTaste]);
+
   // ── Viewability tracking for progress ─────────────────────────
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -410,12 +471,12 @@ export const FeedScreen: React.FC = () => {
       // Pas encore chargé → fallback chronologique mixte
       return interleaveFeed(plans, spots);
     }
-    const ranked = rankFeed(plans, spots, tasteProfile, seenInSession);
+    const ranked = rankFeed(plans, spots, tasteProfile, seenInSession, { jitterSeed });
     return ranked.map(({ item }) => {
       if (item.type === 'plan') return { type: 'plan' as const, id: item.id, plan: item.raw as Plan };
       return { type: 'spot' as const, id: item.id, spot: item.raw as Spot };
     });
-  }, [plans, spots, tasteProfile, seenInSession]);
+  }, [plans, spots, tasteProfile, seenInSession, jitterSeed]);
 
   const currentItems = React.useMemo<FeedItem[]>(
     () => activeTab === 'reco'
@@ -431,8 +492,6 @@ export const FeedScreen: React.FC = () => {
   // (pénalise la catégorie), >= 1.5s = view (signal positif léger).
   // markSeen ajoute aussi à seenInSession pour le novelty bonus.
   const lastViewedRef = useRef<{ id: string; ts: number; category?: string; authorId?: string } | null>(null);
-  const recordSignalTaste = useTasteProfileStore((s) => s.recordSignal);
-  const markSeenTaste = useTasteProfileStore((s) => s.markSeen);
 
   useEffect(() => {
     if (!currentItem) return;
@@ -547,6 +606,7 @@ export const FeedScreen: React.FC = () => {
           }}
           onMapPress={() => handleMapPress(plan)}
           onDetailScrollY={handleDetailScrollY}
+          onNotInterested={() => handleNotInterested(plan)}
         />
       );
     },
@@ -586,6 +646,22 @@ export const FeedScreen: React.FC = () => {
             proof<Text style={{ color: Colors.primary }}>.</Text>
           </Text>
           <View style={styles.headerIcons}>
+            {/* Refresh — re-fetch posts + re-shuffle l'algo (nouveau
+                jitterSeed → ordre différent même corpus identique).
+                Sur natif on aurait un pull-to-refresh, sur web le
+                bouton suffit (FlatList horizontale empêche le drag
+                vertical). Toujours visible sur l'onglet "Pour toi". */}
+            {!isGuest && activeTab === 'reco' && (
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={handleRefresh}
+                activeOpacity={0.7}
+              >
+                <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
+                  <Ionicons name="refresh-outline" size={18} color={Colors.textPrimary} />
+                </Animated.View>
+              </TouchableOpacity>
+            )}
             {isGuest ? (
               <TouchableOpacity
                 style={styles.headerIconBtn}
@@ -683,12 +759,18 @@ export const FeedScreen: React.FC = () => {
           qui se cache en mode détail (pour pas surcharger la lecture
           d'un plan). */}
       {activeTab === 'reco' && tasteProfile && isColdStart(tasteProfile) && !isDetailOpen && (
-        <View style={styles.coldStartBanner} pointerEvents="none">
+        <TouchableOpacity
+          style={styles.coldStartBanner}
+          onPress={() => navigation.navigate('TasteOnboarding')}
+          activeOpacity={0.85}
+        >
           <Ionicons name="sparkles-outline" size={12} color={Colors.terracotta700} />
           <Text style={styles.coldStartBannerText} numberOfLines={1}>
-            On apprend ce que tu aimes — pour l'instant, voilà nos coups de cœur.
+            {tasteProfile.onboardingPrefs
+              ? "On apprend ce que tu aimes — voilà nos coups de cœur."
+              : 'Réponds à 4 questions pour mieux te proposer →'}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* ─── FlatList area ─── */}

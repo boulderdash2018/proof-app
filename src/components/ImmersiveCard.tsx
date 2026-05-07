@@ -61,6 +61,10 @@ interface ImmersiveCardProps {
   onMapPress: () => void;
   /** Fires on every detail scroll frame. Parent can use this to drive pixel-accurate header fades. */
   onDetailScrollY?: (y: number) => void;
+  /** Tap "..." → "Pas intéressé". Optionnel — si non passé, le bouton
+   *  est caché (pour les contextes où le menu n'a pas de sens, ex.
+   *  preview de partage). */
+  onNotInterested?: () => void;
 }
 
 // ── Transport helpers (same as PlanDetailModal) ─────────────
@@ -116,6 +120,7 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
   onGroupPlan,
   onDetailScrollY,
   onMapPress,
+  onNotInterested,
 }) => {
   // ── Dimensions ─────────────────────────────────────────────
   const cardH = Math.max(1, height - CARD_V_TOP - CARD_V_BOTTOM - BELOW_CARD_H);
@@ -696,6 +701,24 @@ export const ImmersiveCard: React.FC<ImmersiveCardProps> = ({
                   style={styles.iconShadow}
                 />
               </TouchableOpacity>
+              {/* "..." menu — pour l'instant juste une option : "Pas
+                  intéressé" qui informe l'algo de cacher ce post +
+                  mettre un malus sur la catégorie. Visible top-right
+                  à côté des like/save pour rester discrète. */}
+              {onNotInterested && (
+                <TouchableOpacity
+                  onPress={onNotInterested}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={22}
+                    color="#FFF"
+                    style={styles.iconShadow}
+                  />
+                </TouchableOpacity>
+              )}
             </Animated.View>
 
             {/* Chevron hint + text */}
