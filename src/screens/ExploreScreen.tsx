@@ -10,7 +10,9 @@ import {
   Modal,
   Animated,
   Platform,
+  Pressable,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -118,6 +120,177 @@ const slotChipStyles = StyleSheet.create({
     color: Colors.textTertiary,
     fontFamily: Fonts.body,
     fontSize: 14,
+  },
+});
+
+// ──────────────────────────────────────────────────────────────
+// ResultCell — composant unitaire pour la grille mosaïque.
+// Pattern aligné sur SavesScreen Cell : photo background + Fraunces
+// italique blanc + mini pill meta top-left + stagger fade-in entry
+// + press scale ressort. Utilisé par les résultats de recherche.
+// ──────────────────────────────────────────────────────────────
+
+interface ResultCellProps {
+  plan: Plan;
+  photo: string | null;
+  gradientColors: [string, string];
+  size: 'large' | 'square';
+  delay: number;
+  onPress: () => void;
+}
+
+const ResultCell: React.FC<ResultCellProps> = ({ plan, photo, gradientColors, size, delay, onPress }) => {
+  const entryAnim = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.spring(entryAnim, {
+      toValue: 1, friction: 8, tension: 60,
+      delay, useNativeDriver: true,
+    }).start();
+  }, [entryAnim, delay]);
+
+  const onPressIn = () => {
+    Animated.spring(pressScale, { toValue: 0.96, friction: 7, tension: 200, useNativeDriver: true }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(pressScale, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true }).start();
+  };
+  const handleTap = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onPress();
+  };
+
+  const cellStyle = size === 'large' ? cellStyles.large : cellStyles.square;
+  const titleStyle = size === 'large' ? cellStyles.titleLarge : cellStyles.titleSquare;
+  const showAuthorByline = size === 'large';
+
+  return (
+    <Animated.View
+      style={{
+        opacity: entryAnim,
+        transform: [
+          { scale: pressScale },
+          { translateY: entryAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+        ],
+      }}
+    >
+      <Pressable onPress={handleTap} onPressIn={onPressIn} onPressOut={onPressOut} style={cellStyle}>
+        {/* Photo bg ou dégradé fallback */}
+        {photo ? (
+          <Image source={{ uri: photo }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+        ) : (
+          <LinearGradient
+            colors={gradientColors as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+
+        {/* Dégradé sombre bas — lisibilité du titre blanc */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.7)']}
+          locations={[0.4, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* Mini pill meta top-left — € · durée · ❤. Compacte sur les
+            cells square pour ne pas voler la vedette au titre. */}
+        <View style={cellStyles.metaPill}>
+          <Ionicons name="cash-outline" size={10} color={Colors.gold} />
+          <Text style={cellStyles.metaPillText}>{plan.price}</Text>
+          <View style={cellStyles.metaSep} />
+          <Ionicons name="hourglass-outline" size={10} color={Colors.gold} />
+          <Text style={cellStyles.metaPillText}>{plan.duration}</Text>
+          <View style={cellStyles.metaSep} />
+          <Ionicons name="heart" size={10} color={Colors.primary} />
+          <Text style={cellStyles.metaPillText}>{plan.likesCount}</Text>
+        </View>
+
+        {/* Bottom : auteur byline (large only) + titre */}
+        <View style={cellStyles.bottom}>
+          {showAuthorByline && plan.author?.username && (
+            <Text style={cellStyles.authorByline} numberOfLines={1}>
+              PAR {(plan.author.username || '').toUpperCase()}
+              {plan.duration ? ` · ${plan.duration.toUpperCase()}` : ''}
+            </Text>
+          )}
+          <Text style={titleStyle} numberOfLines={2}>{plan.title}</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+};
+
+const HERO_W = (width - Layout.screenPadding * 2 - 8) / 2;
+const HERO_H = HERO_W * 1.3;
+const SQ = (width - Layout.screenPadding * 2 - 8 * 2) / 3;
+
+const cellStyles = StyleSheet.create({
+  large: {
+    width: HERO_W,
+    height: HERO_H,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: Colors.bgTertiary,
+  },
+  square: {
+    width: SQ,
+    height: SQ,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: Colors.bgTertiary,
+  },
+  titleLarge: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: '#FFF',
+    letterSpacing: -0.25,
+    lineHeight: 21,
+  },
+  titleSquare: {
+    fontSize: 12.5,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: '#FFF',
+    letterSpacing: -0.1,
+    lineHeight: 15,
+  },
+  metaPill: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 99,
+    backgroundColor: 'rgba(20,16,14,0.62)',
+  },
+  metaPillText: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: '#FFF',
+    letterSpacing: -0.05,
+  },
+  metaSep: {
+    width: 1, height: 8,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 1,
+  },
+  bottom: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 10,
+  },
+  authorByline: {
+    fontSize: 9.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: 'rgba(255,255,255,0.78)',
+    letterSpacing: 1.1,
+    marginBottom: 4,
   },
 });
 
@@ -827,26 +1000,30 @@ export const ExploreScreen: React.FC = () => {
     return null;
   };
 
-  const renderCompactPlan = ({ item, index = 0 }: { item: Plan; index?: number }) => {
+  /**
+   * Cellule de résultat — pattern mosaïque DA Saves V2 transposée à
+   * Explorer. Deux variantes :
+   *  • size='large'  → 2 cells côte-à-côte (50% width, ratio 1:1.3)
+   *  • size='square' → 3-col grid (33% width, ratio 1:1)
+   *
+   * Photo cover en background, fallback dégradé terracotta. Mini pill
+   * meta top-left (€ · durée · ❤). Titre Fraunces italique blanc en
+   * bas sur dégradé sombre. Animation : stagger fade-in + press scale
+   * ressort, identiques aux Cell de SavesScreen pour cohérence.
+   */
+  const renderResultCell = ({ item, index = 0, size }: { item: Plan; index?: number; size: 'large' | 'square' }) => {
     const colors = parseGradientColors(item.gradient);
     const photo = getPlanPhoto(item);
-    // Stagger cap : first 6 cards cascade, beyond that fade in directly.
-    const delay = Math.min(index, 5) * 50;
+    const delay = Math.min(index, 8) * 45;
     return (
-      <ReAnimated.View entering={FadeInUp.delay(delay).duration(350)}>
-        <TouchableOpacity style={[styles.compactCard, { borderBottomColor: Colors.borderMedium }]} activeOpacity={0.85} onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}>
-          <View style={styles.compactBanner}>
-            {photo ? <Image source={{ uri: photo }} style={styles.compactBannerImage} /> : <LinearGradient colors={colors as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
-            <LinearGradient colors={['transparent', 'rgba(44,36,32,0.55)']} style={styles.compactBannerOverlay} />
-            <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
-          </View>
-          <View style={styles.compactMeta}>
-            <View style={styles.compactMetaItem}><Ionicons name="cash-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.price}</Text></View>
-            <View style={styles.compactMetaItem}><Ionicons name="hourglass-outline" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.duration}</Text></View>
-            <View style={styles.compactMetaItem}><Ionicons name="heart" size={13} color={Colors.gold} /><Text style={[styles.compactMetaText, { color: Colors.textPrimary }]}>{item.likesCount}</Text></View>
-          </View>
-        </TouchableOpacity>
-      </ReAnimated.View>
+      <ResultCell
+        plan={item}
+        photo={photo}
+        gradientColors={colors as [string, string]}
+        size={size}
+        delay={delay}
+        onPress={() => navigation.navigate('PlanDetail', { planId: item.id })}
+      />
     );
   };
 
@@ -937,19 +1114,60 @@ export const ExploreScreen: React.FC = () => {
         ) : isFilterLoading ? (
           <LoadingSkeleton variant="list" />
         ) : displayedPlans.length === 0 ? (
-          <View style={{ alignItems: 'center', paddingTop: 40 }}>
-            <Text style={[styles.noResultText, { color: Colors.textSecondary }]}>
-              Aucun plan ne correspond. Essaye d'élargir un slot.
+          // Empty state DA Saves : logo p. + sub + chips de
+          // suggestions pour que l'user reprenne avec un nouveau
+          // critère facile au lieu de partir frustré.
+          <View style={styles.resultsEmpty}>
+            <View style={styles.resultsEmptyLogo}>
+              <Text style={styles.resultsEmptyLogoText}>p<Text style={{ color: Colors.primary }}>.</Text></Text>
+            </View>
+            <Text style={styles.resultsEmptyTitle}>Aucun plan ne correspond.</Text>
+            <Text style={styles.resultsEmptySub}>
+              Essaye d'élargir un slot — ou pioche dans ce qui tourne en ce moment.
             </Text>
+            <View style={styles.resultsEmptyChips}>
+              {['Cool bars', 'Brunch', 'Cafés', 'Culture'].map((label) => (
+                <TouchableOpacity
+                  key={label}
+                  style={styles.resultsEmptyChip}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setSelectedFilters([label]);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.resultsEmptyChipText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         ) : (
-          <View style={{ marginHorizontal: -Layout.screenPadding, paddingTop: 8 }}>
-            <Text style={[styles.resultsSectionLabel, { color: Colors.textSecondary, paddingHorizontal: Layout.screenPadding }]}>
+          // Mosaïque V2 : 2 hero larges + 3-col carrées en dessous.
+          // Pattern DA Saves V2 — cohérence visuelle avec la page
+          // Plans (= Saves) sur tout l'écosystème de listing.
+          <View style={styles.resultsWrap}>
+            <Text style={styles.resultsSectionLabel}>
               {displayedPlans.length} plan{displayedPlans.length > 1 ? 's' : ''}
             </Text>
-            {displayedPlans.map((plan, index) => (
-              <React.Fragment key={plan.id}>{renderCompactPlan({ item: plan, index })}</React.Fragment>
-            ))}
+            {/* Hero — 2 cells larges (50% width chacune, ratio 1:1.3) */}
+            {displayedPlans.slice(0, 2).length > 0 && (
+              <View style={styles.resultsHeroRow}>
+                {displayedPlans.slice(0, 2).map((plan, i) => (
+                  <React.Fragment key={plan.id}>{renderResultCell({ item: plan, index: i, size: 'large' })}</React.Fragment>
+                ))}
+                {/* Filler pour cell unique (sinon le 1ᵉʳ prendrait
+                    100% width — moche). */}
+                {displayedPlans.length === 1 && <View style={styles.resultsHeroFiller} />}
+              </View>
+            )}
+            {/* Grid — 3-col carrées pour les plans 3+ */}
+            {displayedPlans.length > 2 && (
+              <View style={styles.resultsGrid}>
+                {displayedPlans.slice(2).map((plan, i) => (
+                  <React.Fragment key={plan.id}>{renderResultCell({ item: plan, index: i + 2, size: 'square' })}</React.Fragment>
+                ))}
+              </View>
+            )}
           </View>
         )}
         <View style={{ height: 30 }} />
@@ -1514,7 +1732,82 @@ const styles = StyleSheet.create({
   },
 
   // Results
-  resultsSectionLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, fontFamily: Fonts.bodySemiBold },
+  resultsSectionLabel: {
+    fontSize: 10, fontWeight: '600', textTransform: 'uppercase',
+    letterSpacing: 1.2, marginBottom: 10, fontFamily: Fonts.bodySemiBold,
+    color: Colors.textSecondary,
+  },
+  // ── Résultats grid mosaïque (DA Saves V2 transposée) ──
+  resultsWrap: {
+    paddingTop: 6,
+  },
+  resultsHeroRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  resultsHeroFiller: {
+    width: HERO_W,
+  },
+  resultsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  // ── Empty state DA Saves : logo p. + chips suggestions ──
+  resultsEmpty: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingBottom: 60,
+    paddingHorizontal: 24,
+  },
+  resultsEmptyLogo: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 18,
+  },
+  resultsEmptyLogoText: {
+    fontSize: 24,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: Colors.textPrimary,
+  },
+  resultsEmptyTitle: {
+    fontSize: 17,
+    fontFamily: Fonts.displaySemiBoldItalic,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  resultsEmptySub: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  resultsEmptyChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  resultsEmptyChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 99,
+    backgroundColor: Colors.bgSecondary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderMedium,
+  },
+  resultsEmptyChipText: {
+    fontSize: 12.5,
+    fontFamily: Fonts.bodySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.05,
+  },
   compactCard: { marginBottom: 0, borderBottomWidth: 1, overflow: 'hidden' },
   compactBanner: { height: 180, justifyContent: 'flex-end', padding: 14, overflow: 'hidden' },
   compactBannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
