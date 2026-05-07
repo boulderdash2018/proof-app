@@ -2000,11 +2000,31 @@ export const ConversationScreen: React.FC = () => {
       : undefined;
     const effectiveNext = index < msgs.length - 1 ? msgs[index + 1] : virtualNext;
 
-    // For groups, resolve the sender for this specific message (may differ per row).
-    // For DMs, fall back to the constant otherUser.
-    const senderForThisMsg: ConversationParticipant | null = isGroup
-      ? (activeConv?.participantDetails[item.senderId] || null)
-      : otherUser;
+    // Resolve the sender for this specific message — works pour DM ET group.
+    // Bug initialement : en DM on hardcodait `otherUser`, donc une photo
+    // envoyée par moi-même affichait l'autre user comme expéditeur dans le
+    // lightbox. Fix : on tape participantDetails[senderId] qui contient
+    // TOUS les participants (y compris moi). Fallback :
+    //   • si c'est moi et que je ne suis pas dans participantDetails (DM
+    //     legacy) → on construit le ConversationParticipant depuis l'auth
+    //     store ;
+    //   • sinon → otherUser pour DM, null pour group.
+    const senderForThisMsg: ConversationParticipant | null = (() => {
+      const fromDetails = activeConv?.participantDetails?.[item.senderId];
+      if (fromDetails) return fromDetails;
+      if (item.senderId === user?.id && user) {
+        return {
+          userId: user.id,
+          displayName: user.displayName,
+          username: user.username,
+          avatarUrl: user.avatarUrl || null,
+          avatarBg: user.avatarBg,
+          avatarColor: user.avatarColor,
+          initials: user.initials,
+        };
+      }
+      return isGroup ? null : otherUser;
+    })();
 
     // Compute co-plan run-grouping info — used by MessageRow to fold
     // consecutive same-kind same-sender events into a single visual block.
