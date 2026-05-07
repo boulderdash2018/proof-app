@@ -7,6 +7,7 @@ import {
   saveCreatedPlan,
 } from '../services/plansService';
 import { useAuthStore } from './authStore';
+import { useTasteProfileStore } from './tasteProfileStore';
 
 const getCurrentUserId = (): string | null => {
   return useAuthStore.getState().user?.id || null;
@@ -71,6 +72,17 @@ export const useSavesStore = create<SavesStore>((set, get) => ({
     }
     set({ savedPlans: updated });
     if (uid) markPlanAsDone(uid, planId, proofStatus, sender, existing?.plan).catch(console.error);
+    // Capture taste profile signal — done est le signal le plus fort
+    // (W=3), proof encore plus (W=4). L'user a vécu / validé ce plan.
+    if (uid) {
+      const plan = existing?.plan;
+      useTasteProfileStore.getState().recordSignal({
+        type: proofStatus === 'validated' ? 'proof' : 'done',
+        postId: planId,
+        category: plan?.tags?.[0]?.toLowerCase(),
+        authorId: plan?.authorId,
+      });
+    }
   },
 
   addCreatedPlan: (plan: Plan) => {

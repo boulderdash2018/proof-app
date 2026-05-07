@@ -37,6 +37,8 @@ import {
 } from '../store';
 import { useGuestStore } from '../store/guestStore';
 import { useDoItNowStore } from '../store/doItNowStore';
+import { useTasteProfileStore } from '../store/tasteProfileStore';
+import { rankFeed, isColdStart } from '../utils/feedRanking';
 import { useCity } from '../hooks/useCity';
 import { useTranslation } from '../hooks/useTranslation';
 import { Plan, Comment, User, Spot } from '../types';
@@ -395,15 +397,68 @@ export const FeedScreen: React.FC = () => {
 
   // ── Derived ───────────────────────────────────────────────────
   const currentPlans = activeTab === 'reco' ? plans : friendsPlans;
-  // Spots are only interleaved on the reco tab — the friends feed stays
-  // exclusively plans from people you mutually follow.
+
+  // ── Ranked feed (reco tab only) ─────────────────────────────
+  // L'onglet "Pour toi" applique le scoring perso de feedRanking
+  // sur le mix plans + spots. L'onglet "Amis" reste strictement
+  // chronologique (contrat de confiance : on ne filtre pas ce que
+  // tes amis postent).
+  const tasteProfile = useTasteProfileStore((s) => s.profile);
+  const seenInSession = useTasteProfileStore((s) => s.seenInSession);
+  const rankedRecoItems = React.useMemo<FeedItem[]>(() => {
+    if (!tasteProfile) {
+      // Pas encore chargé → fallback chronologique mixte
+      return interleaveFeed(plans, spots);
+    }
+    const ranked = rankFeed(plans, spots, tasteProfile, seenInSession);
+    return ranked.map(({ item }) => {
+      if (item.type === 'plan') return { type: 'plan' as const, id: item.id, plan: item.raw as Plan };
+      return { type: 'spot' as const, id: item.id, spot: item.raw as Spot };
+    });
+  }, [plans, spots, tasteProfile, seenInSession]);
+
   const currentItems = React.useMemo<FeedItem[]>(
     () => activeTab === 'reco'
-      ? interleaveFeed(currentPlans, spots)
+      ? rankedRecoItems
       : currentPlans.map((p) => ({ type: 'plan' as const, id: p.id, plan: p })),
-    [activeTab, currentPlans, spots],
+    [activeTab, rankedRecoItems, currentPlans],
   );
   const currentItem = currentItems[currentIndex];
+
+  // ── Capture taste signals : 'view' ou 'skip' selon dwell time ──
+  // À chaque changement de currentItem, on enregistre l'évènement sur
+  // l'item PRÉCÉDENT avec son temps d'affichage. < 1.5s = skip
+  // (pénalise la catégorie), >= 1.5s = view (signal positif léger).
+  // markSeen ajoute aussi à seenInSession pour le novelty bonus.
+  const lastViewedRef = useRef<{ id: string; ts: number; category?: string; authorId?: string } | null>(null);
+  const recordSignalTaste = useTasteProfileStore((s) => s.recordSignal);
+  const markSeenTaste = useTasteProfileStore((s) => s.markSeen);
+
+  useEffect(() => {
+    if (!currentItem) return;
+    const now = Date.now();
+    const prev = lastViewedRef.current;
+    if (prev && prev.id !== currentItem.id) {
+      const dwellMs = now - prev.ts;
+      const type: 'view' | 'skip' = dwellMs < 1500 ? 'skip' : 'view';
+      recordSignalTaste({
+        type,
+        postId: prev.id,
+        category: prev.category,
+        authorId: prev.authorId,
+        dwellMs,
+      });
+      markSeenTaste(prev.id);
+    }
+    // Met à jour le pointeur courant.
+    const cat = currentItem.type === 'plan'
+      ? currentItem.plan.tags?.[0]?.toLowerCase()
+      : currentItem.spot.placeCategory?.toLowerCase();
+    const author = currentItem.type === 'plan'
+      ? currentItem.plan.authorId
+      : currentItem.spot.recommenderId;
+    lastViewedRef.current = { id: currentItem.id, ts: now, category: cat, authorId: author };
+  }, [currentItem?.id, recordSignalTaste, markSeenTaste]);
 
   // ── Persist scroll position so the feed keeps its place across focus/blur ──
   useEffect(() => {
@@ -620,6 +675,21 @@ export const FeedScreen: React.FC = () => {
           />
         </View>
       </Animated.View>
+
+      {/* ─── Cold-start banner ───
+          Affiché seulement sur l'onglet "Pour toi" et tant que l'user
+          n'a pas accumulé assez de signaux pour que l'algo soit utile
+          (< 5 likes/saves/done cumulés). Une ligne discrète overlay
+          qui se cache en mode détail (pour pas surcharger la lecture
+          d'un plan). */}
+      {activeTab === 'reco' && tasteProfile && isColdStart(tasteProfile) && !isDetailOpen && (
+        <View style={styles.coldStartBanner} pointerEvents="none">
+          <Ionicons name="sparkles-outline" size={12} color={Colors.terracotta700} />
+          <Text style={styles.coldStartBannerText} numberOfLines={1}>
+            On apprend ce que tu aimes — pour l'instant, voilà nos coups de cœur.
+          </Text>
+        </View>
+      )}
 
       {/* ─── FlatList area ─── */}
       <View
@@ -1082,6 +1152,28 @@ const styles = StyleSheet.create({
   },
   listArea: {
     flex: 1,
+  },
+  // Cold-start banner — discret, terracotta-50, juste sous le
+  // header + tab bar. Disparaît dès que l'user a 5 signaux cumulés.
+  coldStartBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginHorizontal: 12,
+    marginBottom: 4,
+    borderRadius: 10,
+    backgroundColor: Colors.terracotta50,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.terracotta200,
+  },
+  coldStartBannerText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: Colors.terracotta700,
+    letterSpacing: -0.05,
   },
 
   // ── Loading / Empty ────────────────────────────────────────

@@ -10,6 +10,8 @@ import * as Haptics from 'expo-haptics';
 import { RootNavigator } from './src/navigation';
 import { initPostHog } from './src/services/posthogConfig';
 import { useAuthStore } from './src/store';
+import { useTasteProfileStore } from './src/store/tasteProfileStore';
+import { AppState } from 'react-native';
 
 // On web, expo-haptics is not implemented and throws an "UnavailabilityError"
 // on every call. That error was bubbling up as "Uncaught (in promise)" warnings
@@ -46,6 +48,10 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 
 export default function App() {
   const loadSession = useAuthStore((s) => s.loadSession);
+  const userId = useAuthStore((s) => s.user?.id);
+  const initTaste = useTasteProfileStore((s) => s.init);
+  const resetTaste = useTasteProfileStore((s) => s.reset);
+  const flushTaste = useTasteProfileStore((s) => s.flush);
 
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -70,6 +76,34 @@ export default function App() {
     initPostHog();
     loadSession();
   }, []);
+
+  // ── Taste profile lifecycle ─────────────────────────────────
+  // Init au signin, reset au signout. Init est idempotent + cache
+  // local AsyncStorage → lecture instantanée au launch (les
+  // signaux capturés sont visibles avant même le sync Firestore).
+  useEffect(() => {
+    if (userId) {
+      initTaste(userId).catch((err) =>
+        console.warn('[App] taste profile init:', err),
+      );
+    } else {
+      resetTaste();
+    }
+  }, [userId, initTaste, resetTaste]);
+
+  // ── Flush des signaux quand l'app passe en background ───────
+  // Garantit que les events captés dans la session atteignent
+  // Firestore même si l'user kill l'app brutalement. Économise
+  // aussi des écritures (on évite de re-flusher juste pour
+  // un foreground/background flap).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        flushTaste().catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [flushTaste]);
 
   if (!fontsLoaded) return null;
 

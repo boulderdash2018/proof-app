@@ -13,6 +13,7 @@ import { fetchFeedSpots } from '../services/spotsService';
 import { getFriendIds, getMutualFollowIds, getFollowingIds } from '../services/friendsService';
 import { useSavesStore } from './savesStore';
 import { useAuthStore } from './authStore';
+import { useTasteProfileStore } from './tasteProfileStore';
 
 // Helper to get current user id reliably
 const getCurrentUserId = (): string | null => {
@@ -233,6 +234,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     // Persist to Firestore in background + notify
     const sender = useAuthStore.getState().user || undefined;
     toggleLikePlan(uid, planId, isLiked, sender, plan || undefined).catch(console.error);
+    // Capture taste profile signal (only on like, not unlike — un
+    // unlike est un signal trop ambigu pour pondérer).
+    if (!isLiked && plan) {
+      // Capture taste profile signal — pondère "like" comme un signal
+      // moyen (W=1). Cf. tasteProfileService.SIGNAL_WEIGHTS.
+      useTasteProfileStore.getState().recordSignal({
+        type: 'like',
+        postId: planId,
+        category: plan.tags?.[0]?.toLowerCase(),
+        authorId: plan.authorId,
+      });
+    }
   },
 
   toggleSave: (planId: string) => {
@@ -267,6 +280,14 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
         // Persist to Firestore + notify
         const sender = useAuthStore.getState().user || undefined;
         savePlanFS(uid, planId, sender, plan).catch(console.error);
+        // Capture taste profile signal — save = signal fort (W=2),
+        // l'user a explicitement bookmark le plan.
+        useTasteProfileStore.getState().recordSignal({
+          type: 'save',
+          postId: planId,
+          category: plan.tags?.[0]?.toLowerCase(),
+          authorId: plan.authorId,
+        });
       }
     }
 
