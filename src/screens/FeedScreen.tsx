@@ -601,19 +601,15 @@ export const FeedScreen: React.FC = () => {
         style={[
           styles.header,
           { paddingTop: insets.top + 8 },
-          {
-            opacity: headerSlide.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-            transform: [
-              {
-                translateY: headerSlide.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -(headerH || 120)],
-                }),
-              },
-            ],
-          },
+          // Le header reste 100% visible et interactif en permanence — pas
+          // d'animation slide/fade sur le scroll détail. L'utilisateur a
+          // demandé que la nav (logo + tabs + boutons) ne bouge jamais.
+          // headerSlide / isHeaderHidden / handleDetailScrollY sont laissés
+          // dans le code mais inertes (ImmersiveCard les appelle encore via
+          // onHeaderHideChange / onDetailScrollY — on garde l'API stable
+          // pour pouvoir réactiver l'animation sans rebrancher des props).
         ]}
-        pointerEvents={isHeaderHidden ? 'none' : 'auto'}
+        pointerEvents="auto"
       >
         <View style={styles.headerRow}>
           <Text style={styles.logo}>
