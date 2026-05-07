@@ -519,21 +519,35 @@ export const NotificationsScreen: React.FC = () => {
         {isUnread && (
           <Animated.View style={[styles.unreadDot, { opacity: fadeAnim }]} />
         )}
-        <View style={styles.rowAvatar}>
+        {/* Avatar — wrappé dans un TouchableOpacity dédié pour que le
+            tap dessus navigue vers le profil de l'auteur de la notif
+            (au lieu de déclencher l'action principale de la row).
+            On utilise activeOpacity 0.85 sur l'avatar pour donner un
+            feedback tap visible sans flash trop marqué. */}
+        <TouchableOpacity
+          style={styles.rowAvatar}
+          onPress={() => {
+            if (notif.senderId) {
+              navigation.navigate('OtherProfile', { userId: notif.senderId });
+            }
+          }}
+          activeOpacity={0.85}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           {notif.senderInitials ? (
             <Avatar
               initials={notif.senderInitials}
               bg={notif.senderAvatar}
               color={notif.senderAvatarColor}
-              size="SS"
+              size="M"
               avatarUrl={avatarUrl}
             />
           ) : (
             <View style={styles.iconAvatar}>
-              <Ionicons name="notifications-outline" size={14} color={Colors.terracotta700} />
+              <Ionicons name="notifications-outline" size={16} color={Colors.terracotta700} />
             </View>
           )}
-        </View>
+        </TouchableOpacity>
         <View style={styles.rowContent}>
           <Text style={styles.rowText} numberOfLines={2}>
             <Text style={styles.rowActor}>{notif.senderUsername}</Text>
