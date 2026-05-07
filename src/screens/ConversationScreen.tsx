@@ -301,6 +301,165 @@ const PhotoBubble: React.FC<PhotoBubbleProps> = ({ url, width, height, caption, 
 };
 
 // ═══════════════════════════════════════════════
+// Photo Lightbox — viewer Instagram-style
+//   • Top    : X · avatar+pseudo+temps · save/forward/plus
+//   • Centre : photo portrait, bords arrondis, fond noir
+//   • Bottom : input 'Répondre…' + camera/photo/sticker
+// ═══════════════════════════════════════════════
+
+interface PhotoLightboxProps {
+  payload: { url: string; sender: ConversationParticipant | null; createdAt: string };
+  onClose: () => void;
+  insetsTop: number;
+  insetsBottom: number;
+}
+
+/** Format "il y a X" lisible (Instagram-style fr).
+ *  Au-delà de 7 jours → semaines, sinon jours/heures/minutes. */
+const formatRelativeTime = (dateStr: string): string => {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'à l’instant';
+  if (mins < 60) return `Il y a ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Il y a ${days} jour${days > 1 ? 's' : ''}`;
+  const weeks = Math.floor(days / 7);
+  return `Il y a ${weeks} semaine${weeks > 1 ? 's' : ''}`;
+};
+
+const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsTop, insetsBottom }) => {
+  const { url, sender, createdAt } = payload;
+  const senderName = sender?.username || sender?.displayName || 'Inconnu';
+
+  // Save photo to camera roll. Native = pas de lib MediaLibrary installée
+  // pour l'instant, donc on tombe sur un placeholder Alert. Web = on
+  // déclenche un download via <a download>. À remplacer par expo-media-
+  // library quand on l'ajoutera aux deps.
+  const handleSave = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Alert.alert(
+        'Bientôt disponible',
+        'L’enregistrement dans la pellicule sera ajouté dans une prochaine version.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+    try {
+      const a = (globalThis as any).document?.createElement('a');
+      if (!a) return;
+      a.href = url;
+      a.download = `photo-${Date.now()}.jpg`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      (globalThis as any).document.body.appendChild(a);
+      a.click();
+      (globalThis as any).document.body.removeChild(a);
+    } catch {
+      /* silent */
+    }
+  }, [url]);
+
+  // Forward — utilise le système Share natif RN (UIActivityViewController
+  // sur iOS, Intent sur Android, navigator.share sur web supporté).
+  const handleForward = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      // Import dynamique pour éviter d'ajouter Share au top-level si jamais
+      // un jour on se passe de ce module.
+      const RN = await import('react-native');
+      await RN.Share.share({
+        message: `Regarde cette photo de ${senderName} : ${url}`,
+        url, // iOS uniquement
+      });
+    } catch {
+      /* user cancelled or no share UI */
+    }
+  }, [url, senderName]);
+
+  return (
+    <View style={[lightboxStyles.root, { paddingTop: insetsTop, paddingBottom: insetsBottom }]}>
+      {/* ── Top bar ── */}
+      <View style={lightboxStyles.topBar}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={lightboxStyles.iconBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="close" size={26} color="#FFF" />
+        </TouchableOpacity>
+
+        {sender && (
+          <View style={lightboxStyles.senderBlock}>
+            <Avatar
+              size="XS"
+              avatarUrl={sender.avatarUrl ?? undefined}
+              bg={sender.avatarBg}
+              color={sender.avatarColor}
+              initials={sender.initials}
+            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={lightboxStyles.senderName} numberOfLines={1}>{senderName}</Text>
+              <Text style={lightboxStyles.senderTime} numberOfLines={1}>{formatRelativeTime(createdAt)}</Text>
+            </View>
+          </View>
+        )}
+
+        <View style={lightboxStyles.topBarRight}>
+          <TouchableOpacity
+            onPress={handleSave}
+            style={lightboxStyles.iconBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="download-outline" size={22} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleForward}
+            style={lightboxStyles.iconBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="paper-plane-outline" size={20} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Photo ── */}
+      <Pressable style={lightboxStyles.imageWrap} onPress={onClose}>
+        <Image
+          source={{ uri: url }}
+          style={lightboxStyles.image}
+          resizeMode="contain"
+        />
+      </Pressable>
+
+      {/* ── Bottom reply bar (visuel, taps désactivés pour éviter d'envoyer
+            depuis le viewer — la vraie input reste dans la conv) ── */}
+      <View style={lightboxStyles.bottomBar} pointerEvents="none">
+        <LinearGradient
+          colors={['#F58529', '#DD2A7B', '#8134AF']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={lightboxStyles.cameraBtn}
+        >
+          <Ionicons name="camera" size={18} color="#FFF" />
+        </LinearGradient>
+        <View style={lightboxStyles.replyInput}>
+          <Text style={lightboxStyles.replyPlaceholder}>Répondre…</Text>
+        </View>
+        <View style={lightboxStyles.bottomIconsRight}>
+          <Ionicons name="mic-outline" size={20} color="rgba(255,255,255,0.85)" />
+          <Ionicons name="image-outline" size={20} color="rgba(255,255,255,0.85)" />
+          <Ionicons name="happy-outline" size={20} color="rgba(255,255,255,0.85)" />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// ═══════════════════════════════════════════════
 // Poll Bubble — shows question + options + live results
 // ═══════════════════════════════════════════════
 
@@ -478,7 +637,9 @@ interface MessageRowProps {
    *  distinct from the regular pinned plan card. */
   onOpenPlanMap: (planId: string) => void;
   onJoinSession: () => void;
-  onPhotoPress: (url: string) => void;
+  /** Tap sur une photo de message — payload complet pour l'overlay
+   *  Instagram-style (URL + sender + timestamp). */
+  onPhotoPress: (payload: { url: string; sender: ConversationParticipant | null; createdAt: string }) => void;
   onOpenAlbum: () => void;
   onVotePoll: (messageId: string, optionIndex: number) => void;
   /** Group participants — used to resolve actor names on co-plan system events. */
@@ -917,7 +1078,11 @@ const MessageRow = React.memo<MessageRowProps>(({
               {item.type === 'photo' ? (
                 <TouchableOpacity
                   activeOpacity={0.92}
-                  onPress={() => item.photoUrl && onPhotoPress(item.photoUrl)}
+                  onPress={() => item.photoUrl && onPhotoPress({
+                    url: item.photoUrl,
+                    sender: senderUser,
+                    createdAt: item.createdAt,
+                  })}
                 >
                   <PhotoBubble
                     url={item.photoUrl!}
@@ -1337,7 +1502,14 @@ export const ConversationScreen: React.FC = () => {
   // capture. Same imperative pattern used in DoItNow's souvenir card.
   const proofCamera = useProofCamera();
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Photo lightbox — payload riche (URL + sender + timestamp) plutôt que
+  // juste l'URL, pour pouvoir afficher la barre du haut à la Instagram
+  // (avatar + pseudo + "il y a X" au-dessus de la photo).
+  const [lightboxPayload, setLightboxPayload] = useState<{
+    url: string;
+    sender: ConversationParticipant | null;
+    createdAt: string;
+  } | null>(null);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
   // Date sheet — used to fix the "Do it now à plusieurs" start time on
   // a group conv. Tappable from the pinned plan card (the calendar line).
@@ -1794,7 +1966,7 @@ export const ConversationScreen: React.FC = () => {
       onPlanPress={handlePlanPress}
       onOpenPlanMap={handleOpenPlanMap}
       onJoinSession={handleJoinSession}
-      onPhotoPress={setLightboxUrl}
+      onPhotoPress={setLightboxPayload}
       onOpenAlbum={() => setAlbumOpen(true)}
       onVotePoll={votePoll}
       participants={activeConv?.participantDetails}
@@ -2384,29 +2556,31 @@ export const ConversationScreen: React.FC = () => {
         </Pressable>
       </Modal>
 
-      {/* Photo lightbox — full-screen dimmed backdrop + zoomed image */}
-      {lightboxUrl && (
+      {/* ════════════════════════════════════════════════════════════════
+          PHOTO LIGHTBOX (Instagram-style)
+
+          Pattern direct messages Instagram :
+          • Top bar  : X gauche · avatar+pseudo+temps · save+share+plus à droite
+          • Centre   : photo en portrait, coins arrondis, fond noir
+          • Bottom   : barre 'Répondre…' + camera/photo/sticker icons
+
+          Ouvert via setLightboxPayload({ url, sender, createdAt }) depuis
+          MessageRow (un tap sur une PhotoBubble).
+          ════════════════════════════════════════════════════════════════ */}
+      {lightboxPayload && (
         <Modal
-          visible={!!lightboxUrl}
+          visible={!!lightboxPayload}
           transparent
           animationType="fade"
           statusBarTranslucent
-          onRequestClose={() => setLightboxUrl(null)}
+          onRequestClose={() => setLightboxPayload(null)}
         >
-          <Pressable style={lightboxStyles.backdrop} onPress={() => setLightboxUrl(null)}>
-            <Image
-              source={{ uri: lightboxUrl }}
-              style={lightboxStyles.image}
-              resizeMode="contain"
-            />
-            <TouchableOpacity
-              style={[lightboxStyles.closeBtn, { top: insets.top + 12 }]}
-              onPress={() => setLightboxUrl(null)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={22} color={Colors.textOnAccent} />
-            </TouchableOpacity>
-          </Pressable>
+          <PhotoLightbox
+            payload={lightboxPayload}
+            onClose={() => setLightboxPayload(null)}
+            insetsTop={insets.top}
+            insetsBottom={insets.bottom}
+          />
         </Modal>
       )}
 
@@ -2595,26 +2769,101 @@ const kebabStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════
 
 const lightboxStyles = StyleSheet.create({
-  backdrop: {
+  // Conteneur plein écran noir — flex column avec safe-area paddings
+  // injectés inline.
+  root: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
+    backgroundColor: '#000',
+  },
+  // ── Top bar : X · sender block · save+forward
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 12,
+  } as any,
+  iconBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Sender block : avatar + nom (gras) + temps (italique léger). Layout
+  // horizontal compact, prend toute la largeur restante entre X et icônes
+  // de droite.
+  senderBlock: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  } as any,
+  senderName: {
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+    color: '#FFF',
+    letterSpacing: -0.1,
+  },
+  senderTime: {
+    fontSize: 11.5,
+    fontFamily: Fonts.body,
+    color: 'rgba(255,255,255,0.65)',
+    marginTop: 1,
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  } as any,
+  // ── Photo wrap (zone tappable pour close)
+  imageWrap: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   image: {
     width: '100%',
     height: '100%',
+    borderRadius: 18,
+    backgroundColor: '#0A0A0A',
   },
-  closeBtn: {
-    position: 'absolute',
-    right: 18,
+  // ── Bottom reply bar (visuel uniquement)
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  } as any,
+  cameraBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  replyInput: {
+    flex: 1,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.35)',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  replyPlaceholder: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  bottomIconsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  } as any,
 });
 
 // ═══════════════════════════════════════════════
