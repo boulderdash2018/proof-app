@@ -6,15 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput as RNTextInput,
-  Image,
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout, Fonts } from '../constants';
-import { EmptyState, LoadingSkeleton } from '../components';
+import { EmptyState, LoadingSkeleton, PlanMosaic } from '../components';
 import { Plan } from '../types';
 import { useColors } from '../hooks/useColors';
 import { useCity } from '../hooks/useCity';
@@ -24,14 +22,8 @@ import { searchPublicPlans } from '../services/plansService';
 import {
   searchPlacesNearby,
   getReadableType,
-  priceLevelToSymbol,
   GooglePlaceDetails,
 } from '../services/googlePlacesService';
-
-const parseGradientColors = (gradient: string): string[] => {
-  const matches = gradient.match(/#[0-9A-Fa-f]{6}/g);
-  return matches && matches.length >= 2 ? matches : ['#8B6A50', '#5C4030'];
-};
 
 export const SearchScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -121,84 +113,9 @@ export const SearchScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  // ── Plan renderer ──
-  const getPlanPhoto = (plan: Plan): string | null => {
-    if (plan.coverPhotos && plan.coverPhotos.length > 0) return plan.coverPhotos[0];
-    for (const place of plan.places) {
-      if (place.photoUrls && place.photoUrls.length > 0) return place.photoUrls[0];
-    }
-    return null;
-  };
-
-  /**
-   * Plan renderer — IDENTIQUE à SavesScreen (image plein largeur ~240px,
-   * titre overlay en Fraunces blanc, stats row sous l'image avec icônes
-   * ambrées). Pas de status pill ici — les résultats de recherche n'ont
-   * pas d'état sauvegardé.
-   */
-  const renderPlan = (plan: Plan) => {
-    const colors = parseGradientColors(plan.gradient);
-    const photo = getPlanPhoto(plan);
-    const authorName = plan.author?.displayName || plan.author?.username || '';
-    return (
-      <TouchableOpacity
-        key={plan.id}
-        style={s.item}
-        activeOpacity={0.92}
-        onPress={() => handlePlanPress(plan)}
-      >
-        {/* ── Hero image (full bleed, ~240px) ── */}
-        <View style={s.hero}>
-          {photo ? (
-            <Image source={{ uri: photo }} style={s.heroImage} />
-          ) : (
-            <LinearGradient
-              colors={colors as [string, string, ...string[]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          )}
-
-          {/* Bottom darkening — title legibility on any photo */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.7)']}
-            locations={[0, 0.55, 1]}
-            style={s.heroFade}
-          />
-
-          {/* Title — bottom-left in Fraunces white */}
-          <View style={s.heroTitleWrap}>
-            <Text style={s.heroTitle} numberOfLines={2}>
-              {plan.title}
-            </Text>
-          </View>
-        </View>
-
-        {/* ── Stats row sous l'image ── */}
-        <View style={s.stats}>
-          <View style={s.stat}>
-            <Ionicons name="trophy" size={13} color={Colors.gold} />
-            <Text style={s.statText}>{plan.price}</Text>
-          </View>
-          <View style={s.statSep} />
-          <View style={s.stat}>
-            <Ionicons name="hourglass-outline" size={13} color={Colors.gold} />
-            <Text style={s.statText}>{plan.duration}</Text>
-          </View>
-          <View style={s.statSep} />
-          <View style={s.stat}>
-            <Ionicons name="heart" size={13} color={Colors.primary} />
-            <Text style={s.statText}>{plan.likesCount}</Text>
-          </View>
-          <View style={{ flex: 1 }} />
-          {authorName ? (
-            <Text style={s.author} numberOfLines={1}>par {authorName}</Text>
-          ) : null}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  // Plans : on délègue le rendu à <PlanMosaic> pour avoir EXACTEMENT le
+  // même look mosaïque (2 hero + grid 3-col) que sur ExploreScreen quand
+  // une catégorie est sélectionnée. Cohérence visuelle = 1 seul composant.
 
   // ── Place renderer (compact) ──
   const renderPlace = (place: GooglePlaceDetails) => {
@@ -387,11 +304,14 @@ export const SearchScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Plans */}
+            {/* Plans — mosaïque cohérente avec ExploreScreen (catégorie). */}
             {searchMode !== 'lieux' && plans.length > 0 && (
               <View style={[s.section, searchMode !== 'plans' && sortedPlaces.length > 0 && { marginTop: 8 }]}>
-                <Text style={[s.sectionLabel, { color: C.gray600 }]}>PLANS ({plans.length})</Text>
-                {plans.map(renderPlan)}
+                <PlanMosaic
+                  plans={plans}
+                  onPlanPress={handlePlanPress}
+                  label={`${plans.length} plan${plans.length > 1 ? 's' : ''}`}
+                />
               </View>
             )}
 
@@ -483,82 +403,6 @@ const s = StyleSheet.create({
   placeName: { fontSize: 14, fontFamily: Fonts.bodySemiBold },
   placeType: { fontSize: 12, marginTop: 1, fontFamily: Fonts.body },
 
-  // ── Plan results — IDENTIQUE à SavesScreen.styles ──
-  // (image plein largeur 240px + titre overlay Fraunces blanc + stats row)
-  item: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: Colors.bgSecondary,
-    marginBottom: 18,
-    shadowColor: 'rgba(44,36,32,1)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  hero: {
-    height: 240,
-    width: '100%',
-    backgroundColor: Colors.bgTertiary,
-    position: 'relative',
-    justifyContent: 'flex-end',
-  },
-  heroImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  heroFade: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    height: 130,
-  },
-  heroTitleWrap: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontFamily: Fonts.displaySemiBold,
-    color: '#FFF',
-    letterSpacing: -0.4,
-    lineHeight: 26,
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
-  stats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 12.5,
-    fontFamily: Fonts.bodySemiBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.05,
-  },
-  statSep: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.borderMedium,
-    marginHorizontal: 2,
-  },
-  author: {
-    fontSize: 11,
-    fontFamily: Fonts.bodyMedium,
-    color: Colors.textTertiary,
-    fontStyle: 'italic',
-    maxWidth: 120,
-  },
+  // (Anciens styles "item / hero / stats / author" retirés — le rendu des
+  // plans passe désormais par <PlanMosaic> qui porte ses propres styles.)
 });

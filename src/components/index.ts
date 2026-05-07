@@ -53,3 +53,4 @@ export { GroupAlbumSheet } from './GroupAlbumSheet';
 export { PollComposerSheet } from './PollComposerSheet';
 export { FloatingAvatars } from './FloatingAvatars';
 export { SpotCard } from './SpotCard';
+export { PlanMosaic } from './PlanMosaic';
