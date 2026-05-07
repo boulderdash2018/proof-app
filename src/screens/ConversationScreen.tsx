@@ -316,6 +316,10 @@ interface PhotoLightboxProps {
    *  vraiment fonctionnelle (envoie un message texte dans la conv en
    *  cours quand l'utilisateur tap sur l'avion en papier). */
   onSendReply: (text: string) => Promise<void>;
+  /** Tap sur le bouton caméra terracotta (bottom-bar) — ferme le
+   *  lightbox et ouvre le picker photo du parent (réutilise le même
+   *  flow que le bouton caméra de l'input bar de la conv). */
+  onTakePhoto: () => void;
 }
 
 /** Format "il y a X" lisible (Instagram-style fr).
@@ -335,7 +339,7 @@ const formatRelativeTime = (dateStr: string): string => {
   return `Il y a ${weeks} semaine${weeks > 1 ? 's' : ''}`;
 };
 
-const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsTop, insetsBottom, onSendReply }) => {
+const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsTop, insetsBottom, onSendReply, onTakePhoto }) => {
   const { url, sender, createdAt } = payload;
   const senderName = sender?.username || sender?.displayName || 'Inconnu';
 
@@ -346,16 +350,23 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsT
   // ── Save vers la pellicule du user ─────────────────────────────
   // Pattern classique Expo : permission MediaLibrary → download via
   // FileSystem.downloadAsync (cache temp) → MediaLibrary.saveToLibraryAsync.
-  // Sur web, on déclenche un fetch + blob download (le <a download> direct
-  // ne marche pas en cross-origin Firebase Storage).
+  //
+  // Côté web, le fetch direct vers firebasestorage.googleapis.com échoue en
+  // CORS (le bucket Firebase ne renvoie pas Access-Control-Allow-Origin par
+  // défaut). On passe donc par notre proxy /api/proxy-image qui tape le
+  // fichier server-side et le ré-émet avec les bons headers — same-origin
+  // pour le browser, donc plus de CORS. Si le proxy n'est pas dispo (dev
+  // local sans Vercel), on retombe sur un window.open de l'URL d'origine
+  // qui ouvre la photo dans un nouvel onglet (l'utilisateur peut alors
+  // faire un clic droit → enregistrer).
   const handleSave = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
     if (Platform.OS === 'web') {
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
       try {
-        // Web : fetch + blob → download via <a> avec object URL pour
-        // contourner les restrictions cross-origin du download attribute.
-        const res = await fetch(url);
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error(`proxy ${res.status}`);
         const blob = await res.blob();
         const objUrl = (globalThis as any).URL.createObjectURL(blob);
         const a = (globalThis as any).document.createElement('a');
@@ -365,10 +376,11 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsT
         a.click();
         (globalThis as any).document.body.removeChild(a);
         (globalThis as any).URL.revokeObjectURL(objUrl);
-        Alert.alert('Téléchargée', 'Photo enregistrée dans tes téléchargements.');
       } catch (err) {
-        console.warn('[PhotoLightbox] web download error:', err);
-        Alert.alert('Échec', 'Impossible de télécharger la photo.');
+        console.warn('[PhotoLightbox] web download via proxy failed, falling back to window.open:', err);
+        // Fallback : ouvre la photo dans un nouvel onglet, l'utilisateur
+        // peut faire un enregistrer-sous manuel.
+        try { (globalThis as any).window?.open(url, '_blank', 'noopener,noreferrer'); } catch { /* silent */ }
       }
       return;
     }
@@ -477,20 +489,36 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({ payload, onClose, insetsT
         </View>
       </View>
 
-      {/* ── Photo ── */}
+      {/* ── Photo ── La photo remplit la frame (cover) plutôt que d'avoir
+            des bandes vides en haut/bas pour les portraits. Cropping léger
+            en contrepartie, mais l'utilisateur visualise pleinement le
+            contenu central — pattern Instagram DM. */}
       <Pressable style={lightboxStyles.imageWrap} onPress={onClose}>
         <Image
           source={{ uri: url }}
           style={lightboxStyles.image}
-          resizeMode="contain"
+          resizeMode="cover"
         />
       </Pressable>
 
       {/* ── Reply bar — input fonctionnel + send terracotta ── */}
       <View style={lightboxStyles.bottomBar}>
-        <View style={lightboxStyles.cameraBtn}>
+        <TouchableOpacity
+          style={lightboxStyles.cameraBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            // Fermer le lightbox AVANT de déclencher le picker — le picker
+            // ouvre son propre full-screen, on évite la collision modale.
+            onClose();
+            // Petit delay pour laisser l'animation de fermeture du Modal
+            // se terminer avant de réouvrir un autre full-screen.
+            setTimeout(() => onTakePhoto(), 150);
+          }}
+          activeOpacity={0.85}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
           <Ionicons name="camera" size={18} color={Colors.textOnAccent} />
-        </View>
+        </TouchableOpacity>
         <View style={lightboxStyles.replyInputWrap}>
           <TextInput
             style={lightboxStyles.replyInput}
@@ -2659,6 +2687,7 @@ export const ConversationScreen: React.FC = () => {
               // on garde simple, l'utilisateur a déjà le contexte visuel).
               await sendText(text);
             }}
+            onTakePhoto={handlePickPhoto}
           />
         </Modal>
       )}
